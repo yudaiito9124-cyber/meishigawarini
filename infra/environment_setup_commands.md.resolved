@@ -1,0 +1,49 @@
+# Environment Setup Commands
+
+Here is the list of commands executed to set up the MeishiGawarini project environment.
+
+## Frontend Initialization (Next.js)
+
+```bash
+# Create Next.js app with TypeScript, Tailwind, ESLint
+npx -y create-next-app@latest frontend --typescript --tailwind --eslint --no-src-dir --app --import-alias "@/*"
+```
+
+## Infrastructure Initialization (AWS CDK)
+
+```bash
+# Create directory for infrastructure
+mkdir infra
+cd infra
+
+# Initialize CDK app (TypeScript)
+npx -y aws-cdk init app --language typescript
+
+# Install Lambda type definitions
+npm install @types/aws-lambda --save-dev
+
+# Install AWS SDK v3 for DynamoDB (for use inside Lambda)
+npm install @aws-sdk/client-dynamodb @aws-sdk/lib-dynamodb
+
+# Install esbuild for Lambda bundling
+npm install esbuild --save-dev
+```
+
+## UI Library Setup (Shadcn/ui)
+
+```bash
+cd frontend
+
+# Initialize Shadcn/ui (using defaults)
+npx shadcn@latest init -d
+
+# Add UI components
+npx shadcn@latest add button input label card
+```
+
+## Verification
+```bash
+# Verify CDK stack
+cd infra
+npx cdk synth
+```

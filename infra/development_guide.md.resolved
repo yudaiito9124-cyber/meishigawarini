@@ -1,0 +1,96 @@
+# MeishiGawarini Development Guide
+
+This document outlines the development workflow, architecture, and commands for the MeishiGawarini project.
+
+## 1. System Architecture
+- **Frontend**: Next.js (React) + Shadcn/ui
+- **Backend**: AWS Serverless (Lambda, API Gateway)
+- **Database**: Amazon DynamoDB (Single Table Design)
+- **Auth**: Amazon Cognito
+- **Infrastructure**: AWS CDK (Infrastructure as Code)
+
+## 2. Project Structure
+```text
+c:\git\meishigawarini\
+├── frontend\       # Next.js Application
+│   ├── app\        # App Router Pages
+│   └── components\ # UI Components
+└── infra\          # AWS CDK Infrastructure
+    ├── lib\        # Stack Definition (services)
+    └── lambda\     # Backend Logic (Node.js)
+```
+
+## 3. Development Workflow
+
+### A. Environment Setup (One-time)
+*These steps have already been completed for this environment.*
+1. **Initialize Project**: Created directories.
+2. **Install Dependencies**: `npm install` in both `frontend` and `infra`.
+3. **Setup UI**: Initialized Shadcn/ui in frontend.
+
+### B. Local Development (Frontend)
+To run the frontend locally and verify UI changes:
+```powershell
+cd c:\git\meishigawarini\frontend
+npm run dev
+```
+*Access at http://localhost:3000*
+
+### C. Backend/Infrastructure Development
+The backend is defined in `infra/`. To verify your changes (without deploying):
+```powershell
+cd c:\git\meishigawarini\infra
+npx cdk synth
+```
+*This compiles the TypeScript code and checks for errors.*
+
+### D. Deployment to AWS (Required for real backend)
+Since the backend uses real AWS services (DynamoDB, Cognito), it must be deployed to work fully.
+
+**1. Authenticate with AWS** (Required)
+```powershell
+aws sso login
+# OR if using static keys
+aws configure
+```
+
+**2. Bootstrap CDK (One-time per AWS region)**
+Prepares your AWS account for CDK deployments.
+```powershell
+cd c:\git\meishigawarini\infra
+npx cdk bootstrap
+```
+
+**3. Deploy Stack**
+Creates/Updates all resources in AWS.
+```powershell
+cd c:\git\meishigawarini\infra
+npx cdk deploy
+```
+
+## 4. Operational Flows (After Deployment)
+
+### Generating QR Codes (Admin)
+1. Access the **Admin API** (URL output after deployment).
+2. Or use the Admin Dashboard (Frontend) connected to the API.
+
+### Shop Activation
+1. Shop logs in (Cognito User).
+2. Scans QR (enters UUID).
+3. Links to Product.
+
+### Receiving Gift
+1. User scans QR (opens URL).
+2. Enters PIN.
+3. Submits Address.
+
+## 5. Useful Commands Reference
+
+| Context | Command | Description |
+| :--- | :--- | :--- |
+| **Frontend** | `npm run dev` | Start local dev server |
+| **Frontend** | `npx shadcn@latest add [component]` | Add UI component |
+| **Infra** | `npx cdk synth` | Verify/Compile infra code |
+| **Infra** | `npx cdk deploy` | Deploy to AWS |
+| **Infra** | `npx cdk diff` | See changes before deploying |
+| **Infra** | `npx cdk destroy` | Delete all AWS resources |
