@@ -40,22 +40,27 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 
         // Mock Product Data for Prototype
         const products: Record<string, any> = {
-            'Premium Sake Set': {
+            'prod-1': {
                 name: 'Premium Sake Set',
-                description: 'A curated selection of the finest sake from Japan.',
+                description: 'A curated selection of the finest sake from Japan. Enjoy the rich aroma and smooth taste.',
                 image_url: 'https://placehold.co/600x400?text=Sake+Set'
             },
-            'prod-1': {
-                name: 'Standard Gift',
-                description: 'A lovely standard gift.',
-                image_url: 'https://placehold.co/600x400?text=Gift'
+            'prod-2': {
+                name: 'Matcha Cookies',
+                description: 'Delicate cookies made with high-quality Matcha powder. Perfect for tea time.',
+                image_url: 'https://placehold.co/600x400?text=Matcha+Cookies'
+            },
+            'prod-3': {
+                name: 'Pottery Vase',
+                description: 'Handcrafted pottery vase. A beautiful piece of art for your home.',
+                image_url: 'https://placehold.co/600x400?text=Pottery+Vase'
             }
         };
 
         const product = products[product_id] || {
-            name: 'Mystery Gift',
-            description: 'A special surprise gift.',
-            image_url: 'https://placehold.co/600x400?text=Mystery'
+            name: 'Special Gift',
+            description: 'A special surprise gift curated just for you.',
+            image_url: 'https://placehold.co/600x400?text=Special+Gift'
         };
 
         return {

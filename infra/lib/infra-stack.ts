@@ -88,6 +88,13 @@ export class InfraStack extends cdk.Stack {
     });
     table.grantReadWriteData(recipientSubmitFn);
 
+    // Lambda: Shop Orders (NEW)
+    const shopOrdersFn = new nodejs.NodejsFunction(this, 'ShopOrdersFn', {
+      entry: path.join(__dirname, '../lambda/shop-orders.ts'),
+      ...commonProps,
+    });
+    table.grantReadWriteData(shopOrdersFn);
+
 
     // API Gateway
     const api = new apigateway.RestApi(this, 'MeishiGawariniApi', {
@@ -126,6 +133,12 @@ export class InfraStack extends cdk.Stack {
       // authorizer, // TEMPORARY DISABLE FOR E2E TESTING
       // authorizationType: apigateway.AuthorizationType.COGNITO,
     });
+
+    const ordersResource = shopResource.addResource('orders');
+    ordersResource.addMethod('GET', new apigateway.LambdaIntegration(shopOrdersFn));
+
+    const orderDetailResource = ordersResource.addResource('{uuid}');
+    orderDetailResource.addMethod('PATCH', new apigateway.LambdaIntegration(shopOrdersFn));
 
     // Recipient Routes
     const recipientResource = api.root.addResource('recipient');

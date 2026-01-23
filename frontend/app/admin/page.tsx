@@ -152,7 +152,7 @@ function QRCodeListSection({ apiUrl }: { apiUrl: string }) {
             </CardHeader>
             <CardContent className="space-y-4">
                 <div className="flex gap-2">
-                    {["UNASSIGNED", "ACTIVE", "USED", "SHIPPED"].map((s) => (
+                    {["UNASSIGNED", "LINKED", "ACTIVE", "USED", "SHIPPED"].map((s) => (
                         <Button
                             key={s}
                             variant={status === s ? "default" : "secondary"}

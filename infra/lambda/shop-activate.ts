@@ -20,50 +20,74 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         }
 
         const body = JSON.parse(event.body || '{}');
-        const { qr_id, product_id, pin_code } = body;
+        const { qr_id, product_id, action, activate_now } = body; // action: 'LINK' | 'ACTIVATE'
 
-        if (!qr_id || !product_id) {
-            return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Missing qr_id or product_id' }) };
+        if (!qr_id) {
+            return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Missing qr_id' }) };
         }
 
-        // Update status to ACTIVE and set product_id
-        // Condition: Status must be UNASSIGNED or LINKED (assuming we allow direct activation from fresh)
-        // Actually, per security, maybe strictly UNASSIGNED?
-        // Let's assume UNASSIGNED -> ACTIVE (with product link)
-
-        await ddb.send(new UpdateCommand({
-            TableName: TABLE_NAME,
-            Key: {
-                PK: `QR#${qr_id}`,
-                SK: 'METADATA'
-            },
-            UpdateExpression: 'SET #status = :active, product_id = :pid, activated_at = :now',
-            ConditionExpression: '#status = :unassigned OR #status = :linked',
-            ExpressionAttributeNames: {
-                '#status': 'status'
-            },
-            ExpressionAttributeValues: {
-                ':active': 'ACTIVE',
-                ':unassigned': 'UNASSIGNED',
-                ':linked': 'LINKED',
-                ':pid': product_id,
-                ':now': new Date().toISOString()
+        if (action === 'LINK') {
+            if (!product_id) {
+                return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Missing product_id for LINK action' }) };
             }
-        }));
 
-        return {
-            statusCode: 200,
-            headers: corsHeaders,
-            body: JSON.stringify({
-                message: 'Activation completed',
-                status: 'success'
-            })
-        };
+            const targetStatus = activate_now ? 'ACTIVE' : 'LINKED';
+            let updateExp = 'SET #status = :target, product_id = :pid';
+            const expValues: any = {
+                ':target': targetStatus,
+                ':pid': product_id,
+                ':unassigned': 'UNASSIGNED'
+            };
+
+            if (activate_now) {
+                updateExp += ', activated_at = :now';
+                expValues[':now'] = new Date().toISOString();
+            }
+
+            await ddb.send(new UpdateCommand({
+                TableName: TABLE_NAME,
+                Key: { PK: `QR#${qr_id}`, SK: 'METADATA' },
+                UpdateExpression: updateExp,
+                ConditionExpression: '#status = :unassigned',
+                ExpressionAttributeNames: { '#status': 'status' },
+                ExpressionAttributeValues: expValues
+            }));
+
+            return {
+                statusCode: 200,
+                headers: corsHeaders,
+                body: JSON.stringify({ message: `QR Code ${activate_now ? 'Activated' : 'Linked'}`, status: 'success' })
+            };
+
+        } else if (action === 'ACTIVATE') {
+            // Activate an already LINKED code
+            await ddb.send(new UpdateCommand({
+                TableName: TABLE_NAME,
+                Key: { PK: `QR#${qr_id}`, SK: 'METADATA' },
+                UpdateExpression: 'SET #status = :active, activated_at = :now',
+                ConditionExpression: '#status = :linked',
+                ExpressionAttributeNames: { '#status': 'status' },
+                ExpressionAttributeValues: {
+                    ':active': 'ACTIVE',
+                    ':linked': 'LINKED',
+                    ':now': new Date().toISOString()
+                }
+            }));
+
+            return {
+                statusCode: 200,
+                headers: corsHeaders,
+                body: JSON.stringify({ message: 'Activation completed', status: 'success' })
+            };
+
+        } else {
+            return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Invalid action' }) };
+        }
 
     } catch (error: any) {
         console.error(error);
         if (error.name === 'ConditionalCheckFailedException') {
-            return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'QR Code not in valid state for activation' }) };
+            return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'QR Code not in valid state for requested action' }) };
         }
         return {
             statusCode: 500,
