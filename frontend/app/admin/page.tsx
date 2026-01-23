@@ -105,7 +105,118 @@ export default function AdminPage() {
                         </div>
                     </CardContent>
                 </Card>
+
+                {/* <div className="border-t pt-6"></div> */}
+
+                <QRCodeListSection apiUrl={API_URL} />
             </div>
         </div>
+    );
+}
+
+function QRCodeListSection({ apiUrl }: { apiUrl: string }) {
+    const [status, setStatus] = useState("UNASSIGNED");
+    const [codes, setCodes] = useState<any[]>([]);
+    const [loading, setLoading] = useState(false);
+
+    const fetchCodes = async () => {
+        setLoading(true);
+        try {
+            const res = await fetch(`${apiUrl}/admin/qrcodes?status=${status}`);
+            if (res.ok) {
+                const data = await res.json();
+                setCodes(data.items || []);
+            } else {
+                console.error("Failed to fetch codes");
+            }
+        } catch (error) {
+            console.error(error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // Initial fetch when invalidating or status changes? 
+    // Let's make it manual for now or useEffect
+    // useEffect(() => { fetchCodes(); }, [status]); 
+
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle className="flex justify-between items-center">
+                    <span>Issued QR Codes (DB Check)</span>
+                    <Button variant="outline" size="sm" onClick={fetchCodes} disabled={loading}>
+                        {loading ? "Loading..." : "Refresh"}
+                    </Button>
+                </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+                <div className="flex gap-2">
+                    {["UNASSIGNED", "ACTIVE", "USED", "SHIPPED"].map((s) => (
+                        <Button
+                            key={s}
+                            variant={status === s ? "default" : "secondary"}
+                            onClick={() => {
+                                setStatus(s);
+                                // optional: auto fetch on click
+                                // setTimeout(fetchCodes, 0); 
+                            }}
+                        >
+                            {s}
+                        </Button>
+                    ))}
+                </div>
+
+                <div className="bg-white border rounded-md p-4">
+                    <p className="text-sm text-gray-500 mb-2">
+                        Showing status: <span className="font-bold">{status}</span> • Count: {codes.length}
+                    </p>
+                    <div className="overflow-auto max-h-96">
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>UUID</TableHead>
+                                    <TableHead>PIN</TableHead>
+                                    <TableHead>Status</TableHead>
+                                    <TableHead>Created At</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {codes.length === 0 ? (
+                                    <TableRow>
+                                        <TableCell colSpan={4} className="text-center text-gray-500">
+                                            No codes found. Press Refresh to load.
+                                        </TableCell>
+                                    </TableRow>
+                                ) : (
+                                    codes.map((item: any) => (
+                                        <TableRow key={item.PK}>
+                                            <TableCell className="font-mono text-xs select-all">
+                                                {item.PK.replace('QR#', '')}
+                                            </TableCell>
+                                            <TableCell className="font-mono text-xs select-all">
+                                                {item.pin}
+                                            </TableCell>
+                                            <TableCell>
+                                                <span className={`px-2 py-1 rounded text-xs ${item.status === 'UNASSIGNED' ? 'bg-gray-100' :
+                                                    item.status === 'ACTIVE' ? 'bg-blue-100 text-blue-800' :
+                                                        item.status === 'USED' ? 'bg-yellow-100 text-yellow-800' :
+                                                            'bg-green-100 text-green-800'
+                                                    }`}>
+                                                    {item.status}
+                                                </span>
+                                            </TableCell>
+                                            <TableCell className="text-xs text-gray-500">
+                                                {item.created_at ? new Date(item.created_at).toLocaleString() : '-'}
+                                            </TableCell>
+                                        </TableRow>
+                                    ))
+                                )}
+                            </TableBody>
+                        </Table>
+                    </div>
+                </div>
+            </CardContent>
+        </Card>
     );
 }

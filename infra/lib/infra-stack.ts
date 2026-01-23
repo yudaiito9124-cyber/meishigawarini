@@ -51,12 +51,28 @@ export class InfraStack extends cdk.Stack {
       }
     };
 
+    // GSI for Status Listing
+    table.addGlobalSecondaryIndex({
+      indexName: 'StatusIndex',
+      partitionKey: { name: 'status', type: dynamodb.AttributeType.STRING },
+      sortKey: { name: 'created_at', type: dynamodb.AttributeType.STRING },
+      projectionType: dynamodb.ProjectionType.ALL,
+    });
+
     // Lambda: Admin Generate
     const adminGenerateFn = new nodejs.NodejsFunction(this, 'AdminGenerateFn', {
       entry: path.join(__dirname, '../lambda/admin-generate.ts'),
       ...commonProps,
     });
     table.grantWriteData(adminGenerateFn);
+
+    // Lambda: Admin List (NEW)
+    const adminListFn = new nodejs.NodejsFunction(this, 'AdminListFn', {
+      entry: path.join(__dirname, '../lambda/admin-list.ts'),
+      ...commonProps,
+    });
+    table.grantReadData(adminListFn);
+
 
     // Lambda: Shop Activate
     const shopActivateFn = new nodejs.NodejsFunction(this, 'ShopActivateFn', {
@@ -92,6 +108,9 @@ export class InfraStack extends cdk.Stack {
     // For simplicity in prototype, I'll add API Key requirement or just open for dev.
     // I'll leave open but comment.
     generateResource.addMethod('POST', new apigateway.LambdaIntegration(adminGenerateFn));
+
+    // Admin List Route
+    qrResource.addMethod('GET', new apigateway.LambdaIntegration(adminListFn));
 
     // Shop Routes
     const shopResource = api.root.addResource('shop');

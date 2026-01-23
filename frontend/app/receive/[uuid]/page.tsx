@@ -53,33 +53,91 @@ export default function ReceivePage() {
     const [address, setAddress] = useState("");
     const [step, setStep] = useState<"PIN" | "FORM" | "SUCCESS">("PIN");
 
+    const [error, setError] = useState<string | null>(null);
+    const [pinVerified, setPinVerified] = useState(false);
+    const [pinError, setPinError] = useState("");
+
     useEffect(() => {
         if (uuid) {
-            fetchGiftDetails(uuid).then(data => {
-                setGift(data);
-                setLoading(false);
-            });
+            setLoading(true);
+            fetchGiftDetails(uuid)
+                .then(data => {
+                    setGift(data);
+
+                    // Check status
+                    if (data.status !== 'ACTIVE' && data.status !== 'USED') {
+                        setError("This card has not been activated yet. Please contact the shop or the person who gave you this gift.");
+                    } else if (data.status === 'USED') {
+                        setStep("SUCCESS");
+                    }
+
+                    setLoading(false);
+                })
+                .catch(err => {
+                    console.error(err);
+                    setError("Failed to load gift details.");
+                    setLoading(false);
+                });
         }
     }, [uuid]);
 
-    const handlePinSubmit = () => {
-        // In real app, verify PIN with API here or just move to FORM
-        if (pin.length >= 4) {
-            setStep("FORM");
+    const verifyPin = () => {
+        if (!gift) return;
+        if (pin === gift.pin) {
+            setPinVerified(true);
+            setPinError("");
+            alert("PIN Verified!");
         } else {
-            alert("Please enter a valid PIN");
+            setPinVerified(false);
+            setPinError("Incorrect PIN");
         }
     };
 
     const handleAddressSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+
+        if (!pinVerified) {
+            // Verify again just in case
+            if (pin === gift.pin) {
+                setPinVerified(true);
+            } else {
+                setPinError("Please verify your PIN code first.");
+                return;
+            }
+        }
+
         setLoading(true);
-        await submitAddress(uuid, pin, { name, address });
-        setLoading(false);
-        setStep("SUCCESS");
+        try {
+            await submitAddress(uuid, pin, { name, address });
+            setStep("SUCCESS");
+        } catch (error: any) {
+            console.error("Submission error:", error);
+            alert(error.message || "Failed to submit address. Please check your PIN and try again.");
+        } finally {
+            setLoading(false);
+        }
     };
 
     if (loading) return <div className="p-8 text-center">Loading gift details...</div>;
+
+    if (error) {
+        return (
+            <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+                <Card className="w-full max-w-md border-red-200">
+                    <CardHeader className="bg-red-50">
+                        <CardTitle className="text-red-800">Error</CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-6">
+                        <p className="text-red-600">{error}</p>
+                        <div className="mt-4 text-sm text-gray-500">
+                            Gift ID: {uuid}
+                        </div>
+                    </CardContent>
+                </Card>
+            </div>
+        );
+    }
+
     if (!gift) return <div className="p-8 text-center">Gift not found</div>;
 
     return (
@@ -87,12 +145,12 @@ export default function ReceivePage() {
             <Card className="w-full max-w-md">
                 <CardHeader>
                     <CardTitle className="text-xl text-center">
-                        {step === "SUCCESS" ? "Thank You!" : "You received a gift!"}
+                        {step === "SUCCESS" ? "Thank You!" : pinVerified ? "You received a gift!" : "Enter PIN to View Gift"}
                     </CardTitle>
                 </CardHeader>
                 <CardContent>
-                    {step !== "SUCCESS" && (
-                        <div className="mb-6">
+                    {step !== "SUCCESS" && pinVerified && (
+                        <div className="mb-6 animate-in fade-in duration-500">
                             <img src={gift.product.image_url} alt="Gift" className="w-full h-48 object-cover rounded-md mb-4" />
                             <h2 className="font-bold text-lg">{gift.product.name}</h2>
                             <p className="text-gray-600 text-sm">{gift.product.description}</p>
@@ -100,42 +158,57 @@ export default function ReceivePage() {
                     )}
 
                     {step === "PIN" && (
-                        <div className="space-y-4">
-                            <div className="space-y-2">
-                                <Label htmlFor="pin">Enter PIN Code</Label>
-                                <Input
-                                    id="pin"
-                                    type="text"
-                                    placeholder="Check your card for the PIN"
-                                    value={pin}
-                                    onChange={(e) => setPin(e.target.value)}
-                                />
+                        <form onSubmit={handleAddressSubmit} className="space-y-6">
+                            {/* PIN Section */}
+                            <div className="space-y-2 p-4 bg-gray-50 rounded-lg">
+                                <Label htmlFor="pin" className="font-semibold">1. Enter PIN Code</Label>
+                                <div className="flex space-x-2">
+                                    <Input
+                                        id="pin"
+                                        type="text"
+                                        placeholder="Check your card"
+                                        value={pin}
+                                        onChange={(e) => {
+                                            setPin(e.target.value);
+                                            setPinVerified(false);
+                                            setPinError("");
+                                        }}
+                                        className={pinVerified ? "border-green-500 bg-green-50" : ""}
+                                    />
+                                    <Button type="button" variant="outline" onClick={verifyPin}>
+                                        Verify
+                                    </Button>
+                                </div>
+                                {pinError && <p className="text-sm text-red-500">{pinError}</p>}
+                                {pinVerified && <p className="text-sm text-green-600 font-medium">✓ PIN Verified</p>}
                             </div>
-                            <Button className="w-full" onClick={handlePinSubmit}>Verify PIN</Button>
-                        </div>
-                    )}
 
-                    {step === "FORM" && (
-                        <form onSubmit={handleAddressSubmit} className="space-y-4">
-                            <div className="space-y-2">
-                                <Label htmlFor="name">Full Name</Label>
-                                <Input
-                                    id="name"
-                                    required
-                                    value={name}
-                                    onChange={(e) => setName(e.target.value)}
-                                />
+                            {/* Address Section */}
+                            <div className="space-y-4 pt-2 border-t">
+                                <Label className="font-semibold">2. Delivery Details</Label>
+                                <div className="space-y-2">
+                                    <Label htmlFor="name">Full Name</Label>
+                                    <Input
+                                        id="name"
+                                        required
+                                        value={name}
+                                        onChange={(e) => setName(e.target.value)}
+                                        disabled={!pinVerified}
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="address">Delivery Address</Label>
+                                    <Input
+                                        id="address"
+                                        required
+                                        value={address}
+                                        onChange={(e) => setAddress(e.target.value)}
+                                        disabled={!pinVerified}
+                                    />
+                                </div>
                             </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="address">Delivery Address</Label>
-                                <Input
-                                    id="address"
-                                    required
-                                    value={address}
-                                    onChange={(e) => setAddress(e.target.value)}
-                                />
-                            </div>
-                            <Button type="submit" className="w-full" disabled={loading}>
+
+                            <Button type="submit" className="w-full" disabled={loading || !pinVerified}>
                                 {loading ? "Submitting..." : "Receive Gift"}
                             </Button>
                         </form>
