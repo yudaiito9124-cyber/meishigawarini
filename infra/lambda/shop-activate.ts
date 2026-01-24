@@ -20,22 +20,23 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         }
 
         const body = JSON.parse(event.body || '{}');
-        const { qr_id, product_id, action, activate_now } = body; // action: 'LINK' | 'ACTIVATE'
+        const { qr_id, product_id, shop_id, action, activate_now } = body; // action: 'LINK' | 'ACTIVATE'
 
         if (!qr_id) {
             return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Missing qr_id' }) };
         }
 
         if (action === 'LINK') {
-            if (!product_id) {
-                return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Missing product_id for LINK action' }) };
+            if (!product_id || !shop_id) {
+                return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Missing product_id or shop_id for LINK action' }) };
             }
 
             const targetStatus = activate_now ? 'ACTIVE' : 'LINKED';
-            let updateExp = 'SET #status = :target, product_id = :pid';
+            let updateExp = 'SET #status = :target, product_id = :pid, shop_id = :sid';
             const expValues: any = {
                 ':target': targetStatus,
                 ':pid': product_id,
+                ':sid': shop_id,
                 ':unassigned': 'UNASSIGNED'
             };
 
@@ -61,6 +62,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 
         } else if (action === 'ACTIVATE') {
             // Activate an already LINKED code
+            // For safety, we should really check if the shop owns it, but this generic endpoint might be used by admin
             await ddb.send(new UpdateCommand({
                 TableName: TABLE_NAME,
                 Key: { PK: `QR#${qr_id}`, SK: 'METADATA' },

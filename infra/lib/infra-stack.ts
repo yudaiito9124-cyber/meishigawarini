@@ -5,6 +5,7 @@ import * as cognito from 'aws-cdk-lib/aws-cognito';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as nodejs from 'aws-cdk-lib/aws-lambda-nodejs';
 import * as apigateway from 'aws-cdk-lib/aws-apigateway';
+import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as path from 'path';
 
 export class InfraStack extends cdk.Stack {
@@ -20,9 +21,29 @@ export class InfraStack extends cdk.Stack {
       encryption: dynamodb.TableEncryption.AWS_MANAGED,
     });
 
+    // S3 Bucket for Product Images
+    const bucket = new s3.Bucket(this, 'ProductImageBucket', {
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+      autoDeleteObjects: true,
+      cors: [
+        {
+          allowedMethods: [s3.HttpMethods.GET, s3.HttpMethods.PUT, s3.HttpMethods.HEAD],
+          allowedOrigins: ['*'], // For prototype simplicity. In prod, lock down to domain.
+          allowedHeaders: ['*'],
+        },
+      ],
+      publicReadAccess: true, // For prototype simplicity. Alternatively use CloudFront or Presigned Get Urls.
+      blockPublicAccess: {
+        blockPublicAcls: false,
+        blockPublicPolicy: false,
+        ignorePublicAcls: false,
+        restrictPublicBuckets: false,
+      } as any // Forced public access for prototype
+    });
+
     // Cognito User Pool
     const userPool = new cognito.UserPool(this, 'MeishiGawariniUserPool', {
-      selfSignUpEnabled: false,
+      selfSignUpEnabled: true,
       signInAliases: { email: true },
       autoVerify: { email: true },
       passwordPolicy: {
@@ -47,7 +68,7 @@ export class InfraStack extends cdk.Stack {
         TABLE_NAME: table.tableName,
       },
       bundling: {
-        externalModules: ['@aws-sdk/client-dynamodb', '@aws-sdk/lib-dynamodb'],
+        externalModules: ['@aws-sdk/client-dynamodb', '@aws-sdk/lib-dynamodb', '@aws-sdk/client-s3', '@aws-sdk/s3-request-presigner'],
       }
     };
 
@@ -55,6 +76,22 @@ export class InfraStack extends cdk.Stack {
     table.addGlobalSecondaryIndex({
       indexName: 'StatusIndex',
       partitionKey: { name: 'status', type: dynamodb.AttributeType.STRING },
+      sortKey: { name: 'created_at', type: dynamodb.AttributeType.STRING },
+      projectionType: dynamodb.ProjectionType.ALL,
+    });
+
+    // GSI for Shop Listing
+    table.addGlobalSecondaryIndex({
+      indexName: 'ShopIndex',
+      partitionKey: { name: 'shop_id', type: dynamodb.AttributeType.STRING },
+      sortKey: { name: 'created_at', type: dynamodb.AttributeType.STRING },
+      projectionType: dynamodb.ProjectionType.ALL,
+    });
+
+    // GSI for Owner Listing (My Shops)
+    table.addGlobalSecondaryIndex({
+      indexName: 'OwnerIndex',
+      partitionKey: { name: 'owner_id', type: dynamodb.AttributeType.STRING },
       sortKey: { name: 'created_at', type: dynamodb.AttributeType.STRING },
       projectionType: dynamodb.ProjectionType.ALL,
     });
@@ -81,6 +118,23 @@ export class InfraStack extends cdk.Stack {
     });
     table.grantReadWriteData(shopActivateFn);
 
+    // Lambda: Shop & Product Mgmt (NEW)
+    const shopMgmtFn = new nodejs.NodejsFunction(this, 'ShopMgmtFn', {
+      entry: path.join(__dirname, '../lambda/shop-mgmt.ts'),
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: 'handler',
+      environment: {
+        TABLE_NAME: table.tableName,
+        BUCKET_NAME: bucket.bucketName,
+      },
+      bundling: {
+        externalModules: ['@aws-sdk/client-dynamodb', '@aws-sdk/lib-dynamodb', '@aws-sdk/client-s3', '@aws-sdk/s3-request-presigner'],
+      }
+    });
+    table.grantReadWriteData(shopMgmtFn);
+    bucket.grantPut(shopMgmtFn);
+    bucket.grantRead(shopMgmtFn);
+
     // Lambda: Recipient Submit
     const recipientSubmitFn = new nodejs.NodejsFunction(this, 'RecipientSubmitFn', {
       entry: path.join(__dirname, '../lambda/recipient-submit.ts'),
@@ -102,6 +156,7 @@ export class InfraStack extends cdk.Stack {
       defaultCorsPreflightOptions: {
         allowOrigins: apigateway.Cors.ALL_ORIGINS,
         allowMethods: apigateway.Cors.ALL_METHODS,
+        allowHeaders: apigateway.Cors.DEFAULT_HEADERS,
       },
     });
 
@@ -119,26 +174,107 @@ export class InfraStack extends cdk.Stack {
     // Admin List Route
     qrResource.addMethod('GET', new apigateway.LambdaIntegration(adminListFn));
 
-    // Shop Routes
+    // Shop Routes (Legacy & Activation)
     const shopResource = api.root.addResource('shop');
     const activateResource = shopResource.addResource('activate');
 
     // Shop Authorizer (Cognito)
-    // Shop Authorizer (Cognito)
-    // const authorizer = new apigateway.CognitoUserPoolsAuthorizer(this, 'ShopAuthorizer', {
-    //   cognitoUserPools: [userPool],
-    // });
+    const authorizer = new apigateway.CognitoUserPoolsAuthorizer(this, 'ShopAuthorizer', {
+      cognitoUserPools: [userPool],
+    });
 
     activateResource.addMethod('POST', new apigateway.LambdaIntegration(shopActivateFn), {
-      // authorizer, // TEMPORARY DISABLE FOR E2E TESTING
-      // authorizationType: apigateway.AuthorizationType.COGNITO,
+      authorizer,
+      authorizationType: apigateway.AuthorizationType.COGNITO,
     });
 
     const ordersResource = shopResource.addResource('orders');
-    ordersResource.addMethod('GET', new apigateway.LambdaIntegration(shopOrdersFn));
+    ordersResource.addMethod('GET', new apigateway.LambdaIntegration(shopOrdersFn), {
+      authorizer,
+      authorizationType: apigateway.AuthorizationType.COGNITO
+    });
 
     const orderDetailResource = ordersResource.addResource('{uuid}');
-    orderDetailResource.addMethod('PATCH', new apigateway.LambdaIntegration(shopOrdersFn));
+    orderDetailResource.addMethod('PATCH', new apigateway.LambdaIntegration(shopOrdersFn), {
+      authorizer,
+      authorizationType: apigateway.AuthorizationType.COGNITO
+    });
+
+    // New Shops Resource /shops
+    const shopsResource = api.root.addResource('shops');
+    shopsResource.addMethod('POST', new apigateway.LambdaIntegration(shopMgmtFn), {
+      // Keeping CREATE SHOP open to allow signup -> create flow? 
+      // Or require Auth? Let's require Auth so they must Register (Cognito) -> Login -> Create Shop.
+      authorizer,
+      authorizationType: apigateway.AuthorizationType.COGNITO
+    });
+    shopsResource.addMethod('GET', new apigateway.LambdaIntegration(shopMgmtFn), {
+      authorizer,
+      authorizationType: apigateway.AuthorizationType.COGNITO
+    }); // List My Shops
+
+    const shopIdResource = shopsResource.addResource('{shopId}');
+    shopIdResource.addMethod('GET', new apigateway.LambdaIntegration(shopMgmtFn), {
+      authorizer,
+      authorizationType: apigateway.AuthorizationType.COGNITO
+    }); // Get Shop
+
+    const productsResource = shopIdResource.addResource('products');
+    productsResource.addMethod('POST', new apigateway.LambdaIntegration(shopMgmtFn), {
+      authorizer,
+      authorizationType: apigateway.AuthorizationType.COGNITO
+    }); // Create Product
+    productsResource.addMethod('GET', new apigateway.LambdaIntegration(shopMgmtFn), {
+      authorizer,
+      authorizationType: apigateway.AuthorizationType.COGNITO
+    }); // List Products
+
+    const uploadUrlResource = productsResource.addResource('upload-url');
+    uploadUrlResource.addMethod('POST', new apigateway.LambdaIntegration(shopMgmtFn), {
+      authorizer,
+      authorizationType: apigateway.AuthorizationType.COGNITO
+    }); // Get Upload URL
+
+    const productIdResource = productsResource.addResource('{productId}');
+    productIdResource.addMethod('PATCH', new apigateway.LambdaIntegration(shopMgmtFn), {
+      authorizer,
+      authorizationType: apigateway.AuthorizationType.COGNITO
+    }); // Update Status
+    productIdResource.addMethod('DELETE', new apigateway.LambdaIntegration(shopMgmtFn), {
+      authorizer,
+      authorizationType: apigateway.AuthorizationType.COGNITO
+    }); // Delete Product
+
+    const linkResource = shopIdResource.addResource('link');
+    linkResource.addMethod('POST', new apigateway.LambdaIntegration(shopMgmtFn), {
+      authorizer,
+      authorizationType: apigateway.AuthorizationType.COGNITO
+    }); // Link QR
+
+    const shopActivateResource = shopIdResource.addResource('activate');
+    shopActivateResource.addMethod('POST', new apigateway.LambdaIntegration(shopMgmtFn), {
+      authorizer,
+      authorizationType: apigateway.AuthorizationType.COGNITO
+    }); // Activate QR
+
+    const shopQrsResource = shopIdResource.addResource('qrcodes');
+    shopQrsResource.addMethod('GET', new apigateway.LambdaIntegration(shopMgmtFn), {
+      authorizer,
+      authorizationType: apigateway.AuthorizationType.COGNITO
+    }); // List QRs
+
+    const shopOrdersResource = shopIdResource.addResource('orders');
+    shopOrdersResource.addMethod('GET', new apigateway.LambdaIntegration(shopOrdersFn), {
+      authorizer,
+      authorizationType: apigateway.AuthorizationType.COGNITO
+    }); // List Shop Orders
+
+    const shopOrderResource = shopOrdersResource.addResource('{qrId}');
+    shopOrderResource.addMethod('PATCH', new apigateway.LambdaIntegration(shopOrdersFn), {
+      authorizer,
+      authorizationType: apigateway.AuthorizationType.COGNITO
+    }); // Ship Order
+
 
     // Recipient Routes
     const recipientResource = api.root.addResource('recipient');
@@ -163,5 +299,6 @@ export class InfraStack extends cdk.Stack {
     new cdk.CfnOutput(this, 'UserPoolId', { value: userPool.userPoolId });
     new cdk.CfnOutput(this, 'UserPoolClientId', { value: userPoolClient.userPoolClientId });
     new cdk.CfnOutput(this, 'TableName', { value: table.tableName });
+    new cdk.CfnOutput(this, 'BucketName', { value: bucket.bucketName });
   }
 }

@@ -16,10 +16,30 @@ const corsHeaders = {
 
 export const handler: APIGatewayProxyHandler = async (event) => {
     try {
-        if (event.httpMethod === 'GET') {
+        const path = event.path;
+        const method = event.httpMethod;
+
+        // Route: GET /shops/{shopId}/orders
+        if (method === 'GET' && path.includes('/shops/')) {
+            const shopId = event.pathParameters?.shopId;
+            if (!shopId) return { statusCode: 400, headers: corsHeaders, body: 'Missing Shop ID' };
+            return handleListShopOrders(shopId);
+        }
+
+        // Route: PATCH /shops/{shopId}/orders/{qrId}
+        if (method === 'PATCH' && path.includes('/shops/')) {
+            const qrId = event.pathParameters?.qrId; // mapped from {qrId} resource
+            if (!qrId) return { statusCode: 400, headers: corsHeaders, body: 'Missing QR ID' };
+            return handleUpdateOrder(event, qrId);
+        }
+
+        // Legacy / Global behavior (if any) or existing implementation
+        if (method === 'GET') {
+            // Fallback to global list (prototype only, should be removed or restricted)
             return handleListOrders();
-        } else if (event.httpMethod === 'PATCH') {
-            return handleUpdateOrder(event);
+        } else if (method === 'PATCH') {
+            const uuid = event.pathParameters?.uuid;
+            return handleUpdateOrder(event, uuid);
         } else {
             return { statusCode: 405, headers: corsHeaders, body: 'Method Not Allowed' };
         }
@@ -97,8 +117,8 @@ async function handleListOrders() {
     };
 }
 
-async function handleUpdateOrder(event: any) {
-    const uuid = event.pathParameters?.uuid;
+async function handleUpdateOrder(event: any, uuidParam?: string) {
+    const uuid = uuidParam || event.pathParameters?.uuid;
     if (!uuid) return { statusCode: 400, headers: corsHeaders, body: 'Missing UUID' };
 
     const body = JSON.parse(event.body || '{}');
@@ -144,5 +164,78 @@ async function handleUpdateOrder(event: any) {
         statusCode: 200,
         headers: corsHeaders,
         body: JSON.stringify({ message: 'Order marked as shipped' })
+    };
+    return {
+        statusCode: 200,
+        headers: corsHeaders,
+        body: JSON.stringify({ message: 'Order marked as shipped' })
+    };
+}
+
+async function handleListShopOrders(shopId: string) {
+    // 1. Query ShopIndex for all QRs in this shop
+    const queryRes = await ddb.send(new QueryCommand({
+        TableName: TABLE_NAME,
+        IndexName: 'ShopIndex',
+        KeyConditionExpression: 'shop_id = :sid',
+        ExpressionAttributeValues: { ':sid': shopId }
+    }));
+
+    if (!queryRes.Items || queryRes.Items.length === 0) {
+        return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ orders: [] }) };
+    }
+
+    // 2. Filter for status = 'USED' (Ready) or 'SHIPPED'
+    const relevantItems = queryRes.Items.filter(item =>
+        ['USED', 'SHIPPED'].includes(item.status)
+    );
+
+    if (relevantItems.length === 0) {
+        return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ orders: [] }) };
+    }
+
+    // 3. BatchGet to get details (ORDER sk)
+    // Construct keys for BatchGet
+    const keys = relevantItems.map(item => ({
+        PK: item.PK,
+        SK: 'ORDER'
+    }));
+
+    // Chunking not implemented for prototype (assume < 100)
+    const batchRes = await ddb.send(new BatchGetCommand({
+        RequestItems: {
+            [TABLE_NAME]: {
+                Keys: keys
+            }
+        }
+    }));
+
+    const orderDetailsMap = new Map();
+    (batchRes.Responses?.[TABLE_NAME] || []).forEach((item: any) => {
+        orderDetailsMap.set(item.PK, item);
+    });
+
+    const orders = relevantItems.map(meta => {
+        const orderDetail = orderDetailsMap.get(meta.PK);
+        if (!orderDetail) return null; // Logic check: Must have order detail if USED/SHIPPED usually.
+        return {
+            id: meta.PK.replace('QR#', ''),
+            qr_id: meta.PK,
+            product_id: meta.product_id,
+            status: meta.status,
+            recipient_name: orderDetail.name || 'Unknown',
+            address: orderDetail.address || 'Unknown',
+            postal_code: orderDetail.postal_code,
+            shipping_info: orderDetail,
+            created_at: meta.created_at, // QR creation? Order date might be in ORDER sk.
+            ordered_at: orderDetail.created_at, // Using order submission time
+            shipped_at: orderDetail.shipped_at
+        };
+    }).filter(Boolean); // Filter out nulls
+
+    return {
+        statusCode: 200,
+        headers: corsHeaders,
+        body: JSON.stringify({ orders })
     };
 }

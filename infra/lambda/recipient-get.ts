@@ -36,32 +36,29 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             return { statusCode: 404, headers: corsHeaders, body: JSON.stringify({ message: 'Gift not found' }) };
         }
 
-        const { status, product_id, pin } = getRes.Item;
+        const { status, product_id, shop_id, pin } = getRes.Item;
 
-        // Mock Product Data for Prototype
-        const products: Record<string, any> = {
-            'prod-1': {
-                name: 'Premium Sake Set',
-                description: 'A curated selection of the finest sake from Japan. Enjoy the rich aroma and smooth taste.',
-                image_url: 'https://placehold.co/600x400?text=Sake+Set'
-            },
-            'prod-2': {
-                name: 'Matcha Cookies',
-                description: 'Delicate cookies made with high-quality Matcha powder. Perfect for tea time.',
-                image_url: 'https://placehold.co/600x400?text=Matcha+Cookies'
-            },
-            'prod-3': {
-                name: 'Pottery Vase',
-                description: 'Handcrafted pottery vase. A beautiful piece of art for your home.',
-                image_url: 'https://placehold.co/600x400?text=Pottery+Vase'
-            }
-        };
+        // Fetch Product Data if available
+        let product = null;
+        if (shop_id && product_id) {
+            const prodRes = await ddb.send(new GetCommand({
+                TableName: TABLE_NAME,
+                Key: {
+                    PK: `SHOP#${shop_id}`,
+                    SK: `PRODUCT#${product_id}`
+                }
+            }));
+            product = prodRes.Item;
+        }
 
-        const product = products[product_id] || {
-            name: 'Special Gift',
-            description: 'A special surprise gift curated just for you.',
-            image_url: 'https://placehold.co/600x400?text=Special+Gift'
-        };
+        // Fallback for legacy or unlinked codes (Prototype safety)
+        if (!product) {
+            product = {
+                name: 'Pending Gift',
+                description: 'This gift has not been linked to a product yet.',
+                image_url: 'https://placehold.co/600x400?text=Pending'
+            };
+        }
 
         return {
             statusCode: 200,
@@ -70,6 +67,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 uuid,
                 status,
                 product_id,
+                shop_id,
                 pin,
                 product
             })
