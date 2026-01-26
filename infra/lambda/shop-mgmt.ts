@@ -49,6 +49,8 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                     SK: 'METADATA',
                     name,
                     owner_id: userId, // Link to User
+                    GSI2_PK: `USER#${userId}`, // GSI2 for Owner Listing
+                    GSI2_SK: new Date().toISOString(),
                     created_at: new Date().toISOString()
                 }
             }));
@@ -68,10 +70,10 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 
             const res = await ddb.send(new QueryCommand({
                 TableName: TABLE_NAME,
-                IndexName: 'OwnerIndex',
-                KeyConditionExpression: 'owner_id = :uid',
+                IndexName: 'GSI2',
+                KeyConditionExpression: 'GSI2_PK = :uid',
                 ExpressionAttributeValues: {
-                    ':uid': userId
+                    ':uid': `USER#${userId}`
                 }
             }));
 
@@ -95,10 +97,10 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 
             const res = await ddb.send(new QueryCommand({
                 TableName: TABLE_NAME,
-                IndexName: 'ShopIndex',
-                KeyConditionExpression: 'shop_id = :sid',
+                IndexName: 'GSI2',
+                KeyConditionExpression: 'GSI2_PK = :sid',
                 ExpressionAttributeValues: {
-                    ':sid': shopId
+                    ':sid': `SHOP#${shopId}`
                 }
             }));
 
@@ -188,6 +190,8 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                     image_url,
                     price,
                     status: 'ACTIVE',
+                    GSI1_PK: 'PRODUCT#ACTIVE',
+                    GSI1_SK: new Date().toISOString(),
                     product_id: productId, // Explicitly save ID for easier access
                     created_at: new Date().toISOString()
                 }
@@ -234,14 +238,17 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             await ddb.send(new UpdateCommand({
                 TableName: TABLE_NAME,
                 Key: { PK: `QR#${qr_id}`, SK: 'METADATA' },
-                UpdateExpression: 'SET #status = :linked, shop_id = :sid, product_id = :pid',
+                UpdateExpression: 'SET #status = :linked, shop_id = :sid, product_id = :pid, GSI1_PK = :gsi_pk, GSI2_PK = :gsi2_pk, GSI2_SK = :now',
                 ConditionExpression: '#status = :unassigned',
                 ExpressionAttributeNames: { '#status': 'status' },
                 ExpressionAttributeValues: {
                     ':linked': 'LINKED',
                     ':unassigned': 'UNASSIGNED',
                     ':sid': shopId,
-                    ':pid': product_id
+                    ':pid': product_id,
+                    ':gsi_pk': 'QR#LINKED',
+                    ':gsi2_pk': `SHOP#${shopId}`,
+                    ':now': new Date().toISOString()
                 }
             }));
 
@@ -259,14 +266,15 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             await ddb.send(new UpdateCommand({
                 TableName: TABLE_NAME,
                 Key: { PK: `QR#${qr_id}`, SK: 'METADATA' },
-                UpdateExpression: 'SET #status = :active, activated_at = :now',
+                UpdateExpression: 'SET #status = :active, activated_at = :now, GSI1_PK = :gsi_pk',
                 ConditionExpression: '#status = :linked AND shop_id = :sid',
                 ExpressionAttributeNames: { '#status': 'status' },
                 ExpressionAttributeValues: {
                     ':active': 'ACTIVE',
                     ':linked': 'LINKED',
                     ':sid': shopId,
-                    ':now': new Date().toISOString()
+                    ':now': new Date().toISOString(),
+                    ':gsi_pk': 'QR#ACTIVE'
                 }
             }));
 
@@ -289,9 +297,9 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             await ddb.send(new UpdateCommand({
                 TableName: TABLE_NAME,
                 Key: { PK: `SHOP#${shopId}`, SK: `PRODUCT#${pid}` },
-                UpdateExpression: 'SET #status = :s',
+                UpdateExpression: 'SET #status = :s, GSI1_PK = :gsi_pk',
                 ExpressionAttributeNames: { '#status': 'status' },
-                ExpressionAttributeValues: { ':s': status }
+                ExpressionAttributeValues: { ':s': status, ':gsi_pk': `PRODUCT#${status}` }
             }));
 
             return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ message: 'Product status updated' }) };
@@ -317,10 +325,9 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 
             const usedRes = await ddb.send(new QueryCommand({
                 TableName: TABLE_NAME,
-                IndexName: 'StatusIndex',
-                KeyConditionExpression: '#status = :s',
-                ExpressionAttributeNames: { '#status': 'status' },
-                ExpressionAttributeValues: { ':s': 'USED' }
+                IndexName: 'GSI1',
+                KeyConditionExpression: 'GSI1_PK = :pk',
+                ExpressionAttributeValues: { ':pk': 'QR#USED' }
             }));
 
             const unshippedOrders = (usedRes.Items || []).filter(item => item.product_id === pid);

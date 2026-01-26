@@ -6,7 +6,7 @@ import { DynamoDBDocumentClient, QueryCommand, BatchGetCommand, UpdateCommand } 
 const client = new DynamoDBClient({});
 const ddb = DynamoDBDocumentClient.from(client);
 const TABLE_NAME = process.env.TABLE_NAME || '';
-const INDEX_NAME = 'StatusIndex';
+const INDEX_NAME = 'GSI1';
 
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
@@ -59,9 +59,8 @@ async function handleListOrders() {
     const queryRes = await ddb.send(new QueryCommand({
         TableName: TABLE_NAME,
         IndexName: INDEX_NAME,
-        KeyConditionExpression: '#status = :s',
-        ExpressionAttributeNames: { '#status': 'status' },
-        ExpressionAttributeValues: { ':s': 'USED' }
+        KeyConditionExpression: 'GSI1_PK = :pk',
+        ExpressionAttributeValues: { ':pk': 'QR#USED' }
     }));
 
     if (!queryRes.Items || queryRes.Items.length === 0) {
@@ -139,11 +138,12 @@ async function handleUpdateOrder(event: any, uuidParam?: string) {
     await ddb.send(new UpdateCommand({
         TableName: TABLE_NAME,
         Key: { PK: `QR#${uuid}`, SK: 'METADATA' },
-        UpdateExpression: 'SET #status = :s, shipped_at = :now',
+        UpdateExpression: 'SET #status = :s, shipped_at = :now, GSI1_PK = :gsi_pk',
         ExpressionAttributeNames: { '#status': 'status' },
         ExpressionAttributeValues: {
             ':s': 'SHIPPED',
-            ':now': new Date().toISOString()
+            ':now': new Date().toISOString(),
+            ':gsi_pk': 'QR#SHIPPED'
         }
     }));
 
@@ -173,12 +173,12 @@ async function handleUpdateOrder(event: any, uuidParam?: string) {
 }
 
 async function handleListShopOrders(shopId: string) {
-    // 1. Query ShopIndex for all QRs in this shop
+    // 1. Query GSI2 for all QRs in this shop
     const queryRes = await ddb.send(new QueryCommand({
         TableName: TABLE_NAME,
-        IndexName: 'ShopIndex',
-        KeyConditionExpression: 'shop_id = :sid',
-        ExpressionAttributeValues: { ':sid': shopId }
+        IndexName: 'GSI2',
+        KeyConditionExpression: 'GSI2_PK = :sid',
+        ExpressionAttributeValues: { ':sid': `SHOP#${shopId}` }
     }));
 
     if (!queryRes.Items || queryRes.Items.length === 0) {

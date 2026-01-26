@@ -182,13 +182,13 @@ function QRCodeListSection({ apiUrl }: { apiUrl: string }) {
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {codes.length === 0 ? (
+                                {codes.length === 0 ? (  // there is nocodes 
                                     <TableRow>
                                         <TableCell colSpan={4} className="text-center text-gray-500">
                                             No codes found. Press Refresh to load.
                                         </TableCell>
                                     </TableRow>
-                                ) : (
+                                ) : ( // there is some codes
                                     codes.map((item: any) => (
                                         <TableRow key={item.PK}>
                                             <TableCell className="font-mono text-xs select-all">

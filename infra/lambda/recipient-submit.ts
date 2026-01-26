@@ -51,10 +51,10 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                     Update: {
                         TableName: TABLE_NAME,
                         Key: { PK: `QR#${qr_id}`, SK: 'METADATA' },
-                        UpdateExpression: 'SET #status = :used',
+                        UpdateExpression: 'SET #status = :used, GSI1_PK = :gsi_pk',
                         ConditionExpression: '#status = :active', // Double check race condition
                         ExpressionAttributeNames: { '#status': 'status' },
-                        ExpressionAttributeValues: { ':used': 'USED', ':active': 'ACTIVE' }
+                        ExpressionAttributeValues: { ':used': 'USED', ':active': 'ACTIVE', ':gsi_pk': 'QR#USED' }
                     }
                 },
                 {

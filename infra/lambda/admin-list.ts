@@ -6,7 +6,7 @@ import { DynamoDBDocumentClient, QueryCommand } from '@aws-sdk/lib-dynamodb';
 const client = new DynamoDBClient({});
 const ddb = DynamoDBDocumentClient.from(client);
 const TABLE_NAME = process.env.TABLE_NAME || '';
-const INDEX_NAME = 'StatusIndex';
+const INDEX_NAME = 'GSI1';
 
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
@@ -29,12 +29,9 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         const result = await ddb.send(new QueryCommand({
             TableName: TABLE_NAME,
             IndexName: INDEX_NAME,
-            KeyConditionExpression: '#status = :s',
-            ExpressionAttributeNames: {
-                '#status': 'status'
-            },
+            KeyConditionExpression: 'GSI1_PK = :pk',
             ExpressionAttributeValues: {
-                ':s': status
+                ':pk': `QR#${status}`
             },
             ScanIndexForward: false, // Descending by created_at
             Limit: 50 // soft listing limit for now

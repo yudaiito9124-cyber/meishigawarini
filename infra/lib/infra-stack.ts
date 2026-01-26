@@ -13,7 +13,7 @@ export class InfraStack extends cdk.Stack {
     super(scope, id, props);
 
     // DynamoDB Table
-    const table = new dynamodb.Table(this, 'MeishiGawariniTable', {
+    const table = new dynamodb.Table(this, 'MeishiGawariniTableV2', {
       partitionKey: { name: 'PK', type: dynamodb.AttributeType.STRING },
       sortKey: { name: 'SK', type: dynamodb.AttributeType.STRING },
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
@@ -74,25 +74,17 @@ export class InfraStack extends cdk.Stack {
 
     // GSI for Status Listing
     table.addGlobalSecondaryIndex({
-      indexName: 'StatusIndex',
-      partitionKey: { name: 'status', type: dynamodb.AttributeType.STRING },
-      sortKey: { name: 'created_at', type: dynamodb.AttributeType.STRING },
+      indexName: 'GSI1',
+      partitionKey: { name: 'GSI1_PK', type: dynamodb.AttributeType.STRING },
+      sortKey: { name: 'GSI1_SK', type: dynamodb.AttributeType.STRING },
       projectionType: dynamodb.ProjectionType.ALL,
     });
 
-    // GSI for Shop Listing
+    // GSI2 for Reverse Lookups (ShopIndex + OwnerIndex)
     table.addGlobalSecondaryIndex({
-      indexName: 'ShopIndex',
-      partitionKey: { name: 'shop_id', type: dynamodb.AttributeType.STRING },
-      sortKey: { name: 'created_at', type: dynamodb.AttributeType.STRING },
-      projectionType: dynamodb.ProjectionType.ALL,
-    });
-
-    // GSI for Owner Listing (My Shops)
-    table.addGlobalSecondaryIndex({
-      indexName: 'OwnerIndex',
-      partitionKey: { name: 'owner_id', type: dynamodb.AttributeType.STRING },
-      sortKey: { name: 'created_at', type: dynamodb.AttributeType.STRING },
+      indexName: 'GSI2',
+      partitionKey: { name: 'GSI2_PK', type: dynamodb.AttributeType.STRING },
+      sortKey: { name: 'GSI2_SK', type: dynamodb.AttributeType.STRING },
       projectionType: dynamodb.ProjectionType.ALL,
     });
 
