@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import QRScanner from '@/components/ui/qr-scanner';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || '';
 
@@ -275,6 +276,21 @@ export default function ShopPage() {
         }
     };
 
+    const [isScanning, setIsScanning] = useState(false);
+    const [scannedUuid, setScannedUuid] = useState('');
+
+    const handleScanSuccess = (decodedText: string) => {
+        // Assuming decodedText is the UUID or a URL containing the UUID
+        // If it's a URL like https://.../r/UUID, extract UUID.
+        // For now assume raw UUID or simple parsing.
+        let uuid = decodedText;
+        if (decodedText.includes('/')) {
+            uuid = decodedText.split('/').pop() || decodedText;
+        }
+        setScannedUuid(uuid);
+        setIsScanning(false);
+    };
+
     if (loading) return <div className="p-8">Loading Dashboard...</div>;
     if (error) return <div className="p-8 text-red-500">Error: {error}</div>;
 
@@ -445,7 +461,37 @@ export default function ShopPage() {
                             <form onSubmit={handleLinkQr} className="space-y-4">
                                 <div className="space-y-2">
                                     <Label htmlFor="uuid">QR UUID (Scan or Type)</Label>
-                                    <Input id="uuid" name="uuid" placeholder="e.g. 123e4567-..." required />
+                                    <div className="flex gap-2">
+                                        <Input
+                                            id="uuid"
+                                            name="uuid"
+                                            placeholder="e.g. 123e4567-..."
+                                            required
+                                            value={scannedUuid}
+                                            onChange={(e) => setScannedUuid(e.target.value)}
+                                        />
+                                        <Dialog open={isScanning} onOpenChange={setIsScanning}>
+                                            <DialogTrigger asChild>
+                                                <Button type="button" variant="outline">Scan</Button>
+                                            </DialogTrigger>
+                                            <DialogContent>
+                                                <DialogHeader>
+                                                    <DialogTitle>Scan QR Code</DialogTitle>
+                                                    <DialogDescription>Position the QR code within the frame.</DialogDescription>
+                                                </DialogHeader>
+                                                <div className="p-4 min-h-[300px]">
+                                                    <QRScanner
+                                                        qrCodeSuccessCallback={handleScanSuccess}
+                                                        qrbox={250}
+                                                        disableFlip={false}
+                                                    />
+                                                </div>
+                                                <DialogFooter>
+                                                    <Button type="button" variant="ghost" onClick={() => setIsScanning(false)}>Cancel</Button>
+                                                </DialogFooter>
+                                            </DialogContent>
+                                        </Dialog>
+                                    </div>
                                 </div>
                                 <div className="space-y-2">
                                     <Label htmlFor="product_id">Select Product</Label>

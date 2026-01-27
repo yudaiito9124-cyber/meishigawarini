@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import QRScanner from "@/components/ui/qr-scanner";
 
 // Mock Products
 const PRODUCTS = [
@@ -18,6 +20,18 @@ export default function LinkPage() {
     const [selectedProduct, setSelectedProduct] = useState(PRODUCTS[0].id);
     const [activateNow, setActivateNow] = useState(false);
     const [status, setStatus] = useState<"IDLE" | "SUCCESS">("IDLE");
+
+    // Scanner State
+    const [isScanning, setIsScanning] = useState(false);
+
+    const handleScanSuccess = (decodedText: string) => {
+        let uuid = decodedText;
+        if (decodedText.includes('/')) {
+            uuid = decodedText.split('/').pop() || decodedText;
+        }
+        setQrId(uuid);
+        setIsScanning(false);
+    };
 
     const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
@@ -79,13 +93,36 @@ export default function LinkPage() {
                     <form onSubmit={handleLink} className="space-y-4">
                         <div className="space-y-2">
                             <Label htmlFor="qr">QR Code ID</Label>
-                            <Input
-                                id="qr"
-                                placeholder="Scan or enter UUID"
-                                value={qrId}
-                                onChange={(e) => setQrId(e.target.value)}
-                                required
-                            />
+                            <div className="flex gap-2">
+                                <Input
+                                    id="qr"
+                                    placeholder="Scan or enter UUID"
+                                    value={qrId}
+                                    onChange={(e) => setQrId(e.target.value)}
+                                    required
+                                />
+                                <Dialog open={isScanning} onOpenChange={setIsScanning}>
+                                    <DialogTrigger asChild>
+                                        <Button type="button" variant="outline">Scan</Button>
+                                    </DialogTrigger>
+                                    <DialogContent>
+                                        <DialogHeader>
+                                            <DialogTitle>Scan QR Code</DialogTitle>
+                                            <DialogDescription>Position the QR code within the frame.</DialogDescription>
+                                        </DialogHeader>
+                                        <div className="p-4 min-h-[300px]">
+                                            <QRScanner
+                                                qrCodeSuccessCallback={handleScanSuccess}
+                                                qrbox={250}
+                                                disableFlip={false}
+                                            />
+                                        </div>
+                                        <DialogFooter>
+                                            <Button type="button" variant="ghost" onClick={() => setIsScanning(false)}>Cancel</Button>
+                                        </DialogFooter>
+                                    </DialogContent>
+                                </Dialog>
+                            </div>
                         </div>
 
                         <div className="space-y-2">
