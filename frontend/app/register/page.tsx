@@ -43,8 +43,13 @@ export default function RegisterPage() {
             }
 
         } catch (err: any) {
-            console.error('Register error', err);
-            setError(err.message || 'Failed to register');
+            if (err.name === 'UsernameExistsException' || err.code === 'UsernameExistsException') {
+                // Determine if we should log this or not. For now, let's skip logging to avoid confusion.
+                setError('User already exists. Please log in instead.');
+            } else {
+                console.error('Register error', err);
+                setError(err.message || 'Failed to register');
+            }
         } finally {
             setLoading(false);
         }

@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { signIn } from 'aws-amplify/auth';
+import { useState, useEffect } from 'react';
+import { signIn, getCurrentUser } from 'aws-amplify/auth';
 import { useRouter } from 'next/navigation';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,6 +16,18 @@ export default function LoginPage() {
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
 
+    useEffect(() => {
+        const checkAuth = async () => {
+            try {
+                await getCurrentUser();
+                router.replace('/shop');
+            } catch (e) {
+                // Not logged in
+            }
+        };
+        checkAuth();
+    }, [router]);
+
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
@@ -25,7 +37,7 @@ export default function LoginPage() {
             const { isSignedIn, nextStep } = await signIn({ username: email, password });
 
             if (isSignedIn) {
-                router.push('/shop/select'); // Or redirect to where they came from
+                router.push('/shop');
             } else {
                 if (nextStep.signInStep === 'CONFIRM_SIGN_UP') {
                     router.push(`/verify?username=${encodeURIComponent(email)}`);
@@ -34,8 +46,16 @@ export default function LoginPage() {
                 }
             }
         } catch (err: any) {
-            console.error('Login error', err);
-            setError(err.message || 'Failed to login');
+            if (err.name === 'NotAuthorizedException' || err.code === 'NotAuthorizedException') {
+                setError('Incorrect username or password.');
+            } else if (err.name === 'UserNotConfirmedException' || err.code === 'UserNotConfirmedException') {
+                // Handle unconfirmed user
+                setError('User is not confirmed. Please verify your email.');
+                router.push(`/verify?username=${encodeURIComponent(email)}`);
+            } else {
+                console.error('Login error', err);
+                setError(err.message || 'Failed to login');
+            }
         } finally {
             setLoading(false);
         }

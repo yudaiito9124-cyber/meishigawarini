@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { fetchAuthSession } from 'aws-amplify/auth';
+import { getCurrentUser } from 'aws-amplify/auth';
 import { fetchWithAuth } from '@/app/utils/api-client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -32,7 +32,7 @@ export default function ShopPage() {
 
     const checkAuth = async () => {
         try {
-            await fetchAuthSession();
+            await getCurrentUser();
             // If successful, proceed to load data
         } catch (e) {
             router.push('/login');
@@ -367,9 +367,9 @@ export default function ShopPage() {
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                             {products.map((product) => (
                                 <Card key={product.product_id} className="overflow-hidden">
-                                    <div className="h-32 bg-gray-200 relative">
+                                    <div className="h-32 relative">
                                         {/* eslint-disable-next-line @next/next/no-img-element */}
-                                        <img src={product.image_url} alt={product.name} className="w-full h-full object-cover" />
+                                        <img src={product.image_url} alt={product.name} className="w-full h-full object-contain" />
                                         <div className="absolute top-2 right-2 flex gap-2">
                                             <span className={`px-2 py-1 rounded text-xs font-bold ${product.status === 'ACTIVE' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
                                                 }`}>

@@ -1,132 +1,141 @@
+'use client';
 
-"use client";
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { getCurrentUser } from 'aws-amplify/auth';
+import { fetchWithAuth } from '@/app/utils/api-client';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 
-import { useState, useEffect } from "react";
-import Link from "next/link";
-import { Button } from "@/components/ui/button";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+export default function ShopListPage() {
+    const router = useRouter();
+    const [shops, setShops] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [createName, setCreateName] = useState('');
+    const [creating, setCreating] = useState(false);
 
-export default function ShopDashboard() {
-    const [orders, setOrders] = useState<any[]>([]);
-    const [loading, setLoading] = useState(false);
+    useEffect(() => {
+        const init = async () => {
+            try {
+                // Check session
+                await getCurrentUser();
+                fetchShops();
+            } catch (e) {
+                router.push('/login');
+            }
+        };
+        init();
+    }, []);
 
-    const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
-
-    const fetchOrders = async () => {
+    const fetchShops = async () => {
         setLoading(true);
         try {
-            const res = await fetch(`${API_URL}/shop/orders`);
+            const res = await fetchWithAuth('/shops');
             if (res.ok) {
                 const data = await res.json();
-                setOrders(data.orders || []);
+                setShops(data.shops || []);
+            } else {
+                console.error('Failed to fetch shops');
             }
-        } catch (error) {
-            console.error(error);
+        } catch (e) {
+            console.error(e);
         } finally {
             setLoading(false);
         }
     };
 
-    useEffect(() => {
-        fetchOrders();
-    }, []);
-
-    const markAsShipped = async (id: string) => {
-        // Optimistic update
-        const originalOrders = [...orders];
-        setOrders(orders.filter(o => o.id !== id)); // Remove from list immediately or move to shipped? 
-        // Logic: Dashboard 'Orders to Ship' uses 'USED'. History?? 
-        // The API returns 'USED' orders only (mostly). So let's just remove it or refresh.
-        // Actually, let's call API and then refresh.
-
+    const handleCreateShop = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setCreating(true);
         try {
-            const tracking = prompt("Enter Tracking Number (Optional):");
-            const res = await fetch(`${API_URL}/shop/orders/${id}`, {
-                method: "PATCH",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ tracking_number: tracking })
+            const res = await fetchWithAuth('/shops', {
+                method: 'POST',
+                body: JSON.stringify({ name: createName })
             });
 
             if (res.ok) {
-                // Refresh list
-                fetchOrders();
+                const data = await res.json();
+                // Redirect to the new shop
+                router.push(`/shop/${data.shop_id}`);
             } else {
-                alert("Failed to mark as shipped");
-                setOrders(originalOrders);
+                const text = await res.text();
+                console.error('Create Shop Failed:', text);
+                alert(`Failed to create shop: ${text}`);
             }
         } catch (e) {
-            alert("Error");
-            setOrders(originalOrders);
+            console.error(e);
+            alert('Error creating shop');
+        } finally {
+            setCreating(false);
         }
     };
 
-    // Note: The API currently only returns 'USED' orders from queries. 
-    // Shipped history is not returned by the current /shop/orders endpoint (it filters by status=USED).
-    // So 'Recent History' section will be empty unless we fetch SHIPPED orders too.
-    // For this prototype, I'll just show pending orders.
-    // Or I can keep local history of what I just shipped in this session for UX.
-
-    // For now, let's focus on Pending Orders.
+    if (loading) return <div className="p-8 flex justify-center">Loading...</div>;
 
     return (
-        <div className="min-h-screen bg-gray-50 p-8">
-            <div className="max-w-4xl mx-auto space-y-6">
-                <header className="flex justify-between items-center">
-                    <h1 className="text-2xl font-bold">Shop Dashboard</h1>
-                    <div className="space-x-2">
-                        <Link href="/shop/link">
-                            <Button variant="outline">Link QR (Initial)</Button>
-                        </Link>
-                        <Link href="/shop/activate">
-                            <Button>Activate QR (Sale)</Button>
-                        </Link>
+        <div className="min-h-screen bg-gray-50 p-6 flex flex-col items-center">
+            <div className="w-full max-w-4xl space-y-8">
+                <div className="flex justify-between items-center">
+                    <div>
+                        <h1 className="text-3xl font-bold text-gray-900">My Shops</h1>
+                        <p className="text-gray-500">Select a shop to manage or create a new one.</p>
                     </div>
-                </header>
+                    <Dialog>
+                        <DialogTrigger asChild>
+                            <Button size="lg">Create New Shop</Button>
+                        </DialogTrigger>
+                        <DialogContent>
+                            <DialogHeader>
+                                <DialogTitle>Create Shop</DialogTitle>
+                                <DialogDescription>Enter the name of your new shop.</DialogDescription>
+                            </DialogHeader>
+                            <form onSubmit={handleCreateShop}>
+                                <div className="grid gap-4 py-4">
+                                    <Label htmlFor="name">Shop Name</Label>
+                                    <Input
+                                        id="name"
+                                        value={createName}
+                                        onChange={(e) => setCreateName(e.target.value)}
+                                        placeholder="My Awesome Shop"
+                                        required
+                                    />
+                                </div>
+                                <DialogFooter>
+                                    <Button type="submit" disabled={creating}>
+                                        {creating ? 'Creating...' : 'Create'}
+                                    </Button>
+                                </DialogFooter>
+                            </form>
+                        </DialogContent>
+                    </Dialog>
+                </div>
 
-                <div className="grid gap-6">
-                    <Card>
-                        <CardHeader className="flex flex-row items-center justify-between">
-                            <CardTitle>Orders to Ship ({orders.length})</CardTitle>
-                            <Button variant="ghost" className="h-8 w-8 p-0" onClick={fetchOrders}>
-                                ↻
-                            </Button>
-                        </CardHeader>
-                        <CardContent>
-                            {loading ? <p>Loading...</p> : orders.length === 0 ? (
-                                <p className="text-gray-500">No pending orders.</p>
-                            ) : (
-                                <ul className="space-y-4">
-                                    {orders.map(order => (
-                                        <li key={order.id} className="border p-4 rounded-md flex justify-between items-center bg-white">
-                                            <div>
-                                                <p className="font-bold">
-                                                    {/* Map product_id to name if possible, or just show ID */}
-                                                    Product: {order.product_id}
-                                                </p>
-                                                <p className="text-sm">To: {order.recipient_name}</p>
-                                                <p className="text-xs text-gray-500">
-                                                    {order.postal_code} {order.address}
-                                                </p>
-                                                <p className="text-xs text-blue-600">
-                                                    Slot: {order.shipping_info?.delivery_slot}
-                                                </p>
-                                            </div>
-                                            <Button size="sm" onClick={() => markAsShipped(order.id)}>Mark Shipped</Button>
-                                        </li>
-                                    ))}
-                                </ul>
-                            )}
-                        </CardContent>
-                    </Card>
-
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Recent History</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <p className="text-sm text-gray-400">Shipped orders are archived.</p>
-                        </CardContent>
-                    </Card>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {shops.length === 0 ? (
+                        <div className="col-span-full text-center py-12 text-gray-500 bg-white rounded-lg border border-dashed">
+                            No shops found. Create one to get started!
+                        </div>
+                    ) : (
+                        shops.map((shop) => (
+                            <Card key={shop.PK} className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => router.push(`/shop/${shop.PK.replace('SHOP#', '')}`)}>
+                                <CardHeader>
+                                    <CardTitle>{shop.name}</CardTitle>
+                                    <CardDescription>Created: {new Date(shop.created_at).toLocaleDateString()}</CardDescription>
+                                </CardHeader>
+                                <CardContent>
+                                    <div className="h-24 bg-gray-100 rounded flex items-center justify-center text-gray-400">
+                                        Shop Logo / Image
+                                    </div>
+                                </CardContent>
+                                <CardFooter>
+                                    <Button className="w-full" variant="secondary">Manage Shop</Button>
+                                </CardFooter>
+                            </Card>
+                        ))
+                    )}
                 </div>
             </div>
         </div>
