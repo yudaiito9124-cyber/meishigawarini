@@ -1,17 +1,31 @@
 
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { getCurrentUser } from 'aws-amplify/auth';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"; // Need to install table if not present, but using simple div for now or install
+import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 export default function AdminPage() {
+    const router = useRouter();
     const [count, setCount] = useState(10);
     const [generatedBatches, setGeneratedBatches] = useState<any[]>([]);
 
     const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
+
+    useEffect(() => {
+        const checkAuth = async () => {
+            try {
+                await getCurrentUser();
+            } catch (e) {
+                router.replace('/login');
+            }
+        };
+        checkAuth();
+    }, [router]);
 
     const handleGenerate = async () => {
         const res = await fetch(`${API_URL}/admin/qrcodes/generate`, {
