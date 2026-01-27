@@ -78,7 +78,7 @@ export default function AdminPage() {
 
                 <Card>
                     <CardHeader>
-                        <CardTitle>History</CardTitle>
+                        <CardTitle>Currentry Generated QR Codes</CardTitle>
                     </CardHeader>
                     <CardContent>
                         <div className="space-y-4">
@@ -158,7 +158,7 @@ function QRCodeListSection({ apiUrl }: { apiUrl: string }) {
         <Card>
             <CardHeader>
                 <CardTitle className="flex justify-between items-center">
-                    <span>Issued QR Codes (DB Check)</span>
+                    <span>All QR Codes</span>
                     <Button variant="outline" size="sm" onClick={fetchCodes} disabled={loading}>
                         {loading ? "Loading..." : "Refresh"}
                     </Button>
@@ -193,6 +193,7 @@ function QRCodeListSection({ apiUrl }: { apiUrl: string }) {
                                     <TableHead>PIN</TableHead>
                                     <TableHead>Status</TableHead>
                                     <TableHead>Created At</TableHead>
+                                    <TableHead>Fraud?</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -268,13 +269,5 @@ function BanButton({ uuid, apiUrl, onSuccess }: { uuid: string, apiUrl: string, 
         <Button variant="destructive" size="sm" onClick={handleBan} disabled={loading} className="h-6 text-xs bg-red-600 hover:bg-red-700">
             {loading ? '...' : 'Ban'}
         </Button>
-    );
-}
-                            </TableBody >
-                        </Table >
-                    </div >
-                </div >
-            </CardContent >
-        </Card >
     );
 }
