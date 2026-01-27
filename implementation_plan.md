@@ -1,52 +1,54 @@
-# Landing Page Redesign
+# Implement Shop Logout
 
-Replace the default Next.js starter page with a custom landing page for "MeishiGawarini".
-
-## Design Goals
-- **Service Name**: MeishiGawarini (名刺代わりに)
-- **Concept**: Digital Gifting / QR Code Service
-- **Call to Action**: "ショップへ移動" (Go to Shop) -> Links to `/shop`
-- **Aesthetics**: Clean, modern, using existing Tailwind coloring variables (`--background`, `--foreground`, etc.) from `globals.css`.
+Add a logout button to the shop list page (`/shop`) to allow users to sign out.
 
 ## Proposed Changes
 
 ### Frontend
-#### [MODIFY] [page.tsx](file:///c:/git/meishigawarini/frontend/app/page.tsx)
-- Remove default Next.js content.
-- Add a hero section with title and description.
-- Add a primary button linking to `/shop`.
+#### [MODIFY] [page.tsx](file:///c:/git/meishigawarini/frontend/app/shop/page.tsx)
+- Import `signOut` from `aws-amplify/auth`.
+- Add a `handleLogout` function that calls `signOut()` and redirects to `/`.
+- Add a "Logout" button to the header section (next to "Create New Shop").
 
 ```tsx
-import Link from 'next/link';
+// ... imports
+import { getCurrentUser, signOut } from 'aws-amplify/auth';
+// ...
 
-export default function Home() {
-  return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-background text-foreground">
-      <main className="flex flex-col items-center gap-8 px-4 text-center">
-        <h1 className="text-4xl font-bold tracking-tight sm:text-6xl">
-          名刺代わりに、<br/>
-          <span className="text-primary">心を贈ろう。</span>
-        </h1>
-        <p className="max-w-xl text-lg text-muted-foreground">
-          MeishiGawariniは、QRコードを使った新しいデジタルギフトサービスです。
-          手軽に、想いを形にして届けましょう。
-        </p>
-        <div className="flex gap-4">
-          <Link
-            href="/shop"
-            className="rounded-full bg-primary px-8 py-3 text-lg font-semibold text-primary-foreground hover:opacity-90 transition-opacity"
-          >
-            ショップを見る
-          </Link>
+export default function ShopListPage() {
+    // ...
+    const handleLogout = async () => {
+       try {
+           await signOut();
+           router.push('/');
+       } catch (error) {
+           console.error('Error signing out: ', error);
+       }
+    };
+
+    // ...
+    return (
+        // ...
+        <div className="flex justify-between items-center">
+            <div>
+                <h1 className="text-3xl font-bold text-gray-900">My Shops</h1>
+                <p className="text-gray-500">Select a shop to manage or create a new one.</p>
+            </div>
+            <div className="flex gap-4"> {/* Container for buttons */}
+                <Button variant="outline" onClick={handleLogout}>Logout</Button>
+                <Dialog>
+                   {/* Create Shop Dialog ... */}
+                </Dialog>
+            </div>
         </div>
-      </main>
-    </div>
-  );
+        // ...
+    )
 }
 ```
 
 ## Verification
 1.  Apply changes.
-2.  Push to GitHub.
-3.  Wait for Amplify build.
-4.  Verify the new landing page on the live URL.
+2.  Run `npm run dev`.
+3.  Login and visit `/shop`.
+4.  Click "Logout".
+5.  Verify redirection to title page and session clear (cannot access `/shop` again without login).

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { getCurrentUser } from 'aws-amplify/auth';
+import { getCurrentUser, signOut } from 'aws-amplify/auth';
 import { fetchWithAuth } from '@/app/utils/api-client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
@@ -73,6 +73,15 @@ export default function ShopListPage() {
         }
     };
 
+    const handleLogout = async () => {
+        try {
+            await signOut();
+            router.push('/');
+        } catch (error) {
+            console.error('Error signing out: ', error);
+        }
+    };
+
     if (loading) return <div className="p-8 flex justify-center">Loading...</div>;
 
     return (
@@ -83,34 +92,37 @@ export default function ShopListPage() {
                         <h1 className="text-3xl font-bold text-gray-900">My Shops</h1>
                         <p className="text-gray-500">Select a shop to manage or create a new one.</p>
                     </div>
-                    <Dialog>
-                        <DialogTrigger asChild>
-                            <Button size="lg">Create New Shop</Button>
-                        </DialogTrigger>
-                        <DialogContent>
-                            <DialogHeader>
-                                <DialogTitle>Create Shop</DialogTitle>
-                                <DialogDescription>Enter the name of your new shop.</DialogDescription>
-                            </DialogHeader>
-                            <form onSubmit={handleCreateShop}>
-                                <div className="grid gap-4 py-4">
-                                    <Label htmlFor="name">Shop Name</Label>
-                                    <Input
-                                        id="name"
-                                        value={createName}
-                                        onChange={(e) => setCreateName(e.target.value)}
-                                        placeholder="My Awesome Shop"
-                                        required
-                                    />
-                                </div>
-                                <DialogFooter>
-                                    <Button type="submit" disabled={creating}>
-                                        {creating ? 'Creating...' : 'Create'}
-                                    </Button>
-                                </DialogFooter>
-                            </form>
-                        </DialogContent>
-                    </Dialog>
+                    <div className="flex gap-4">
+                        <Button variant="outline" onClick={handleLogout}>Logout</Button>
+                        <Dialog>
+                            <DialogTrigger asChild>
+                                <Button size="lg">Create New Shop</Button>
+                            </DialogTrigger>
+                            <DialogContent>
+                                <DialogHeader>
+                                    <DialogTitle>Create Shop</DialogTitle>
+                                    <DialogDescription>Enter the name of your new shop.</DialogDescription>
+                                </DialogHeader>
+                                <form onSubmit={handleCreateShop}>
+                                    <div className="grid gap-4 py-4">
+                                        <Label htmlFor="name">Shop Name</Label>
+                                        <Input
+                                            id="name"
+                                            value={createName}
+                                            onChange={(e) => setCreateName(e.target.value)}
+                                            placeholder="My Awesome Shop"
+                                            required
+                                        />
+                                    </div>
+                                    <DialogFooter>
+                                        <Button type="submit" disabled={creating}>
+                                            {creating ? 'Creating...' : 'Create'}
+                                        </Button>
+                                    </DialogFooter>
+                                </form>
+                            </DialogContent>
+                        </Dialog>
+                    </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
