@@ -37,10 +37,15 @@ export default function AdminPage() {
 
         if (res.ok) {
             const data = await res.json();
+            const now = new Date();
+            const pad = (n: number) => n.toString().padStart(2, '0');
+            const timeStr = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+            const ms = Math.floor(now.getMilliseconds() / 10).toString().padStart(2, '0');
+
             const newBatch = {
-                id: `batch-${Date.now()}`,
+                id: `batch-${timeStr}${ms}`,
                 count: data.count,
-                date: new Date().toLocaleString(),
+                date: now.toLocaleString(),
                 status: "Ready",
                 codes: data.data // Store the codes
             };
