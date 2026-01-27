@@ -10,14 +10,14 @@ export default function Home() {
         </h1>
         <p className="max-w-xl text-lg text-muted-foreground">
           MeishiGawariniは、QRコードを使った新しいデジタルギフトサービスです。
-          オンラインで手軽に、想いを形にして届けましょう。
+          カードで手軽に想いを手渡し、重いギフトは相手の好きな住所に直接配送できます。
         </p>
         <div className="flex gap-4">
           <Link
             href="/shop"
             className="rounded-full bg-primary px-8 py-3 text-lg font-semibold text-primary-foreground hover:opacity-90 transition-opacity"
           >
-            ショップを見る
+            ショップ管理者画面
           </Link>
         </div>
       </main>
