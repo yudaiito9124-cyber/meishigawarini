@@ -166,7 +166,7 @@ function QRCodeListSection({ apiUrl }: { apiUrl: string }) {
             </CardHeader>
             <CardContent className="space-y-4">
                 <div className="flex gap-2">
-                    {["UNASSIGNED", "LINKED", "ACTIVE", "USED", "SHIPPED"].map((s) => (
+                    {["UNASSIGNED", "LINKED", "ACTIVE", "USED", "SHIPPED", "BANNED"].map((s) => (
                         <Button
                             key={s}
                             variant={status === s ? "default" : "secondary"}
@@ -215,13 +215,19 @@ function QRCodeListSection({ apiUrl }: { apiUrl: string }) {
                                                 <span className={`px-2 py-1 rounded text-xs ${item.status === 'UNASSIGNED' ? 'bg-gray-100' :
                                                     item.status === 'ACTIVE' ? 'bg-blue-100 text-blue-800' :
                                                         item.status === 'USED' ? 'bg-yellow-100 text-yellow-800' :
-                                                            'bg-green-100 text-green-800'
+                                                            item.status === 'BANNED' ? 'bg-red-100 text-red-800' : // BANNED style
+                                                                'bg-green-100 text-green-800'
                                                     }`}>
                                                     {item.status}
                                                 </span>
                                             </TableCell>
                                             <TableCell className="text-xs text-gray-500">
                                                 {item.created_at ? new Date(item.created_at).toLocaleString() : '-'}
+                                            </TableCell>
+                                            <TableCell>
+                                                {item.status !== 'BANNED' && (
+                                                    <BanButton uuid={item.PK.replace('QR#', '')} apiUrl={apiUrl} onSuccess={fetchCodes} />
+                                                )}
                                             </TableCell>
                                         </TableRow>
                                     ))
@@ -232,5 +238,43 @@ function QRCodeListSection({ apiUrl }: { apiUrl: string }) {
                 </div>
             </CardContent>
         </Card>
+    );
+}
+
+function BanButton({ uuid, apiUrl, onSuccess }: { uuid: string, apiUrl: string, onSuccess: () => void }) {
+    const [loading, setLoading] = useState(false);
+
+    const handleBan = async () => {
+        if (!confirm('Are you sure you want to BAN this QR code? It will stop working immediately.')) return;
+        setLoading(true);
+        try {
+            const res = await fetch(`${apiUrl}/admin/qrcodes/${uuid}/ban`, {
+                method: 'POST'
+            });
+            if (res.ok) {
+                onSuccess();
+            } else {
+                alert('Failed to ban QR code');
+            }
+        } catch (e) {
+            console.error(e);
+            alert('Error banning QR code');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <Button variant="destructive" size="sm" onClick={handleBan} disabled={loading} className="h-6 text-xs bg-red-600 hover:bg-red-700">
+            {loading ? '...' : 'Ban'}
+        </Button>
+    );
+}
+                            </TableBody >
+                        </Table >
+                    </div >
+                </div >
+            </CardContent >
+        </Card >
     );
 }

@@ -1,54 +1,29 @@
-# Implement Shop Logout
+# Admin: QR Code Banning
 
-Add a logout button to the shop list page (`/shop`) to allow users to sign out.
+Enable administrators to completely invalidate a QR code, setting its status to `BANNED`. A banned QR code rejects all operations (link, activate, use).
 
 ## Proposed Changes
 
+### Backend
+#### [NEW] [infra/lambda/admin-update.ts](file:///c:/git/meishigawarini/infra/lambda/admin-update.ts)
+- Create a new Lambda function to handle admin updates.
+- POST /admin/qrcodes/{uuid}/ban
+- Updates QR status to `BANNED`.
+- Sets `GSI1_PK` to `QR#BANNED`.
+
+#### [MODIFY] [infra/lib/infra-stack.ts](file:///c:/git/meishigawarini/infra/lib/infra-stack.ts)
+- Define `AdminUpdateFn`.
+- Grant read/write access to DynamoDB.
+- Add API Gateway resource: `POST /admin/qrcodes/{uuid}/ban`.
+
 ### Frontend
-#### [MODIFY] [page.tsx](file:///c:/git/meishigawarini/frontend/app/shop/page.tsx)
-- Import `signOut` from `aws-amplify/auth`.
-- Add a `handleLogout` function that calls `signOut()` and redirects to `/`.
-- Add a "Logout" button to the header section (next to "Create New Shop").
-
-```tsx
-// ... imports
-import { getCurrentUser, signOut } from 'aws-amplify/auth';
-// ...
-
-export default function ShopListPage() {
-    // ...
-    const handleLogout = async () => {
-       try {
-           await signOut();
-           router.push('/');
-       } catch (error) {
-           console.error('Error signing out: ', error);
-       }
-    };
-
-    // ...
-    return (
-        // ...
-        <div className="flex justify-between items-center">
-            <div>
-                <h1 className="text-3xl font-bold text-gray-900">My Shops</h1>
-                <p className="text-gray-500">Select a shop to manage or create a new one.</p>
-            </div>
-            <div className="flex gap-4"> {/* Container for buttons */}
-                <Button variant="outline" onClick={handleLogout}>Logout</Button>
-                <Dialog>
-                   {/* Create Shop Dialog ... */}
-                </Dialog>
-            </div>
-        </div>
-        // ...
-    )
-}
-```
+#### [MODIFY] [frontend/app/admin/page.tsx](file:///c:/git/meishigawarini/frontend/app/admin/page.tsx)
+- Add "Ban" button to the QR code list table.
+- Implement `handleBan(uuid)` function to call the new API.
+- Update UI to show `BANNED` status (red badge).
 
 ## Verification
-1.  Apply changes.
-2.  Run `npm run dev`.
-3.  Login and visit `/shop`.
-4.  Click "Logout".
-5.  Verify redirection to title page and session clear (cannot access `/shop` again without login).
+1.  Deploy Backend.
+2.  Frontend: Generates QRs.
+3.  Click "Ban" on a QR.
+4.  Try to link that QR in Shop Dashboard -> Should fail with "Operation failed" (ConditionalCheckFailed).

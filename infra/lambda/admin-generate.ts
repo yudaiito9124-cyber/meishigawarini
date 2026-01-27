@@ -41,6 +41,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                         SK: { S: 'METADATA' },
                         GSI1_PK: { S: 'QR#UNASSIGNED' },
                         GSI1_SK: { S: new Date().toISOString() },
+                        status: { S: 'UNASSIGNED' },
                         pin: { S: pin },
                         created_at: { S: new Date().toISOString() }
                     }

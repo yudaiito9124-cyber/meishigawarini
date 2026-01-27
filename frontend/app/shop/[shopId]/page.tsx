@@ -201,19 +201,20 @@ export default function ShopPage() {
         const productId = formData.get('product_id') as string;
 
         try {
-            // 1. Link
-            const linkRes = await fetchWithAuth(`/shops/${shopId}/link`, {
+            // Atomic Link & Activate
+            const res = await fetchWithAuth(`/shops/${shopId}/link`, {
                 method: 'POST',
-                body: JSON.stringify({ qr_id: uuid, product_id: productId })
+                body: JSON.stringify({
+                    qr_id: uuid,
+                    product_id: productId,
+                    activate_now: true
+                })
             });
-            if (!linkRes.ok) throw new Error('Failed to link');
 
-            // 2. Activate
-            const actRes = await fetchWithAuth(`/shops/${shopId}/activate`, {
-                method: 'POST',
-                body: JSON.stringify({ qr_id: uuid })
-            });
-            if (!actRes.ok) throw new Error('Failed to activate');
+            if (!res.ok) {
+                const errorData = await res.json().catch(() => ({}));
+                throw new Error(errorData.message || 'Failed to link and activate');
+            }
 
             alert('QR Code Linked and Activated!');
             form.reset();

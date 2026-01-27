@@ -224,7 +224,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             await verifyShopOwner();
 
             const body = JSON.parse(event.body || '{}');
-            const { qr_id, product_id } = body;
+            const { qr_id, product_id, activate_now } = body;
             if (!qr_id || !product_id) return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Missing qr_id or product_id' }) };
 
             // Verify Product belongs to Shop
@@ -234,25 +234,40 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             }));
             if (!prodCheck.Item) return { statusCode: 404, headers: corsHeaders, body: JSON.stringify({ message: 'Product not found in this shop' }) };
 
-            // Link QR
+            // Link QR (and optionally activate)
+            const status = activate_now ? 'ACTIVE' : 'LINKED';
+            const gsiPk = activate_now ? 'QR#ACTIVE' : 'QR#LINKED';
+            const activatedAt = activate_now ? new Date().toISOString() : undefined;
+
+            let updateExpr = 'SET #status = :status, shop_id = :sid, product_id = :pid, GSI1_PK = :gsi_pk, GSI2_PK = :gsi2_pk, GSI2_SK = :now';
+            const attrValues: any = {
+                ':status': status,
+                ':unassigned': 'UNASSIGNED',
+                ':sid': shopId,
+                ':pid': product_id,
+                ':gsi_pk': gsiPk,
+                ':gsi2_pk': `SHOP#${shopId}`,
+                ':now': new Date().toISOString()
+            };
+
+            if (activate_now) {
+                updateExpr += ', activated_at = :act_at';
+                attrValues[':act_at'] = activatedAt;
+            }
+
             await ddb.send(new UpdateCommand({
                 TableName: TABLE_NAME,
                 Key: { PK: `QR#${qr_id}`, SK: 'METADATA' },
-                UpdateExpression: 'SET #status = :linked, shop_id = :sid, product_id = :pid, GSI1_PK = :gsi_pk, GSI2_PK = :gsi2_pk, GSI2_SK = :now',
-                ConditionExpression: '#status = :unassigned',
+                UpdateExpression: updateExpr,
+                ConditionExpression: '(attribute_not_exists(#status) OR #status = :unassigned) OR (#status = :linked AND shop_id = :sid)',
                 ExpressionAttributeNames: { '#status': 'status' },
-                ExpressionAttributeValues: {
-                    ':linked': 'LINKED',
-                    ':unassigned': 'UNASSIGNED',
-                    ':sid': shopId,
-                    ':pid': product_id,
-                    ':gsi_pk': 'QR#LINKED',
-                    ':gsi2_pk': `SHOP#${shopId}`,
-                    ':now': new Date().toISOString()
-                }
+                ExpressionAttributeValues: attrValues
             }));
 
-            return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ message: 'QR Linked successfully' }) };
+            // If activating, we might want to also set GSI1 separately if our single-table design requires it, 
+            // but here we are just updating the main item. GSI1 maps to status usually.
+
+            return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ message: `QR Linked successfully${activate_now ? ' and Activated' : ''}` }) };
         }
 
         // 6. Activate QR (POST /shops/{shopId}/activate)

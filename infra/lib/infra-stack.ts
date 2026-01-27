@@ -168,8 +168,20 @@ export class InfraStack extends cdk.Stack {
     // I'll leave open but comment.
     generateResource.addMethod('POST', new apigateway.LambdaIntegration(adminGenerateFn));
 
+    // Lambda: Admin Update (NEW)
+    const adminUpdateFn = new nodejs.NodejsFunction(this, 'AdminUpdateFn', {
+      entry: path.join(__dirname, '../lambda/admin-update.ts'),
+      ...commonProps,
+    });
+    table.grantReadWriteData(adminUpdateFn);
+
     // Admin List Route
     qrResource.addMethod('GET', new apigateway.LambdaIntegration(adminListFn));
+
+    // Admin QR Detail Routes
+    const adminQrDetail = qrResource.addResource('{uuid}');
+    const banResource = adminQrDetail.addResource('ban');
+    banResource.addMethod('POST', new apigateway.LambdaIntegration(adminUpdateFn));
 
     // Shop Routes (Legacy & Activation)
     const shopResource = api.root.addResource('shop');
