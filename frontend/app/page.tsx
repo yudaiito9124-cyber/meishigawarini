@@ -3,7 +3,7 @@ import Link from 'next/link';
 export default function Home() {
   return (
     <div className="flex min-h-screen flex-col bg-background text-foreground">
-      <header className="flex w-full justify-end p-6">
+      <header className="relative z-10 flex w-full justify-end p-6">
         <Link
           href="/shop"
           className="rounded-full bg-primary px-6 py-2.5 text-sm font-semibold text-primary-foreground hover:opacity-90 transition-opacity"
