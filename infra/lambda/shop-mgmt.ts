@@ -243,6 +243,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             const attrValues: any = {
                 ':status': status,
                 ':unassigned': 'UNASSIGNED',
+                ':linked': 'LINKED', // Fix: Added missing value
                 ':sid': shopId,
                 ':pid': product_id,
                 ':gsi_pk': gsiPk,

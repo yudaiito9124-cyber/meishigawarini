@@ -96,27 +96,32 @@ export default function ShopPage() {
                 const ctx = canvas.getContext('2d');
                 if (!ctx) return reject('No context');
 
-                // Target dimensions: HD (1280x720)
-                const MAX_WIDTH = 1280;
-                const MAX_HEIGHT = 720;
-                let width = img.width;
-                let height = img.height;
+                // Target dimensions: 16:9 (1280x720)
+                const TARGET_WIDTH = 1280;
+                const TARGET_HEIGHT = 720;
 
-                // Scale Logic: Contain (Fit within box, maintaining aspect ratio, no crop)
-                if (width > MAX_WIDTH || height > MAX_HEIGHT) {
-                    const ratio = Math.min(MAX_WIDTH / width, MAX_HEIGHT / height);
-                    width = Math.floor(width * ratio);
-                    height = Math.floor(height * ratio);
-                }
+                canvas.width = TARGET_WIDTH;
+                canvas.height = TARGET_HEIGHT;
 
-                canvas.width = width;
-                canvas.height = height;
-                ctx.drawImage(img, 0, 0, width, height);
+                // Fill white background
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(0, 0, TARGET_WIDTH, TARGET_HEIGHT);
+
+                // Calculate Scale for Contain (Fit within box, maintaining aspect ratio)
+                const scale = Math.min(TARGET_WIDTH / img.width, TARGET_HEIGHT / img.height);
+                const dWidth = img.width * scale;
+                const dHeight = img.height * scale;
+
+                const dx = (TARGET_WIDTH - dWidth) / 2;
+                const dy = (TARGET_HEIGHT - dHeight) / 2;
+
+                // Draw
+                ctx.drawImage(img, dx, dy, dWidth, dHeight);
 
                 canvas.toBlob((blob) => {
                     if (blob) resolve(blob);
                     else reject('Canvas to Blob failed');
-                }, file.type);
+                }, file.type, 0.9);
             };
             img.onerror = reject;
         });
@@ -280,7 +285,7 @@ export default function ShopPage() {
                 <div className="max-w-7xl mx-auto px-4 py-6 flex justify-between items-center">
                     <div>
                         <h1 className="text-2xl font-bold text-gray-900">{shop?.name || 'Shop Dashboard'}</h1>
-                        <p className="text-sm text-gray-500">ID: {shopId}</p>
+                        <p className="text-sm text-gray-500">Shop ID: {shopId}</p>
                     </div>
                     {/* <Button variant="outline" onClick={() => router.push('/shop/select')}>Back to Shops</Button> */}
                 </div>
@@ -368,9 +373,9 @@ export default function ShopPage() {
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                             {products.map((product) => (
                                 <Card key={product.product_id} className="overflow-hidden">
-                                    <div className="h-32 relative">
+                                    <div className="w-full relative">
                                         {/* eslint-disable-next-line @next/next/no-img-element */}
-                                        <img src={product.image_url} alt={product.name} className="w-full h-full object-contain" />
+                                        <img src={product.image_url} alt={product.name} className="w-full h-auto object-cover" />
                                         <div className="absolute top-2 right-2 flex gap-2">
                                             <span className={`px-2 py-1 rounded text-xs font-bold ${product.status === 'ACTIVE' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
                                                 }`}>

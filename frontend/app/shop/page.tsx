@@ -16,12 +16,14 @@ export default function ShopListPage() {
     const [loading, setLoading] = useState(true);
     const [createName, setCreateName] = useState('');
     const [creating, setCreating] = useState(false);
+    const [userId, setUserId] = useState('');
 
     useEffect(() => {
         const init = async () => {
             try {
                 // Check session
-                await getCurrentUser();
+                const user = await getCurrentUser();
+                setUserId(user.userId);
                 fetchShops();
             } catch (e) {
                 router.push('/login');
@@ -91,9 +93,10 @@ export default function ShopListPage() {
                     <div>
                         <h1 className="text-3xl font-bold text-gray-900">My Shops</h1>
                         <p className="text-gray-500">Select a shop to manage or create a new one.</p>
+                        {userId && <p className="text-xs text-gray-400 mt-1">User ID: {userId}</p>}
                     </div>
                     <div className="flex gap-4">
-                        <Button variant="outline" onClick={handleLogout}>Logout</Button>
+                        <Button variant="outline" size="lg" onClick={handleLogout}>Logout</Button>
                         <Dialog>
                             <DialogTrigger asChild>
                                 <Button size="lg">Create New Shop</Button>
@@ -135,7 +138,7 @@ export default function ShopListPage() {
                             <Card key={shop.PK} className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => router.push(`/shop/${shop.PK.replace('SHOP#', '')}`)}>
                                 <CardHeader>
                                     <CardTitle>{shop.name}</CardTitle>
-                                    <CardDescription>Created: {new Date(shop.created_at).toLocaleDateString()}</CardDescription>
+                                    <CardDescription>Created: {new Date(shop.created_at).toLocaleString()}</CardDescription>
                                 </CardHeader>
                                 <CardContent>
                                     <div className="h-24 bg-gray-100 rounded flex items-center justify-center text-gray-400">
@@ -143,7 +146,9 @@ export default function ShopListPage() {
                                     </div>
                                 </CardContent>
                                 <CardFooter>
-                                    <Button className="w-full" variant="secondary">Manage Shop</Button>
+                                    <Button className="w-full" variant="secondary" asChild>
+                                        <div>Manage Shop</div>
+                                    </Button>
                                 </CardFooter>
                             </Card>
                         ))

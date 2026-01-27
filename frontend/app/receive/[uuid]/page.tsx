@@ -51,7 +51,7 @@ export default function ReceivePage() {
     const [pin, setPin] = useState("");
     const [name, setName] = useState("");
     const [address, setAddress] = useState("");
-    const [step, setStep] = useState<"PIN" | "FORM" | "SUCCESS">("PIN");
+    const [step, setStep] = useState<"PIN" | "FORM" | "SUCCESS" | "SHIPPED">("PIN");
 
     const [error, setError] = useState<string | null>(null);
     const [pinVerified, setPinVerified] = useState(false);
@@ -65,7 +65,7 @@ export default function ReceivePage() {
                     setGift(data);
 
                     // Check status
-                    if (data.status !== 'ACTIVE' && data.status !== 'USED') {
+                    if (data.status !== 'ACTIVE' && data.status !== 'USED' && data.status !== 'SHIPPED') {
                         setError("This card has not been activated yet. Please contact the shop or the person who gave you this gift.");
                     } else if (data.status === 'USED') {
                         setStep("SUCCESS");
@@ -87,6 +87,13 @@ export default function ReceivePage() {
             setPinVerified(true);
             setPinError("");
             alert("PIN Verified!");
+
+            if (gift.status === 'ACTIVE') {
+                setStep("FORM");
+            } else if (gift.status === 'SHIPPED') {
+                setStep("SHIPPED");
+            }
+
         } else {
             setPinVerified(false);
             setPinError("Incorrect PIN");
@@ -100,6 +107,7 @@ export default function ReceivePage() {
             // Verify again just in case
             if (pin === gift.pin) {
                 setPinVerified(true);
+                setStep("FORM");
             } else {
                 setPinError("Please verify your PIN code first.");
                 return;
@@ -145,11 +153,11 @@ export default function ReceivePage() {
             <Card className="w-full max-w-md">
                 <CardHeader>
                     <CardTitle className="text-xl text-center">
-                        {step === "SUCCESS" ? "Thank You!" : pinVerified ? "You received a gift!" : "Enter PIN to View Gift"}
+                        {step === "PIN" ? "Enter PIN to View Gift" : step === "FORM" ? "You received a gift!" : step === "SUCCESS" ? "Thank You!" : step === "SHIPPED" ? "Your gift is on the way!" : "UNDEFINED"}
                     </CardTitle>
                 </CardHeader>
                 <CardContent>
-                    {step !== "SUCCESS" && pinVerified && (
+                    {step !== "PIN" && pinVerified && (
                         <div className="mb-6 animate-in fade-in duration-500">
                             <img src={gift.product.image_url} alt="Gift" className="w-full h-48 object-cover rounded-md mb-4" />
                             <h2 className="font-bold text-lg">{gift.product.name}</h2>
@@ -159,7 +167,6 @@ export default function ReceivePage() {
 
                     {step === "PIN" && (
                         <form onSubmit={handleAddressSubmit} className="space-y-6">
-                            {/* PIN Section */}
                             <div className="space-y-2 p-4 bg-gray-50 rounded-lg">
                                 <Label htmlFor="pin" className="font-semibold">1. Enter PIN Code</Label>
                                 <div className="flex space-x-2">
@@ -180,10 +187,11 @@ export default function ReceivePage() {
                                     </Button>
                                 </div>
                                 {pinError && <p className="text-sm text-red-500">{pinError}</p>}
-                                {pinVerified && <p className="text-sm text-green-600 font-medium">✓ PIN Verified</p>}
                             </div>
-
-                            {/* Address Section */}
+                        </form>
+                    )}
+                    {step === "FORM" && (
+                        <form onSubmit={handleAddressSubmit} className="space-y-6">
                             <div className="space-y-4 pt-2 border-t">
                                 <Label className="font-semibold">2. Delivery Details</Label>
                                 <div className="space-y-2">
@@ -218,6 +226,15 @@ export default function ReceivePage() {
                         <div className="text-center py-6 space-y-4">
                             <p className="text-green-600 font-medium">Your shipping information has been sent!</p>
                             <p className="text-sm text-gray-500">The shop will ship your gift soon.</p>
+                        </div>
+                    )}
+                    {step === "SHIPPED" && (
+                        <div className="text-center py-6 space-y-4">
+                            <p className="text-green-600 font-medium">Your gift has been shipped!</p>
+                            <p className="text-sm text-gray-500">{gift.shipping_info}</p>
+                            <p className="text-sm text-gray-500">{gift.tracking_number}</p>
+                            <p className="text-sm text-gray-500">{gift.shipped_at}</p>
+
                         </div>
                     )}
                 </CardContent>

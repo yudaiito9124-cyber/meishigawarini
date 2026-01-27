@@ -51,6 +51,21 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             product = prodRes.Item;
         }
 
+        // Fetch Tracking Number if SHIPPED
+        let tracking_number = undefined;
+        if (status === 'SHIPPED') {
+            const orderRes = await ddb.send(new GetCommand({
+                TableName: TABLE_NAME,
+                Key: {
+                    PK: `QR#${uuid}`,
+                    SK: 'ORDER'
+                }
+            }));
+            if (orderRes.Item) {
+                tracking_number = orderRes.Item.tracking_number;
+            }
+        }
+
         // Fallback for legacy or unlinked codes (Prototype safety)
         if (!product) {
             product = {
@@ -69,6 +84,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 product_id,
                 shop_id,
                 pin,
+                tracking_number, // Include tracking info
                 product
             })
         };

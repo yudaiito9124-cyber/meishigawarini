@@ -110,7 +110,7 @@ export default function AdminPage() {
                 const qr = new QRCodeStyling({
                     width: 500,
                     height: 500,
-                    data: `${APP_URL}/recipient/${code.uuid}`,
+                    data: `${APP_URL}/receive/${code.uuid}`,
                     image: '/presenticon.png', // Placeholder Logo
                     qrOptions: {
                         typeNumber: 0,
@@ -307,14 +307,45 @@ function QRCodeListSection({ apiUrl }: { apiUrl: string }) {
     // Let's make it manual for now or useEffect
     // useEffect(() => { fetchCodes(); }, [status]); 
 
+    const handleDeleteAllBanned = async () => {
+        if (status !== 'BANNED') return;
+        if (!confirm('Are you sure you want to DELETE ALL BANNED QR codes? This action cannot be undone.')) return;
+
+        setLoading(true);
+        try {
+            const res = await fetch(`${apiUrl}/admin/qrcodes/banned`, {
+                method: 'DELETE'
+            });
+            if (res.ok) {
+                const data = await res.json();
+                alert(`Successfully deleted ${data.count} BANNED codes.`);
+                fetchCodes(); // Refresh list
+            } else {
+                alert('Failed to delete Banned codes');
+            }
+        } catch (e) {
+            console.error(e);
+            alert('Error deleting Banned codes');
+        } finally {
+            setLoading(false);
+        }
+    };
+
     return (
         <Card>
             <CardHeader>
                 <CardTitle className="flex justify-between items-center">
                     <span>All QR Codes</span>
-                    <Button variant="outline" size="sm" onClick={fetchCodes} disabled={loading}>
-                        {loading ? "Loading..." : "Refresh"}
-                    </Button>
+                    <div className="flex gap-2">
+                        {status === 'BANNED' && (
+                            <Button variant="destructive" size="sm" onClick={handleDeleteAllBanned} disabled={loading}>
+                                Delete All BANNED
+                            </Button>
+                        )}
+                        <Button variant="outline" size="sm" onClick={fetchCodes} disabled={loading}>
+                            {loading ? "Loading..." : "Refresh"}
+                        </Button>
+                    </div>
                 </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">

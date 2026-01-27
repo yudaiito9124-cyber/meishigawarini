@@ -178,6 +178,16 @@ export class InfraStack extends cdk.Stack {
     // Admin List Route
     qrResource.addMethod('GET', new apigateway.LambdaIntegration(adminListFn));
 
+    // Lambda: Admin Delete Banned
+    const adminDeleteBannedFn = new nodejs.NodejsFunction(this, 'AdminDeleteBannedFn', {
+      entry: path.join(__dirname, '../lambda/admin-delete-banned.ts'),
+      ...commonProps,
+    });
+    table.grantReadWriteData(adminDeleteBannedFn);
+
+    const bannedResource = qrResource.addResource('banned');
+    bannedResource.addMethod('DELETE', new apigateway.LambdaIntegration(adminDeleteBannedFn));
+
     // Admin QR Detail Routes
     const adminQrDetail = qrResource.addResource('{uuid}');
     const banResource = adminQrDetail.addResource('ban');
