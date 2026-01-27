@@ -9,7 +9,10 @@ applications:
         build:
           commands:
             - npm run build
-      # artifacts は削除して Amplify の自動検知に任せる
+      artifacts:
+        baseDirectory: .next
+        files:
+          - '**/*'
       cache:
         paths:
           - node_modules/**/*
