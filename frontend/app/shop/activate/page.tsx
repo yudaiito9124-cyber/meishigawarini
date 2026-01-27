@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import QRScanner from "@/components/ui/qr-scanner";
+import { APP_CONFIG } from "@/lib/config";
 
 export default function ActivatePage() {
     const [qrId, setQrId] = useState("");
@@ -24,7 +25,7 @@ export default function ActivatePage() {
         setIsScanning(false);
     };
 
-    const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
+    const API_URL = APP_CONFIG.API_URL;
 
     const handleActivate = async (e: React.FormEvent) => {
         e.preventDefault();

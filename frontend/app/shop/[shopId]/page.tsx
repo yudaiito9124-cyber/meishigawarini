@@ -11,9 +11,11 @@ import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import QRScanner from '@/components/ui/qr-scanner';
+import { APP_CONFIG } from "@/lib/config";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || '';
+const API_URL = APP_CONFIG.API_URL;
 
+// --- Effects ---
 export default function ShopPage() {
     const params = useParams();
     const router = useRouter();

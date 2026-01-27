@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { APP_CONFIG } from "@/lib/config";
 import jsPDF from 'jspdf';
 
 export default function AdminPage() {
@@ -68,7 +69,7 @@ export default function AdminPage() {
         const QRCodeStyling = (await import('qr-code-styling')).default;
 
         const doc = new jsPDF();
-        const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://example.com';
+        // const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://example.com'; // Replaced by APP_CONFIG.APP_URL
 
         // Layout Settings for A4
         const pageWidth = 210; // mm
@@ -108,10 +109,10 @@ export default function AdminPage() {
                 // Create Custom QR
                 //https://qr-code-styling.com/
                 const qr = new QRCodeStyling({
-                    width: 500,
-                    height: 500,
-                    data: `${APP_URL}/receive/${code.uuid}`,
-                    image: '/presenticon.png', // Placeholder Logo
+                    width: 300,
+                    height: 300,
+                    data: `${APP_CONFIG.APP_URL}/receive/${code.uuid}`,
+                    image: APP_CONFIG.QR_LOGO_PATH, // Placeholder Logo
                     qrOptions: {
                         typeNumber: 0,
                         mode: "Byte",

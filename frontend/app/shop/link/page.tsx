@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import QRScanner from "@/components/ui/qr-scanner";
+import { APP_CONFIG } from "@/lib/config";
 
 // Mock Products
 const PRODUCTS = [
@@ -33,7 +34,7 @@ export default function LinkPage() {
         setIsScanning(false);
     };
 
-    const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
+    const API_URL = APP_CONFIG.API_URL;
 
     const handleLink = async (e: React.FormEvent) => {
         e.preventDefault();
