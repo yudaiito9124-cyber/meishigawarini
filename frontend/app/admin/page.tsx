@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import jsPDF from 'jspdf';
 
 export default function AdminPage() {
     const router = useRouter();
@@ -46,9 +47,155 @@ export default function AdminPage() {
             setGeneratedBatches([newBatch, ...generatedBatches]);
             // In a real app, we would process 'data.data' (UUIDs/PINs) to generate PDF/CSV 
             console.log("Generated Codes:", data.data);
+
+            // Automatically download PDF
+            await generatePDF(newBatch);
         } else {
             alert("Failed to generate QR codes");
         }
+    };
+
+    const generatePDF = async (batch: any) => {
+        const codes = batch.codes || [];
+        if (codes.length === 0) return;
+
+        // Dynamic import for QRCodeStyling to ensure it runs on client
+        const QRCodeStyling = (await import('qr-code-styling')).default;
+
+        const doc = new jsPDF();
+        const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://example.com';
+
+        // Layout Settings for A4
+        const pageWidth = 210; // mm
+        const pageHeight = 297; // mm
+        const cols = 2;
+        const rows = 5;
+        const cellWidth = pageWidth / cols;
+        const cellHeight = pageHeight / rows;
+        const itemsPerPage = cols * rows;
+
+        // Helper to get position
+        const getFrontPos = (indexInPage: number) => {
+            const row = Math.floor(indexInPage / cols);
+            const col = indexInPage % cols;
+            return { x: col * cellWidth, y: row * cellHeight };
+        };
+
+        // Helper for Back Page (Mirrored columns)
+        // If col 0 -> print at col 1 pos (so it is behind col 0 when flipped on long edge)
+        // If col 1 -> print at col 0 pos
+        const getBackPos = (indexInPage: number) => {
+            const row = Math.floor(indexInPage / cols);
+            const col = indexInPage % cols;
+            const mirroredCol = cols - col - 1;
+            return { x: mirroredCol * cellWidth, y: row * cellHeight };
+        };
+
+        for (let i = 0; i < codes.length; i += itemsPerPage) {
+            if (i > 0) doc.addPage();
+            const pageCodes = codes.slice(i, i + itemsPerPage);
+
+            // FRONT PAGE (QR Codes)
+            for (let j = 0; j < pageCodes.length; j++) {
+                const code = pageCodes[j];
+                const { x, y } = getFrontPos(j);
+
+                // Create Custom QR
+                //https://qr-code-styling.com/
+                const qr = new QRCodeStyling({
+                    width: 500,
+                    height: 500,
+                    data: `${APP_URL}/recipient/${code.uuid}`,
+                    image: '/presenticon.png', // Placeholder Logo
+                    qrOptions: {
+                        typeNumber: 0,
+                        mode: "Byte",
+                        errorCorrectionLevel: "Q"
+                    },
+                    imageOptions: {
+                        saveAsBlob: true,
+                        hideBackgroundDots: true,
+                        imageSize: 0.4,
+                        margin: 0
+                    },
+                    dotsOptions: {
+                        type: "dots",
+                        color: "#6a1a4c",
+                        roundSize: true,
+                        gradient: {
+                            type: "radial",
+                            rotation: 0,
+                            colorStops: [
+                                { offset: 0, color: "#383838" },
+                                { offset: 1, color: "#000000" }
+                            ]
+                        }
+                    },
+                    backgroundOptions: {
+                        round: 0,
+                        color: "#fcfcfc"
+                    },
+                    cornersSquareOptions: {
+                        type: "extra-rounded",
+                        color: "#000000"
+                    },
+                    cornersDotOptions: {
+                        type: "dot",
+                        color: "#000000"
+                    },
+                });
+
+                // Get Raw Data (Blob) -> Base64
+                const rawData = await qr.getRawData('png');
+                if (!rawData) continue;
+
+                // Ensure we have a Blob (qr-code-styling can return Buffer in Node environment)
+                const blob = rawData instanceof Blob ? rawData : new Blob([rawData as any]);
+
+                const base64data = await new Promise<string>((resolve) => {
+                    const reader = new FileReader();
+                    reader.onloadend = () => resolve(reader.result as string);
+                    reader.readAsDataURL(blob);
+                });
+
+                // Draw Cell Border
+                doc.setDrawColor(200);
+                doc.rect(x, y, cellWidth, cellHeight);
+
+                // Draw QR
+                const qrSize = 40;
+                doc.addImage(base64data, 'PNG', x + (cellWidth - qrSize) / 2, y + cellHeight / 2 - qrSize / 2, qrSize, qrSize);
+
+                doc.setFontSize(15);
+                doc.setFont("helvetica", "bold");
+                doc.text(`Gift for you !`, x + cellWidth / 2, y + 8, { align: 'center' });
+            }
+
+            doc.addPage(); // Back Page
+
+            // BACK PAGE (PIN Codes)
+            for (let j = 0; j < pageCodes.length; j++) {
+                const code = pageCodes[j];
+                const { x, y } = getBackPos(j);
+
+                // Draw Cell Border
+                doc.setDrawColor(200);
+                doc.rect(x, y, cellWidth, cellHeight);
+
+                // Draw PIN
+                doc.setFontSize(12);
+                doc.setFont("helvetica", "normal");
+                doc.text("Security PIN", x + cellWidth / 2, y + cellHeight / 2 - 10, { align: 'center' });
+                doc.setFontSize(24);
+                doc.setFont("helvetica", "bold");
+                doc.text(code.pin, x + cellWidth / 2, y + cellHeight / 2 + 5, { align: 'center' });
+                doc.setFontSize(8);
+                doc.setFont("helvetica", "normal");
+                doc.text(`${code.uuid.substring(0, 16)}...`, x + cellWidth / 2, y + cellHeight - 10, { align: 'center' });
+            }
+        }
+
+        doc.save(`qrcodes-${batch.id}.pdf`);
     };
 
     return (
@@ -93,6 +240,7 @@ export default function AdminPage() {
                                             <span className="text-sm bg-green-100 text-green-800 px-2 py-1 rounded">
                                                 {batch.status}
                                             </span>
+                                            <Button variant="outline" size="sm" onClick={() => generatePDF(batch)}>Download PDF</Button>
                                         </div>
                                         {/* Display Codes */}
                                         <div className="mt-2 bg-gray-100 p-2 rounded text-xs font-mono overflow-auto max-h-40">

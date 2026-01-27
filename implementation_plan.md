@@ -1,29 +1,28 @@
-# Admin: QR Code Banning
+# Admin: Custom QR Code Styling
 
-Enable administrators to completely invalidate a QR code, setting its status to `BANNED`. A banned QR code rejects all operations (link, activate, use).
+Replace the standard `qrcode` library with `qr-code-styling` to support:
+- "Dots" or "Rounded" style (丸の集合).
+- Embedded center image (Logo).
+- Custom colors (if needed).
 
-## Proposed Changes
-
-### Backend
-#### [NEW] [infra/lambda/admin-update.ts](file:///c:/git/meishigawarini/infra/lambda/admin-update.ts)
-- Create a new Lambda function to handle admin updates.
-- POST /admin/qrcodes/{uuid}/ban
-- Updates QR status to `BANNED`.
-- Sets `GSI1_PK` to `QR#BANNED`.
-
-#### [MODIFY] [infra/lib/infra-stack.ts](file:///c:/git/meishigawarini/infra/lib/infra-stack.ts)
-- Define `AdminUpdateFn`.
-- Grant read/write access to DynamoDB.
-- Add API Gateway resource: `POST /admin/qrcodes/{uuid}/ban`.
+## Changes
 
 ### Frontend
+#### [MODIFY] [frontend/package.json](file:///c:/git/meishigawarini/frontend/package.json)
+- Add `qr-code-styling`. (Done via command)
+
 #### [MODIFY] [frontend/app/admin/page.tsx](file:///c:/git/meishigawarini/frontend/app/admin/page.tsx)
-- Add "Ban" button to the QR code list table.
-- Implement `handleBan(uuid)` function to call the new API.
-- Update UI to show `BANNED` status (red badge).
+- Import `QRCodeStyling`.
+- Update `generatePDF` function:
+    - Instantiate `QRCodeStyling` for each code (or reuse and update data).
+    - Configure `dotsOptions: { type: 'dots' }` for the "circle" look.
+    - Configure `cornersSquareOptions: { type: 'extra-rounded' }`.
+    - Configure `image` with a placeholder (e.g., `/logo.png` or a sample URL).
+    - Use `getRawData('png')` to get the image blob.
+    - Convert Blob to Base64 (helper function).
+    - Pass Base64 to `doc.addImage`.
 
 ## Verification
-1.  Deploy Backend.
-2.  Frontend: Generates QRs.
-3.  Click "Ban" on a QR.
-4.  Try to link that QR in Shop Dashboard -> Should fail with "Operation failed" (ConditionalCheckFailed).
+1.  Reload Admin Page.
+2.  Generate PDF.
+3.  Check if QRs are "cute" (dots) and have a placeholder logo space (or handle missing logo gracefully).
