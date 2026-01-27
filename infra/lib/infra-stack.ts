@@ -7,6 +7,7 @@ import * as nodejs from 'aws-cdk-lib/aws-lambda-nodejs';
 import * as apigateway from 'aws-cdk-lib/aws-apigateway';
 import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as path from 'path';
+import * as wafv2 from 'aws-cdk-lib/aws-wafv2';
 
 export class InfraStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
@@ -46,6 +47,12 @@ export class InfraStack extends cdk.Stack {
       selfSignUpEnabled: true,
       signInAliases: { email: true },
       autoVerify: { email: true },
+      // Enable MFA
+      mfa: cognito.Mfa.OPTIONAL,
+      mfaSecondFactor: {
+        sms: true,
+        otp: true,
+      },
       passwordPolicy: {
         minLength: 8,
         requireLowercase: true,
@@ -62,7 +69,6 @@ export class InfraStack extends cdk.Stack {
 
     // Lambda Layer or Bundling
     const commonProps = {
-      runtime: lambda.Runtime.NODEJS_20_X,
       handler: 'handler',
       environment: {
         TABLE_NAME: table.tableName,
@@ -95,7 +101,7 @@ export class InfraStack extends cdk.Stack {
     });
     table.grantWriteData(adminGenerateFn);
 
-    // Lambda: Admin List (NEW)
+    // Lambda: Admin List
     const adminListFn = new nodejs.NodejsFunction(this, 'AdminListFn', {
       entry: path.join(__dirname, '../lambda/admin-list.ts'),
       ...commonProps,
@@ -113,7 +119,6 @@ export class InfraStack extends cdk.Stack {
     // Lambda: Shop & Product Mgmt (NEW)
     const shopMgmtFn = new nodejs.NodejsFunction(this, 'ShopMgmtFn', {
       entry: path.join(__dirname, '../lambda/shop-mgmt.ts'),
-      runtime: lambda.Runtime.NODEJS_20_X,
       handler: 'handler',
       environment: {
         TABLE_NAME: table.tableName,
@@ -284,6 +289,75 @@ export class InfraStack extends cdk.Stack {
 
     const submitResource = recipientResource.addResource('submit');
     submitResource.addMethod('POST', new apigateway.LambdaIntegration(recipientSubmitFn));
+
+    // --- WAF Setup for Admin IP Restriction ---
+
+    // 1. IP Set (Allowed IPs)
+    const allowedIpSet = new wafv2.CfnIPSet(this, 'AdminAllowedIPs', {
+      name: 'AdminAllowedIPs',
+      scope: 'REGIONAL',
+      ipAddressVersion: 'IPV4',
+      addresses: [
+        '115.65.249.220/32' // User's IP
+      ],
+      description: 'Allowed IPs for Admin access',
+    });
+
+    // 2. Web ACL
+    const webAcl = new wafv2.CfnWebACL(this, 'MeishiGawariniWebACL', {
+      name: 'MeishiGawariniWebACL',
+      scope: 'REGIONAL',
+      defaultAction: { allow: {} },
+      visibilityConfig: {
+        cloudWatchMetricsEnabled: true,
+        metricName: 'MeishiGawariniWebACL',
+        sampledRequestsEnabled: true,
+      },
+      rules: [
+        {
+          name: 'BlockAdminOutsideIp',
+          priority: 100,
+          statement: {
+            andStatement: {
+              statements: [
+                {
+                  byteMatchStatement: {
+                    fieldToMatch: { uriPath: {} },
+                    positionalConstraint: 'STARTS_WITH',
+                    searchString: '/admin',
+                    textTransformations: [{ priority: 0, type: 'NONE' }]
+                  }
+                },
+                {
+                  notStatement: {
+                    statement: {
+                      ipSetReferenceStatement: {
+                        arn: allowedIpSet.attrArn
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          action: { block: {} },
+          visibilityConfig: {
+            cloudWatchMetricsEnabled: true,
+            metricName: 'BlockAdminOutsideIp',
+            sampledRequestsEnabled: true,
+          }
+        }
+      ]
+    });
+
+    // 3. Associate with API Gateway
+    // API Gateway deployment stage ARN: arn:aws:apigateway:region::/restapi_id/stages/stage_name
+    const apiGatewayArn = `arn:aws:apigateway:${this.region}::/restapis/${api.restApiId}/stages/${api.deploymentStage.stageName}`;
+
+    new wafv2.CfnWebACLAssociation(this, 'ApiGatewayAssociation', {
+      resourceArn: apiGatewayArn,
+      webAclArn: webAcl.attrArn,
+    });
 
 
     // Outputs
