@@ -157,16 +157,44 @@ export class InfraStack extends cdk.Stack {
       },
     });
 
+    // Create Administrators Group
+    new cognito.CfnUserPoolGroup(this, 'AdministratorsGroup', {
+      userPoolId: userPool.userPoolId,
+      groupName: 'Administrators',
+      description: 'Admin users with access to dashboard',
+    });
+
+    // Shop Authorizer (Cognito) - Reused for Admin for now (Authenticated User)
+    const authorizer = new apigateway.CognitoUserPoolsAuthorizer(this, 'ShopAuthorizer', {
+      cognitoUserPools: [userPool],
+    });
+
+    // Lambda: Admin Auth Verify (NEW)
+    const adminAuthVerifyFn = new nodejs.NodejsFunction(this, 'AdminAuthVerifyFn', {
+      entry: path.join(__dirname, '../lambda/admin-auth-verify.ts'),
+      ...commonProps,
+    });
+    // Valid permissions if needed (none for now as it just checks context)
+
     // Admin Routes
     const adminResource = api.root.addResource('admin');
+    const authResource = adminResource.addResource('auth');
+    const verifyResource = authResource.addResource('verify');
+
+    // GET /admin/auth/verify - Authenticated Only
+    verifyResource.addMethod('GET', new apigateway.LambdaIntegration(adminAuthVerifyFn), {
+      authorizer,
+      authorizationType: apigateway.AuthorizationType.COGNITO
+    });
+
     const qrResource = adminResource.addResource('qrcodes');
     const generateResource = qrResource.addResource('generate');
-    // For now, no auth on admin API in this prototype or use IAM? 
-    // Usually admin API should be protected. I'll leave it open or use API Key for simplicity for now?
-    // User requested "Admin controls". I'll use API Key for simple protection or Cognito?
-    // For simplicity in prototype, I'll add API Key requirement or just open for dev.
-    // I'll leave open but comment.
-    generateResource.addMethod('POST', new apigateway.LambdaIntegration(adminGenerateFn));
+
+    // Protect Admin API with Cognito Auth
+    generateResource.addMethod('POST', new apigateway.LambdaIntegration(adminGenerateFn), {
+      authorizer,
+      authorizationType: apigateway.AuthorizationType.COGNITO
+    });
 
     // Lambda: Admin Update (NEW)
     const adminUpdateFn = new nodejs.NodejsFunction(this, 'AdminUpdateFn', {
@@ -176,7 +204,10 @@ export class InfraStack extends cdk.Stack {
     table.grantReadWriteData(adminUpdateFn);
 
     // Admin List Route
-    qrResource.addMethod('GET', new apigateway.LambdaIntegration(adminListFn));
+    qrResource.addMethod('GET', new apigateway.LambdaIntegration(adminListFn), {
+      authorizer,
+      authorizationType: apigateway.AuthorizationType.COGNITO
+    });
 
     // Lambda: Admin Delete Banned
     const adminDeleteBannedFn = new nodejs.NodejsFunction(this, 'AdminDeleteBannedFn', {
@@ -186,21 +217,22 @@ export class InfraStack extends cdk.Stack {
     table.grantReadWriteData(adminDeleteBannedFn);
 
     const bannedResource = qrResource.addResource('banned');
-    bannedResource.addMethod('DELETE', new apigateway.LambdaIntegration(adminDeleteBannedFn));
+    bannedResource.addMethod('DELETE', new apigateway.LambdaIntegration(adminDeleteBannedFn), {
+      authorizer,
+      authorizationType: apigateway.AuthorizationType.COGNITO
+    });
 
     // Admin QR Detail Routes
     const adminQrDetail = qrResource.addResource('{uuid}');
     const banResource = adminQrDetail.addResource('ban');
-    banResource.addMethod('POST', new apigateway.LambdaIntegration(adminUpdateFn));
+    banResource.addMethod('POST', new apigateway.LambdaIntegration(adminUpdateFn), {
+      authorizer,
+      authorizationType: apigateway.AuthorizationType.COGNITO
+    });
 
     // Shop Routes (Legacy & Activation)
     const shopResource = api.root.addResource('shop');
     const activateResource = shopResource.addResource('activate');
-
-    // Shop Authorizer (Cognito)
-    const authorizer = new apigateway.CognitoUserPoolsAuthorizer(this, 'ShopAuthorizer', {
-      cognitoUserPools: [userPool],
-    });
 
     activateResource.addMethod('POST', new apigateway.LambdaIntegration(shopActivateFn), {
       authorizer,

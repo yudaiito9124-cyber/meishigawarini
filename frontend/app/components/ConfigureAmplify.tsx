@@ -1,9 +1,10 @@
 'use client';
 
 import { Amplify } from 'aws-amplify';
+import { APP_CONFIG } from "@/lib/config";
 
-const userPoolId = process.env.NEXT_PUBLIC_COGNITO_USER_POOL_ID;
-const userPoolClientId = process.env.NEXT_PUBLIC_COGNITO_CLIENT_ID;
+const userPoolId = APP_CONFIG.NEXT_PUBLIC_COGNITO_USER_POOL_ID;
+const userPoolClientId = APP_CONFIG.NEXT_PUBLIC_COGNITO_CLIENT_ID;
 
 if (userPoolId && userPoolClientId) {
     Amplify.configure({

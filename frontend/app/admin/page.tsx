@@ -1,9 +1,8 @@
-
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
-import { getCurrentUser } from 'aws-amplify/auth';
+import { notFound } from "next/navigation";
+import { getCurrentUser, fetchAuthSession } from 'aws-amplify/auth';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
@@ -12,52 +11,100 @@ import { APP_CONFIG } from "@/lib/config";
 import jsPDF from 'jspdf';
 
 export default function AdminPage() {
-    const router = useRouter();
     const [count, setCount] = useState(10);
     const [generatedBatches, setGeneratedBatches] = useState<any[]>([]);
+    const [isAuthorized, setIsAuthorized] = useState<boolean | null>(null); // null = loading
 
     const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
     useEffect(() => {
         const checkAuth = async () => {
             try {
-                await getCurrentUser();
+                const session = await fetchAuthSession();
+                const token = session.tokens?.accessToken?.toString();
+
+                if (!token) throw new Error("No session");
+
+                const res = await fetch(`${API_URL}/admin/auth/verify`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.isAdmin) {
+                        setIsAuthorized(true);
+                    } else {
+                        // User exists but is not Admin -> 404
+                        setIsAuthorized(false);
+                        notFound();
+                    }
+                } else {
+                    // API Error or Token invalid -> 404
+                    setIsAuthorized(false);
+                    notFound();
+                }
             } catch (e) {
-                router.replace('/login');
+                // Not logged in or error -> 404
+                setIsAuthorized(false);
+                notFound();
             }
         };
         checkAuth();
-    }, [router]);
+    }, []);
+
+
+    notFound();
+
+    // Show nothing (or loading spinner) while checking
+    if (isAuthorized === null) {
+        return <div className="min-h-screen bg-gray-50 flex items-center justify-center">Loading...</div>;
+    }
+
+    // Double safety: If not authorized (and notFound hasn't redirected yet), don't show content
+    if (!isAuthorized) {
+        return null;
+    }
 
     const handleGenerate = async () => {
-        const res = await fetch(`${API_URL}/admin/qrcodes/generate`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ count }),
-        });
+        try {
+            const session = await fetchAuthSession();
+            const token = session.tokens?.accessToken?.toString();
 
-        if (res.ok) {
-            const data = await res.json();
-            const now = new Date();
-            const pad = (n: number) => n.toString().padStart(2, '0');
-            const timeStr = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
-            const ms = Math.floor(now.getMilliseconds() / 10).toString().padStart(2, '0');
+            const res = await fetch(`${API_URL}/admin/qrcodes/generate`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${token}`
+                },
+                body: JSON.stringify({ count }),
+            });
 
-            const newBatch = {
-                id: `batch-${timeStr}${ms}`,
-                count: data.count,
-                date: now.toLocaleString(),
-                status: "Ready",
-                codes: data.data // Store the codes
-            };
-            setGeneratedBatches([newBatch, ...generatedBatches]);
-            // In a real app, we would process 'data.data' (UUIDs/PINs) to generate PDF/CSV 
-            console.log("Generated Codes:", data.data);
+            if (res.ok) {
+                const data = await res.json();
+                const now = new Date();
+                const pad = (n: number) => n.toString().padStart(2, '0');
+                const timeStr = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+                const ms = Math.floor(now.getMilliseconds() / 10).toString().padStart(2, '0');
 
-            // Automatically download PDF
-            await generatePDF(newBatch);
-        } else {
-            alert("Failed to generate QR codes");
+                const newBatch = {
+                    id: `batch-${timeStr}${ms}`,
+                    count: data.count,
+                    date: now.toLocaleString(),
+                    status: "Ready",
+                    codes: data.data // Store the codes
+                };
+                setGeneratedBatches([newBatch, ...generatedBatches]);
+                // In a real app, we would process 'data.data' (UUIDs/PINs) to generate PDF/CSV 
+                console.log("Generated Codes:", data.data);
+
+                // Automatically download PDF
+                await generatePDF(newBatch);
+            } else {
+                alert("Failed to generate QR codes");
+            }
+        } catch (e) {
+            console.error(e);
+            alert("Error generating codes");
         }
     };
 
@@ -290,7 +337,14 @@ function QRCodeListSection({ apiUrl }: { apiUrl: string }) {
     const fetchCodes = async () => {
         setLoading(true);
         try {
-            const res = await fetch(`${apiUrl}/admin/qrcodes?status=${status}`);
+            const session = await fetchAuthSession();
+            const token = session.tokens?.accessToken?.toString();
+
+            const res = await fetch(`${apiUrl}/admin/qrcodes?status=${status}`, {
+                headers: {
+                    "Authorization": `Bearer ${token}`
+                }
+            });
             if (res.ok) {
                 const data = await res.json();
                 setCodes(data.items || []);
@@ -314,8 +368,14 @@ function QRCodeListSection({ apiUrl }: { apiUrl: string }) {
 
         setLoading(true);
         try {
+            const session = await fetchAuthSession();
+            const token = session.tokens?.accessToken?.toString();
+
             const res = await fetch(`${apiUrl}/admin/qrcodes/banned`, {
-                method: 'DELETE'
+                method: 'DELETE',
+                headers: {
+                    "Authorization": `Bearer ${token}`
+                }
             });
             if (res.ok) {
                 const data = await res.json();
@@ -434,8 +494,14 @@ function BanButton({ uuid, apiUrl, onSuccess }: { uuid: string, apiUrl: string, 
         if (!confirm('Are you sure you want to BAN this QR code? It will stop working immediately.')) return;
         setLoading(true);
         try {
+            const session = await fetchAuthSession();
+            const token = session.tokens?.accessToken?.toString();
+
             const res = await fetch(`${apiUrl}/admin/qrcodes/${uuid}/ban`, {
-                method: 'POST'
+                method: 'POST',
+                headers: {
+                    "Authorization": `Bearer ${token}`
+                }
             });
             if (res.ok) {
                 onSuccess();
