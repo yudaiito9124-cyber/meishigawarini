@@ -1,8 +1,0 @@
-
-### for debug
-add .env.local file
-```
-NEXT_PUBLIC_API_URL=https://cs8f9x08p5.execute-api.ap-northeast-1.amazonaws.com/prod
-NEXT_PUBLIC_COGNITO_USER_POOL_ID=ap-northeast-1_kdVaLx6Rn
-NEXT_PUBLIC_COGNITO_CLIENT_ID=2dusqokqmc8lfa1rpffv1gbuvv
-```

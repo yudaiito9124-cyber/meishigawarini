@@ -9,68 +9,66 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { APP_CONFIG } from "@/lib/config";
 import jsPDF from 'jspdf';
+const NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
 export default function AdminPage() {
     const [count, setCount] = useState(10);
     const [generatedBatches, setGeneratedBatches] = useState<any[]>([]);
     const [isAuthorized, setIsAuthorized] = useState<boolean | null>(null); // null = loading
 
-    const API_URL = APP_CONFIG.API_URL;
 
     useEffect(() => {
         const checkAuth = async () => {
             try {
                 const session = await fetchAuthSession();
-                const token = session.tokens?.accessToken?.toString();
+                const token = session.tokens?.idToken?.toString();
 
-                if (!token) throw new Error("No session");
-
-                const res = await fetch(`${API_URL}/admin/auth/verify`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
+                // APIを叩く
+                const res = await fetch(`${NEXT_PUBLIC_API_URL}/admin`, {
+                    headers: { "Authorization": `Bearer ${token}` }
                 });
 
-                if (res.ok) {
-                    const data = await res.json();
-                    if (data.isAdmin) {
-                        setIsAuthorized(true);
-                    } else {
-                        // User exists but is not Admin -> 404
-                        setIsAuthorized(false);
-                        notFound();
-                    }
-                } else {
-                    // API Error or Token invalid -> 404
+                // 404が返ってきたら、即座に notFound 実行
+                if (res.status === 404) {
                     setIsAuthorized(false);
-                    notFound();
+                    return notFound(); // 直接 return する
+                }
+
+                if (res.ok) {
+                    setIsAuthorized(true);
+                } else {
+                    setIsAuthorized(false);
+                    return notFound();
                 }
             } catch (e) {
-                // Not logged in or error -> 404
+                console.error("Auth check failed", e);
                 setIsAuthorized(false);
-                notFound();
+                return notFound(); // ここで標準404へ
+
             }
         };
         checkAuth();
     }, []);
 
 
-    notFound();
 
-    // Show nothing (or loading spinner) while checking
+    // notFound();
     if (isAuthorized === null) {
-        return <div className="min-h-screen bg-gray-50 flex items-center justify-center">Loading...</div>;
+        return null; // 判定が終わるまでページの中身を一切レンダリングさせない
     }
 
-    // Double safety: If not authorized (and notFound hasn't redirected yet), don't show content
-    if (!isAuthorized) {
+    if (isAuthorized === false) {
+        notFound();
         return null;
     }
+
 
     const handleGenerate = async () => {
         try {
             const session = await fetchAuthSession();
-            const token = session.tokens?.accessToken?.toString();
+            const token = session.tokens?.idToken?.toString();
 
-            const res = await fetch(`${API_URL}/admin/qrcodes/generate`, {
+            const res = await fetch(`${NEXT_PUBLIC_API_URL}/admin/qrcodes/generate`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
@@ -116,7 +114,7 @@ export default function AdminPage() {
         const QRCodeStyling = (await import('qr-code-styling')).default;
 
         const doc = new jsPDF();
-        // const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://example.com'; // Replaced by APP_CONFIG.APP_URL
+        // const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://example.com'; // Replaced by process.env.APP_URL
 
         // Layout Settings for A4
         const pageWidth = 210; // mm
@@ -158,7 +156,7 @@ export default function AdminPage() {
                 const qr = new QRCodeStyling({
                     width: 300,
                     height: 300,
-                    data: `${APP_CONFIG.APP_URL}/receive/${code.uuid}`,
+                    data: `${process.env.APP_URL}/receive/${code.uuid}`,
                     image: APP_CONFIG.QR_LOGO_PATH, // Placeholder Logo
                     qrOptions: {
                         typeNumber: 0,
@@ -323,7 +321,7 @@ export default function AdminPage() {
 
                 {/* <div className="border-t pt-6"></div> */}
 
-                <QRCodeListSection apiUrl={API_URL} />
+                <QRCodeListSection apiUrl={NEXT_PUBLIC_API_URL} />
             </div>
         </div>
     );
@@ -338,7 +336,7 @@ function QRCodeListSection({ apiUrl }: { apiUrl: string }) {
         setLoading(true);
         try {
             const session = await fetchAuthSession();
-            const token = session.tokens?.accessToken?.toString();
+            const token = session.tokens?.idToken?.toString();
 
             const res = await fetch(`${apiUrl}/admin/qrcodes?status=${status}`, {
                 headers: {
@@ -369,7 +367,7 @@ function QRCodeListSection({ apiUrl }: { apiUrl: string }) {
         setLoading(true);
         try {
             const session = await fetchAuthSession();
-            const token = session.tokens?.accessToken?.toString();
+            const token = session.tokens?.idToken?.toString();
 
             const res = await fetch(`${apiUrl}/admin/qrcodes/banned`, {
                 method: 'DELETE',
@@ -495,7 +493,7 @@ function BanButton({ uuid, apiUrl, onSuccess }: { uuid: string, apiUrl: string, 
         setLoading(true);
         try {
             const session = await fetchAuthSession();
-            const token = session.tokens?.accessToken?.toString();
+            const token = session.tokens?.idToken?.toString();
 
             const res = await fetch(`${apiUrl}/admin/qrcodes/${uuid}/ban`, {
                 method: 'POST',

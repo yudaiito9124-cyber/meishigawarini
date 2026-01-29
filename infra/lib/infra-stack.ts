@@ -157,6 +157,54 @@ export class InfraStack extends cdk.Stack {
       },
     });
 
+    // // 認証エラー(401)が発生したときも、404を返すように上書きする設定
+    // api.addGatewayResponse('Default401Response', {
+    //   type: apigateway.ResponseType.UNAUTHORIZED,
+    //   statusCode: '404',
+    //   templates: {
+    //     'application/json': '{"message": "Not Found"}'
+    //   }
+    // });
+
+    // // 権限エラー(403)が発生したときも、404を返すように上書き
+    // api.addGatewayResponse('Default403Response', {
+    //   type: apigateway.ResponseType.ACCESS_DENIED,
+    //   statusCode: '404',
+    //   templates: {
+    //     'application/json': '{"message": "Not Found"}'
+    //   }
+    // });
+
+    // --- 認証エラー(401)を 404 に偽装しつつ CORS を許可 ---
+    api.addGatewayResponse('Default401Response', {
+      type: apigateway.ResponseType.UNAUTHORIZED,
+      statusCode: '404',
+      responseParameters: {
+        // ヘッダー名にはシングルクォート、値にはシングル＋ダブルクォートが必要
+        'gatewayresponse.header.Access-Control-Allow-Origin': "'*'",
+        'gatewayresponse.header.Access-Control-Allow-Headers': "'*'",
+        'gatewayresponse.header.Access-Control-Allow-Methods': "'GET,POST,PUT,DELETE,OPTIONS,PATCH'",
+      },
+      templates: {
+        'application/json': '{"message": "Not Found."}'
+      }
+    } as any); // オブジェクト全体を any でキャストして型エラー(ts2353)を消す
+
+    // --- 権限エラー(403)を 404 に偽装しつつ CORS を許可 ---
+    api.addGatewayResponse('Default403Response', {
+      type: apigateway.ResponseType.ACCESS_DENIED,
+      statusCode: '404',
+      responseParameters: {
+        'gatewayresponse.header.Access-Control-Allow-Origin': "'*'",
+        'gatewayresponse.header.Access-Control-Allow-Headers': "'*'",
+        'gatewayresponse.header.Access-Control-Allow-Methods': "'GET,POST,PUT,DELETE,OPTIONS,PATCH'",
+      },
+      templates: {
+        'application/json': '{"message": "Not Found."}'
+      }
+    } as any);
+
+
     // Create Administrators Group
     new cognito.CfnUserPoolGroup(this, 'AdministratorsGroup', {
       userPoolId: userPool.userPoolId,
@@ -169,22 +217,17 @@ export class InfraStack extends cdk.Stack {
       cognitoUserPools: [userPool],
     });
 
-    // Lambda: Admin Auth Verify (NEW)
-    const adminAuthVerifyFn = new nodejs.NodejsFunction(this, 'AdminAuthVerifyFn', {
-      entry: path.join(__dirname, '../lambda/admin-auth-verify.ts'),
+    // Admin-check用のLambda関数
+    const adminCheckFn = new nodejs.NodejsFunction(this, 'AdminCheckFn', {
+      entry: path.join(__dirname, '../lambda/admin-check.ts'),
       ...commonProps,
     });
-    // Valid permissions if needed (none for now as it just checks context)
 
     // Admin Routes
     const adminResource = api.root.addResource('admin');
-    const authResource = adminResource.addResource('auth');
-    const verifyResource = authResource.addResource('verify');
-
-    // GET /admin/auth/verify - Authenticated Only
-    verifyResource.addMethod('GET', new apigateway.LambdaIntegration(adminAuthVerifyFn), {
+    adminResource.addMethod('GET', new apigateway.LambdaIntegration(adminCheckFn), {
       authorizer,
-      authorizationType: apigateway.AuthorizationType.COGNITO
+      authorizationType: apigateway.AuthorizationType.COGNITO,
     });
 
     const qrResource = adminResource.addResource('qrcodes');
@@ -344,8 +387,9 @@ export class InfraStack extends cdk.Stack {
     const submitResource = recipientResource.addResource('submit');
     submitResource.addMethod('POST', new apigateway.LambdaIntegration(recipientSubmitFn));
 
-    // --- WAF Setup for Admin IP Restriction ---
 
+    // ######################### ここからIP制限
+    // --- WAF Setup for Admin IP Restriction ---
     // 1. IP Set (Allowed IPs)
     const allowedIpSet = new wafv2.CfnIPSet(this, 'AdminAllowedIPs', {
       name: 'AdminAllowedIPs',
@@ -358,60 +402,64 @@ export class InfraStack extends cdk.Stack {
     });
 
     // 2. Web ACL
-    const webAcl = new wafv2.CfnWebACL(this, 'MeishiGawariniWebACL', {
-      name: 'MeishiGawariniWebACL',
-      scope: 'REGIONAL',
-      defaultAction: { allow: {} },
-      visibilityConfig: {
-        cloudWatchMetricsEnabled: true,
-        metricName: 'MeishiGawariniWebACL',
-        sampledRequestsEnabled: true,
-      },
-      rules: [
-        {
-          name: 'BlockAdminOutsideIp',
-          priority: 100,
-          statement: {
-            andStatement: {
-              statements: [
-                {
-                  byteMatchStatement: {
-                    fieldToMatch: { uriPath: {} },
-                    positionalConstraint: 'STARTS_WITH',
-                    searchString: '/admin',
-                    textTransformations: [{ priority: 0, type: 'NONE' }]
-                  }
-                },
-                {
-                  notStatement: {
-                    statement: {
-                      ipSetReferenceStatement: {
-                        arn: allowedIpSet.attrArn
-                      }
-                    }
-                  }
-                }
-              ]
-            }
-          },
-          action: { block: {} },
-          visibilityConfig: {
-            cloudWatchMetricsEnabled: true,
-            metricName: 'BlockAdminOutsideIp',
-            sampledRequestsEnabled: true,
-          }
-        }
-      ]
-    });
+    // const webAcl = new wafv2.CfnWebACL(this, 'MeishiGawariniWebACL', {
+    //   name: 'MeishiGawariniWebACL',
+    //   scope: 'REGIONAL',
+    //   defaultAction: { allow: {} },
+    //   visibilityConfig: {
+    //     cloudWatchMetricsEnabled: true,
+    //     metricName: 'MeishiGawariniWebACL',
+    //     sampledRequestsEnabled: true,
+    //   },
+    //   rules: [
+    //     {
+    //       name: 'BlockAdminOutsideIp',
+    //       priority: 100,
+    //       statement: {
+    //         andStatement: {
+    //           statements: [
+    //             {
+    //               byteMatchStatement: {
+    //                 fieldToMatch: { uriPath: {} },
+    //                 positionalConstraint: 'STARTS_WITH',
+    //                 searchString: '/admin',
+    //                 textTransformations: [{ priority: 0, type: 'NONE' }]
+    //               }
+    //             },
+    //             {
+    //               notStatement: {
+    //                 statement: {
+    //                   ipSetReferenceStatement: {
+    //                     arn: allowedIpSet.attrArn
+    //                   }
+    //                 }
+    //               }
+    //             }
+    //           ]
+    //         }
+    //       },
+    //       action: { block: {} },
+    //       visibilityConfig: {
+    //         cloudWatchMetricsEnabled: true,
+    //         metricName: 'BlockAdminOutsideIp',
+    //         sampledRequestsEnabled: true,
+    //       }
+    //     }
+    //   ]
+    // });
 
     // 3. Associate with API Gateway
     // API Gateway deployment stage ARN: arn:aws:apigateway:region::/restapi_id/stages/stage_name
-    const apiGatewayArn = `arn:aws:apigateway:${this.region}::/restapis/${api.restApiId}/stages/${api.deploymentStage.stageName}`;
+    // const apiGatewayArn = `arn:aws:apigateway:${this.region}::/restapis/${api.restApiId}/stages/${api.deploymentStage.stageName}`;
 
-    new wafv2.CfnWebACLAssociation(this, 'ApiGatewayAssociation', {
-      resourceArn: apiGatewayArn,
-      webAclArn: webAcl.attrArn,
-    });
+    // new wafv2.CfnWebACLAssociation(this, 'ApiGatewayAssociation', {
+    //   resourceArn: apiGatewayArn,
+    //   webAclArn: webAcl.attrArn,
+    // });
+    // ######################### ここまでIP制限
+
+
+
 
 
     // Outputs

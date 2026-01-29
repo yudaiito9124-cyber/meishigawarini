@@ -26,9 +26,9 @@
 
     | キー | 値 |
     | :--- | :--- |
-    | `NEXT_PUBLIC_API_URL` | `https://cs8f9x08p5.execute-api.ap-northeast-1.amazonaws.com/prod` |
-    | `NEXT_PUBLIC_COGNITO_USER_POOL_ID` | `ap-northeast-1_kdVaLx6Rn` |
-    | `NEXT_PUBLIC_COGNITO_CLIENT_ID` | `2dusqokqmc8lfa1rpffv1gbuvv` |
+    | `NEXT_PUBLIC_NEXT_PUBLIC_API_URL` | `https://cs8f9x08p5.execute-api.ap-northeast-1.amazonaws.com/prod` |
+    | `COGNITO_USER_POOL_ID` | `ap-northeast-1_kdVaLx6Rn` |
+    | `COGNITO_CLIENT_ID` | `2dusqokqmc8lfa1rpffv1gbuvv` |
 
     > ※ `NEXT_PUBLIC_COGNITO_REGION` はコード内で使用されていないようですが、念のため `ap-northeast-1` と設定しても構いません。
 

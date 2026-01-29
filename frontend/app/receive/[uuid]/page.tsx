@@ -7,13 +7,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card";
-import { APP_CONFIG } from "@/lib/config";
 
-const API_URL = APP_CONFIG.API_URL;
+
+const NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
 // Fetch Gift Details
 const fetchGiftDetails = async (uuid: string) => {
-    const res = await fetch(`${API_URL}/recipient/qrcodes/${uuid}`, {
+    const res = await fetch(`${NEXT_PUBLIC_API_URL}/recipient/qrcodes/${uuid}`, {
         method: "GET",
     });
 
@@ -25,7 +25,7 @@ const fetchGiftDetails = async (uuid: string) => {
 
 // Submit Address
 const submitAddress = async (uuid: string, pin: string, addressData: any) => {
-    const res = await fetch(`${API_URL}/recipient/submit`, {
+    const res = await fetch(`${NEXT_PUBLIC_API_URL}/recipient/submit`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
