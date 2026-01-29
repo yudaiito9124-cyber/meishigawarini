@@ -15,7 +15,7 @@ export default function AdminPage() {
     const [generatedBatches, setGeneratedBatches] = useState<any[]>([]);
     const [isAuthorized, setIsAuthorized] = useState<boolean | null>(null); // null = loading
 
-    const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
+    const API_URL = APP_CONFIG.API_URL;
 
     useEffect(() => {
         const checkAuth = async () => {

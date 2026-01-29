@@ -1,7 +1,9 @@
 
 import { fetchAuthSession } from 'aws-amplify/auth';
+import { APP_CONFIG } from "@/lib/config";
+const API_URL = APP_CONFIG.API_URL;
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || '';
+
 
 export async function fetchWithAuth(path: string, options: RequestInit = {}) {
     try {

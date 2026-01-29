@@ -1,4 +1,3 @@
-
 import { APIGatewayProxyHandler } from 'aws-lambda';
 import { DynamoDBClient, BatchWriteItemCommand } from '@aws-sdk/client-dynamodb';
 import * as crypto from 'crypto';

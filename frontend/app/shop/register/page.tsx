@@ -5,12 +5,13 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { APP_CONFIG } from "@/lib/config";
 
 export default function ShopRegisterPage() {
     const [name, setName] = useState("");
     const [loading, setLoading] = useState(false);
     const router = useRouter();
-    const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
+    const API_URL = APP_CONFIG.API_URL;
 
     const handleRegister = async () => {
         if (!name) return;

@@ -12,7 +12,6 @@ import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, Tabl
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import QRScanner from '@/components/ui/qr-scanner';
 import { APP_CONFIG } from "@/lib/config";
-
 const API_URL = APP_CONFIG.API_URL;
 
 // --- Effects ---
