@@ -39,7 +39,11 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 
         for (let i = 0; i < count; i++) {
             const uuid = crypto.randomUUID();
-            const pin = Math.floor(1000 + Math.random() * 9000).toString(); // 4 digit PIN
+            let pin = '';
+            do {
+                // Cryptographically secure random number
+                pin = crypto.randomInt(10000000, 100000000).toString();
+            } while (/^(\d)\1+$/.test(pin)); // 8 digit PIN, avoid repdigits
 
             items.push({
                 PutRequest: {
