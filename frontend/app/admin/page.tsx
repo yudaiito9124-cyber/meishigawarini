@@ -114,22 +114,46 @@ export default function AdminPage() {
         const QRCodeStyling = (await import('qr-code-styling')).default;
 
         const doc = new jsPDF();
-        // const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://example.com'; // Replaced by process.env.APP_URL
+        const APP_URL = process.env.NEXT_PUBLIC_APP_URL || ''; // Replaced by process.env.APP_URL
+
+        // Background Image
+        const bgImgf = new Image();
+        const bgImgb = new Image();
+        bgImgf.src = '/cardimage-f-1.png';
+        bgImgb.src = '/cardimage-b-1.png';
+        await new Promise((resolve) => {
+            bgImgf.onload = resolve;
+            bgImgb.onload = resolve;
+        });
+
 
         // Layout Settings for A4
         const pageWidth = 210; // mm
         const pageHeight = 297; // mm
+
+        // Card Size
+        const cardWidth = 85.60; // mm
+        const cardHeight = 53.98; // mm
+
         const cols = 2;
         const rows = 5;
-        const cellWidth = pageWidth / cols;
-        const cellHeight = pageHeight / rows;
+
+        // Calculate Margins to Center the Grid
+        const totalGridWidth = cols * cardWidth;
+        const totalGridHeight = rows * cardHeight;
+        const marginLeft = (pageWidth - totalGridWidth) / 2;
+        const marginTop = (pageHeight - totalGridHeight) / 2;
+
         const itemsPerPage = cols * rows;
 
         // Helper to get position
         const getFrontPos = (indexInPage: number) => {
             const row = Math.floor(indexInPage / cols);
             const col = indexInPage % cols;
-            return { x: col * cellWidth, y: row * cellHeight };
+            return {
+                x: marginLeft + col * cardWidth,
+                y: marginTop + row * cardHeight
+            };
         };
 
         // Helper for Back Page (Mirrored columns)
@@ -139,7 +163,10 @@ export default function AdminPage() {
             const row = Math.floor(indexInPage / cols);
             const col = indexInPage % cols;
             const mirroredCol = cols - col - 1;
-            return { x: mirroredCol * cellWidth, y: row * cellHeight };
+            return {
+                x: marginLeft + mirroredCol * cardWidth,
+                y: marginTop + row * cardHeight
+            };
         };
 
         for (let i = 0; i < codes.length; i += itemsPerPage) {
@@ -150,6 +177,9 @@ export default function AdminPage() {
             for (let j = 0; j < pageCodes.length; j++) {
                 const code = pageCodes[j];
                 const { x, y } = getFrontPos(j);
+
+                // Draw Background Image
+                doc.addImage(bgImgf, 'PNG', x, y, cardWidth, cardHeight);
 
                 // Create Custom QR
                 //https://qr-code-styling.com/
@@ -184,7 +214,7 @@ export default function AdminPage() {
                     },
                     backgroundOptions: {
                         round: 0,
-                        color: "#fcfcfc"
+                        color: "#ffffff" // Transparent background for QR not supported well in all viewers, keeping white for safety or custom
                     },
                     cornersSquareOptions: {
                         type: "extra-rounded",
@@ -209,17 +239,30 @@ export default function AdminPage() {
                     reader.readAsDataURL(blob);
                 });
 
-                // Draw Cell Border
-                doc.setDrawColor(200);
-                doc.rect(x, y, cellWidth, cellHeight);
+                // Draw Corner Dots (Cut marks)
+                doc.setFillColor(0, 0, 0); // Black
+                const dotRadius = 0.5; // mm radius
+
+                // Top Left
+                doc.circle(x, y, dotRadius, 'F');
+                // Top Right
+                doc.circle(x + cardWidth, y, dotRadius, 'F');
+                // Bottom Left
+                doc.circle(x, y + cardHeight, dotRadius, 'F');
+                // Bottom Right
+                doc.circle(x + cardWidth, y + cardHeight, dotRadius, 'F');
 
                 // Draw QR
-                const qrSize = 40;
-                doc.addImage(base64data, 'PNG', x + (cellWidth - qrSize) / 2, y + cellHeight / 2 - qrSize / 2, qrSize, qrSize);
+                const qrSize = 26; // Slightly smaller to fit better
+                // Position QR: Center horizontally, slightly above center vertically or as per design
+                // Let's place it somewhat centrally
+                doc.addImage(base64data, 'PNG', x + (cardWidth - qrSize) - 4, y + cardHeight / 2 - qrSize / 2 + 8, qrSize, qrSize);
 
-                doc.setFontSize(15);
+                doc.setFontSize(12);
+                doc.setTextColor(255, 255, 255); // White text assuming dark background, change if needed
                 doc.setFont("helvetica", "bold");
-                doc.text(`Gift for you !`, x + cellWidth / 2, y + 8, { align: 'center' });
+                // const textWidth = doc.getTextWidth(`Gift for you !`);
+                // doc.text(`Gift for you !`, x + (cardWidth - textWidth) / 2, y + 10);
             }
 
             doc.addPage(); // Back Page
@@ -229,20 +272,45 @@ export default function AdminPage() {
                 const code = pageCodes[j];
                 const { x, y } = getBackPos(j);
 
-                // Draw Cell Border
-                doc.setDrawColor(200);
-                doc.rect(x, y, cellWidth, cellHeight);
+                // Draw Background Image (Reuse same bg or different back bg?)
+                // Assuming same bg for now, typically back has instructions
+                doc.addImage(bgImgb, 'PNG', x, y, cardWidth, cardHeight);
+
+                // Draw Corner Dots
+                doc.setFillColor(0, 0, 0); // Black
+                const dotRadius = 0.5;
+
+                // Top Left
+                doc.circle(x, y, dotRadius, 'F');
+                // Top Right
+                doc.circle(x + cardWidth, y, dotRadius, 'F');
+                // Bottom Left
+                doc.circle(x, y + cardHeight, dotRadius, 'F');
+                // Bottom Right
+                doc.circle(x + cardWidth, y + cardHeight, dotRadius, 'F');
 
                 // Draw PIN
-                doc.setFontSize(12);
+                doc.setTextColor(0, 0, 0); // Reset to black or keep white depending on BG
+                // Let's make a white box for text readability if bg is complex, or just use white text with shadow
+                // Simple approach: White Text
+                doc.setTextColor(255, 255, 255);
+                doc.setTextColor(0, 0, 0);
+
+                doc.setFontSize(10);
                 doc.setFont("helvetica", "normal");
-                doc.text("Security PIN", x + cellWidth / 2, y + cellHeight / 2 - 10, { align: 'center' });
-                doc.setFontSize(24);
+                // const labelWidth = doc.getTextWidth("Security PIN");
+                // doc.text("Security PIN", x + (cardWidth - labelWidth) / 2, y + cardHeight / 2 - 8);
+
+                doc.setFontSize(20);
                 doc.setFont("helvetica", "bold");
-                doc.text(code.pin, x + cellWidth / 2, y + cellHeight / 2 + 5, { align: 'center' });
-                doc.setFontSize(8);
+                const pinWidth = doc.getTextWidth(code.pin);
+                doc.text(code.pin, x + (cardWidth - pinWidth) / 2 + 10, y + 16);
+
+                doc.setFontSize(5);
                 doc.setFont("helvetica", "normal");
-                doc.text(`${code.uuid.substring(0, 16)}...`, x + cellWidth / 2, y + cellHeight - 10, { align: 'center' });
+                const uuidText = `${code.uuid.substring(0, 16)}...`;
+                const uuidWidth = doc.getTextWidth(uuidText);
+                doc.text(uuidText, x + (cardWidth - uuidWidth) / 2, y + cardHeight - 1);
             }
         }
 
