@@ -136,7 +136,7 @@ export default function ShopPage() {
         const file = formData.get('image') as File;
 
         try {
-            let imageUrl = 'https://placehold.co/600x400?text=No+Image';
+            let imageUrl = 'https://placehold.co/1280x720?text=No+Image';
 
             // 1. Upload Image if exists
             if (file && file.size > 0) {
