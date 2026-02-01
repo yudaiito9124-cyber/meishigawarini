@@ -37,12 +37,12 @@ export default function ShopListPage() {
     const fetchShops = async () => {
         setLoading(true);
         try {
-            const res = await fetchWithAuth('/shops');
+            const res = await fetchWithAuth('/shop');
             if (res.ok) {
                 const data = await res.json();
                 setShops(data.shops || []);
             } else {
-                console.error('Failed to fetch shops');
+                console.error('Failed to fetch shop');
             }
         } catch (e) {
             console.error(e);
@@ -55,7 +55,7 @@ export default function ShopListPage() {
         e.preventDefault();
         setCreating(true);
         try {
-            const res = await fetchWithAuth('/shops', {
+            const res = await fetchWithAuth('/shop', {
                 method: 'POST',
                 body: JSON.stringify({ name: createName })
             });
@@ -142,11 +142,11 @@ export default function ShopListPage() {
                                     <CardTitle>{shop.name}</CardTitle>
                                     <CardDescription>{t('created', { date: new Date(shop.created_at).toLocaleString() })}</CardDescription>
                                 </CardHeader>
-                                <CardContent>
+                                {/* <CardContent>
                                     <div className="h-24 bg-gray-100 rounded flex items-center justify-center text-gray-400">
                                         Shop Logo / Image
                                     </div>
-                                </CardContent>
+                                </CardContent> */}
                                 <CardFooter>
                                     <Button className="w-full" variant="secondary" asChild>
                                         <div>{t('manageShop')}</div>

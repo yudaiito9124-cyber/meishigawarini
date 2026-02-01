@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useParams } from 'next/navigation';
+import { notFound, useParams } from 'next/navigation';
 import { useRouter } from '@/i18n/routing';
 import { useTranslations } from 'next-intl';
 import { getCurrentUser } from 'aws-amplify/auth';
@@ -54,41 +54,46 @@ export default function ShopPage() {
         // setLoading(true); // Don't block UI on refresh
         try {
             // 1. Get Shop Details
-            const shopRes = await fetchWithAuth(`/shops/${shopId}`);
+            const shopRes = await fetchWithAuth(`/shop/${shopId}`);
             if (!shopRes.ok) throw new Error('Failed to fetch shop');
             const shopData = await shopRes.json();
             setShop(shopData);
 
             // 2. Get Products
-            const prodRes = await fetchWithAuth(`/shops/${shopId}/products`);
+            const prodRes = await fetchWithAuth(`/shop/${shopId}/products`);
             if (prodRes.ok) {
                 const prodData = await prodRes.json();
                 setProducts(prodData.products || prodData.items || []);
             }
 
             // 3. Get QR Codes
-            const qrRes = await fetchWithAuth(`/shops/${shopId}/qrcodes`);
+            const qrRes = await fetchWithAuth(`/shop/${shopId}/qrcodes`);
             if (qrRes.ok) {
                 const qrData = await qrRes.json();
                 setQrCodes(qrData.items || []);
             }
 
             // 4. Get Orders
-            const orderRes = await fetchWithAuth(`/shops/${shopId}/orders`);
+            const orderRes = await fetchWithAuth(`/shop/${shopId}/orders`);
             if (orderRes.ok) {
                 const orderData = await orderRes.json();
                 setOrders(orderData.orders || orderData.items || []); // robust check
             }
 
         } catch (err: any) {
-            console.error(err);
+            // console.error(err);
             if (err.message === 'Unauthorized') {
+                router.push('/login');
+                return;
+            }
+            if (err.message === 'Failed to fetch shop') {
                 router.push('/login');
                 return;
             }
             setError(err.message);
         } finally {
             setLoading(false);
+            // router.push('/login')
         }
     };
 
@@ -155,7 +160,7 @@ export default function ShopPage() {
                 const resizedFile = new File([resizedBlob], filename, { type: file.type });
 
                 // Get Presigned URL
-                const uploadRes = await fetchWithAuth(`/shops/${shopId}/products/upload-url`, {
+                const uploadRes = await fetchWithAuth(`/shop/${shopId}/products/upload-url`, {
                     method: 'POST',
                     body: JSON.stringify({
                         filename: resizedFile.name,
@@ -179,7 +184,7 @@ export default function ShopPage() {
             }
 
             // 2. Create Product
-            const res = await fetchWithAuth(`/shops/${shopId}/products`, {
+            const res = await fetchWithAuth(`/shop/${shopId}/products`, {
                 method: 'POST',
                 body: JSON.stringify({
                     name: formData.get('name'),
@@ -212,7 +217,7 @@ export default function ShopPage() {
 
         try {
             // Atomic Link & Activate
-            const res = await fetchWithAuth(`/shops/${shopId}/link`, {
+            const res = await fetchWithAuth(`/shop/${shopId}/link`, {
                 method: 'POST',
                 body: JSON.stringify({
                     qr_id: uuid,
@@ -238,7 +243,7 @@ export default function ShopPage() {
         if (!confirm(t('product.deleteConfirm', { name: productName }))) return;
 
         try {
-            const res = await fetchWithAuth(`/shops/${shopId}/products/${productId}`, {
+            const res = await fetchWithAuth(`/shop/${shopId}/products/${productId}`, {
                 method: 'DELETE'
             });
 
@@ -255,7 +260,7 @@ export default function ShopPage() {
     const handleToggleStatus = async (productId: string, currentStatus: string) => {
         const newStatus = currentStatus === 'ACTIVE' ? 'STOPPED' : 'ACTIVE';
         try {
-            const res = await fetchWithAuth(`/shops/${shopId}/products/${productId}`, {
+            const res = await fetchWithAuth(`/shop/${shopId}/products/${productId}`, {
                 method: 'PATCH',
                 body: JSON.stringify({ status: newStatus })
             });
@@ -265,7 +270,7 @@ export default function ShopPage() {
 
     const handleShipOrder = async (qrId: string, trackingNumber: string) => {
         try {
-            const res = await fetchWithAuth(`/shops/${shopId}/orders/${qrId}`, {
+            const res = await fetchWithAuth(`/shop/${shopId}/orders/${qrId}`, {
                 method: 'PATCH',
                 body: JSON.stringify({ tracking_number: trackingNumber })
             });

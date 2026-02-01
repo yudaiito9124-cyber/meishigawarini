@@ -275,39 +275,39 @@ export class InfraStack extends cdk.Stack {
 
     // Shop Routes (Legacy & Activation)
     const shopResource = api.root.addResource('shop');
-    const activateResource = shopResource.addResource('activate');
+    // const activateResource = shopResource.addResource('activate');
 
-    activateResource.addMethod('POST', new apigateway.LambdaIntegration(shopActivateFn), {
-      authorizer,
-      authorizationType: apigateway.AuthorizationType.COGNITO,
-    });
+    // activateResource.addMethod('POST', new apigateway.LambdaIntegration(shopActivateFn), {
+    //   authorizer,
+    //   authorizationType: apigateway.AuthorizationType.COGNITO,
+    // });
 
-    const ordersResource = shopResource.addResource('orders');
-    ordersResource.addMethod('GET', new apigateway.LambdaIntegration(shopOrdersFn), {
-      authorizer,
-      authorizationType: apigateway.AuthorizationType.COGNITO
-    });
+    // const ordersResource = shopResource.addResource('orders');
+    // ordersResource.addMethod('GET', new apigateway.LambdaIntegration(shopOrdersFn), {
+    //   authorizer,
+    //   authorizationType: apigateway.AuthorizationType.COGNITO
+    // });
 
-    const orderDetailResource = ordersResource.addResource('{uuid}');
-    orderDetailResource.addMethod('PATCH', new apigateway.LambdaIntegration(shopOrdersFn), {
-      authorizer,
-      authorizationType: apigateway.AuthorizationType.COGNITO
-    });
+    // const orderDetailResource = ordersResource.addResource('{uuid}');
+    // orderDetailResource.addMethod('PATCH', new apigateway.LambdaIntegration(shopOrdersFn), {
+    //   authorizer,
+    //   authorizationType: apigateway.AuthorizationType.COGNITO
+    // });
 
     // New Shops Resource /shops
-    const shopsResource = api.root.addResource('shops');
-    shopsResource.addMethod('POST', new apigateway.LambdaIntegration(shopMgmtFn), {
+    // const shopsResource = api.root.addResource('shops');
+    shopResource.addMethod('POST', new apigateway.LambdaIntegration(shopMgmtFn), {
       // Keeping CREATE SHOP open to allow signup -> create flow? 
       // Or require Auth? Let's require Auth so they must Register (Cognito) -> Login -> Create Shop.
       authorizer,
       authorizationType: apigateway.AuthorizationType.COGNITO
     });
-    shopsResource.addMethod('GET', new apigateway.LambdaIntegration(shopMgmtFn), {
+    shopResource.addMethod('GET', new apigateway.LambdaIntegration(shopMgmtFn), {
       authorizer,
       authorizationType: apigateway.AuthorizationType.COGNITO
     }); // List My Shops
 
-    const shopIdResource = shopsResource.addResource('{shopId}');
+    const shopIdResource = shopResource.addResource('{shopId}');
     shopIdResource.addMethod('GET', new apigateway.LambdaIntegration(shopMgmtFn), {
       authorizer,
       authorizationType: apigateway.AuthorizationType.COGNITO

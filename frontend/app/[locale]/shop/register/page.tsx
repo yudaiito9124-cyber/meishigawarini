@@ -17,7 +17,7 @@ export default function ShopRegisterPage() {
         if (!name) return;
         setLoading(true);
         try {
-            const res = await fetch(`${NEXT_PUBLIC_API_URL}/shops`, {
+            const res = await fetch(`${NEXT_PUBLIC_API_URL}/shop`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ name }),

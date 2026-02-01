@@ -32,9 +32,9 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             return { statusCode: 200, headers: corsHeaders, body: '' };
         }
 
-        // 1. Create Shop (POST /shops)
+        // 1. Create Shop (POST /shop)
         // Requires Auth
-        if (method === 'POST' && path.endsWith('/shops') && !shopId) {
+        if (method === 'POST' && path.endsWith('/shop') && !shopId) {
             if (!userId) return { statusCode: 401, headers: corsHeaders, body: 'Unauthorized' };
 
             const body = JSON.parse(event.body || '{}');
@@ -58,14 +58,14 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             return { statusCode: 201, headers: corsHeaders, body: JSON.stringify({ shop_id: newShopId, message: 'Shop created' }) };
         }
 
-        // 1b. List My Shops (GET /shops)
+        // 1b. List My Shops (GET /shop)
         // Requires Auth
-        // Note: infra-stack defines GET /shops/{shopId}, but usually GET /shops maps to List if no ID.
+        // Note: infra-stack defines GET /shop/{shopId}, but usually GET /shop maps to List if no ID.
         // If event.pathParameters is empty or shopId is undefined...
-        // But APIGW resource is /shops/{shopId}. To support /shops list, we need a root /shops GET method in infra.
-        // Let's assume we added GET /shops in infra (List My Shops).
-        // Check if path ends with /shops exactly
-        if (method === 'GET' && path.endsWith('/shops') && !shopId) {
+        // But APIGW resource is /shop/{shopId}. To support /shop list, we need a root /shop GET method in infra.
+        // Let's assume we added GET /shop in infra (List My Shops).
+        // Check if path ends with /shop exactly
+        if (method === 'GET' && path.endsWith('/shop') && !shopId) {
             if (!userId) return { statusCode: 401, headers: corsHeaders, body: 'Unauthorized' };
 
             const res = await ddb.send(new QueryCommand({
@@ -87,7 +87,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Missing shopId' }) };
         }
 
-        // 9. List Shop QRs ((GET /shops/{shopId}/qrcodes)
+        // 9. List Shop QRs ((GET /shop/{shopId}/qrcodes)
         if (method === 'GET' && path.endsWith('/qrcodes')) {
             // Verify Ownership (Optimization: Query Shop first? Or assumes product access check implies ownership?)
             // Better to check ownership for security.
@@ -116,7 +116,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ items }) };
         }
 
-        // 2. Get Shop Details (GET /shops/{shopId})
+        // 2. Get Shop Details (GET /shop/{shopId})
         if (method === 'GET' && !path.endsWith('/products')) {
             const getRes = await ddb.send(new GetCommand({
                 TableName: TABLE_NAME,
@@ -149,7 +149,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             return getRes.Item;
         };
 
-        // NEW: Get Upload URL (POST /shops/{shopId}/products/upload-url)
+        // NEW: Get Upload URL (POST /shop/{shopId}/products/upload-url)
         if (method === 'POST' && path.endsWith('/upload-url')) {
             await verifyShopOwner(); // Check permissions
 
@@ -157,7 +157,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             const { filename, contentType } = body;
             if (!filename || !contentType) return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Missing filename or contentType' }) };
 
-            const key = `shops/${shopId}/products/${filename}`;
+            const key = `shop/${shopId}/products/${filename}`;
             const command = new PutObjectCommand({
                 Bucket: BUCKET_NAME,
                 Key: key,
@@ -171,7 +171,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ uploadUrl, publicUrl }) };
         }
 
-        // 3. Create Product (POST /shops/{shopId}/products)
+        // 3. Create Product (POST /shop/{shopId}/products)
         if (method === 'POST' && path.endsWith('/products')) {
             await verifyShopOwner();
 
@@ -200,7 +200,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             return { statusCode: 201, headers: corsHeaders, body: JSON.stringify({ product_id: productId, message: 'Product created' }) };
         }
 
-        // 4. List Products (GET /shops/{shopId}/products)
+        // 4. List Products (GET /shop/{shopId}/products)
         if (method === 'GET' && path.endsWith('/products')) {
             await verifyShopOwner(); // Even listing should be protected for private shop data? Yes.
 
@@ -219,7 +219,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ items }) };
         }
 
-        // 5. Link QR (POST /shops/{shopId}/link)
+        // 5. Link QR (POST /shop/{shopId}/link)
         if (method === 'POST' && path.endsWith('/link')) {
             await verifyShopOwner();
 
@@ -271,7 +271,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ message: `QR Linked successfully${activate_now ? ' and Activated' : ''}` }) };
         }
 
-        // 6. Activate QR (POST /shops/{shopId}/activate)
+        // 6. Activate QR (POST /shop/{shopId}/activate)
         if (method === 'POST' && path.endsWith('/activate')) {
             await verifyShopOwner();
 

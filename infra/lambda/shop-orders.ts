@@ -19,15 +19,15 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         const path = event.path;
         const method = event.httpMethod;
 
-        // Route: GET /shops/{shopId}/orders
-        if (method === 'GET' && path.includes('/shops/')) {
+        // Route: GET /shop/{shopId}/orders
+        if (method === 'GET' && path.includes('/shop/')) {
             const shopId = event.pathParameters?.shopId;
             if (!shopId) return { statusCode: 400, headers: corsHeaders, body: 'Missing Shop ID' };
             return handleListShopOrders(shopId);
         }
 
-        // Route: PATCH /shops/{shopId}/orders/{qrId}
-        if (method === 'PATCH' && path.includes('/shops/')) {
+        // Route: PATCH /shop/{shopId}/orders/{qrId}
+        if (method === 'PATCH' && path.includes('/shop/')) {
             const qrId = event.pathParameters?.qrId; // mapped from {qrId} resource
             if (!qrId) return { statusCode: 400, headers: corsHeaders, body: 'Missing QR ID' };
             return handleUpdateOrder(event, qrId);
