@@ -1,7 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams } from 'next/navigation';
+import { useRouter } from '@/i18n/routing';
+import { useTranslations } from 'next-intl';
 import { getCurrentUser } from 'aws-amplify/auth';
 import { fetchWithAuth } from '@/app/utils/api-client';
 import { Button } from '@/components/ui/button';
@@ -16,6 +18,7 @@ const NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
 // --- Effects ---
 export default function ShopPage() {
+    const t = useTranslations('ShopPage');
     const params = useParams();
     const router = useRouter();
     const shopId = Array.isArray(params.shopId) ? params.shopId[0] : params.shopId;
@@ -223,7 +226,7 @@ export default function ShopPage() {
                 throw new Error(errorData.message || 'Failed to link and activate');
             }
 
-            alert('QR Code Linked and Activated!');
+            alert(t('linkQr.success'));
             form.reset();
             fetchShopData();
         } catch (err: any) {
@@ -232,7 +235,7 @@ export default function ShopPage() {
     };
 
     const handleDeleteProduct = async (productId: string, productName: string) => {
-        if (!confirm(`Are you sure you want to delete "${productName}"?`)) return;
+        if (!confirm(t('product.deleteConfirm', { name: productName }))) return;
 
         try {
             const res = await fetchWithAuth(`/shops/${shopId}/products/${productId}`, {
@@ -292,7 +295,7 @@ export default function ShopPage() {
         setIsScanning(false);
     };
 
-    if (loading) return <div className="p-8">Loading Dashboard...</div>;
+    if (loading) return <div className="p-8">{t('loading')}</div>;
     if (error) return <div className="p-8 text-red-500">Error: {error}</div>;
 
     return (
@@ -301,10 +304,9 @@ export default function ShopPage() {
             <div className="bg-white shadow">
                 <div className="max-w-7xl mx-auto px-4 py-6 flex justify-between items-center">
                     <div>
-                        <h1 className="text-2xl font-bold text-gray-900">{shop?.name || 'Shop Dashboard'}</h1>
-                        <p className="text-sm text-gray-500">Shop ID: {shopId}</p>
+                        <h1 className="text-2xl font-bold text-gray-900">{shop?.name || t('title')}</h1>
+                        <p className="text-sm text-gray-500">{t('shopId', { id: String(shopId || '') })}</p>
                     </div>
-                    {/* <Button variant="outline" onClick={() => router.push('/shop/select')}>Back to Shops</Button> */}
                 </div>
             </div>
 
@@ -313,22 +315,22 @@ export default function ShopPage() {
                 {/* Incoming Orders */}
                 <Card>
                     <CardHeader>
-                        <CardTitle>Incoming Orders</CardTitle>
-                        <CardDescription>Manage your orders and shipments.</CardDescription>
+                        <CardTitle>{t('incomingOrders')}</CardTitle>
+                        <CardDescription>{t('ordersDesc')}</CardDescription>
                     </CardHeader>
                     <CardContent>
                         <Table>
                             <TableHeader>
                                 <TableRow>
-                                    <TableHead>Date</TableHead>
-                                    <TableHead>Recipient</TableHead>
-                                    <TableHead>Address</TableHead>
-                                    <TableHead>Status</TableHead>
-                                    <TableHead>Action</TableHead>
+                                    <TableHead>{t('orders.date')}</TableHead>
+                                    <TableHead>{t('orders.recipient')}</TableHead>
+                                    <TableHead>{t('orders.address')}</TableHead>
+                                    <TableHead>{t('orders.status')}</TableHead>
+                                    <TableHead>{t('orders.action')}</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {orders.length === 0 ? <TableRow><TableCell colSpan={5} className="text-center">No active orders</TableCell></TableRow> : (
+                                {orders.length === 0 ? <TableRow><TableCell colSpan={5} className="text-center">{t('orders.noOrders')}</TableCell></TableRow> : (
                                     orders.map((order: any) => (
                                         <TableRow key={order.qr_id}>
                                             <TableCell>{new Date(order.shipping_info?.submitted_at || order.created_at).toLocaleDateString()}</TableCell>
@@ -349,12 +351,12 @@ export default function ShopPage() {
                                                 {order.status === 'USED' && (
                                                     <Dialog>
                                                         <DialogTrigger asChild>
-                                                            <Button size="sm">Ship</Button>
+                                                            <Button size="sm">{t('orders.ship')}</Button>
                                                         </DialogTrigger>
                                                         <DialogContent>
                                                             <DialogHeader>
-                                                                <DialogTitle>Mark as Shipped</DialogTitle>
-                                                                <DialogDescription>Enter tracking number for {order.recipient_name}</DialogDescription>
+                                                                <DialogTitle>{t('orders.shipDialog.title')}</DialogTitle>
+                                                                <DialogDescription>{t('orders.shipDialog.description', { name: order.recipient_name })}</DialogDescription>
                                                             </DialogHeader>
                                                             <form onSubmit={(e) => {
                                                                 e.preventDefault();
@@ -362,11 +364,11 @@ export default function ShopPage() {
                                                                 handleShipOrder(order.id || order.qr_id.replace('QR#', ''), fd.get('tracking') as string);
                                                             }}>
                                                                 <div className="grid gap-4 py-4">
-                                                                    <Label htmlFor="tracking">Tracking Number</Label>
+                                                                    <Label htmlFor="tracking">{t('orders.shipDialog.label')}</Label>
                                                                     <Input id="tracking" name="tracking" placeholder="1234-5678" required />
                                                                 </div>
                                                                 <DialogFooter>
-                                                                    <Button type="submit">Confirm Shipment</Button>
+                                                                    <Button type="submit">{t('orders.shipDialog.submit')}</Button>
                                                                 </DialogFooter>
                                                             </form>
                                                         </DialogContent>
@@ -384,7 +386,7 @@ export default function ShopPage() {
                 {/* Existing Products */}
                 <Card>
                     <CardHeader>
-                        <CardTitle>Products</CardTitle>
+                        <CardTitle>{t('products')}</CardTitle>
                     </CardHeader>
                     <CardContent>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -408,11 +410,11 @@ export default function ShopPage() {
                                         <span className="font-bold">¥{product.price ? Number(product.price).toLocaleString("ja-JP") : "0"}</span>
                                         <div className="flex gap-2">
                                             <Button variant="outline" size="sm" onClick={() => handleToggleStatus(product.product_id, product.status)}>
-                                                {product.status === 'ACTIVE' ? 'Stop' : 'Activate'}
+                                                {product.status === 'ACTIVE' ? t('product.stop') : t('product.activate')}
                                             </Button>
                                             {product.status !== 'ACTIVE' && (
                                                 <Button variant="destructive" size="sm" onClick={() => handleDeleteProduct(product.product_id, product.name)}>
-                                                    Delete
+                                                    {t('product.delete')}
                                                 </Button>
                                             )}
                                         </div>
@@ -427,27 +429,27 @@ export default function ShopPage() {
                     {/* Create Product */}
                     <Card>
                         <CardHeader>
-                            <CardTitle>Add New Product</CardTitle>
+                            <CardTitle>{t('addProduct.title')}</CardTitle>
                         </CardHeader>
                         <CardContent>
                             <form onSubmit={handleCreateProduct} className="space-y-4">
                                 <div className="space-y-2">
-                                    <Label htmlFor="name">Product Name</Label>
+                                    <Label htmlFor="name">{t('addProduct.name')}</Label>
                                     <Input id="name" name="name" required />
                                 </div>
                                 <div className="space-y-2">
-                                    <Label htmlFor="description">Description</Label>
+                                    <Label htmlFor="description">{t('addProduct.description')}</Label>
                                     <Input id="description" name="description" required />
                                 </div>
                                 <div className="space-y-2">
-                                    <Label htmlFor="price">Price (¥)</Label>
+                                    <Label htmlFor="price">{t('addProduct.price')}</Label>
                                     <Input id="price" name="price" type="number" required />
                                 </div>
                                 <div className="space-y-2">
-                                    <Label htmlFor="image">Product Image</Label>
+                                    <Label htmlFor="image">{t('addProduct.image')}</Label>
                                     <Input id="image" name="image" type="file" accept="image/*" />
                                 </div>
-                                <Button type="submit" className="w-full">Create Product</Button>
+                                <Button type="submit" className="w-full">{t('addProduct.submit')}</Button>
                             </form>
                         </CardContent>
                     </Card>
@@ -455,30 +457,30 @@ export default function ShopPage() {
                     {/* Link QR */}
                     <Card>
                         <CardHeader>
-                            <CardTitle>Link QR Code</CardTitle>
-                            <CardDescription>Connect a physical QR card to a product.</CardDescription>
+                            <CardTitle>{t('linkQr.title')}</CardTitle>
+                            <CardDescription>{t('linkQr.description')}</CardDescription>
                         </CardHeader>
                         <CardContent>
                             <form onSubmit={handleLinkQr} className="space-y-4">
                                 <div className="space-y-2">
-                                    <Label htmlFor="uuid">QR UUID (Scan or Type)</Label>
+                                    <Label htmlFor="uuid">{t('linkQr.uuidLabel')}</Label>
                                     <div className="flex gap-2">
                                         <Input
                                             id="uuid"
                                             name="uuid"
-                                            placeholder="e.g. 123e4567-..."
+                                            placeholder={t('linkQr.placeholder')}
                                             required
                                             value={scannedUuid}
                                             onChange={(e) => setScannedUuid(e.target.value)}
                                         />
                                         <Dialog open={isScanning} onOpenChange={setIsScanning}>
                                             <DialogTrigger asChild>
-                                                <Button type="button" variant="outline">Scan</Button>
+                                                <Button type="button" variant="outline">{t('linkQr.scan')}</Button>
                                             </DialogTrigger>
                                             <DialogContent>
                                                 <DialogHeader>
-                                                    <DialogTitle>Scan QR Code</DialogTitle>
-                                                    <DialogDescription>Position the QR code within the frame.</DialogDescription>
+                                                    <DialogTitle>{t('linkQr.scanDialog.title')}</DialogTitle>
+                                                    <DialogDescription>{t('linkQr.scanDialog.description')}</DialogDescription>
                                                 </DialogHeader>
                                                 <div className="p-4 min-h-[300px]">
                                                     <QRScanner
@@ -488,22 +490,22 @@ export default function ShopPage() {
                                                     />
                                                 </div>
                                                 <DialogFooter>
-                                                    <Button type="button" variant="ghost" onClick={() => setIsScanning(false)}>Cancel</Button>
+                                                    <Button type="button" variant="ghost" onClick={() => setIsScanning(false)}>{t('linkQr.scanDialog.cancel')}</Button>
                                                 </DialogFooter>
                                             </DialogContent>
                                         </Dialog>
                                     </div>
                                 </div>
                                 <div className="space-y-2">
-                                    <Label htmlFor="product_id">Select Product</Label>
+                                    <Label htmlFor="product_id">{t('linkQr.selectProduct')}</Label>
                                     <select id="product_id" name="product_id" className="w-full p-2 border rounded-md" required>
-                                        <option value="">Select a product...</option>
+                                        <option value="">{t('linkQr.selectPlaceholder')}</option>
                                         {products.filter(p => p.status === 'ACTIVE').map(p => (
                                             <option key={p.product_id} value={p.product_id}>{p.name}</option>
                                         ))}
                                     </select>
                                 </div>
-                                <Button type="submit" variant="secondary" className="w-full">Link & Activate</Button>
+                                <Button type="submit" variant="secondary" className="w-full">{t('linkQr.submit')}</Button>
                             </form>
                         </CardContent>
                     </Card>
@@ -512,20 +514,20 @@ export default function ShopPage() {
                 {/* Linked QR Codes Table */}
                 <Card>
                     <CardHeader>
-                        <CardTitle>Linked QR Codes</CardTitle>
+                        <CardTitle>{t('linkedQr.title')}</CardTitle>
                     </CardHeader>
                     <CardContent>
                         <Table>
                             <TableHeader>
                                 <TableRow>
-                                    <TableHead>QR ID</TableHead>
-                                    <TableHead>Product</TableHead>
-                                    <TableHead>Status</TableHead>
-                                    <TableHead>Activated At</TableHead>
+                                    <TableHead>{t('linkedQr.id')}</TableHead>
+                                    <TableHead>{t('linkedQr.product')}</TableHead>
+                                    <TableHead>{t('linkedQr.status')}</TableHead>
+                                    <TableHead>{t('linkedQr.activatedAt')}</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {qrCodes.length === 0 ? <TableRow><TableCell colSpan={4} className="text-center">No linked QR codes</TableCell></TableRow> : (
+                                {qrCodes.length === 0 ? <TableRow><TableCell colSpan={4} className="text-center">{t('linkedQr.noLinks')}</TableCell></TableRow> : (
                                     qrCodes.map((qr) => {
                                         const prod = products.find(p => p.product_id === qr.product_id);
                                         return (

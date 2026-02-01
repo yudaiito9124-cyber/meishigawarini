@@ -1,5 +1,157 @@
 {
     "HomePage": {
-        "title": "Welcome to meishigawarini"
+        "title": "名刺代わりにへようこそ",
+        "shopAdmin": "ショップ管理者画面",
+        "heroTitle": "名刺代わりに、",
+        "heroSubtitle": "心を贈ろう。",
+        "description": "”名刺代わりに。” は出会いにちょっとした贈りものを添えるデジタルギフトサービス。 ギフトの送り先はQRコードから指定できます。"
+    },
+    "LoginPage": {
+        "title": "ログイン",
+        "email": "メールアドレス",
+        "password": "パスワード",
+        "signIn": "ログイン",
+        "signingIn": "ログイン中...",
+        "noAccount": "アカウントをお持ちでないですか？",
+        "signUpLink": "登録する",
+        "errors": {
+            "default": "ログインに失敗しました",
+            "notAuthorized": "メールアドレスまたはパスワードが間違っています。",
+            "notConfirmed": "ユーザーが確認されていません。メールを確認してください。"
+        }
+    },
+    "RegisterPage": {
+        "title": "アカウント作成",
+        "email": "メールアドレス",
+        "password": "パスワード",
+        "passwordHint": "大文字、小文字、数字を含む8文字以上で入力してください。",
+        "signUp": "登録",
+        "creatingAccount": "作成中...",
+        "hasAccount": "すでにアカウントをお持ちですか？",
+        "loginLink": "ログイン",
+        "successTitle": "登録完了！",
+        "successMessage": "アカウントが作成されました。",
+        "goToLogin": "ログイン画面へ",
+        "errors": {
+            "default": "登録に失敗しました",
+            "usernameExists": "ユーザーは既に存在します。ログインしてください。"
+        }
+    },
+    "Metadata": {
+        "title": "名刺代わりに。",
+        "description": "出会いにちょっとした贈りものを添えるデジタルギフトサービス。 ギフトの送り先はQRコードから指定できます。"
+    },
+    "ShopListPage": {
+        "title": "マイショップ",
+        "subtitle": "管理するショップを選択するか、新しいショップを作成してください。",
+        "userId": "ユーザーID: {id}",
+        "logout": "ログアウト",
+        "createShop": "ショップ新規作成",
+        "createDialog": {
+            "title": "ショップ作成",
+            "description": "新しいショップの名前を入力してください。",
+            "label": "ショップ名",
+            "placeholder": "素敵なショップ",
+            "submit": "作成",
+            "submitting": "作成中..."
+        },
+        "noShops": "ショップが見つかりません。まずは作成しましょう！",
+        "manageShop": "管理画面へ",
+        "created": "作成日: {date}"
+    },
+    "ShopPage": {
+        "loading": "ショップの管理画面を読み込み中...",
+        "title": "ショップダッシュボード",
+        "shopId": "ショップID: {id}",
+        "incomingOrders": "受信した注文",
+        "ordersDesc": "注文と発送を管理します。",
+        "orders": {
+            "date": "日付",
+            "recipient": "受取人",
+            "address": "住所",
+            "status": "ステータス",
+            "action": "操作",
+            "noOrders": "アクティブな注文はありません",
+            "ship": "発送する",
+            "shipDialog": {
+                "title": "発送済みにする",
+                "description": "{name} 様への追跡番号を入力してください",
+                "label": "追跡番号",
+                "submit": "発送を確定"
+            }
+        },
+        "products": "商品一覧",
+        "product": {
+            "stop": "停止",
+            "activate": "有効化",
+            "delete": "削除",
+            "deleteConfirm": "\"{name}\" を削除してもよろしいですか？"
+        },
+        "addProduct": {
+            "title": "商品追加",
+            "name": "商品名",
+            "description": "説明",
+            "price": "価格 (円)",
+            "image": "商品画像",
+            "submit": "商品を登録"
+        },
+        "linkQr": {
+            "title": "QRコード連携",
+            "description": "物理QRカードと商品を紐付けます。",
+            "uuidLabel": "QR UUID (スキャンまたは入力)",
+            "placeholder": "例: 123e4567-...",
+            "scan": "スキャン",
+            "selectProduct": "商品を選択",
+            "selectPlaceholder": "商品を選択してください...",
+            "submit": "連携して有効化",
+            "scanDialog": {
+                "title": "QRコードスキャン",
+                "description": "枠内にQRコードを合わせてください。",
+                "cancel": "キャンセル"
+            },
+            "success": "QRコードが連携され有効化されました！"
+        },
+        "linkedQr": {
+            "title": "連携済みQRコード",
+            "id": "QR ID",
+            "product": "商品",
+            "status": "ステータス",
+            "activatedAt": "有効化日時",
+            "noLinks": "連携済みのQRコードはありません"
+        }
+    },
+    "ReceivePage": {
+        "titles": {
+            "pin": "PINコードを入力してギフトを受け取る",
+            "form": "ギフトが届いています！",
+            "success": "ありがとうございます！",
+            "shipped": "ギフトが発送されました！"
+        },
+        "pinStep": {
+            "label": "PINコード入力",
+            "placeholder": "8桁の数字",
+            "submit": "ギフトを見る",
+            "verifying": "確認中..."
+        },
+        "formStep": {
+            "title": "配送先情報",
+            "name": "お名前",
+            "address": "配送先住所",
+            "submit": "ギフトを受け取る",
+            "submitting": "送信中..."
+        },
+        "successStep": {
+            "message": "配送先情報が送信されました！",
+            "subMessage": "ショップからまもなく発送されます。"
+        },
+        "shippedStep": {
+            "message": "ギフトは発送済みです！",
+            "tracking": "追跡番号: {number}"
+        },
+        "errors": {
+            "invalidPin": "PINが無効か、ギフトが見つかりません",
+            "inactive": "このカードは有効ではありません。",
+            "submitFailed": "住所の送信に失敗しました。"
+        }
     }
 }

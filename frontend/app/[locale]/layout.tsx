@@ -17,10 +17,17 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-export const metadata: Metadata = {
-  title: "名刺代わりに。",
-  description: "出会いにちょっとした贈りものを添えるデジタルギフトサービス。 ギフトの送り先はQRコードから指定できます。",
-};
+import { getTranslations } from 'next-intl/server';
+
+export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }) {
+  const { locale } = await params;
+  const t = await getTranslations({ locale, namespace: 'Metadata' });
+
+  return {
+    title: t('title'),
+    description: t('description'),
+  };
+}
 
 export default async function RootLayout({
   children,

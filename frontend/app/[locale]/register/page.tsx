@@ -2,14 +2,15 @@
 
 import { useState } from 'react';
 import { signUp } from 'aws-amplify/auth';
-import { useRouter } from 'next/navigation';
+import { useRouter, Link } from '@/i18n/routing';
+import { useTranslations } from 'next-intl';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import Link from 'next/link';
 
 export default function RegisterPage() {
+    const t = useTranslations('RegisterPage');
     const router = useRouter();
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
@@ -45,10 +46,10 @@ export default function RegisterPage() {
         } catch (err: any) {
             if (err.name === 'UsernameExistsException' || err.code === 'UsernameExistsException') {
                 // Determine if we should log this or not. For now, let's skip logging to avoid confusion.
-                setError('User already exists. Please log in instead.');
+                setError(t('errors.usernameExists'));
             } else {
                 console.error('Register error', err);
-                setError(err.message || 'Failed to register');
+                setError(err.message || t('errors.default'));
             }
         } finally {
             setLoading(false);
@@ -60,12 +61,12 @@ export default function RegisterPage() {
             <div className="min-h-screen flex items-center justify-center bg-gray-100 p-4">
                 <Card className="w-full max-w-md text-center">
                     <CardHeader>
-                        <CardTitle className="text-green-600">Registration Successful!</CardTitle>
+                        <CardTitle className="text-green-600">{t('successTitle')}</CardTitle>
                     </CardHeader>
                     <CardContent>
-                        <p>Your account has been created.</p>
+                        <p>{t('successMessage')}</p>
                         <Link href="/login">
-                            <Button className="mt-4 w-full">Go to Login</Button>
+                            <Button className="mt-4 w-full">{t('goToLogin')}</Button>
                         </Link>
                     </CardContent>
                 </Card>
@@ -77,12 +78,12 @@ export default function RegisterPage() {
         <div className="min-h-screen flex items-center justify-center bg-gray-100 p-4">
             <Card className="w-full max-w-md">
                 <CardHeader>
-                    <CardTitle className="text-center text-2xl">Create Account</CardTitle>
+                    <CardTitle className="text-center text-2xl">{t('title')}</CardTitle>
                 </CardHeader>
                 <CardContent>
                     <form onSubmit={handleRegister} className="space-y-4">
                         <div className="space-y-2">
-                            <Label htmlFor="email">Email</Label>
+                            <Label htmlFor="email">{t('email')}</Label>
                             <Input
                                 id="email"
                                 type="email"
@@ -93,7 +94,7 @@ export default function RegisterPage() {
                             />
                         </div>
                         <div className="space-y-2">
-                            <Label htmlFor="password">Password</Label>
+                            <Label htmlFor="password">{t('password')}</Label>
                             <Input
                                 id="password"
                                 type="password"
@@ -102,17 +103,17 @@ export default function RegisterPage() {
                                 required
                                 minLength={8}
                             />
-                            <p className="text-xs text-gray-500">Must be at least 8 characters, with uppercase, lowercase, and numbers.</p>
+                            <p className="text-xs text-gray-500">{t('passwordHint')}</p>
                         </div>
                         {error && <p className="text-sm text-red-500">{error}</p>}
                         <Button type="submit" className="w-full" disabled={loading}>
-                            {loading ? 'Creating Account...' : 'Sign Up'}
+                            {loading ? t('creatingAccount') : t('signUp')}
                         </Button>
                     </form>
                 </CardContent>
                 <CardFooter className="justify-center">
                     <p className="text-sm text-gray-500">
-                        Already have an account? <Link href="/login" className="text-blue-600 hover:underline">Log in</Link>
+                        {t('hasAccount')} <Link href="/login" className="text-blue-600 hover:underline">{t('loginLink')}</Link>
                     </p>
                 </CardFooter>
             </Card>

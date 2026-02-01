@@ -1,5 +1,157 @@
 {
     "HomePage": {
-        "title": "Welcome to meishigawarini"
+        "title": "Welcome to meishigawarini",
+        "shopAdmin": "Shop Admin",
+        "heroTitle": "Instead of a business card,",
+        "heroSubtitle": "give a heart.",
+        "description": "\"Meishigawarini\" is a digital gift service that adds a small gift to your encounter. You can specify the recipient of the gift from the QR code."
+    },
+    "LoginPage": {
+        "title": "Sign In",
+        "email": "Email",
+        "password": "Password",
+        "signIn": "Sign In",
+        "signingIn": "Signing in...",
+        "noAccount": "Don't have an account?",
+        "signUpLink": "Sign up",
+        "errors": {
+            "default": "Failed to login",
+            "notAuthorized": "Incorrect username or password.",
+            "notConfirmed": "User is not confirmed. Please verify your email."
+        }
+    },
+    "RegisterPage": {
+        "title": "Create Account",
+        "email": "Email",
+        "password": "Password",
+        "passwordHint": "Must be at least 8 characters, with uppercase, lowercase, and numbers.",
+        "signUp": "Sign Up",
+        "creatingAccount": "Creating Account...",
+        "hasAccount": "Already have an account?",
+        "loginLink": "Log in",
+        "successTitle": "Registration Successful!",
+        "successMessage": "Your account has been created.",
+        "goToLogin": "Go to Login",
+        "errors": {
+            "default": "Failed to register",
+            "usernameExists": "User already exists. Please log in instead."
+        }
+    },
+    "Metadata": {
+        "title": "Meishigawarini",
+        "description": "Digital gift service adding a small gift to encounters."
+    },
+    "ShopListPage": {
+        "title": "My Shops",
+        "subtitle": "Select a shop to manage or create a new one.",
+        "userId": "User ID: {id}",
+        "logout": "Logout",
+        "createShop": "Create New Shop",
+        "createDialog": {
+            "title": "Create Shop",
+            "description": "Enter the name of your new shop.",
+            "label": "Shop Name",
+            "placeholder": "My Awesome Shop",
+            "submit": "Create",
+            "submitting": "Creating..."
+        },
+        "noShops": "No shops found. Create one to get started!",
+        "manageShop": "Manage Shop",
+        "created": "Created: {date}"
+    },
+    "ShopPage": {
+        "loading": "Loading Dashboard...",
+        "title": "Shop Dashboard",
+        "shopId": "Shop ID: {id}",
+        "incomingOrders": "Incoming Orders",
+        "ordersDesc": "Manage your orders and shipments.",
+        "orders": {
+            "date": "Date",
+            "recipient": "Recipient",
+            "address": "Address",
+            "status": "Status",
+            "action": "Action",
+            "noOrders": "No active orders",
+            "ship": "Ship",
+            "shipDialog": {
+                "title": "Mark as Shipped",
+                "description": "Enter tracking number for {name}",
+                "label": "Tracking Number",
+                "submit": "Confirm Shipment"
+            }
+        },
+        "products": "Products",
+        "product": {
+            "stop": "Stop",
+            "activate": "Activate",
+            "delete": "Delete",
+            "deleteConfirm": "Are you sure you want to delete \"{name}\"?"
+        },
+        "addProduct": {
+            "title": "Add New Product",
+            "name": "Product Name",
+            "description": "Description",
+            "price": "Price (¥)",
+            "image": "Product Image",
+            "submit": "Create Product"
+        },
+        "linkQr": {
+            "title": "Link QR Code",
+            "description": "Connect a physical QR card to a product.",
+            "uuidLabel": "QR UUID (Scan or Type)",
+            "placeholder": "e.g. 123e4567-...",
+            "scan": "Scan",
+            "selectProduct": "Select Product",
+            "selectPlaceholder": "Select a product...",
+            "submit": "Link & Activate",
+            "scanDialog": {
+                "title": "Scan QR Code",
+                "description": "Position the QR code within the frame.",
+                "cancel": "Cancel"
+            },
+            "success": "QR Code Linked and Activated!"
+        },
+        "linkedQr": {
+            "title": "Linked QR Codes",
+            "id": "QR ID",
+            "product": "Product",
+            "status": "Status",
+            "activatedAt": "Activated At",
+            "noLinks": "No linked QR codes"
+        }
+    },
+    "ReceivePage": {
+        "titles": {
+            "pin": "Enter PIN to View Gift",
+            "form": "You received a gift!",
+            "success": "Thank You!",
+            "shipped": "Your gift is on the way!"
+        },
+        "pinStep": {
+            "label": "Enter PIN Code",
+            "placeholder": "8-digit PIN",
+            "submit": "View Gift",
+            "verifying": "Verifying..."
+        },
+        "formStep": {
+            "title": "Delivery Details",
+            "name": "Full Name",
+            "address": "Delivery Address",
+            "submit": "Receive Gift",
+            "submitting": "Submitting..."
+        },
+        "successStep": {
+            "message": "Your shipping information has been sent!",
+            "subMessage": "The shop will ship your gift soon."
+        },
+        "shippedStep": {
+            "message": "Your gift has been shipped!",
+            "tracking": "Tracking: {number}"
+        },
+        "errors": {
+            "invalidPin": "Invalid PIN or Gift not found",
+            "inactive": "This card is not active.",
+            "submitFailed": "Failed to submit address."
+        }
     }
 }

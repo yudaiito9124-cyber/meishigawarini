@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useParams } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -46,6 +47,7 @@ const submitAddress = async (uuid: string, pin: string, addressData: any) => {
 };
 
 export default function ReceivePage() {
+    const t = useTranslations('ReceivePage');
     const params = useParams();
     const uuid = params?.uuid as string;
 
@@ -80,12 +82,12 @@ export default function ReceivePage() {
                 setStep("FORM");
             } else {
                 // UNASSIGNED, BANNED, etc.
-                setError("This card is not active.");
+                setError(t('errors.inactive'));
             }
 
         } catch (err: any) {
             console.error(err);
-            setPinError(err.message || "Incorrect PIN");
+            setPinError(err.message || t('errors.invalidPin'));
         } finally {
             setLoading(false);
         }
@@ -99,7 +101,7 @@ export default function ReceivePage() {
             setStep("SUCCESS");
         } catch (error: any) {
             console.error("Submission error:", error);
-            alert(error.message || "Failed to submit address.");
+            alert(error.message || t('errors.submitFailed'));
         } finally {
             setLoading(false);
         }
@@ -125,10 +127,10 @@ export default function ReceivePage() {
             <Card className="w-full max-w-md">
                 <CardHeader>
                     <CardTitle className="text-xl text-center">
-                        {step === "PIN" ? "Enter PIN to View Gift" :
-                            step === "FORM" ? "You received a gift!" :
-                                step === "SUCCESS" ? "Thank You!" :
-                                    step === "SHIPPED" ? "Your gift is on the way!" : ""}
+                        {step === "PIN" ? t('titles.pin') :
+                            step === "FORM" ? t('titles.form') :
+                                step === "SUCCESS" ? t('titles.success') :
+                                    step === "SHIPPED" ? t('titles.shipped') : ""}
                     </CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -144,11 +146,11 @@ export default function ReceivePage() {
                     {step === "PIN" && (
                         <form onSubmit={handleVerifyPin} className="space-y-6">
                             <div className="space-y-2 p-4 bg-gray-50 rounded-lg">
-                                <Label htmlFor="pin" className="font-semibold">Enter PIN Code</Label>
+                                <Label htmlFor="pin" className="font-semibold">{t('pinStep.label')}</Label>
                                 <Input
                                     id="pin"
                                     type="text" // or password if preferred, but usually printed on card so text is fine
-                                    placeholder="8-digit PIN"
+                                    placeholder={t('pinStep.placeholder')}
                                     value={pin}
                                     onChange={(e) => {
                                         setPin(e.target.value);
@@ -158,7 +160,7 @@ export default function ReceivePage() {
                                 {pinError && <p className="text-sm text-red-500">{pinError}</p>}
                             </div>
                             <Button type="submit" className="w-full" disabled={loading || !pin}>
-                                {loading ? "Verifying..." : "View Gift"}
+                                {loading ? t('pinStep.verifying') : t('pinStep.submit')}
                             </Button>
                         </form>
                     )}
@@ -166,9 +168,9 @@ export default function ReceivePage() {
                     {step === "FORM" && (
                         <form onSubmit={handleAddressSubmit} className="space-y-6">
                             <div className="space-y-4 pt-2 border-t">
-                                <Label className="font-semibold">Delivery Details</Label>
+                                <Label className="font-semibold">{t('formStep.title')}</Label>
                                 <div className="space-y-2">
-                                    <Label htmlFor="name">Full Name</Label>
+                                    <Label htmlFor="name">{t('formStep.name')}</Label>
                                     <Input
                                         id="name"
                                         required
@@ -177,7 +179,7 @@ export default function ReceivePage() {
                                     />
                                 </div>
                                 <div className="space-y-2">
-                                    <Label htmlFor="address">Delivery Address</Label>
+                                    <Label htmlFor="address">{t('formStep.address')}</Label>
                                     <Input
                                         id="address"
                                         required
@@ -188,24 +190,24 @@ export default function ReceivePage() {
                             </div>
 
                             <Button type="submit" className="w-full" disabled={loading}>
-                                {loading ? "Submitting..." : "Receive Gift"}
+                                {loading ? t('formStep.submitting') : t('formStep.submit')}
                             </Button>
                         </form>
                     )}
 
                     {step === "SUCCESS" && (
                         <div className="text-center py-6 space-y-4">
-                            <p className="text-green-600 font-medium">Your shipping information has been sent!</p>
-                            <p className="text-sm text-gray-500">The shop will ship your gift soon.</p>
+                            <p className="text-green-600 font-medium">{t('successStep.message')}</p>
+                            <p className="text-sm text-gray-500">{t('successStep.subMessage')}</p>
                         </div>
                     )}
 
                     {step === "SHIPPED" && gift && (
                         <div className="text-center py-6 space-y-4">
-                            <p className="text-green-600 font-medium">Your gift has been shipped!</p>
+                            <p className="text-green-600 font-medium">{t('shippedStep.message')}</p>
                             {/* Assuming gift object has shipping details if fetched */}
                             {gift.tracking_number && (
-                                <p className="text-sm text-gray-500">Tracking: {gift.tracking_number}</p>
+                                <p className="text-sm text-gray-500">{t('shippedStep.tracking', { number: gift.tracking_number })}</p>
                             )}
                         </div>
                     )}
