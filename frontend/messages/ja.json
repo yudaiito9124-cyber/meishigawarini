@@ -98,6 +98,7 @@
             "name": "商品名",
             "description": "説明",
             "price": "価格 (円)",
+            "validDays": "有効期限 (日数)",
             "image": "商品画像",
             "submit": "商品を登録"
         },

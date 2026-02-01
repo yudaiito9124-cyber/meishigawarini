@@ -38,7 +38,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             }));
 
             // If product doesn't exist, we could error, but let's just default
-            const validDays = (prodRes.Item && prodRes.Item.valid_days) ? prodRes.Item.valid_days : 180;
+            const validDays = (prodRes.Item && prodRes.Item.valid_days) ? prodRes.Item.valid_days : parseInt(process.env.DEFAULT_VALID_DAYS || '1');
 
             const targetStatus = activate_now ? 'ACTIVE' : 'LINKED';
             let updateExp = 'SET #status = :target, product_id = :pid, shop_id = :sid';
@@ -111,7 +111,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 Key: { PK: `SHOP#${sId}`, SK: `PRODUCT#${pId}` }
             }));
 
-            const validDays = (prodRes.Item && prodRes.Item.valid_days) ? prodRes.Item.valid_days : 180;
+            const validDays = (prodRes.Item && prodRes.Item.valid_days) ? prodRes.Item.valid_days : parseInt(process.env.DEFAULT_VALID_DAYS || '1');
             const now = new Date();
             const expiresAt = new Date(now);
             expiresAt.setDate(expiresAt.getDate() + validDays);

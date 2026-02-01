@@ -9,6 +9,8 @@ import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as path from 'path';
 import * as wafv2 from 'aws-cdk-lib/aws-wafv2';
 
+const DEFAULT_VALID_DAYS = '1';
+
 export class InfraStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
@@ -72,6 +74,7 @@ export class InfraStack extends cdk.Stack {
       handler: 'handler',
       environment: {
         TABLE_NAME: table.tableName,
+        DEFAULT_VALID_DAYS: DEFAULT_VALID_DAYS,
       },
       bundling: {
         externalModules: ['@aws-sdk/client-dynamodb', '@aws-sdk/lib-dynamodb', '@aws-sdk/client-s3', '@aws-sdk/s3-request-presigner'],

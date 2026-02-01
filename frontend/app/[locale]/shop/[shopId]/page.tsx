@@ -13,6 +13,7 @@ import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import QRScanner from '@/components/ui/qr-scanner';
+import { APP_CONFIG } from '@/lib/config';
 
 const NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
@@ -190,6 +191,7 @@ export default function ShopPage() {
                     name: formData.get('name'),
                     description: formData.get('description'),
                     price: Number(formData.get('price')),
+                    valid_days: formData.get('valid_days'),
                     image_url: imageUrl,
                     status: 'ACTIVE'
                 })
@@ -621,6 +623,9 @@ export default function ShopPage() {
                                     <CardHeader className="px-3 pt-2 pb-1">
                                         <CardTitle className="text-base truncate" title={product.name}>{product.name}</CardTitle>
                                         <CardDescription className="line-clamp-1 text-xs">{product.description}</CardDescription>
+                                        <p className="text-xs text-gray-500 mt-1">
+                                            {t('addProduct.validDays')}: {product.valid_days ? product.valid_days : APP_CONFIG.DEFAULT_VALID_DAYS}日
+                                        </p>
                                     </CardHeader>
                                     <CardContent className="px-3 pb-2 pt-0 flex justify-between items-center">
                                         <span className="font-bold text-sm">¥{product.price ? Number(product.price).toLocaleString("ja-JP") : "0"}</span>
@@ -651,9 +656,15 @@ export default function ShopPage() {
                                             <Label htmlFor="description">{t('addProduct.description')}</Label>
                                             <Input id="description" name="description" required />
                                         </div>
-                                        <div className="space-y-2">
-                                            <Label htmlFor="price">{t('addProduct.price')}</Label>
-                                            <Input id="price" name="price" type="number" required />
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div className="space-y-2">
+                                                <Label htmlFor="price">{t('addProduct.price')}</Label>
+                                                <Input id="price" name="price" type="number" required />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label htmlFor="valid_days">{t('addProduct.validDays')}</Label>
+                                                <Input id="valid_days" name="valid_days" type="number" defaultValue={APP_CONFIG.DEFAULT_VALID_DAYS} min={1} required />
+                                            </div>
                                         </div>
                                         <div className="space-y-2">
                                             <Label htmlFor="image">{t('addProduct.image')}</Label>

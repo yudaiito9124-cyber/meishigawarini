@@ -180,8 +180,8 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             if (!name) return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Missing product name' }) };
 
             const productId = crypto.randomUUID();
-            // Default valid_days to 180 if not provided
-            const validityPeriod = valid_days ? parseInt(valid_days) : 180;
+            // Default valid_days to 1 if not provided
+            const validityPeriod = valid_days ? parseInt(valid_days) : parseInt(process.env.DEFAULT_VALID_DAYS || '1');
 
             await ddb.send(new PutCommand({
                 TableName: TABLE_NAME,
@@ -193,10 +193,8 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                     image_url,
                     price,
                     valid_days: validityPeriod,
-                    status: 'ACTIVE',
-                    GSI1_PK: 'PRODUCT#ACTIVE',
-                    GSI1_SK: new Date().toISOString(),
-                    product_id: productId, // Explicitly save ID for easier access
+                    status: 'ACTIVE', // Default status
+                    GSI1_PK: 'PRODUCT#ACTIVE', // For listing active products
                     created_at: new Date().toISOString()
                 }
             }));
@@ -239,7 +237,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             if (!prodCheck.Item) return { statusCode: 404, headers: corsHeaders, body: JSON.stringify({ message: 'Product not found in this shop' }) };
 
             const product = prodCheck.Item;
-            const validDays = product.valid_days || 180;
+            const validDays = product.valid_days || parseInt(process.env.DEFAULT_VALID_DAYS || '1');
 
             // Link QR (and optionally activate)
             const status = activate_now ? 'ACTIVE' : 'LINKED';
@@ -331,7 +329,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 Key: { PK: `SHOP#${shopId}`, SK: `PRODUCT#${productId}` }
             }));
 
-            const validDays = (prodRes.Item && prodRes.Item.valid_days) ? prodRes.Item.valid_days : 180;
+            const validDays = (prodRes.Item && prodRes.Item.valid_days) ? prodRes.Item.valid_days : 1;
             const now = new Date();
             const expiresAt = new Date(now);
             expiresAt.setDate(expiresAt.getDate() + validDays);
