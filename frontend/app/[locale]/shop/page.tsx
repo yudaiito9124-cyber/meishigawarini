@@ -86,7 +86,7 @@ export default function ShopListPage() {
         }
     };
 
-    if (loading) return <div className="p-8 flex justify-center">Loading...</div>;
+    if (loading) return <div className="p-8">{t('loading')}</div>;
 
     return (
         <div className="min-h-screen bg-gray-50 p-6 flex flex-col items-center">

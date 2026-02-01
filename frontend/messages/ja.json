@@ -42,6 +42,7 @@
         "description": "出会いにちょっとした贈りものを添えるデジタルギフトサービス。 ギフトの送り先はQRコードから指定できます。"
     },
     "ShopListPage": {
+        "loading": "ショップ一覧を読み込み中...",
         "title": "マイショップ",
         "subtitle": "管理するショップを選択するか、新しいショップを作成してください。",
         "userId": "ユーザーID: {id}",
@@ -152,6 +153,70 @@
             "invalidPin": "PINが無効か、ギフトが見つかりません",
             "inactive": "このカードは有効ではありません。",
             "submitFailed": "住所の送信に失敗しました。"
+        }
+    },
+    "AdminPage": {
+        "title": "管理ダッシュボード",
+        "generate": {
+            "title": "QRコード生成",
+            "quantity": "生成数",
+            "button": "生成"
+        },
+        "batches": {
+            "title": "現在生成されているQRコード",
+            "noBatches": "まだバッチが生成されていません。",
+            "batchId": "バッチ: {id}",
+            "info": "{count} 件 • {date}",
+            "status": {
+                "ready": "準備完了",
+                "processing": "処理中"
+            },
+            "downloadPdf": "PDFダウンロード",
+            "table": {
+                "uuid": "UUID",
+                "pin": "PIN"
+            },
+            "alerts": {
+                "success": "QRコードの生成に成功しました",
+                "failed": "QRコードの生成に失敗しました",
+                "error": "エラーが発生しました"
+            }
+        },
+        "list": {
+            "title": "全QRコード",
+            "refresh": "更新",
+            "loading": "読み込み中...",
+            "deleteAllBanned": "BAN済みを全て削除",
+            "status": {
+                "unassigned": "未割り当て",
+                "linked": "連携済み",
+                "active": "有効",
+                "used": "使用済み",
+                "shipped": "発送済み",
+                "banned": "BAN済み"
+            },
+            "info": "ステータス: {status} • 件数: {count}",
+            "table": {
+                "uuid": "UUID",
+                "pin": "PIN",
+                "status": "ステータス",
+                "createdAt": "作成日時",
+                "fraud": "不正対策",
+                "noCodes": "コードが見つかりません。更新ボタンを押してください。"
+            },
+            "ban": {
+                "button": "BAN",
+                "confirm": "本当にこのQRコードをBANしますか？この操作は即座に無効化されます。",
+                "success": "BANしました",
+                "failed": "BANに失敗しました",
+                "error": "エラーが発生しました"
+            },
+            "deleteBanned": {
+                "confirm": "本当に全てのBAN済みコードを削除しますか？この操作は元に戻せません。",
+                "success": "BAN済みコードを {count} 件削除しました。",
+                "failed": "削除に失敗しました",
+                "error": "削除中にエラーが発生しました"
+            }
         }
     }
 }

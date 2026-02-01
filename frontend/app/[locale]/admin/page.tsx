@@ -9,9 +9,12 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { APP_CONFIG } from "@/lib/config";
 import jsPDF from 'jspdf';
+import { useTranslations } from 'next-intl';
 const NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || "";
+const NEXT_PUBLIC_APP_URL = process.env.NEXT_PUBLIC_APP_URL || "";
 
 export default function AdminPage() {
+    const t = useTranslations('AdminPage');
     const [count, setCount] = useState(10);
     const [generatedBatches, setGeneratedBatches] = useState<any[]>([]);
     const [isAuthorized, setIsAuthorized] = useState<boolean | null>(null); // null = loading
@@ -82,13 +85,13 @@ export default function AdminPage() {
                 const now = new Date();
                 const pad = (n: number) => n.toString().padStart(2, '0');
                 const timeStr = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
-                const ms = Math.floor(now.getMilliseconds() / 10).toString().padStart(2, '0');
+                const ms = now.getMilliseconds().toString().padStart(3, '0');
 
                 const newBatch = {
                     id: `batch-${timeStr}${ms}`,
                     count: data.count,
                     date: now.toLocaleString(),
-                    status: "Ready",
+                    status: t('batches.status.ready'),
                     codes: data.data // Store the codes
                 };
                 setGeneratedBatches([newBatch, ...generatedBatches]);
@@ -98,11 +101,11 @@ export default function AdminPage() {
                 // Automatically download PDF
                 await generatePDF(newBatch);
             } else {
-                alert("Failed to generate QR codes");
+                alert(t('batches.alerts.failed'));
             }
         } catch (e) {
             console.error(e);
-            alert("Error generating codes");
+            alert(t('batches.alerts.error'));
         }
     };
 
@@ -114,7 +117,6 @@ export default function AdminPage() {
         const QRCodeStyling = (await import('qr-code-styling')).default;
 
         const doc = new jsPDF();
-        const APP_URL = process.env.NEXT_PUBLIC_APP_URL || ''; // Replaced by process.env.APP_URL
 
         // Background Image
         const bgImgf = new Image();
@@ -186,7 +188,7 @@ export default function AdminPage() {
                 const qr = new QRCodeStyling({
                     width: 300,
                     height: 300,
-                    data: `${process.env.APP_URL}/receive/${code.uuid}`,
+                    data: `${NEXT_PUBLIC_APP_URL}/receive/${code.uuid}`,
                     image: APP_CONFIG.QR_LOGO_PATH, // Placeholder Logo
                     qrOptions: {
                         typeNumber: 0,
@@ -320,16 +322,16 @@ export default function AdminPage() {
     return (
         <div className="min-h-screen bg-gray-50 p-8">
             <div className="max-w-4xl mx-auto space-y-6">
-                <h1 className="text-2xl font-bold">Admin Dashboard</h1>
+                <h1 className="text-2xl font-bold">{t('title')}</h1>
 
                 <Card>
                     <CardHeader>
-                        <CardTitle>Generate QR Codes</CardTitle>
+                        <CardTitle>{t('generate.title')}</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-4">
                         <div className="flex items-end gap-4">
                             <div className="grid w-full max-w-sm items-center gap-1.5">
-                                <label htmlFor="count" className="text-sm font-medium">Quantity to Generate</label>
+                                <label htmlFor="count" className="text-sm font-medium">{t('generate.quantity')}</label>
                                 <Input
                                     id="count"
                                     type="number"
@@ -337,37 +339,37 @@ export default function AdminPage() {
                                     onChange={(e) => setCount(Number(e.target.value))}
                                 />
                             </div>
-                            <Button onClick={handleGenerate}>Generate</Button>
+                            <Button onClick={handleGenerate}>{t('generate.button')}</Button>
                         </div>
                     </CardContent>
                 </Card>
 
                 <Card>
                     <CardHeader>
-                        <CardTitle>Currentry Generated QR Codes</CardTitle>
+                        <CardTitle>{t('batches.title')}</CardTitle>
                     </CardHeader>
                     <CardContent>
                         <div className="space-y-4">
-                            {generatedBatches.length === 0 ? <p className="text-gray-500">No batches generated yet.</p> : (
+                            {generatedBatches.length === 0 ? <p className="text-gray-500">{t('batches.noBatches')}</p> : (
                                 generatedBatches.map(batch => (
                                     <div key={batch.id} className="bg-white border p-4 rounded-md">
                                         <div className="flex justify-between items-center mb-2">
                                             <div>
-                                                <p className="font-medium">Batch: {batch.id}</p>
-                                                <p className="text-sm text-gray-500">{batch.count} codes • {batch.date}</p>
+                                                <p className="font-medium">{t('batches.batchId', { id: batch.id })}</p>
+                                                <p className="text-sm text-gray-500">{t('batches.info', { count: batch.count, date: batch.date })}</p>
                                             </div>
                                             <span className="text-sm bg-green-100 text-green-800 px-2 py-1 rounded">
                                                 {batch.status}
                                             </span>
-                                            <Button variant="outline" size="sm" onClick={() => generatePDF(batch)}>Download PDF</Button>
+                                            <Button variant="outline" size="sm" onClick={() => generatePDF(batch)}>{t('batches.downloadPdf')}</Button>
                                         </div>
                                         {/* Display Codes */}
                                         <div className="mt-2 bg-gray-100 p-2 rounded text-xs font-mono overflow-auto max-h-40">
                                             <table className="w-full text-left">
                                                 <thead>
                                                     <tr>
-                                                        <th>UUID</th>
-                                                        <th>PIN</th>
+                                                        <th>{t('batches.table.uuid')}</th>
+                                                        <th>{t('batches.table.pin')}</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody>
@@ -396,6 +398,7 @@ export default function AdminPage() {
 }
 
 function QRCodeListSection({ apiUrl }: { apiUrl: string }) {
+    const t = useTranslations('AdminPage');
     const [status, setStatus] = useState("UNASSIGNED");
     const [codes, setCodes] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
@@ -430,7 +433,7 @@ function QRCodeListSection({ apiUrl }: { apiUrl: string }) {
 
     const handleDeleteAllBanned = async () => {
         if (status !== 'BANNED') return;
-        if (!confirm('Are you sure you want to DELETE ALL BANNED QR codes? This action cannot be undone.')) return;
+        if (!confirm(t('list.deleteBanned.confirm'))) return;
 
         setLoading(true);
         try {
@@ -445,14 +448,14 @@ function QRCodeListSection({ apiUrl }: { apiUrl: string }) {
             });
             if (res.ok) {
                 const data = await res.json();
-                alert(`Successfully deleted ${data.count} BANNED codes.`);
+                alert(t('list.deleteBanned.success', { count: data.count }));
                 fetchCodes(); // Refresh list
             } else {
-                alert('Failed to delete Banned codes');
+                alert(t('list.deleteBanned.failed'));
             }
         } catch (e) {
             console.error(e);
-            alert('Error deleting Banned codes');
+            alert(t('list.deleteBanned.error'));
         } finally {
             setLoading(false);
         }
@@ -466,11 +469,11 @@ function QRCodeListSection({ apiUrl }: { apiUrl: string }) {
                     <div className="flex gap-2">
                         {status === 'BANNED' && (
                             <Button variant="destructive" size="sm" onClick={handleDeleteAllBanned} disabled={loading}>
-                                Delete All BANNED
+                                {t('list.deleteAllBanned')}
                             </Button>
                         )}
                         <Button variant="outline" size="sm" onClick={fetchCodes} disabled={loading}>
-                            {loading ? "Loading..." : "Refresh"}
+                            {loading ? t('list.loading') : t('list.refresh')}
                         </Button>
                     </div>
                 </CardTitle>
@@ -487,31 +490,31 @@ function QRCodeListSection({ apiUrl }: { apiUrl: string }) {
                                 // setTimeout(fetchCodes, 0); 
                             }}
                         >
-                            {s}
+                            {t(`list.status.${s.toLowerCase()}`)}
                         </Button>
                     ))}
                 </div>
 
                 <div className="bg-white border rounded-md p-4">
                     <p className="text-sm text-gray-500 mb-2">
-                        Showing status: <span className="font-bold">{status}</span> • Count: {codes.length}
+                        {t('list.info', { status: t(`list.status.${status.toLowerCase()}`), count: codes.length })}
                     </p>
                     <div className="overflow-auto max-h-96">
                         <Table>
                             <TableHeader>
                                 <TableRow>
-                                    <TableHead>UUID</TableHead>
-                                    <TableHead>PIN</TableHead>
-                                    <TableHead>Status</TableHead>
-                                    <TableHead>Created At</TableHead>
-                                    <TableHead>Fraud?</TableHead>
+                                    <TableHead>{t('list.table.uuid')}</TableHead>
+                                    <TableHead>{t('list.table.pin')}</TableHead>
+                                    <TableHead>{t('list.table.status')}</TableHead>
+                                    <TableHead>{t('list.table.createdAt')}</TableHead>
+                                    <TableHead>{t('list.table.fraud')}</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
                                 {codes.length === 0 ? (  // there is nocodes 
                                     <TableRow>
                                         <TableCell colSpan={4} className="text-center text-gray-500">
-                                            No codes found. Press Refresh to load.
+                                            {t('list.table.noCodes')}
                                         </TableCell>
                                     </TableRow>
                                 ) : ( // there is some codes
@@ -530,7 +533,7 @@ function QRCodeListSection({ apiUrl }: { apiUrl: string }) {
                                                             item.status === 'BANNED' ? 'bg-red-100 text-red-800' : // BANNED style
                                                                 'bg-green-100 text-green-800'
                                                     }`}>
-                                                    {item.status}
+                                                    {t(`list.status.${item.status.toLowerCase()}`)}
                                                 </span>
                                             </TableCell>
                                             <TableCell className="text-xs text-gray-500">
@@ -554,10 +557,11 @@ function QRCodeListSection({ apiUrl }: { apiUrl: string }) {
 }
 
 function BanButton({ uuid, apiUrl, onSuccess }: { uuid: string, apiUrl: string, onSuccess: () => void }) {
+    const t = useTranslations('AdminPage');
     const [loading, setLoading] = useState(false);
 
     const handleBan = async () => {
-        if (!confirm('Are you sure you want to BAN this QR code? It will stop working immediately.')) return;
+        if (!confirm(t('list.ban.confirm'))) return;
         setLoading(true);
         try {
             const session = await fetchAuthSession();
@@ -572,11 +576,11 @@ function BanButton({ uuid, apiUrl, onSuccess }: { uuid: string, apiUrl: string, 
             if (res.ok) {
                 onSuccess();
             } else {
-                alert('Failed to ban QR code');
+                alert(t('list.ban.failed'));
             }
         } catch (e) {
             console.error(e);
-            alert('Error banning QR code');
+            alert(t('list.ban.error'));
         } finally {
             setLoading(false);
         }
@@ -584,7 +588,7 @@ function BanButton({ uuid, apiUrl, onSuccess }: { uuid: string, apiUrl: string, 
 
     return (
         <Button variant="destructive" size="sm" onClick={handleBan} disabled={loading} className="h-6 text-xs bg-red-600 hover:bg-red-700">
-            {loading ? '...' : 'Ban'}
+            {loading ? '...' : t('list.ban.button')}
         </Button>
     );
 }

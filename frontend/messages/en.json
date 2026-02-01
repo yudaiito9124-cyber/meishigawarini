@@ -153,5 +153,69 @@
             "inactive": "This card is not active.",
             "submitFailed": "Failed to submit address."
         }
+    },
+    "AdminPage": {
+        "title": "Admin Dashboard",
+        "generate": {
+            "title": "Generate QR Codes",
+            "quantity": "Quantity to Generate",
+            "button": "Generate"
+        },
+        "batches": {
+            "title": "Currently Generated QR Codes",
+            "noBatches": "No batches generated yet.",
+            "batchId": "Batch: {id}",
+            "info": "{count} codes • {date}",
+            "status": {
+                "ready": "Ready",
+                "processing": "Processing"
+            },
+            "downloadPdf": "Download PDF",
+            "table": {
+                "uuid": "UUID",
+                "pin": "PIN"
+            },
+            "alerts": {
+                "success": "Successfully generated codes",
+                "failed": "Failed to generate codes",
+                "error": "Error generating codes"
+            }
+        },
+        "list": {
+            "title": "All QR Codes",
+            "refresh": "Refresh",
+            "loading": "Loading...",
+            "deleteAllBanned": "Delete All BANNED",
+            "status": {
+                "unassigned": "UNASSIGNED",
+                "linked": "LINKED",
+                "active": "ACTIVE",
+                "used": "USED",
+                "shipped": "SHIPPED",
+                "banned": "BANNED"
+            },
+            "info": "Showing status: {status} • Count: {count}",
+            "table": {
+                "uuid": "UUID",
+                "pin": "PIN",
+                "status": "Status",
+                "createdAt": "Created At",
+                "fraud": "Fraud?",
+                "noCodes": "No codes found. Press Refresh to load."
+            },
+            "ban": {
+                "button": "Ban",
+                "confirm": "Are you sure you want to BAN this QR code? It will stop working immediately.",
+                "success": "Successfully banned",
+                "failed": "Failed to ban",
+                "error": "Error banning QR code"
+            },
+            "deleteBanned": {
+                "confirm": "Are you sure you want to DELETE ALL BANNED QR codes? This action cannot be undone.",
+                "success": "Successfully deleted {count} BANNED codes.",
+                "failed": "Failed to delete Banned codes",
+                "error": "Error deleting Banned codes"
+            }
+        }
     }
 }
