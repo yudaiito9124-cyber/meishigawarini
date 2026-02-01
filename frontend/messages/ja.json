@@ -193,7 +193,9 @@
                 "active": "有効",
                 "used": "使用済み",
                 "shipped": "発送済み",
-                "banned": "BAN済み"
+                "banned": "BAN済み",
+                "search": "UUIDで検索",
+                "undefined": "不明な状態"
             },
             "info": "ステータス: {status} • 件数: {count}",
             "table": {
@@ -201,22 +203,42 @@
                 "pin": "PIN",
                 "status": "ステータス",
                 "createdAt": "作成日時",
-                "fraud": "不正対策",
+                "actions": "操作",
                 "noCodes": "コードが見つかりません。更新ボタンを押してください。"
             },
             "ban": {
                 "button": "BAN",
-                "confirm": "本当にこのQRコードをBANしますか？この操作は即座に無効化されます。",
+                "confirm": "本当にこのQRコードをBANしますか？この操作で即座に無効化されます。一度BANされたQRコードは元に戻せません。",
                 "success": "BANしました",
                 "failed": "BANに失敗しました",
-                "error": "エラーが発生しました"
+                "error": "エラーが発生しました",
+                "pdf": "PDF"
             },
             "deleteBanned": {
                 "confirm": "本当に全てのBAN済みコードを削除しますか？この操作は元に戻せません。",
                 "success": "BAN済みコードを {count} 件削除しました。",
                 "failed": "削除に失敗しました",
                 "error": "削除中にエラーが発生しました"
+            },
+            "keyword": {
+                "placeholder": "UUIDで検索 (8文字以上)",
+                "tooShort": "キーワードは8文字以上で入力してください。"
             }
+        }
+    },
+    "VerifyPage": {
+        "title": "アカウント確認",
+        "description": "メールに送信されたコードを入力してください。",
+        "email": "メールアドレス",
+        "emailPlaceholder": "you@example.com",
+        "code": "確認コード",
+        "codePlaceholder": "123456",
+        "button": "確認",
+        "verifying": "確認中...",
+        "loading": "読み込み中...",
+        "errors": {
+            "failed": "確認に失敗しました",
+            "incomplete": "確認が完了していません。次のステップ: {step}"
         }
     }
 }

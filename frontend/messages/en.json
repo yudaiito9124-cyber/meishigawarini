@@ -192,7 +192,9 @@
                 "active": "ACTIVE",
                 "used": "USED",
                 "shipped": "SHIPPED",
-                "banned": "BANNED"
+                "banned": "BANNED",
+                "search": "Search by UUID",
+                "undefined": "undefined"
             },
             "info": "Showing status: {status} • Count: {count}",
             "table": {
@@ -200,7 +202,7 @@
                 "pin": "PIN",
                 "status": "Status",
                 "createdAt": "Created At",
-                "fraud": "Fraud?",
+                "actions": "Actions",
                 "noCodes": "No codes found. Press Refresh to load."
             },
             "ban": {
@@ -208,14 +210,34 @@
                 "confirm": "Are you sure you want to BAN this QR code? It will stop working immediately.",
                 "success": "Successfully banned",
                 "failed": "Failed to ban",
-                "error": "Error banning QR code"
+                "error": "Error banning QR code",
+                "pdf": "PDF"
             },
             "deleteBanned": {
-                "confirm": "Are you sure you want to DELETE ALL BANNED QR codes? This action cannot be undone.",
+                "confirm": "Are you sure you want to DELAETE ALL BANNED QR codes? This action cannot be undone.",
                 "success": "Successfully deleted {count} BANNED codes.",
                 "failed": "Failed to delete Banned codes",
                 "error": "Error deleting Banned codes"
+            },
+            "keyword": {
+                "placeholder": "Enter keyword to search by UUID (at least 8 characters)",
+                "tooShort": "Keyword must be at least 8 characters long."
             }
+        }
+    },
+    "VerifyPage": {
+        "title": "Verify Account",
+        "description": "Enter the code sent to your email.",
+        "email": "Email",
+        "emailPlaceholder": "you@example.com",
+        "code": "Confirmation Code",
+        "codePlaceholder": "123456",
+        "button": "Verify",
+        "verifying": "Verifying...",
+        "loading": "Loading...",
+        "errors": {
+            "failed": "Failed to verify",
+            "incomplete": "Verification incomplete. Next step: {step}"
         }
     }
 }

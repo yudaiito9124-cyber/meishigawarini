@@ -7,8 +7,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
+import { useTranslations } from 'next-intl';
 
 function VerifyContent() {
+    const t = useTranslations('VerifyPage');
     const router = useRouter();
     const searchParams = useSearchParams();
     const initialUsername = searchParams.get('username') || '';
@@ -32,12 +34,12 @@ function VerifyContent() {
             if (isSignUpComplete) {
                 router.push('/login');
             } else {
-                setError(`Verification incomplete. Next step: ${nextStep.signUpStep}`);
+                setError(t('errors.incomplete', { step: nextStep.signUpStep }));
             }
 
         } catch (err: any) {
             console.error('Verification error', err);
-            setError(err.message || 'Failed to verify');
+            setError(err.message || t('errors.failed'));
         } finally {
             setLoading(false);
         }
@@ -47,35 +49,35 @@ function VerifyContent() {
         <div className="min-h-screen flex items-center justify-center bg-gray-100 p-4">
             <Card className="w-full max-w-md">
                 <CardHeader>
-                    <CardTitle>Verify Account</CardTitle>
-                    <CardDescription>Enter the code sent to your email.</CardDescription>
+                    <CardTitle>{t('title')}</CardTitle>
+                    <CardDescription>{t('description')}</CardDescription>
                 </CardHeader>
                 <CardContent>
                     <form onSubmit={handleVerify} className="space-y-4">
                         <div className="space-y-2">
-                            <Label htmlFor="username">Email</Label>
+                            <Label htmlFor="username">{t('email')}</Label>
                             <Input
                                 id="username"
                                 type="email"
                                 value={username}
                                 onChange={(e) => setUsername(e.target.value)}
                                 required
-                                placeholder="you@example.com"
+                                placeholder={t('emailPlaceholder')}
                             />
                         </div>
                         <div className="space-y-2">
-                            <Label htmlFor="code">Confirmation Code</Label>
+                            <Label htmlFor="code">{t('code')}</Label>
                             <Input
                                 id="code"
                                 value={code}
                                 onChange={(e) => setCode(e.target.value)}
                                 required
-                                placeholder="123456"
+                                placeholder={t('codePlaceholder')}
                             />
                         </div>
                         {error && <p className="text-sm text-red-500">{error}</p>}
                         <Button type="submit" className="w-full" disabled={loading}>
-                            {loading ? 'Verifying...' : 'Verify'}
+                            {loading ? t('verifying') : t('button')}
                         </Button>
                     </form>
                 </CardContent>
@@ -85,8 +87,9 @@ function VerifyContent() {
 }
 
 export default function VerifyPage() {
+    const t = useTranslations('VerifyPage');
     return (
-        <Suspense fallback={<div>Loading...</div>}>
+        <Suspense fallback={<div>{t('loading')}</div>}>
             <VerifyContent />
         </Suspense>
     );

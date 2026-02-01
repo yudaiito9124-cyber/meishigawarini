@@ -16,6 +16,7 @@ const NEXT_PUBLIC_APP_URL = process.env.NEXT_PUBLIC_APP_URL || "";
 export default function AdminPage() {
     const t = useTranslations('AdminPage');
     const [count, setCount] = useState(10);
+    const [keyword, setKeyword] = useState("");
     const [generatedBatches, setGeneratedBatches] = useState<any[]>([]);
     const [isAuthorized, setIsAuthorized] = useState<boolean | null>(null); // null = loading
 
@@ -86,9 +87,10 @@ export default function AdminPage() {
                 const pad = (n: number) => n.toString().padStart(2, '0');
                 const timeStr = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
                 const ms = now.getMilliseconds().toString().padStart(3, '0');
+                const batchid = `batch-${timeStr}${ms}`;
 
                 const newBatch = {
-                    id: `batch-${timeStr}${ms}`,
+                    id: batchid,
                     count: data.count,
                     date: now.toLocaleString(),
                     status: t('batches.status.ready'),
@@ -391,25 +393,33 @@ export default function AdminPage() {
 
                 {/* <div className="border-t pt-6"></div> */}
 
-                <QRCodeListSection apiUrl={NEXT_PUBLIC_API_URL} />
+                <QRCodeListSection apiUrl={NEXT_PUBLIC_API_URL} onGeneratePDF={generatePDF} />
             </div>
         </div>
     );
 }
 
-function QRCodeListSection({ apiUrl }: { apiUrl: string }) {
+function QRCodeListSection({ apiUrl, onGeneratePDF }: { apiUrl: string, onGeneratePDF: (batch: any) => Promise<void> }) {
     const t = useTranslations('AdminPage');
     const [status, setStatus] = useState("UNASSIGNED");
+    const [keyword, setKeyword] = useState("");
     const [codes, setCodes] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
 
-    const fetchCodes = async () => {
+    const fetchCodes = async (targetStatus?: string) => {
         setLoading(true);
         try {
+            const currentStatus = targetStatus ?? status;
             const session = await fetchAuthSession();
             const token = session.tokens?.idToken?.toString();
 
-            const res = await fetch(`${apiUrl}/admin/qrcodes?status=${status}`, {
+            // Include query param if status is SEARCH
+            let url = `${apiUrl}/admin/qrcodes?status=${currentStatus}`;
+            if (currentStatus === 'SEARCH' && keyword) {
+                url += `&keyword=${encodeURIComponent(keyword)}`;
+            }
+
+            const res = await fetch(url, {
                 headers: {
                     "Authorization": `Bearer ${token}`
                 }
@@ -426,6 +436,7 @@ function QRCodeListSection({ apiUrl }: { apiUrl: string }) {
             setLoading(false);
         }
     };
+
 
     // Initial fetch when invalidating or status changes? 
     // Let's make it manual for now or useEffect
@@ -472,7 +483,7 @@ function QRCodeListSection({ apiUrl }: { apiUrl: string }) {
                                 {t('list.deleteAllBanned')}
                             </Button>
                         )}
-                        <Button variant="outline" size="sm" onClick={fetchCodes} disabled={loading}>
+                        <Button variant="outline" size="sm" onClick={() => fetchCodes()} disabled={loading}>
                             {loading ? t('list.loading') : t('list.refresh')}
                         </Button>
                     </div>
@@ -486,13 +497,41 @@ function QRCodeListSection({ apiUrl }: { apiUrl: string }) {
                             variant={status === s ? "default" : "secondary"}
                             onClick={() => {
                                 setStatus(s);
+                                fetchCodes(s);
                                 // optional: auto fetch on click
-                                // setTimeout(fetchCodes, 0); 
+                                // setTimeout(fetchCodes, 0);
                             }}
                         >
                             {t(`list.status.${s.toLowerCase()}`)}
                         </Button>
                     ))}
+                </div>
+                <div className="flex gap-2">
+                    {["SEARCH"].map((s) => (
+                        <Button
+                            key={s}
+                            variant={status === s ? "default" : "secondary"}
+                            onClick={() => {
+                                if (keyword.length < 8) {
+                                    alert(t('list.keyword.tooShort'));
+                                    return;
+                                }
+                                setStatus(s);
+                                fetchCodes(s);
+                                // optional: auto fetch on click
+                                // setTimeout(fetchCodes, 0);
+                            }}
+                        >
+                            {t(`list.status.${s.toLowerCase()}`)}
+                        </Button>
+                    ))}
+                    <Input
+                        id="keyword"
+                        type="text"
+                        value={keyword}
+                        placeholder={t('list.keyword.placeholder')}
+                        onChange={(e) => setKeyword(e.target.value)}
+                    />
                 </div>
 
                 <div className="bg-white border rounded-md p-4">
@@ -507,7 +546,7 @@ function QRCodeListSection({ apiUrl }: { apiUrl: string }) {
                                     <TableHead>{t('list.table.pin')}</TableHead>
                                     <TableHead>{t('list.table.status')}</TableHead>
                                     <TableHead>{t('list.table.createdAt')}</TableHead>
-                                    <TableHead>{t('list.table.fraud')}</TableHead>
+                                    <TableHead>{t('list.table.actions')}</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -533,13 +572,27 @@ function QRCodeListSection({ apiUrl }: { apiUrl: string }) {
                                                             item.status === 'BANNED' ? 'bg-red-100 text-red-800' : // BANNED style
                                                                 'bg-green-100 text-green-800'
                                                     }`}>
-                                                    {t(`list.status.${item.status.toLowerCase()}`)}
+                                                    {t(`list.status.${item.status ? item.status.toLowerCase() : 'undefined'}`)}
                                                 </span>
                                             </TableCell>
                                             <TableCell className="text-xs text-gray-500">
                                                 {item.created_at ? new Date(item.created_at).toLocaleString() : '-'}
                                             </TableCell>
                                             <TableCell>
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    className="mr-2 h-6 text-xs"
+                                                    onClick={() => {
+                                                        const uuid = item.PK.replace('QR#', '');
+                                                        onGeneratePDF({
+                                                            id: uuid,
+                                                            codes: [{ uuid, pin: item.pin }]
+                                                        });
+                                                    }}
+                                                >
+                                                    {t('list.ban.pdf')}
+                                                </Button>
                                                 {item.status !== 'BANNED' && (
                                                     <BanButton uuid={item.PK.replace('QR#', '')} apiUrl={apiUrl} onSuccess={fetchCodes} />
                                                 )}
