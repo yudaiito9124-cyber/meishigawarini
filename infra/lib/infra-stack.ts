@@ -371,31 +371,31 @@ export class InfraStack extends cdk.Stack {
 
 
     // Recipient Routes
-    const recipientResource = api.root.addResource('recipient');
-    const qrResourceRecip = recipientResource.addResource('qrcodes');
-    const qrDetailResource = qrResourceRecip.addResource('{uuid}');
+    // const recipientResource = api.root.addResource('recipient');
+    // const qrResourceRecip = recipientResource.addResource('qrcodes');
+    // const qrDetailResource = qrResourceRecip.addResource('{uuid}');
 
     // Lambda: Recipient Get
-    const recipientGetFn = new nodejs.NodejsFunction(this, 'RecipientGetFn', {
-      entry: path.join(__dirname, '../lambda/recipient-get.ts'),
-      ...commonProps,
-    });
-    table.grantReadData(recipientGetFn);
+    // const recipientGetFn = new nodejs.NodejsFunction(this, 'RecipientGetFn', {
+    //   entry: path.join(__dirname, '../lambda/recipient-get.ts'),
+    //   ...commonProps,
+    // });
+    // table.grantReadData(recipientGetFn);
 
-    qrDetailResource.addMethod('GET', new apigateway.LambdaIntegration(recipientGetFn));
+    // qrDetailResource.addMethod('GET', new apigateway.LambdaIntegration(recipientGetFn));
 
-    // Lambda: Recipient Verify PIN (NEW)
-    const recipientVerifyPinFn = new nodejs.NodejsFunction(this, 'RecipientVerifyPinFn', {
-      entry: path.join(__dirname, '../lambda/recipient-verify-pin.ts'),
-      ...commonProps,
-    });
-    table.grantReadData(recipientVerifyPinFn);
+    // // Lambda: Recipient Verify PIN (NEW)
+    // const recipientVerifyPinFn = new nodejs.NodejsFunction(this, 'RecipientVerifyPinFn', {
+    //   entry: path.join(__dirname, '../lambda/recipient-verify-pin.ts'),
+    //   ...commonProps,
+    // });
+    // table.grantReadData(recipientVerifyPinFn);
 
-    const verifyResource = qrResourceRecip.addResource('verify');
-    verifyResource.addMethod('POST', new apigateway.LambdaIntegration(recipientVerifyPinFn));
+    // const verifyResource = qrResourceRecip.addResource('verify');
+    // verifyResource.addMethod('POST', new apigateway.LambdaIntegration(recipientVerifyPinFn));
 
-    const submitResource = recipientResource.addResource('submit');
-    submitResource.addMethod('POST', new apigateway.LambdaIntegration(recipientSubmitFn));
+    // const submitResource = recipientResource.addResource('submit');
+    // submitResource.addMethod('POST', new apigateway.LambdaIntegration(recipientSubmitFn));
 
 
     // ######################### ここからIP制限

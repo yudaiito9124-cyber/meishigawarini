@@ -1,7 +1,7 @@
 
 import { APIGatewayProxyHandler } from 'aws-lambda';
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
-import { DynamoDBDocumentClient, QueryCommand } from '@aws-sdk/lib-dynamodb';
+import { DynamoDBDocumentClient, QueryCommand, ScanCommand } from '@aws-sdk/lib-dynamodb';
 import { verifyAdmin } from './share/admin-auth-inlambda';
 
 const client = new DynamoDBClient({});
@@ -33,17 +33,38 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         }
 
         const status = event.queryStringParameters?.status || 'UNASSIGNED';
+        const keyword = event.queryStringParameters?.keyword || '';
 
-        const result = await ddb.send(new QueryCommand({
-            TableName: TABLE_NAME,
-            IndexName: INDEX_NAME,
-            KeyConditionExpression: 'GSI1_PK = :pk',
-            ExpressionAttributeValues: {
-                ':pk': `QR#${status}`
-            },
-            ScanIndexForward: false, // Descending by created_at
-            // Limit: 50 // soft listing limit for now
-        }));
+        let result;
+
+        if (status === 'SEARCH') {
+            const trimmedKeyword = keyword.trim();
+            console.log(`Searching for keyword: "${trimmedKeyword}"`);
+
+            // UUIDs are lowercase, so let's search lowercased keyword against PK
+            // PIN is numeric string, acceptable to search as is (lowercase doesn't change digits)
+
+            result = await ddb.send(new ScanCommand({
+                TableName: TABLE_NAME,
+                FilterExpression: '(contains(PK, :kw) OR contains(pin, :kw)) AND begins_with(PK, :prefix) AND SK = :sk',
+                ExpressionAttributeValues: {
+                    ':kw': trimmedKeyword.toLowerCase(),
+                    ':prefix': 'QR#',
+                    ':sk': 'METADATA'
+                }
+            }));
+        } else {
+            result = await ddb.send(new QueryCommand({
+                TableName: TABLE_NAME,
+                IndexName: INDEX_NAME,
+                KeyConditionExpression: 'GSI1_PK = :pk',
+                ExpressionAttributeValues: {
+                    ':pk': `QR#${status}`
+                },
+                ScanIndexForward: false, // Descending by created_at
+                // Limit: 50 // soft listing limit for now
+            }));
+        }
 
         return {
             statusCode: 200,
