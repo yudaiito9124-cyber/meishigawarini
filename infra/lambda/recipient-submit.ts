@@ -26,6 +26,11 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Missing required fields' }) };
         }
 
+        const { name, address, zipCode } = shipping_info;
+        if (!name || !address || !zipCode) {
+            return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Missing required address fields (name, address, zipCode)' }) };
+        }
+
         // 1. Verify QR and PIN
         const getRes = await ddb.send(new GetCommand({
             TableName: TABLE_NAME,

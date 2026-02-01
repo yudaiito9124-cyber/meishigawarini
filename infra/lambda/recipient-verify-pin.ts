@@ -51,7 +51,17 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             return { statusCode: 403, headers: corsHeaders, body: JSON.stringify({ message: 'Invalid PIN' }) };
         }
 
-        const { status, product_id, shop_id } = item;
+        const { product_id, shop_id } = item;
+        let status = item.status;
+
+        // Check Expiration
+        if (status === 'ACTIVE' && item.expires_at) {
+            const now = new Date();
+            const expiresAt = new Date(item.expires_at);
+            if (now > expiresAt) {
+                status = 'EXPIRED';
+            }
+        }
 
         // Fetch Product Data if available
         let product = null;
@@ -100,7 +110,9 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 shop_id,
                 // Do NOT return the PIN in the response, obviously, though they sent it.
                 tracking_number,
-                product
+                product,
+                memo_for_users: item.memo_for_users,
+                expires_at: item.expires_at
             })
         };
 

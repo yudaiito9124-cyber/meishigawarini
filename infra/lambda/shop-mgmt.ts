@@ -176,10 +176,13 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             await verifyShopOwner();
 
             const body = JSON.parse(event.body || '{}');
-            const { name, description, image_url, price } = body;
+            const { name, description, image_url, price, valid_days } = body;
             if (!name) return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Missing product name' }) };
 
             const productId = crypto.randomUUID();
+            // Default valid_days to 180 if not provided
+            const validityPeriod = valid_days ? parseInt(valid_days) : 180;
+
             await ddb.send(new PutCommand({
                 TableName: TABLE_NAME,
                 Item: {
@@ -189,6 +192,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                     description,
                     image_url,
                     price,
+                    valid_days: validityPeriod,
                     status: 'ACTIVE',
                     GSI1_PK: 'PRODUCT#ACTIVE',
                     GSI1_SK: new Date().toISOString(),
@@ -224,7 +228,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             await verifyShopOwner();
 
             const body = JSON.parse(event.body || '{}');
-            const { qr_id, product_id, activate_now } = body;
+            const { qr_id, product_id, memo_for_users, memo_for_shop, activate_now } = body;
             if (!qr_id || !product_id) return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Missing qr_id or product_id' }) };
 
             // Verify Product belongs to Shop
@@ -234,16 +238,28 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             }));
             if (!prodCheck.Item) return { statusCode: 404, headers: corsHeaders, body: JSON.stringify({ message: 'Product not found in this shop' }) };
 
+            const product = prodCheck.Item;
+            const validDays = product.valid_days || 180;
+
             // Link QR (and optionally activate)
             const status = activate_now ? 'ACTIVE' : 'LINKED';
             const gsiPk = activate_now ? 'QR#ACTIVE' : 'QR#LINKED';
             const activatedAt = activate_now ? new Date().toISOString() : undefined;
 
+            // Calculate expiration if activating now
+            let expiresAt = undefined;
+            if (activate_now) {
+                const activationDate = new Date();
+                const expirationDate = new Date(activationDate);
+                expirationDate.setDate(expirationDate.getDate() + validDays);
+                expiresAt = expirationDate.toISOString();
+            }
+
             let updateExpr = 'SET #status = :status, shop_id = :sid, product_id = :pid, GSI1_PK = :gsi_pk, GSI2_PK = :gsi2_pk, GSI2_SK = :now';
             const attrValues: any = {
                 ':status': status,
                 ':unassigned': 'UNASSIGNED',
-                ':linked': 'LINKED', // Fix: Added missing value
+                ':linked': 'LINKED',
                 ':sid': shopId,
                 ':pid': product_id,
                 ':gsi_pk': gsiPk,
@@ -251,9 +267,22 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 ':now': new Date().toISOString()
             };
 
+            if (memo_for_users !== undefined) {
+                updateExpr += ', memo_for_users = :memo_for_users';
+                attrValues[':memo_for_users'] = memo_for_users;
+            }
+            if (memo_for_shop !== undefined) {
+                updateExpr += ', memo_for_shop = :memo_for_shop';
+                attrValues[':memo_for_shop'] = memo_for_shop;
+            }
+
             if (activate_now) {
                 updateExpr += ', activated_at = :act_at';
                 attrValues[':act_at'] = activatedAt;
+                if (expiresAt) {
+                    updateExpr += ', expires_at = :exp_at';
+                    attrValues[':exp_at'] = expiresAt;
+                }
             }
 
             await ddb.send(new UpdateCommand({
@@ -279,17 +308,46 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             const { qr_id } = body;
             if (!qr_id) return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Missing qr_id' }) };
 
+            // Fetch QR to get product_id
+            const qrRes = await ddb.send(new GetCommand({
+                TableName: TABLE_NAME,
+                Key: { PK: `QR#${qr_id}`, SK: 'METADATA' }
+            }));
+
+            if (!qrRes.Item) return { statusCode: 404, headers: corsHeaders, body: JSON.stringify({ message: 'QR not found' }) };
+
+            if (qrRes.Item.status !== 'LINKED') {
+                return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'QR is not in LINKED state' }) };
+            }
+            if (qrRes.Item.shop_id !== shopId) {
+                return { statusCode: 403, headers: corsHeaders, body: JSON.stringify({ message: 'QR does not belong to this shop' }) };
+            }
+
+            const productId = qrRes.Item.product_id;
+
+            // Fetch Product for validity days
+            const prodRes = await ddb.send(new GetCommand({
+                TableName: TABLE_NAME,
+                Key: { PK: `SHOP#${shopId}`, SK: `PRODUCT#${productId}` }
+            }));
+
+            const validDays = (prodRes.Item && prodRes.Item.valid_days) ? prodRes.Item.valid_days : 180;
+            const now = new Date();
+            const expiresAt = new Date(now);
+            expiresAt.setDate(expiresAt.getDate() + validDays);
+
             await ddb.send(new UpdateCommand({
                 TableName: TABLE_NAME,
                 Key: { PK: `QR#${qr_id}`, SK: 'METADATA' },
-                UpdateExpression: 'SET #status = :active, activated_at = :now, GSI1_PK = :gsi_pk',
+                UpdateExpression: 'SET #status = :active, activated_at = :now, expires_at = :exp, GSI1_PK = :gsi_pk',
                 ConditionExpression: '#status = :linked AND shop_id = :sid',
                 ExpressionAttributeNames: { '#status': 'status' },
                 ExpressionAttributeValues: {
                     ':active': 'ACTIVE',
                     ':linked': 'LINKED',
                     ':sid': shopId,
-                    ':now': new Date().toISOString(),
+                    ':now': now.toISOString(),
+                    ':exp': expiresAt.toISOString(),
                     ':gsi_pk': 'QR#ACTIVE'
                 }
             }));

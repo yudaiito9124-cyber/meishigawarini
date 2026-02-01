@@ -371,8 +371,9 @@ export class InfraStack extends cdk.Stack {
 
 
     // Recipient Routes
-    // const recipientResource = api.root.addResource('recipient');
-    // const qrResourceRecip = recipientResource.addResource('qrcodes');
+    // Recipient Routes
+    const recipientResource = api.root.addResource('recipient');
+    const qrResourceRecip = recipientResource.addResource('qrcodes');
     // const qrDetailResource = qrResourceRecip.addResource('{uuid}');
 
     // Lambda: Recipient Get
@@ -385,17 +386,29 @@ export class InfraStack extends cdk.Stack {
     // qrDetailResource.addMethod('GET', new apigateway.LambdaIntegration(recipientGetFn));
 
     // // Lambda: Recipient Verify PIN (NEW)
-    // const recipientVerifyPinFn = new nodejs.NodejsFunction(this, 'RecipientVerifyPinFn', {
-    //   entry: path.join(__dirname, '../lambda/recipient-verify-pin.ts'),
-    //   ...commonProps,
-    // });
-    // table.grantReadData(recipientVerifyPinFn);
+    // Lambda: Recipient Verify PIN (NEW)
+    const recipientVerifyPinFn = new nodejs.NodejsFunction(this, 'RecipientVerifyPinFn', {
+      entry: path.join(__dirname, '../lambda/recipient-verify-pin.ts'),
+      ...commonProps,
+    });
+    table.grantReadData(recipientVerifyPinFn);
 
-    // const verifyResource = qrResourceRecip.addResource('verify');
-    // verifyResource.addMethod('POST', new apigateway.LambdaIntegration(recipientVerifyPinFn));
+    const verifyResource = qrResourceRecip.addResource('verify');
+    verifyResource.addMethod('POST', new apigateway.LambdaIntegration(recipientVerifyPinFn));
 
-    // const submitResource = recipientResource.addResource('submit');
-    // submitResource.addMethod('POST', new apigateway.LambdaIntegration(recipientSubmitFn));
+    const submitResource = recipientResource.addResource('submit');
+    submitResource.addMethod('POST', new apigateway.LambdaIntegration(recipientSubmitFn));
+
+    // Lambda: Recipient Chat (NEW)
+    const recipientChatFn = new nodejs.NodejsFunction(this, 'RecipientChatFn', {
+      entry: path.join(__dirname, '../lambda/recipient-chat.ts'),
+      ...commonProps,
+    });
+    table.grantReadWriteData(recipientChatFn);
+
+    const chatResource = qrResourceRecip.addResource('{uuid}').addResource('chat');
+    chatResource.addMethod('GET', new apigateway.LambdaIntegration(recipientChatFn));
+    chatResource.addMethod('POST', new apigateway.LambdaIntegration(recipientChatFn));
 
 
     // ######################### ここからIP制限

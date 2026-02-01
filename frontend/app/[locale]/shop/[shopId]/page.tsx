@@ -214,16 +214,22 @@ export default function ShopPage() {
         const formData = new FormData(form);
         const uuid = formData.get('uuid') as string;
         const productId = formData.get('product_id') as string;
+        const memo_for_users = formData.get('memo_for_users') as string;
+        const memo_for_shop = formData.get('memo_for_shop') as string;
 
         try {
             // Atomic Link & Activate
+            const body: any = {
+                qr_id: uuid,
+                product_id: productId,
+                activate_now: true,
+            };
+            if (memo_for_users) body.memo_for_users = memo_for_users;
+            if (memo_for_shop) body.memo_for_shop = memo_for_shop;
+
             const res = await fetchWithAuth(`/shop/${shopId}/link`, {
                 method: 'POST',
-                body: JSON.stringify({
-                    qr_id: uuid,
-                    product_id: productId,
-                    activate_now: true
-                })
+                body: JSON.stringify(body)
             });
 
             if (!res.ok) {
@@ -233,6 +239,7 @@ export default function ShopPage() {
 
             alert(t('linkQr.success'));
             form.reset();
+            setScannedUuid(''); // Reset state driven input
             fetchShopData();
         } catch (err: any) {
             alert("Error: " + err.message);
@@ -268,11 +275,15 @@ export default function ShopPage() {
         } catch (e) { console.error(e); }
     };
 
-    const handleShipOrder = async (qrId: string, trackingNumber: string) => {
+    const handleShipOrder = async (qrId: string, trackingNumber: string, memoForUsers?: string, memoForShop?: string) => {
         try {
+            const body: any = { tracking_number: trackingNumber };
+            if (memoForUsers !== undefined) body.memo_for_users = memoForUsers;
+            if (memoForShop !== undefined) body.memo_for_shop = memoForShop;
+
             const res = await fetchWithAuth(`/shop/${shopId}/orders/${qrId}`, {
                 method: 'PATCH',
-                body: JSON.stringify({ tracking_number: trackingNumber })
+                body: JSON.stringify(body)
             });
             if (res.ok) {
                 fetchShopData();
@@ -315,123 +326,12 @@ export default function ShopPage() {
                 </div>
             </div>
 
-            <div className="max-w-7xl mx-auto px-4 py-6 space-y-6">
 
-                {/* Incoming Orders */}
-                <Card>
-                    <CardHeader>
-                        <CardTitle>{t('incomingOrders')}</CardTitle>
-                        <CardDescription>{t('ordersDesc')}</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>{t('orders.date')}</TableHead>
-                                    <TableHead>{t('orders.recipient')}</TableHead>
-                                    <TableHead>{t('orders.address')}</TableHead>
-                                    <TableHead>{t('orders.status')}</TableHead>
-                                    <TableHead>{t('orders.action')}</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {orders.length === 0 ? <TableRow><TableCell colSpan={5} className="text-center">{t('orders.noOrders')}</TableCell></TableRow> : (
-                                    orders.map((order: any) => (
-                                        <TableRow key={order.qr_id}>
-                                            <TableCell>{new Date(order.shipping_info?.submitted_at || order.created_at).toLocaleDateString()}</TableCell>
-                                            <TableCell>
-                                                <div className="font-medium">{order.recipient_name}</div>
-                                                <div className="text-xs text-gray-500">{order.shipping_info?.phone}</div>
-                                            </TableCell>
-                                            <TableCell className="max-w-xs truncate" title={order.address}>
-                                                {order.address}
-                                            </TableCell>
-                                            <TableCell>
-                                                <span className={`px-2 py-1 rounded text-xs ${order.status === 'SHIPPED' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'
-                                                    }`}>
-                                                    {order.status}
-                                                </span>
-                                            </TableCell>
-                                            <TableCell>
-                                                {order.status === 'USED' && (
-                                                    <Dialog>
-                                                        <DialogTrigger asChild>
-                                                            <Button size="sm">{t('orders.ship')}</Button>
-                                                        </DialogTrigger>
-                                                        <DialogContent>
-                                                            <DialogHeader>
-                                                                <DialogTitle>{t('orders.shipDialog.title')}</DialogTitle>
-                                                                <DialogDescription>{t('orders.shipDialog.description', { name: order.recipient_name })}</DialogDescription>
-                                                            </DialogHeader>
-                                                            <form onSubmit={(e) => {
-                                                                e.preventDefault();
-                                                                const fd = new FormData(e.target as HTMLFormElement);
-                                                                handleShipOrder(order.id || order.qr_id.replace('QR#', ''), fd.get('tracking') as string);
-                                                            }}>
-                                                                <div className="grid gap-4 py-4">
-                                                                    <Label htmlFor="tracking">{t('orders.shipDialog.label')}</Label>
-                                                                    <Input id="tracking" name="tracking" placeholder="1234-5678" required />
-                                                                </div>
-                                                                <DialogFooter>
-                                                                    <Button type="submit">{t('orders.shipDialog.submit')}</Button>
-                                                                </DialogFooter>
-                                                            </form>
-                                                        </DialogContent>
-                                                    </Dialog>
-                                                )}
-                                            </TableCell>
-                                        </TableRow>
-                                    ))
-                                )}
-                            </TableBody>
-                        </Table>
-                    </CardContent>
-                </Card>
 
-                {/* Existing Products */}
-                <Card>
-                    <CardHeader>
-                        <CardTitle>{t('products')}</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                            {products.map((product) => (
-                                <Card key={product.product_id} className="overflow-hidden">
-                                    <div className="w-full relative">
-                                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                                        <img src={product.image_url} alt={product.name} className="w-full h-auto object-cover" />
-                                        <div className="absolute top-2 right-2 flex gap-2">
-                                            <span className={`px-2 py-1 rounded text-xs font-bold ${product.status === 'ACTIVE' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                                                }`}>
-                                                {product.status}
-                                            </span>
-                                        </div>
-                                    </div>
-                                    <CardHeader className="p-4">
-                                        <CardTitle className="text-lg">{product.name}</CardTitle>
-                                        <CardDescription className="line-clamp-2">{product.description}</CardDescription>
-                                    </CardHeader>
-                                    <CardContent className="p-4 pt-0 flex justify-between items-center">
-                                        <span className="font-bold">¥{product.price ? Number(product.price).toLocaleString("ja-JP") : "0"}</span>
-                                        <div className="flex gap-2">
-                                            <Button variant="outline" size="sm" onClick={() => handleToggleStatus(product.product_id, product.status)}>
-                                                {product.status === 'ACTIVE' ? t('product.stop') : t('product.activate')}
-                                            </Button>
-                                            {product.status !== 'ACTIVE' && (
-                                                <Button variant="destructive" size="sm" onClick={() => handleDeleteProduct(product.product_id, product.name)}>
-                                                    {t('product.delete')}
-                                                </Button>
-                                            )}
-                                        </div>
-                                    </CardContent>
-                                </Card>
-                            ))}
-                        </div>
-                    </CardContent>
-                </Card>
+            <div className="max-w-7xl mx-auto px-4 py-10 space-y-10">
 
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    {/* Create Product */}
+                <div className="grid grid-cols-1 lg:grid-cols-1 gap-6">
+                    {/* Create Product
                     <Card>
                         <CardHeader>
                             <CardTitle>{t('addProduct.title')}</CardTitle>
@@ -457,7 +357,7 @@ export default function ShopPage() {
                                 <Button type="submit" className="w-full">{t('addProduct.submit')}</Button>
                             </form>
                         </CardContent>
-                    </Card>
+                    </Card> */}
 
                     {/* Link QR */}
                     <Card>
@@ -467,20 +367,58 @@ export default function ShopPage() {
                         </CardHeader>
                         <CardContent>
                             <form onSubmit={handleLinkQr} className="space-y-4">
-                                <div className="space-y-2">
-                                    <Label htmlFor="uuid">{t('linkQr.uuidLabel')}</Label>
-                                    <div className="flex gap-2">
-                                        <Input
-                                            id="uuid"
-                                            name="uuid"
-                                            placeholder={t('linkQr.placeholder')}
-                                            required
-                                            value={scannedUuid}
-                                            onChange={(e) => setScannedUuid(e.target.value)}
-                                        />
+                                <div className="flex gap-4">
+                                    <div className="flex-[7] space-y-4">
+                                        <div className="space-y-2">
+                                            <Label htmlFor="uuid">{t('linkQr.uuidLabel')}</Label>
+                                            <div className="flex gap-2">
+                                                <Input
+                                                    id="uuid"
+                                                    name="uuid"
+                                                    placeholder={t('linkQr.placeholder')}
+                                                    required
+                                                    value={scannedUuid}
+                                                    onChange={(e) => setScannedUuid(e.target.value)}
+                                                />
+                                            </div>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="product_id">{t('linkQr.selectProduct')}</Label>
+                                            <select id="product_id" name="product_id" className="w-full p-2 border rounded-md" required>
+                                                <option value="">{t('linkQr.selectPlaceholder')}</option>
+                                                {products.filter(p => p.status === 'ACTIVE').map(p => (
+                                                    <option key={p.product_id} value={p.product_id}>{p.name}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="memo_for_users">{t('linkQr.memoForUsersLabel')}</Label>
+                                            <div className="flex gap-2">
+                                                <Input
+                                                    id="memo_for_users"
+                                                    name="memo_for_users"
+                                                    placeholder={t('linkQr.memoForUsersPlaceholder')}
+                                                />
+                                            </div>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="memo_for_shop">{t('linkQr.memoForShopLabel')}</Label>
+                                            <div className="flex gap-2">
+                                                <Input
+                                                    id="memo_for_shop"
+                                                    name="memo_for_shop"
+                                                    placeholder={t('linkQr.memoForShopPlaceholder')}
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="flex-[3] flex mt-7">
                                         <Dialog open={isScanning} onOpenChange={setIsScanning}>
                                             <DialogTrigger asChild>
-                                                <Button type="button" variant="outline">{t('linkQr.scan')}</Button>
+                                                <Button type="button" variant="secondary" className="flex-[3] h-auto flex flex-col gap-2 text-xl">
+                                                    <span>📷</span>
+                                                    <span>{t('linkQr.scan')}</span>
+                                                </Button>
                                             </DialogTrigger>
                                             <DialogContent>
                                                 <DialogHeader>
@@ -501,20 +439,235 @@ export default function ShopPage() {
                                         </Dialog>
                                     </div>
                                 </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="product_id">{t('linkQr.selectProduct')}</Label>
-                                    <select id="product_id" name="product_id" className="w-full p-2 border rounded-md" required>
-                                        <option value="">{t('linkQr.selectPlaceholder')}</option>
-                                        {products.filter(p => p.status === 'ACTIVE').map(p => (
-                                            <option key={p.product_id} value={p.product_id}>{p.name}</option>
-                                        ))}
-                                    </select>
-                                </div>
-                                <Button type="submit" variant="secondary" className="w-full">{t('linkQr.submit')}</Button>
+                                <Button type="submit" className="w-full h-12 space-y-3">{t('linkQr.submit')}</Button>
                             </form>
                         </CardContent>
                     </Card>
                 </div>
+
+                {/* Incoming Orders */}
+                <Card>
+                    <CardHeader>
+                        <CardTitle>{t('incomingOrders')}</CardTitle>
+                        <CardDescription>{t('ordersDesc')}</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>{t('orders.date')}</TableHead>
+                                    <TableHead>{t('orders.productName')}</TableHead>
+                                    <TableHead>{t('orders.status')}</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {orders.filter(o => ['USED', 'SHIPPED'].includes(o.status)).length === 0 ? (
+                                    <TableRow><TableCell colSpan={3} className="text-center">{t('orders.noOrders')}</TableCell></TableRow>
+                                ) : (
+                                    orders
+                                        .filter(o => ['USED', 'SHIPPED'].includes(o.status))
+                                        .sort((a, b) => {
+                                            // 1. Status: USED > SHIPPED
+                                            if (a.status === 'USED' && b.status !== 'USED') return -1;
+                                            if (a.status !== 'USED' && b.status === 'USED') return 1;
+                                            // 2. Date: Newest first
+                                            const dateA = new Date(a.shipping_info?.submitted_at || a.created_at).getTime();
+                                            const dateB = new Date(b.shipping_info?.submitted_at || b.created_at).getTime();
+                                            return dateB - dateA;
+                                        })
+                                        .map((order: any) => {
+                                            const product = products.find(p => p.product_id === order.product_id);
+                                            const uuid = order.id || order.qr_id.replace('QR#', '');
+
+                                            return (
+                                                <Dialog key={order.qr_id}>
+                                                    <DialogTrigger asChild>
+                                                        <TableRow className="cursor-pointer hover:bg-gray-100">
+                                                            <TableCell>{new Date(order.shipping_info?.submitted_at || order.created_at).toLocaleDateString()}</TableCell>
+                                                            <TableCell className="font-medium">{product?.name || order.product_id}</TableCell>
+                                                            <TableCell>
+                                                                <span className={`px-2 py-1 rounded text-xs ${order.status === 'SHIPPED' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'
+                                                                    }`}>
+                                                                    {order.status}
+                                                                </span>
+                                                            </TableCell>
+                                                        </TableRow>
+                                                    </DialogTrigger>
+                                                    <DialogContent className="max-w-md">
+                                                        <DialogHeader>
+                                                            <DialogTitle>{t('orders.details')}</DialogTitle>
+                                                            <DialogDescription className="font-mono text-xs text-gray-500">
+                                                                ID: {uuid}
+                                                            </DialogDescription>
+                                                        </DialogHeader>
+
+                                                        <div className="space-y-4 py-4">
+                                                            {/* Product Info */}
+                                                            <div>
+                                                                <h4 className="text-sm font-semibold text-gray-500">{t('orders.productName')}</h4>
+                                                                <p className="font-medium">{product?.name || order.product_id}</p>
+                                                            </div>
+
+                                                            {/* Status */}
+                                                            <div>
+                                                                <h4 className="text-sm font-semibold text-gray-500">{t('orders.status')}</h4>
+                                                                <span className={`px-2 py-1 rounded text-xs ${order.status === 'SHIPPED' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'
+                                                                    }`}>
+                                                                    {order.status}
+                                                                </span>
+                                                            </div>
+
+                                                            {/* Recipient Info */}
+                                                            <div className="grid grid-cols-2 gap-4">
+                                                                <div>
+                                                                    <h4 className="text-sm font-semibold text-gray-500">{t('orders.recipient')}</h4>
+                                                                    <p>{order.recipient_name}</p>
+                                                                </div>
+                                                                <div>
+                                                                    <h4 className="text-sm font-semibold text-gray-500">{t('orders.date')}</h4>
+                                                                    <p>{new Date(order.shipping_info?.submitted_at || order.created_at).toLocaleString()}</p>
+                                                                </div>
+                                                            </div>
+
+                                                            <div>
+                                                                <h4 className="text-sm font-semibold text-gray-500">{t('orders.address')}</h4>
+                                                                {order.postal_code && <p className="text-sm">〒{order.postal_code}</p>}
+                                                                <p className="whitespace-pre-wrap text-sm">{order.address}</p>
+                                                                {order.shipping_info?.phone && <p className="text-sm mt-1">{order.shipping_info.phone}</p>}
+                                                            </div>
+
+                                                            {/* Memos (if available) - Assuming these fields might exist on order object or shipping_info */}
+                                                            {/* These are now handled within the shipping form for 'USED' status and read-only for 'SHIPPED' */}
+                                                            {order.status === 'USED' && (
+                                                                <div className="pt-4 border-t">
+                                                                    <h4 className="text-sm font-bold mb-2">{t('orders.action')}</h4>
+                                                                    <form onSubmit={(e) => {
+                                                                        e.preventDefault();
+                                                                        const fd = new FormData(e.target as HTMLFormElement);
+                                                                        handleShipOrder(
+                                                                            uuid,
+                                                                            fd.get('tracking') as string,
+                                                                            fd.get('memo_for_users') as string,
+                                                                            fd.get('memo_for_shop') as string
+                                                                        );
+                                                                    }} className="space-y-4">
+                                                                        <div className="space-y-2">
+                                                                            <Label htmlFor={`memo_users-${uuid}`}>{t('orders.userMessage')}</Label>
+                                                                            <Input id={`memo_users-${uuid}`} name="memo_for_users" defaultValue={order.memo_for_users} placeholder={t('linkQr.memoForUsersPlaceholder')} />
+                                                                        </div>
+                                                                        <div className="space-y-2">
+                                                                            <Label htmlFor={`memo_shop-${uuid}`}>{t('orders.shopMemo')}</Label>
+                                                                            <Input id={`memo_shop-${uuid}`} name="memo_for_shop" defaultValue={order.memo_for_shop} placeholder={t('linkQr.memoForShopPlaceholder')} />
+                                                                        </div>
+                                                                        <div className="space-y-2">
+                                                                            <Label htmlFor={`tracking-${uuid}`}>{t('orders.shipDialog.label')}</Label>
+                                                                            <Input id={`tracking-${uuid}`} name="tracking" placeholder="1234-5678" required />
+                                                                        </div>
+                                                                        <Button type="submit" className="w-full">{t('orders.shipDialog.submit')}</Button>
+                                                                    </form>
+                                                                </div>
+                                                            )}
+                                                            {order.status === 'SHIPPED' && (
+                                                                <div className="pt-2 space-y-4">
+                                                                    {/* Read-only view for SHIPPED, or we could allow edit. For now keeping read-only as per previous pattern but showing memos */}
+                                                                    {order.memo_for_users && (
+                                                                        <div>
+                                                                            <h4 className="text-sm font-semibold text-gray-500">{t('orders.userMessage')}</h4>
+                                                                            <p className="text-sm bg-gray-50 p-2 rounded">{order.memo_for_users}</p>
+                                                                        </div>
+                                                                    )}
+                                                                    {order.memo_for_shop && (
+                                                                        <div>
+                                                                            <h4 className="text-sm font-semibold text-gray-500">{t('orders.shopMemo')}</h4>
+                                                                            <p className="text-sm bg-yellow-50 p-2 rounded">{order.memo_for_shop}</p>
+                                                                        </div>
+                                                                    )}
+                                                                    <div>
+                                                                        <h4 className="text-sm font-semibold text-gray-500">{t('orders.shipDialog.label')}</h4>
+                                                                        <p className="font-mono">{order.tracking_number || order.shipping_info?.tracking_number || '-'}</p>
+                                                                    </div>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </DialogContent>
+                                                </Dialog>
+                                            );
+                                        })
+                                )}
+                            </TableBody>
+                        </Table>
+                    </CardContent>
+                </Card>
+
+                {/* Existing Products */}
+                <Card>
+                    <CardHeader>
+                        <CardTitle>{t('products')}</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                            {products.map((product) => (
+                                <Card key={product.product_id} className="overflow-hidden">
+                                    <div className="w-full relative aspect-[16/9]">
+                                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                                        <img src={product.image_url} alt={product.name} className="w-full h-full object-cover" />
+                                        <div className="absolute top-2 right-2 flex gap-2">
+                                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${product.status === 'ACTIVE' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                                                }`}>
+                                                {product.status}
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <CardHeader className="px-3 pt-2 pb-1">
+                                        <CardTitle className="text-base truncate" title={product.name}>{product.name}</CardTitle>
+                                        <CardDescription className="line-clamp-1 text-xs">{product.description}</CardDescription>
+                                    </CardHeader>
+                                    <CardContent className="px-3 pb-2 pt-0 flex justify-between items-center">
+                                        <span className="font-bold text-sm">¥{product.price ? Number(product.price).toLocaleString("ja-JP") : "0"}</span>
+                                        <div className="flex gap-2">
+                                            <Button variant="outline" size="sm" className="h-7 text-xs px-2" onClick={() => handleToggleStatus(product.product_id, product.status)}>
+                                                {product.status === 'ACTIVE' ? t('product.stop') : t('product.activate')}
+                                            </Button>
+                                            {product.status !== 'ACTIVE' && (
+                                                <Button variant="destructive" size="sm" className="h-7 text-xs px-2" onClick={() => handleDeleteProduct(product.product_id, product.name)}>
+                                                    {t('product.delete')}
+                                                </Button>
+                                            )}
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            ))}
+                            <Card className="col-span-2 sm:col-span-2 md:col-span-3 lg:col-span-4">
+                                <CardHeader>
+                                    <CardTitle>{t('addProduct.title')}</CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                    <form onSubmit={handleCreateProduct} className="space-y-4">
+                                        <div className="space-y-2">
+                                            <Label htmlFor="name">{t('addProduct.name')}</Label>
+                                            <Input id="name" name="name" required />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="description">{t('addProduct.description')}</Label>
+                                            <Input id="description" name="description" required />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="price">{t('addProduct.price')}</Label>
+                                            <Input id="price" name="price" type="number" required />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="image">{t('addProduct.image')}</Label>
+                                            <Input id="image" name="image" type="file" accept="image/*" />
+                                        </div>
+                                        <Button type="submit" className="w-full">{t('addProduct.submit')}</Button>
+                                    </form>
+                                </CardContent>
+                            </Card>
+                        </div>
+                    </CardContent>
+                </Card>
+
+
 
                 {/* Linked QR Codes Table */}
                 <Card>
@@ -560,6 +713,6 @@ export default function ShopPage() {
                 </Card>
 
             </div>
-        </div>
+        </div >
     );
 }

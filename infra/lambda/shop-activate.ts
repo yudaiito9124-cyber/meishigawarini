@@ -1,7 +1,7 @@
 
 import { APIGatewayProxyHandler } from 'aws-lambda';
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
-import { DynamoDBDocumentClient, UpdateCommand } from '@aws-sdk/lib-dynamodb';
+import { DynamoDBDocumentClient, UpdateCommand, GetCommand } from '@aws-sdk/lib-dynamodb';
 
 const client = new DynamoDBClient({});
 const ddb = DynamoDBDocumentClient.from(client);
@@ -31,6 +31,15 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Missing product_id or shop_id for LINK action' }) };
             }
 
+            // Fetch Product to get valid_days
+            const prodRes = await ddb.send(new GetCommand({
+                TableName: TABLE_NAME,
+                Key: { PK: `SHOP#${shop_id}`, SK: `PRODUCT#${product_id}` }
+            }));
+
+            // If product doesn't exist, we could error, but let's just default
+            const validDays = (prodRes.Item && prodRes.Item.valid_days) ? prodRes.Item.valid_days : 180;
+
             const targetStatus = activate_now ? 'ACTIVE' : 'LINKED';
             let updateExp = 'SET #status = :target, product_id = :pid, shop_id = :sid';
             const expValues: any = {
@@ -41,8 +50,24 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             };
 
             if (activate_now) {
+                const now = new Date();
                 updateExp += ', activated_at = :now';
-                expValues[':now'] = new Date().toISOString();
+                expValues[':now'] = now.toISOString();
+
+                const expiresAt = new Date(now);
+                expiresAt.setDate(expiresAt.getDate() + validDays);
+                updateExp += ', expires_at = :exp';
+                expValues[':exp'] = expiresAt.toISOString();
+            }
+
+            const { memo_for_users, memo_for_shop } = body;
+            if (memo_for_users) {
+                updateExp += ', memo_for_users = :mu';
+                expValues[':mu'] = memo_for_users;
+            }
+            if (memo_for_shop) {
+                updateExp += ', memo_for_shop = :ms';
+                expValues[':ms'] = memo_for_shop;
             }
 
             await ddb.send(new UpdateCommand({
@@ -62,17 +87,46 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 
         } else if (action === 'ACTIVATE') {
             // Activate an already LINKED code
-            // For safety, we should really check if the shop owns it, but this generic endpoint might be used by admin
+            // Need to fetch QR first to get product_id and shop_id
+            const qrRes = await ddb.send(new GetCommand({
+                TableName: TABLE_NAME,
+                Key: { PK: `QR#${qr_id}`, SK: 'METADATA' }
+            }));
+
+            if (!qrRes.Item) {
+                return { statusCode: 404, headers: corsHeaders, body: JSON.stringify({ message: 'QR not found' }) };
+            }
+
+            const currentStatus = qrRes.Item.status;
+            if (currentStatus !== 'LINKED') {
+                return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: `QR is not LINKED (current: ${currentStatus})` }) };
+            }
+
+            const pId = qrRes.Item.product_id;
+            const sId = qrRes.Item.shop_id;
+
+            // Fetch Product
+            const prodRes = await ddb.send(new GetCommand({
+                TableName: TABLE_NAME,
+                Key: { PK: `SHOP#${sId}`, SK: `PRODUCT#${pId}` }
+            }));
+
+            const validDays = (prodRes.Item && prodRes.Item.valid_days) ? prodRes.Item.valid_days : 180;
+            const now = new Date();
+            const expiresAt = new Date(now);
+            expiresAt.setDate(expiresAt.getDate() + validDays);
+
             await ddb.send(new UpdateCommand({
                 TableName: TABLE_NAME,
                 Key: { PK: `QR#${qr_id}`, SK: 'METADATA' },
-                UpdateExpression: 'SET #status = :active, activated_at = :now',
+                UpdateExpression: 'SET #status = :active, activated_at = :now, expires_at = :exp',
                 ConditionExpression: '#status = :linked',
                 ExpressionAttributeNames: { '#status': 'status' },
                 ExpressionAttributeValues: {
                     ':active': 'ACTIVE',
                     ':linked': 'LINKED',
-                    ':now': new Date().toISOString()
+                    ':now': now.toISOString(),
+                    ':exp': expiresAt.toISOString()
                 }
             }));
 
@@ -85,6 +139,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         } else {
             return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Invalid action' }) };
         }
+
 
     } catch (error: any) {
         console.error(error);

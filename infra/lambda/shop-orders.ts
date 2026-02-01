@@ -121,7 +121,7 @@ async function handleUpdateOrder(event: any, uuidParam?: string) {
     if (!uuid) return { statusCode: 400, headers: corsHeaders, body: 'Missing UUID' };
 
     const body = JSON.parse(event.body || '{}');
-    const { tracking_number } = body;
+    const { tracking_number, memo_for_users, memo_for_shop } = body;
 
     // Transactionally update METADATA status and ORDER details?
     // Or just update individually. For SHIPPED, updating METADATA is critical for list removal.
@@ -129,22 +129,35 @@ async function handleUpdateOrder(event: any, uuidParam?: string) {
     // And update ORDER item -> add tracking number.
 
     // We can do TransactWriteItems
-    // 1. Update METADATA: status='SHIPPED', shipped_at=now
+    // 1. Update METADATA: status='SHIPPED', shipped_at=now, memos...
     // 2. Update ORDER: tracking_number=..., shipped_at=now
 
     // But for simplicity in lambda-nodejs, let's do simple update
     // Update METADATA is most important for the Dashboard list.
 
+    const updateExpParts = ['SET #status = :s', 'shipped_at = :now', 'GSI1_PK = :gsi_pk'];
+    const expAttrValues: any = {
+        ':s': 'SHIPPED',
+        ':now': new Date().toISOString(),
+        ':gsi_pk': 'QR#SHIPPED'
+    };
+    const expAttrNames: any = { '#status': 'status' };
+
+    if (memo_for_users !== undefined) {
+        updateExpParts.push('memo_for_users = :mu');
+        expAttrValues[':mu'] = memo_for_users;
+    }
+    if (memo_for_shop !== undefined) {
+        updateExpParts.push('memo_for_shop = :ms');
+        expAttrValues[':ms'] = memo_for_shop;
+    }
+
     await ddb.send(new UpdateCommand({
         TableName: TABLE_NAME,
         Key: { PK: `QR#${uuid}`, SK: 'METADATA' },
-        UpdateExpression: 'SET #status = :s, shipped_at = :now, GSI1_PK = :gsi_pk',
-        ExpressionAttributeNames: { '#status': 'status' },
-        ExpressionAttributeValues: {
-            ':s': 'SHIPPED',
-            ':now': new Date().toISOString(),
-            ':gsi_pk': 'QR#SHIPPED'
-        }
+        UpdateExpression: updateExpParts.join(', '),
+        ExpressionAttributeNames: expAttrNames,
+        ExpressionAttributeValues: expAttrValues
     }));
 
     // Update ORDER if tracking provided
@@ -225,8 +238,11 @@ async function handleListShopOrders(shopId: string) {
             status: meta.status,
             recipient_name: orderDetail.name || 'Unknown',
             address: orderDetail.address || 'Unknown',
-            postal_code: orderDetail.postal_code,
+            postal_code: orderDetail.zipCode || orderDetail.postal_code,
             shipping_info: orderDetail,
+            memo_for_users: meta.memo_for_users,
+            memo_for_shop: meta.memo_for_shop,
+            tracking_number: orderDetail.tracking_number,
             created_at: meta.created_at, // QR creation? Order date might be in ORDER sk.
             ordered_at: orderDetail.created_at, // Using order submission time
             shipped_at: orderDetail.shipped_at

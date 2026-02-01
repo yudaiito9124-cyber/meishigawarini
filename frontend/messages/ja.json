@@ -72,13 +72,18 @@
             "address": "住所",
             "status": "ステータス",
             "action": "操作",
-            "noOrders": "アクティブな注文はありません",
+            "uuid": "ID",
+            "productName": "商品名",
+            "noOrders": "注文はまだありません",
             "ship": "発送する",
+            "details": "詳細",
+            "userMessage": "購入者へのメッセージ(オプション)",
+            "shopMemo": "ショップ(ショップのみ閲覧可能)",
             "shipDialog": {
-                "title": "発送済みにする",
-                "description": "{name} 様への追跡番号を入力してください",
+                "title": "発送処理",
+                "description": "{name} 様への発送情報を入力してください。",
                 "label": "追跡番号",
-                "submit": "発送を確定"
+                "submit": "発送済みにする"
             }
         },
         "products": "商品一覧",
@@ -98,12 +103,16 @@
         },
         "linkQr": {
             "title": "QRコード連携",
-            "description": "物理QRカードと商品を紐付けます。",
+            "description": "会計後，カードと商品を紐付けし，有効化します。",
             "uuidLabel": "QR UUID (スキャンまたは入力)",
             "placeholder": "例: 123e4567-...",
-            "scan": "スキャン",
+            "scan": "QRコードをスキャン",
             "selectProduct": "商品を選択",
             "selectPlaceholder": "商品を選択してください...",
+            "memoForUsersLabel": "ショップからのメッセージ(購入者・受取者が閲覧可能)",
+            "memoForUsersPlaceholder": "メッセージを入力できます...",
+            "memoForShopLabel": "メモ(ショップのみ閲覧可能)",
+            "memoForShopPlaceholder": "メモを入力できます...",
             "submit": "連携して有効化",
             "scanDialog": {
                 "title": "QRコードスキャン",
@@ -126,7 +135,8 @@
             "pin": "PINコードを入力してギフトを受け取る",
             "form": "ギフトが届いています！",
             "success": "ありがとうございます！",
-            "shipped": "ギフトが発送されました！"
+            "shipped": "ギフトが発送されました！",
+            "expired": "有効期限が切れています"
         },
         "pinStep": {
             "label": "PINコード入力",
@@ -134,10 +144,14 @@
             "submit": "ギフトを見る",
             "verifying": "確認中..."
         },
+        "daysRemaining": "有効期限はあと{days}日です",
         "formStep": {
             "title": "配送先情報",
             "name": "お名前",
             "address": "配送先住所",
+            "zipCode": "郵便番号",
+            "phone": "電話番号 (任意)",
+            "email": "メールアドレス (任意)",
             "submit": "ギフトを受け取る",
             "submitting": "送信中..."
         },
@@ -149,11 +163,25 @@
             "message": "ギフトは発送済みです！",
             "tracking": "追跡番号: {number}"
         },
+        "expiredStep": {
+            "message": "このギフトの有効期限は切れています。",
+            "subMessage": "有効期限: {date}"
+        },
         "errors": {
             "invalidPin": "PINが無効か、ギフトが見つかりません",
             "inactive": "このカードは有効ではありません。",
             "submitFailed": "住所の送信に失敗しました。"
-        }
+        },
+        "chat": {
+            "title": "メッセージ",
+            "name": "お名前",
+            "message": "メッセージ",
+            "submit": "送信",
+            "submitting": "送信中...",
+            "placeholder": "メッセージを入力...",
+            "namePlaceholder": "ニックネーム"
+        },
+        "shopMessage": "ショップからのメッセージ"
     },
     "AdminPage": {
         "title": "管理ダッシュボード",

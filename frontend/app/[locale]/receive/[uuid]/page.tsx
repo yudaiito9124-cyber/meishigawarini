@@ -46,6 +46,24 @@ const submitAddress = async (uuid: string, pin: string, addressData: any) => {
     return res.json();
 };
 
+// Fetch Chat Messages
+const fetchChatMessages = async (uuid: string, pin: string) => {
+    const res = await fetch(`${NEXT_PUBLIC_API_URL}/recipient/qrcodes/${uuid}/chat?pin=${pin}`);
+    if (!res.ok) throw new Error("Failed to fetch messages");
+    return res.json();
+};
+
+// Post Chat Message
+const postChatMessage = async (uuid: string, pin: string, username: string, message: string) => {
+    const res = await fetch(`${NEXT_PUBLIC_API_URL}/recipient/qrcodes/${uuid}/chat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pin, username, message }),
+    });
+    if (!res.ok) throw new Error("Failed to post message");
+    return res.json();
+};
+
 export default function ReceivePage() {
     const t = useTranslations('ReceivePage');
     const params = useParams();
@@ -55,10 +73,19 @@ export default function ReceivePage() {
     const [gift, setGift] = useState<any>(null);
     const [pin, setPin] = useState("");
     const [name, setName] = useState("");
+    const [zipCode, setZipCode] = useState("");
     const [address, setAddress] = useState("");
+    const [phone, setPhone] = useState("");
+    const [email, setEmail] = useState("");
+
+    // Chat State
+    const [messages, setMessages] = useState<any[]>([]);
+    const [chatName, setChatName] = useState("");
+    const [chatMessage, setChatMessage] = useState("");
+    const [chatLoading, setChatLoading] = useState(false);
 
     // Steps: PIN -> FORM (or SHIPPED/SUCCESS)
-    const [step, setStep] = useState<"PIN" | "FORM" | "SUCCESS" | "SHIPPED">("PIN");
+    const [step, setStep] = useState<"PIN" | "FORM" | "SUCCESS" | "SHIPPED" | "EXPIRED">("PIN");
 
     const [error, setError] = useState<string | null>(null);
     const [pinError, setPinError] = useState("");
@@ -80,6 +107,8 @@ export default function ReceivePage() {
                 setStep("SHIPPED");
             } else if (data.status === 'ACTIVE') {
                 setStep("FORM");
+            } else if (data.status === 'EXPIRED') {
+                setStep("EXPIRED");
             } else {
                 // UNASSIGNED, BANNED, etc.
                 setError(t('errors.inactive'));
@@ -87,7 +116,7 @@ export default function ReceivePage() {
 
         } catch (err: any) {
             console.error(err);
-            setPinError(err.message || t('errors.invalidPin'));
+            setPinError(t('errors.invalidPin'));
         } finally {
             setLoading(false);
         }
@@ -97,7 +126,7 @@ export default function ReceivePage() {
         e.preventDefault();
         setLoading(true);
         try {
-            await submitAddress(uuid, pin, { name, address });
+            await submitAddress(uuid, pin, { name, zipCode, address, phone, email });
             setStep("SUCCESS");
         } catch (error: any) {
             console.error("Submission error:", error);
@@ -105,6 +134,45 @@ export default function ReceivePage() {
         } finally {
             setLoading(false);
         }
+    };
+
+    // Load messages when step is not PIN (i.e. logged in)
+    const loadMessages = async () => {
+        try {
+            const data = await fetchChatMessages(uuid, pin);
+            setMessages(data.messages || []);
+        } catch (e) {
+            console.error(e);
+        }
+    };
+
+    // Toggle chat loading state if needed, or just effect.
+    // Effect to reload when step changes to something other than PIN
+    const [hasLoadedChat, setHasLoadedChat] = useState(false);
+    if (step !== "PIN" && !hasLoadedChat && pin) {
+        setHasLoadedChat(true);
+        loadMessages();
+    }
+
+    const handleChatSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!chatName || !chatMessage) return;
+        setChatLoading(true);
+        try {
+            await postChatMessage(uuid, pin, chatName, chatMessage);
+            setChatMessage(""); // Keep name
+            await loadMessages();
+        } catch (e) {
+            alert("Failed to send message: " + e);
+        } finally {
+            setChatLoading(false);
+        }
+    };
+
+    const getRemainingDays = (expiresAt: string) => {
+        if (!expiresAt) return null;
+        const diff = new Date(expiresAt).getTime() - new Date().getTime();
+        return Math.ceil(diff / (1000 * 60 * 60 * 24));
     };
 
     if (error) {
@@ -123,14 +191,15 @@ export default function ReceivePage() {
     }
 
     return (
-        <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-4">
             <Card className="w-full max-w-md">
                 <CardHeader>
                     <CardTitle className="text-xl text-center">
                         {step === "PIN" ? t('titles.pin') :
                             step === "FORM" ? t('titles.form') :
                                 step === "SUCCESS" ? t('titles.success') :
-                                    step === "SHIPPED" ? t('titles.shipped') : ""}
+                                    step === "SHIPPED" ? t('titles.shipped') :
+                                        step === "EXPIRED" ? t('titles.expired') : ""}
                     </CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -140,6 +209,28 @@ export default function ReceivePage() {
                             <img src={gift.product.image_url} alt="Gift" className="w-full h-48 object-cover rounded-md mb-4" />
                             <h2 className="font-bold text-lg">{gift.product.name}</h2>
                             <p className="text-gray-600 text-sm">{gift.product.description}</p>
+
+                            {/* Remaining Days for Active Gift */}
+                            {step === "FORM" && gift.expires_at && (
+                                <p className="mt-2 text-sm font-semibold text-green-600 border border-green-200 bg-green-50 p-2 rounded text-center">
+                                    {t('daysRemaining', { days: getRemainingDays(gift.expires_at) ?? 0 })}
+                                </p>
+                            )}
+
+                            {/* Expired Message */}
+                            {step === "EXPIRED" && (
+                                <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded text-center">
+                                    <p className="text-red-600 font-bold">{t('expiredStep.message')}</p>
+                                    <p className="text-red-500 text-sm mt-1">{t('expiredStep.subMessage', { date: new Date(gift.expires_at).toLocaleDateString() })}</p>
+                                </div>
+                            )}
+
+                            {gift.memo_for_users && (
+                                <div className="mt-4 p-3 bg-blue-50 rounded-md border border-blue-100">
+                                    <h3 className="font-semibold text-sm text-blue-800 mb-1">{t('shopMessage')}</h3>
+                                    <p className="text-sm text-blue-900 whitespace-pre-wrap">{gift.memo_for_users}</p>
+                                </div>
+                            )}
                         </div>
                     )}
 
@@ -179,12 +270,42 @@ export default function ReceivePage() {
                                     />
                                 </div>
                                 <div className="space-y-2">
+                                    <Label htmlFor="zipCode">{t('formStep.zipCode')}</Label>
+                                    <Input
+                                        id="zipCode"
+                                        required
+                                        value={zipCode}
+                                        onChange={(e) => setZipCode(e.target.value)}
+                                        placeholder="123-4567"
+                                    />
+                                </div>
+                                <div className="space-y-2">
                                     <Label htmlFor="address">{t('formStep.address')}</Label>
                                     <Input
                                         id="address"
                                         required
                                         value={address}
                                         onChange={(e) => setAddress(e.target.value)}
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="phone">{t('formStep.phone')}</Label>
+                                    <Input
+                                        id="phone"
+                                        type="tel"
+                                        value={phone}
+                                        onChange={(e) => setPhone(e.target.value)}
+                                        placeholder="090-1234-5678"
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="email">{t('formStep.email')}</Label>
+                                    <Input
+                                        id="email"
+                                        type="email"
+                                        value={email}
+                                        onChange={(e) => setEmail(e.target.value)}
+                                        placeholder="you@example.com"
                                     />
                                 </div>
                             </div>
@@ -213,6 +334,59 @@ export default function ReceivePage() {
                     )}
                 </CardContent>
             </Card>
+
+            {/* Chat Section */}
+            {step !== "PIN" && (
+                <Card className="w-full max-w-md mt-6">
+                    <CardHeader>
+                        <CardTitle className="text-lg">{t('chat.title')}</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="space-y-4">
+                            <div className="max-h-60 overflow-y-auto space-y-3 p-2 border rounded bg-gray-50">
+                                {messages.length === 0 ? (
+                                    <p className="text-sm text-gray-500 text-center py-4">No messages yet.</p>
+                                ) : (
+                                    messages.slice().reverse().map((msg) => (
+                                        <div key={msg.id} className="bg-white p-2 rounded shadow-sm text-sm">
+                                            <p className="font-bold text-xs text-gray-600 mb-1">{msg.username} <span className="text-gray-400 font-normal">• {new Date(msg.created_at).toLocaleString()}</span></p>
+                                            <p className="whitespace-pre-wrap">{msg.message}</p>
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+
+                            <form onSubmit={handleChatSubmit} className="space-y-3 border-t pt-4">
+                                <div>
+                                    <Label htmlFor="chatName" className="text-xs">{t('chat.name')}</Label>
+                                    <Input
+                                        id="chatName"
+                                        placeholder={t('chat.namePlaceholder')}
+                                        value={chatName}
+                                        onChange={(e) => setChatName(e.target.value)}
+                                        required
+                                        className="h-8"
+                                    />
+                                </div>
+                                <div>
+                                    <Label htmlFor="chatMessage" className="text-xs">{t('chat.message')}</Label>
+                                    <Input
+                                        id="chatMessage"
+                                        placeholder={t('chat.placeholder')}
+                                        value={chatMessage}
+                                        onChange={(e) => setChatMessage(e.target.value)}
+                                        required
+                                    />
+                                </div>
+                                <Button type="submit" size="sm" className="w-full" disabled={chatLoading}>
+                                    {chatLoading ? t('chat.submitting') : t('chat.submit')}
+                                </Button>
+                            </form>
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
+
         </div>
     );
 }
