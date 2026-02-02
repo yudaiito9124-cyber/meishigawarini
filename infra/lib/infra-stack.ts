@@ -61,6 +61,11 @@ export class InfraStack extends cdk.Stack {
         requireUppercase: true,
         requireDigits: true,
       },
+      userVerification: {
+        emailSubject: '【名刺がわりに】認証コードのお知らせ (2FA Notification for Meishigawarini)',
+        emailBody: 'あなたの認証コードは {####} です。 (Your verification code is {####}.)',
+        emailStyle: cognito.VerificationEmailStyle.CODE,
+      },
       removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
 

@@ -63,10 +63,11 @@
         "loading": "Loading Dashboard...",
         "title": "Shop Dashboard",
         "shopId": "Shop ID: {id}",
+        "movetoshops": "Back to shop list",
         "incomingOrders": "Incoming Orders",
         "ordersDesc": "Manage your orders and shipments.",
         "orders": {
-            "date": "Date",
+            "date": "Last Updated Date Time",
             "recipient": "Recipient",
             "address": "Address",
             "status": "Status",
@@ -127,6 +128,14 @@
             "status": "Status",
             "activatedAt": "Activated At",
             "noLinks": "No linked QR codes"
+        },
+        "history": {
+            "title": "Order History",
+            "noLinks": "No history.",
+            "id": "ID",
+            "product": "Product",
+            "status": "Status",
+            "activatedAt": "Last Updated Date Time"
         }
     },
     "ReceivePage": {
@@ -161,7 +170,18 @@
             "invalidPin": "Invalid PIN or Gift not found",
             "inactive": "This card is not active.",
             "submitFailed": "Failed to submit address."
-        }
+        },
+        "chat": {
+            "title": "Chat",
+            "name": "Name",
+            "message": "Message",
+            "noMessages": "No messages yet.",
+            "submit": "Submit",
+            "submitting": "Submitting...",
+            "placeholder": "Enter message...",
+            "namePlaceholder": "Nickname"
+        },
+        "shopMessage": "Shop Message"
     },
     "AdminPage": {
         "title": "Admin Dashboard",

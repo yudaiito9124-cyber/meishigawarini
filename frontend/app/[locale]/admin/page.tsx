@@ -476,7 +476,7 @@ function QRCodeListSection({ apiUrl, onGeneratePDF }: { apiUrl: string, onGenera
         <Card>
             <CardHeader>
                 <CardTitle className="flex justify-between items-center">
-                    <span>All QR Codes</span>
+                    <span>{t('list.title')}</span>
                     <div className="flex gap-2">
                         {status === 'BANNED' && (
                             <Button variant="destructive" size="sm" onClick={handleDeleteAllBanned} disabled={loading}>

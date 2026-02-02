@@ -345,7 +345,7 @@ export default function ReceivePage() {
                         <div className="space-y-4">
                             <div className="max-h-60 overflow-y-auto space-y-3 p-2 border rounded bg-gray-50">
                                 {messages.length === 0 ? (
-                                    <p className="text-sm text-gray-500 text-center py-4">No messages yet.</p>
+                                    <p className="text-sm text-gray-500 text-center py-4">{t('chat.noMessages')}</p>
                                 ) : (
                                     messages.slice().reverse().map((msg) => (
                                         <div key={msg.id} className="bg-white p-2 rounded shadow-sm text-sm">

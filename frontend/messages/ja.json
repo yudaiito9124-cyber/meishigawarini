@@ -63,11 +63,12 @@
     "ShopPage": {
         "loading": "ショップの管理画面を読み込み中...",
         "title": "ショップダッシュボード",
+        "movetoshops": "ショップ一覧へ戻る",
         "shopId": "ショップID: {id}",
         "incomingOrders": "受信した注文",
         "ordersDesc": "注文と発送を管理します。",
         "orders": {
-            "date": "日付",
+            "date": "最終更新日時",
             "recipient": "受取人",
             "address": "住所",
             "status": "ステータス",
@@ -129,6 +130,14 @@
             "status": "ステータス",
             "activatedAt": "有効化日時",
             "noLinks": "連携済みのQRコードはありません"
+        },
+        "history": {
+            "title": "過去の注文履歴",
+            "noLinks": "履歴はありません",
+            "id": "ID",
+            "product": "商品",
+            "status": "ステータス",
+            "activatedAt": "最終更新日時"
         }
     },
     "ReceivePage": {
@@ -174,9 +183,10 @@
             "submitFailed": "住所の送信に失敗しました。"
         },
         "chat": {
-            "title": "メッセージ",
+            "title": "メッセージチャット",
             "name": "お名前",
             "message": "メッセージ",
+            "noMessages": "まだメッセージはありません",
             "submit": "送信",
             "submitting": "送信中...",
             "placeholder": "メッセージを入力...",

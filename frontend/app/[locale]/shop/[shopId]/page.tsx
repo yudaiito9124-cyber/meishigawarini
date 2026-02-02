@@ -98,6 +98,14 @@ export default function ShopPage() {
         }
     };
 
+    const handleShops = async () => {
+        try {
+            router.push('/shop');
+        } catch (error) {
+            console.error('Error move to shops: ', error);
+        }
+    };
+
     const resizeImage = (file: File): Promise<Blob> => {
         return new Promise((resolve, reject) => {
             const img = new Image();
@@ -325,7 +333,9 @@ export default function ShopPage() {
                         <h1 className="text-2xl font-bold text-gray-900">{shop?.name || t('title')}</h1>
                         <p className="text-sm text-gray-500">{t('shopId', { id: String(shopId || '') })}</p>
                     </div>
+                    <Button variant="outline" size="lg" onClick={handleShops}>{t('movetoshops')}</Button>
                 </div>
+
             </div>
 
 
@@ -414,7 +424,7 @@ export default function ShopPage() {
                                             </div>
                                         </div>
                                     </div>
-                                    <div className="flex-[3] flex mt-7">
+                                    <div className="flex-[3] flex mt-5">
                                         <Dialog open={isScanning} onOpenChange={setIsScanning}>
                                             <DialogTrigger asChild>
                                                 <Button type="button" variant="secondary" className="flex-[3] h-auto flex flex-col gap-2 text-xl">
@@ -485,7 +495,7 @@ export default function ShopPage() {
                                                 <Dialog key={order.qr_id}>
                                                     <DialogTrigger asChild>
                                                         <TableRow className="cursor-pointer hover:bg-gray-100">
-                                                            <TableCell>{new Date(order.shipping_info?.submitted_at || order.created_at).toLocaleDateString()}</TableCell>
+                                                            <TableCell>{new Date(order.shipping_info?.submitted_at || order.created_at).toLocaleString()}</TableCell>
                                                             <TableCell className="font-medium">{product?.name || order.product_id}</TableCell>
                                                             <TableCell>
                                                                 <span className={`px-2 py-1 rounded text-xs ${order.status === 'SHIPPED' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'
@@ -680,43 +690,97 @@ export default function ShopPage() {
 
 
 
-                {/* Linked QR Codes Table */}
+                {/* Order History */}
                 <Card>
                     <CardHeader>
-                        <CardTitle>{t('linkedQr.title')}</CardTitle>
+                        <CardTitle>{t('history.title')}</CardTitle>
                     </CardHeader>
                     <CardContent>
                         <Table>
                             <TableHeader>
                                 <TableRow>
-                                    <TableHead>{t('linkedQr.id')}</TableHead>
-                                    <TableHead>{t('linkedQr.product')}</TableHead>
-                                    <TableHead>{t('linkedQr.status')}</TableHead>
-                                    <TableHead>{t('linkedQr.activatedAt')}</TableHead>
+                                    <TableHead>{t('history.activatedAt')}</TableHead>
+                                    <TableHead>{t('history.product')}</TableHead>
+                                    <TableHead>{t('history.status')}</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {qrCodes.length === 0 ? <TableRow><TableCell colSpan={4} className="text-center">{t('linkedQr.noLinks')}</TableCell></TableRow> : (
-                                    qrCodes.map((qr) => {
-                                        const prod = products.find(p => p.product_id === qr.product_id);
-                                        return (
-                                            <TableRow key={qr.id}>
-                                                <TableCell className="font-mono text-xs">{qr.id}</TableCell>
-                                                <TableCell>{prod?.name || qr.product_id}</TableCell>
-                                                <TableCell>
-                                                    <span className={`px-2 py-1 rounded text-xs ${qr.status === 'USED' ? 'bg-yellow-100 text-yellow-800' :
-                                                        qr.status === 'ACTIVE' ? 'bg-green-100 text-green-800' :
-                                                            'bg-gray-100'
-                                                        }`}>
-                                                        {qr.status}
-                                                    </span>
-                                                </TableCell>
-                                                <TableCell className="text-xs text-gray-500">
-                                                    {qr.activated_at ? new Date(qr.activated_at).toLocaleDateString() : '-'}
-                                                </TableCell>
-                                            </TableRow>
-                                        );
-                                    })
+                                {qrCodes.filter(q => ['COMPLETED', 'EXPIRED', 'BANNED'].includes(q.status)).length === 0 ? (
+                                    <TableRow><TableCell colSpan={3} className="text-center">{t('history.noLinks')}</TableCell></TableRow>
+                                ) : (
+                                    qrCodes
+                                        .filter(q => ['COMPLETED', 'EXPIRED', 'BANNED'].includes(q.status))
+                                        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+                                        .map((qr) => {
+                                            const product = products.find(p => p.product_id === qr.product_id);
+                                            const uuid = qr.id;
+                                            // Mock missing order info since qrCodes endpoint does not return it
+                                            const recipientName = "-";
+                                            const address = "-";
+
+                                            return (
+                                                <Dialog key={qr.id}>
+                                                    <DialogTrigger asChild>
+                                                        <TableRow className="cursor-pointer hover:bg-gray-100">
+                                                            <TableCell>{qr.activated_at ? new Date(qr.activated_at).toLocaleString() : new Date(qr.created_at).toLocaleDateString()}</TableCell>
+                                                            <TableCell className="font-medium">{product?.name || qr.product_id}</TableCell>
+                                                            <TableCell>
+                                                                <span className={`px-2 py-1 rounded text-xs ${qr.status === 'COMPLETED' ? 'bg-blue-100 text-blue-800' :
+                                                                    qr.status === 'BANNED' ? 'bg-red-100 text-red-800' :
+                                                                        'bg-gray-100'
+                                                                    }`}>
+                                                                    {qr.status}
+                                                                </span>
+                                                            </TableCell>
+                                                        </TableRow>
+                                                    </DialogTrigger>
+                                                    <DialogContent className="max-w-md">
+                                                        <DialogHeader>
+                                                            <DialogTitle>{t('orders.details')}</DialogTitle>
+                                                            <DialogDescription className="font-mono text-xs text-gray-500">
+                                                                ID: {uuid}
+                                                            </DialogDescription>
+                                                        </DialogHeader>
+
+                                                        <div className="space-y-4 py-4">
+                                                            {/* Product Info */}
+                                                            <div>
+                                                                <h4 className="text-sm font-semibold text-gray-500">{t('orders.productName')}</h4>
+                                                                <p className="font-medium">{product?.name || qr.product_id}</p>
+                                                            </div>
+
+                                                            {/* Status */}
+                                                            <div>
+                                                                <h4 className="text-sm font-semibold text-gray-500">{t('orders.status')}</h4>
+                                                                <span className={`px-2 py-1 rounded text-xs ${qr.status === 'COMPLETED' ? 'bg-blue-100 text-blue-800' :
+                                                                    qr.status === 'BANNED' ? 'bg-red-100 text-red-800' :
+                                                                        'bg-gray-100'
+                                                                    }`}>
+                                                                    {qr.status}
+                                                                </span>
+                                                            </div>
+
+                                                            {/* Recipient Info */}
+                                                            <div className="grid grid-cols-2 gap-4">
+                                                                <div>
+                                                                    <h4 className="text-sm font-semibold text-gray-500">{t('orders.recipient')}</h4>
+                                                                    <p>{recipientName}</p>
+                                                                </div>
+                                                                <div>
+                                                                    <h4 className="text-sm font-semibold text-gray-500">{t('orders.date')}</h4>
+                                                                    <p>{qr.activated_at ? new Date(qr.activated_at).toLocaleString() : new Date(qr.created_at).toLocaleString()}</p>
+                                                                </div>
+                                                            </div>
+
+                                                            <div>
+                                                                <h4 className="text-sm font-semibold text-gray-500">{t('orders.address')}</h4>
+                                                                <p className="whitespace-pre-wrap text-sm">{address}</p>
+                                                            </div>
+                                                        </div>
+                                                    </DialogContent>
+                                                </Dialog>
+                                            );
+                                        })
                                 )}
                             </TableBody>
                         </Table>
