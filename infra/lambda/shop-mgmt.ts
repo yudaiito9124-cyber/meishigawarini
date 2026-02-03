@@ -18,6 +18,8 @@ const corsHeaders = {
     'Access-Control-Allow-Methods': 'OPTIONS,POST,GET,PATCH,DELETE'
 };
 
+const DEFAULT_VALID_DAYS = parseInt(process.env.DEFAULT_VALID_DAYS || '1');
+
 export const handler: APIGatewayProxyHandler = async (event) => {
     try {
         const path = event.path;
@@ -181,7 +183,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 
             const productId = crypto.randomUUID();
             // Default valid_days to 1 if not provided
-            const validityPeriod = valid_days ? parseInt(valid_days) : parseInt(process.env.DEFAULT_VALID_DAYS || '1');
+            const validityPeriod = valid_days ? parseInt(valid_days) : DEFAULT_VALID_DAYS;
 
             await ddb.send(new PutCommand({
                 TableName: TABLE_NAME,
@@ -237,7 +239,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             if (!prodCheck.Item) return { statusCode: 404, headers: corsHeaders, body: JSON.stringify({ message: 'Product not found in this shop' }) };
 
             const product = prodCheck.Item;
-            const validDays = product.valid_days || parseInt(process.env.DEFAULT_VALID_DAYS || '1');
+            const validDays = product.valid_days || DEFAULT_VALID_DAYS;
 
             // Link QR (and optionally activate)
             const status = activate_now ? 'ACTIVE' : 'LINKED';
@@ -253,10 +255,9 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 expiresAt = expirationDate.toISOString();
             }
 
-            let updateExpr = 'SET #status = :status, shop_id = :sid, product_id = :pid, GSI1_PK = :gsi_pk, GSI2_PK = :gsi2_pk, GSI2_SK = :now';
+            let updateExpr = 'SET #status = :status, shop_id = :sid, product_id = :pid, GSI1_PK = :gsi_pk, GSI2_PK = :gsi2_pk, GSI2_SK = :now, updated_at = :now';
             const attrValues: any = {
                 ':status': status,
-                ':unassigned': 'UNASSIGNED',
                 ':linked': 'LINKED',
                 ':sid': shopId,
                 ':pid': product_id,
@@ -287,7 +288,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 TableName: TABLE_NAME,
                 Key: { PK: `QR#${qr_id}`, SK: 'METADATA' },
                 UpdateExpression: updateExpr,
-                ConditionExpression: '(attribute_not_exists(#status) OR #status = :unassigned) OR (#status = :linked AND shop_id = :sid)',
+                ConditionExpression: '#status = :linked AND shop_id = :sid',
                 ExpressionAttributeNames: { '#status': 'status' },
                 ExpressionAttributeValues: attrValues
             }));
@@ -329,7 +330,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 Key: { PK: `SHOP#${shopId}`, SK: `PRODUCT#${productId}` }
             }));
 
-            const validDays = (prodRes.Item && prodRes.Item.valid_days) ? prodRes.Item.valid_days : 1;
+            const validDays = (prodRes.Item && prodRes.Item.valid_days) ? prodRes.Item.valid_days : DEFAULT_VALID_DAYS;
             const now = new Date();
             const expiresAt = new Date(now);
             expiresAt.setDate(expiresAt.getDate() + validDays);
@@ -337,7 +338,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             await ddb.send(new UpdateCommand({
                 TableName: TABLE_NAME,
                 Key: { PK: `QR#${qr_id}`, SK: 'METADATA' },
-                UpdateExpression: 'SET #status = :active, activated_at = :now, expires_at = :exp, GSI1_PK = :gsi_pk',
+                UpdateExpression: 'SET #status = :active, activated_at = :now, expires_at = :exp, GSI1_PK = :gsi_pk, updated_at = :now',
                 ConditionExpression: '#status = :linked AND shop_id = :sid',
                 ExpressionAttributeNames: { '#status': 'status' },
                 ExpressionAttributeValues: {

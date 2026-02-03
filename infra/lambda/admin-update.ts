@@ -35,14 +35,17 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 
         console.log(`Banning QR: ${uuid}`);
 
+        const now = new Date().toISOString()
         await ddb.send(new UpdateCommand({
             TableName: TABLE_NAME,
             Key: { PK: `QR#${uuid}`, SK: 'METADATA' },
-            UpdateExpression: 'SET #status = :banned, GSI1_PK = :gsi_pk',
+            UpdateExpression: 'SET #status = :banned, GSI1_PK = :gsi_pk, updated_at = :updated_at, banned_at = :banned_at',
             ExpressionAttributeNames: { '#status': 'status' },
             ExpressionAttributeValues: {
                 ':banned': 'BANNED',
-                ':gsi_pk': 'QR#BANNED'
+                ':gsi_pk': 'QR#BANNED',
+                ':updated_at': now,
+                ':banned_at': now
             }
         }));
 

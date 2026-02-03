@@ -45,16 +45,18 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 pin = crypto.randomInt(10000000, 100000000).toString();
             } while (/^(\d)\1+$/.test(pin)); // 8 digit PIN, avoid repdigits
 
+            const now = new Date().toISOString();
             items.push({
                 PutRequest: {
                     Item: {
                         PK: { S: `QR#${uuid}` },
                         SK: { S: 'METADATA' },
                         GSI1_PK: { S: 'QR#UNASSIGNED' },
-                        GSI1_SK: { S: new Date().toISOString() },
+                        GSI1_SK: { S: now },
                         status: { S: 'UNASSIGNED' },
                         pin: { S: pin },
-                        created_at: { S: new Date().toISOString() }
+                        created_at: { S: now },
+                        updated_at: { S: now }
                     }
                 }
             });

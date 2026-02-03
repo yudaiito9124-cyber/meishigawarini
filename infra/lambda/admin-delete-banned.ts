@@ -37,8 +37,8 @@ export const handler: APIGatewayProxyHandler = async (event) => {
     }
 
     try {
-        // 1. Query all BANNED items
-        let itemsToDelete: any[] = [];
+        // 1. Query & Delete in batches
+        let deletedCount = 0;
         let lastEvaluatedKey: Record<string, any> | undefined;
 
         do {
@@ -53,48 +53,31 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 ExclusiveStartKey: lastEvaluatedKey
             }));
 
-            if (result.Items) {
-                itemsToDelete.push(...result.Items);
+            if (result.Items && result.Items.length > 0) {
+                // Process this page of items immediately
+                const pageItems = result.Items;
+
+                // Chunk into batches of 25 for BatchWrite
+                for (let i = 0; i < pageItems.length; i += 25) {
+                    const chunk = pageItems.slice(i, i + 25);
+                    const deleteRequests = chunk.map((item: any) => ({
+                        DeleteRequest: {
+                            Key: { PK: item.PK, SK: item.SK }
+                        }
+                    }));
+
+                    await ddb.send(new BatchWriteCommand({
+                        RequestItems: {
+                            [TABLE_NAME]: deleteRequests
+                        }
+                    }));
+
+                    deletedCount += chunk.length;
+                }
             }
+
             lastEvaluatedKey = result.LastEvaluatedKey;
         } while (lastEvaluatedKey);
-
-        console.log(`Found ${itemsToDelete.length} items to delete`);
-
-        if (itemsToDelete.length === 0) {
-            return {
-                statusCode: 200,
-                headers: corsHeaders,
-                body: JSON.stringify({ message: 'No BANNED items found', count: 0 })
-            };
-        }
-
-        // 2. Batch Delete (max 25 items per batch)
-        const chunks = [];
-        for (let i = 0; i < itemsToDelete.length; i += 25) {
-            chunks.push(itemsToDelete.slice(i, i + 25));
-        }
-
-        let deletedCount = 0;
-
-        for (const chunk of chunks) {
-            const deleteRequests = chunk.map((item: any) => ({
-                DeleteRequest: {
-                    Key: {
-                        PK: item.PK,
-                        SK: item.SK
-                    }
-                }
-            }));
-
-            await ddb.send(new BatchWriteCommand({
-                RequestItems: {
-                    [TABLE_NAME]: deleteRequests
-                }
-            }));
-
-            deletedCount += chunk.length;
-        }
 
         return {
             statusCode: 200,

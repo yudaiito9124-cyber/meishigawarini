@@ -491,7 +491,7 @@ function QRCodeListSection({ apiUrl, onGeneratePDF }: { apiUrl: string, onGenera
             </CardHeader>
             <CardContent className="space-y-4">
                 <div className="flex gap-2">
-                    {["UNASSIGNED", "LINKED", "ACTIVE", "USED", "SHIPPED", "BANNED"].map((s) => (
+                    {["UNASSIGNED", "LINKED", "ACTIVE", "USED", "SHIPPED", "COMPLETED", "BANNED"].map((s) => (
                         <Button
                             key={s}
                             variant={status === s ? "default" : "secondary"}
@@ -567,16 +567,19 @@ function QRCodeListSection({ apiUrl, onGeneratePDF }: { apiUrl: string, onGenera
                                             </TableCell>
                                             <TableCell>
                                                 <span className={`px-2 py-1 rounded text-xs ${item.status === 'UNASSIGNED' ? 'bg-gray-100' :
-                                                    item.status === 'ACTIVE' ? 'bg-blue-100 text-blue-800' :
-                                                        item.status === 'USED' ? 'bg-yellow-100 text-yellow-800' :
-                                                            item.status === 'BANNED' ? 'bg-red-100 text-red-800' : // BANNED style
-                                                                'bg-green-100 text-green-800'
+                                                    item.status === 'LINKED' ? 'bg-brown-100 text-brown-800' :
+                                                        item.status === 'ACTIVE' ? 'bg-orange-100 text-orange-800' :
+                                                            item.status === 'USED' ? 'bg-yellow-100 text-yellow-800' :
+                                                                item.status === 'SHIPPED' ? 'bg-green-100 text-green-800' :
+                                                                    item.status === 'COMPLETED' ? 'bg-purple-100 text-purple-800' :
+                                                                        item.status === 'BANNED' ? 'bg-red-100 text-red-800' : // BANNED style
+                                                                            'bg-green-100 text-green-800'
                                                     }`}>
                                                     {t(`list.status.${item.status ? item.status.toLowerCase() : 'undefined'}`)}
                                                 </span>
                                             </TableCell>
                                             <TableCell className="text-xs text-gray-500">
-                                                {item.created_at ? new Date(item.created_at).toLocaleString() : '-'}
+                                                {item.updated_at ? new Date(item.updated_at).toLocaleString() : '-'}
                                             </TableCell>
                                             <TableCell>
                                                 <Button

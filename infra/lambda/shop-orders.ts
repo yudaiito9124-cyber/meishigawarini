@@ -165,7 +165,7 @@ async function handleUpdateOrder(event: any, uuidParam?: string) {
         await ddb.send(new UpdateCommand({
             TableName: TABLE_NAME,
             Key: { PK: `QR#${uuid}`, SK: 'ORDER' },
-            UpdateExpression: 'SET tracking_number = :t, shipped_at = :now',
+            UpdateExpression: 'SET tracking_number = :t, shipped_at = :now, updated_at = :now',
             ExpressionAttributeValues: {
                 ':t': tracking_number,
                 ':now': new Date().toISOString()
@@ -173,11 +173,6 @@ async function handleUpdateOrder(event: any, uuidParam?: string) {
         }));
     }
 
-    return {
-        statusCode: 200,
-        headers: corsHeaders,
-        body: JSON.stringify({ message: 'Order marked as shipped' })
-    };
     return {
         statusCode: 200,
         headers: corsHeaders,

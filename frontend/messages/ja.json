@@ -171,7 +171,10 @@
         },
         "shippedStep": {
             "message": "ギフトは発送済みです！",
-            "tracking": "追跡番号: {number}"
+            "tracking": "追跡番号: {number}",
+            "receivedMessage": "荷物の受け取りが完了しましたか？",
+            "receivedButton": "受け取り完了",
+            "compleatedMessage": "荷物の受け取りが完了しました！"
         },
         "expiredStep": {
             "message": "このギフトの有効期限は切れています。",
@@ -232,6 +235,7 @@
                 "active": "有効",
                 "used": "使用済み",
                 "shipped": "発送済み",
+                "completed": "完了済み",
                 "banned": "BAN済み",
                 "search": "UUIDで検索",
                 "undefined": "不明な状態"
@@ -241,7 +245,7 @@
                 "uuid": "UUID",
                 "pin": "PIN",
                 "status": "ステータス",
-                "createdAt": "作成日時",
+                "createdAt": "更新日時",
                 "actions": "操作",
                 "noCodes": "コードが見つかりません。更新ボタンを押してください。"
             },

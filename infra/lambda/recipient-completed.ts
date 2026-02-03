@@ -20,16 +20,12 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         }
 
         const body = JSON.parse(event.body || '{}');
-        const { qr_id, pin_code, shipping_info } = body;
+        const { qr_id, pin_code } = body;
 
-        if (!qr_id || !pin_code || !shipping_info) {
+        if (!qr_id || !pin_code) {
             return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Missing required fields' }) };
         }
 
-        const { name, address, zipCode } = shipping_info;
-        if (!name || !address || !zipCode) {
-            return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Missing required address fields (name, address, zipCode)' }) };
-        }
 
         // 1. Verify QR and PIN
         const getRes = await ddb.send(new GetCommand({
@@ -41,35 +37,29 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             return { statusCode: 404, headers: corsHeaders, body: JSON.stringify({ message: 'QR Code not found' }) };
         }
 
-        if (getRes.Item.status !== 'ACTIVE') {
-            return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'QR Code is not active' }) };
+        if (getRes.Item.status !== 'SHIPPED') {
+            return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'QR Code is not shipped' }) };
         }
 
         if (getRes.Item.pin !== pin_code) {
             return { statusCode: 403, headers: corsHeaders, body: JSON.stringify({ message: 'Invalid PIN' }) };
         }
 
-        // 2. Transact Write: Update Status + Create Order
+        // 2. Transact Write: Update Status to COMPLETED
         await ddb.send(new TransactWriteCommand({
             TransactItems: [
                 {
                     Update: {
                         TableName: TABLE_NAME,
                         Key: { PK: `QR#${qr_id}`, SK: 'METADATA' },
-                        UpdateExpression: 'SET #status = :used, GSI1_PK = :gsi_pk, updated_at = :now',
-                        ConditionExpression: '#status = :active', // Double check race condition
+                        UpdateExpression: 'SET #status = :completed, GSI1_PK = :gsi_pk, completed_at = :now, updated_at = :now',
+                        ConditionExpression: '#status = :shipped', // Double check race condition
                         ExpressionAttributeNames: { '#status': 'status' },
-                        ExpressionAttributeValues: { ':used': 'USED', ':active': 'ACTIVE', ':gsi_pk': 'QR#USED', ':now': new Date().toISOString() }
-                    }
-                },
-                {
-                    Put: {
-                        TableName: TABLE_NAME,
-                        Item: {
-                            PK: `QR#${qr_id}`,
-                            SK: 'ORDER',
-                            ...shipping_info,
-                            submitted_at: new Date().toISOString()
+                        ExpressionAttributeValues: {
+                            ':completed': 'COMPLETED',
+                            ':shipped': 'SHIPPED',
+                            ':gsi_pk': 'QR#COMPLETED',
+                            ':now': new Date().toISOString()
                         }
                     }
                 }
@@ -80,7 +70,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             statusCode: 200,
             headers: corsHeaders,
             body: JSON.stringify({
-                message: 'Address submitted successfully',
+                message: 'Gift received successfully',
                 order_id: `ORDER#${qr_id}` // logically same ID space or new UUID? Using QR ID is simpler for lookup
             })
         };
@@ -88,7 +78,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
     } catch (error: any) {
         console.error(error);
         if (error.name === 'TransactionCanceledException') {
-            return { statusCode: 409, headers: corsHeaders, body: JSON.stringify({ message: 'Transaction failed (possibly already used)' }) };
+            return { statusCode: 409, headers: corsHeaders, body: JSON.stringify({ message: 'Transaction failed (possibly already received)' }) };
         }
         return {
             statusCode: 500,

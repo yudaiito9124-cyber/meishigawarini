@@ -9,7 +9,7 @@ import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as path from 'path';
 import * as wafv2 from 'aws-cdk-lib/aws-wafv2';
 
-const DEFAULT_VALID_DAYS = '1';
+const DEFAULT_VALID_DAYS = process.env.DEFAULT_VALID_DAYS || '1';
 
 export class InfraStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
@@ -117,12 +117,12 @@ export class InfraStack extends cdk.Stack {
     table.grantReadData(adminListFn);
 
 
-    // Lambda: Shop Activate
-    const shopActivateFn = new nodejs.NodejsFunction(this, 'ShopActivateFn', {
-      entry: path.join(__dirname, '../lambda/shop-activate.ts'),
-      ...commonProps,
-    });
-    table.grantReadWriteData(shopActivateFn);
+    // // Lambda: Shop Activate
+    // const shopActivateFn = new nodejs.NodejsFunction(this, 'ShopActivateFn', {
+    //   entry: path.join(__dirname, '../lambda/shop-activate.ts'),
+    //   ...commonProps,
+    // });
+    // table.grantReadWriteData(shopActivateFn);
 
     // Lambda: Shop & Product Mgmt (NEW)
     const shopMgmtFn = new nodejs.NodejsFunction(this, 'ShopMgmtFn', {
@@ -146,6 +146,13 @@ export class InfraStack extends cdk.Stack {
       ...commonProps,
     });
     table.grantReadWriteData(recipientSubmitFn);
+
+    // Lambda: Recipient Receive completed
+    const recipientCompletedFn = new nodejs.NodejsFunction(this, 'RecipientCompletedFn', {
+      entry: path.join(__dirname, '../lambda/recipient-completed.ts'),
+      ...commonProps,
+    });
+    table.grantReadWriteData(recipientCompletedFn);
 
     // Lambda: Shop Orders (NEW)
     const shopOrdersFn = new nodejs.NodejsFunction(this, 'ShopOrdersFn', {
@@ -406,6 +413,9 @@ export class InfraStack extends cdk.Stack {
 
     const submitResource = recipientResource.addResource('submit');
     submitResource.addMethod('POST', new apigateway.LambdaIntegration(recipientSubmitFn));
+
+    const completedResource = recipientResource.addResource('completed');
+    completedResource.addMethod('POST', new apigateway.LambdaIntegration(recipientCompletedFn));
 
     // Lambda: Recipient Chat (NEW)
     const recipientChatFn = new nodejs.NodejsFunction(this, 'RecipientChatFn', {

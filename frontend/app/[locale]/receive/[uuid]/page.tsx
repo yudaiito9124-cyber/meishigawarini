@@ -46,6 +46,24 @@ const submitAddress = async (uuid: string, pin: string, addressData: any) => {
     return res.json();
 };
 
+// Receive Gift
+const receiveGift = async (uuid: string, pin: string) => {
+    const res = await fetch(`${NEXT_PUBLIC_API_URL}/recipient/completed`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            qr_id: uuid,
+            pin_code: pin,
+        }),
+    });
+
+    if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.message || "Failed to receive gift");
+    }
+    return res.json();
+};
+
 // Fetch Chat Messages
 const fetchChatMessages = async (uuid: string, pin: string) => {
     const res = await fetch(`${NEXT_PUBLIC_API_URL}/recipient/qrcodes/${uuid}/chat?pin=${pin}`);
@@ -85,7 +103,7 @@ export default function ReceivePage() {
     const [chatLoading, setChatLoading] = useState(false);
 
     // Steps: PIN -> FORM (or SHIPPED/SUCCESS)
-    const [step, setStep] = useState<"PIN" | "FORM" | "SUCCESS" | "SHIPPED" | "EXPIRED">("PIN");
+    const [step, setStep] = useState<"PIN" | "FORM" | "SUCCESS" | "SHIPPED" | "EXPIRED" | "COMPLETED">("PIN");
 
     const [error, setError] = useState<string | null>(null);
     const [pinError, setPinError] = useState("");
@@ -103,6 +121,8 @@ export default function ReceivePage() {
             // Check status
             if (data.status === 'USED') {
                 setStep("SUCCESS");
+            } else if (data.status === 'COMPLETED') {
+                setStep("COMPLETED");
             } else if (data.status === 'SHIPPED') {
                 setStep("SHIPPED");
             } else if (data.status === 'ACTIVE') {
@@ -131,6 +151,20 @@ export default function ReceivePage() {
         } catch (error: any) {
             console.error("Submission error:", error);
             alert(error.message || t('errors.submitFailed'));
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleReceive = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setLoading(true);
+        try {
+            await receiveGift(uuid, pin);
+            setStep("COMPLETED");
+        } catch (error: any) {
+            console.error("Receive error:", error);
+            alert(error.message || t('errors.receiveFailed'));
         } finally {
             setLoading(false);
         }
@@ -330,6 +364,19 @@ export default function ReceivePage() {
                             {gift.tracking_number && (
                                 <p className="text-sm text-gray-500">{t('shippedStep.tracking', { number: gift.tracking_number })}</p>
                             )}
+                            <hr className="my-10 border-gray-200" />
+
+                            <p className="text-gray-600 text-sm">{t('shippedStep.receivedMessage')}</p>
+                            <Button type="submit" className="w-full" variant="outline" onClick={handleReceive} disabled={loading}>
+                                {loading ? t('formStep.submitting') : t('shippedStep.receivedButton')}
+                            </Button>
+
+                        </div>
+                    )}
+
+                    {step === "COMPLETED" && gift && (
+                        <div className="text-center py-6 space-y-4">
+                            <p className="text-green-600 font-medium">{t('shippedStep.compleatedMessage')}</p>
                         </div>
                     )}
                 </CardContent>
