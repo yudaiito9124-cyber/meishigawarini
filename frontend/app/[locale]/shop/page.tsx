@@ -140,7 +140,7 @@ export default function ShopListPage() {
                             <Card key={shop.PK} className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => router.push(`/shop/${shop.PK.replace('SHOP#', '')}`)}>
                                 <CardHeader>
                                     <CardTitle>{shop.name}</CardTitle>
-                                    <CardDescription>{t('created', { date: new Date(shop.created_at).toLocaleString() })}</CardDescription>
+                                    <CardDescription>{t('created', { date: new Date(shop.ts_created_at).toLocaleString() })}</CardDescription>
                                 </CardHeader>
                                 {/* <CardContent>
                                     <div className="h-24 bg-gray-100 rounded flex items-center justify-center text-gray-400">

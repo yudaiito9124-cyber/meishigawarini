@@ -47,12 +47,12 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             }
 
             // 2. Append Message to SK=CHAT
-            // Structure: messages: [ { username, message, created_at, id } ]
+            // Structure: messages: [ { username, message, ts_created_at, id } ]
             const newMessage = {
                 id: crypto.randomUUID(),
                 username,
                 message,
-                created_at: new Date().toISOString()
+                ts_created_at: new Date().toISOString()
             };
 
             await ddb.send(new UpdateCommand({

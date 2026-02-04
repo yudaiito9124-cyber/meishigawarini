@@ -55,8 +55,8 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                         GSI1_SK: { S: now },
                         status: { S: 'UNASSIGNED' },
                         pin: { S: pin },
-                        created_at: { S: now },
-                        updated_at: { S: now }
+                        ts_created_at: { S: now },
+                        ts_updated_at: { S: now }
                     }
                 }
             });

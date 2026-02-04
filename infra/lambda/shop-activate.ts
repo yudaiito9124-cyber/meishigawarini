@@ -49,16 +49,16 @@
 //                 ':unassigned': 'UNASSIGNED'
 //             };
 
-//             updateExp += ', updated_at = :now';
-//             updateExp += ', linked_at = :now';
+//             updateExp += ', ts_updated_at = :now';
+//             updateExp += ', ts_linked_at = :now';
 //             const now = new Date();
 //             expValues[':now'] = now.toISOString();
 
 //             if (activate_now) {
-//                 updateExp += ', activated_at = :now';
+//                 updateExp += ', ts_activated_at = :now';
 //                 const expiresAt = new Date(now);
 //                 expiresAt.setDate(expiresAt.getDate() + validDays);
-//                 updateExp += ', expires_at = :exp';
+//                 updateExp += ', ts_expired_at = :exp';
 //                 expValues[':exp'] = expiresAt.toISOString();
 //             }
 
@@ -121,13 +121,13 @@
 //             await ddb.send(new UpdateCommand({
 //                 TableName: TABLE_NAME,
 //                 Key: { PK: `QR#${qr_id}`, SK: 'METADATA' },
-//                 UpdateExpression: 'SET #status = :active, activated_at = :now, updated_at = :now, expires_at = :exp',
+//                 UpdateExpression: 'SET #status = :active, ts_activated_at = :now, ts_updated_at = :now, ts_expired_at = :exp',
 //                 ConditionExpression: '#status = :linked',
 //                 ExpressionAttributeNames: { '#status': 'status' },
 //                 ExpressionAttributeValues: {
 //                     ':active': 'ACTIVE',
 //                     ':linked': 'LINKED',
-//                     ':now': now.toISOString(),
+//                     ':now':now.toISOString(),
 //                     ':exp': expiresAt.toISOString()
 //                 }
 //             }));

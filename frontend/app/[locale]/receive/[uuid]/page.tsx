@@ -245,9 +245,9 @@ export default function ReceivePage() {
                             <p className="text-gray-600 text-sm">{gift.product.description}</p>
 
                             {/* Remaining Days for Active Gift */}
-                            {step === "FORM" && gift.expires_at && (
+                            {step === "FORM" && gift.ts_expired_at && (
                                 <p className="mt-2 text-sm font-semibold text-green-600 border border-green-200 bg-green-50 p-2 rounded text-center">
-                                    {t('daysRemaining', { days: getRemainingDays(gift.expires_at) ?? 0 })}
+                                    {t('daysRemaining', { days: getRemainingDays(gift.ts_expired_at) ?? 0 })}
                                 </p>
                             )}
 
@@ -255,7 +255,7 @@ export default function ReceivePage() {
                             {step === "EXPIRED" && (
                                 <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded text-center">
                                     <p className="text-red-600 font-bold">{t('expiredStep.message')}</p>
-                                    <p className="text-red-500 text-sm mt-1">{t('expiredStep.subMessage', { date: new Date(gift.expires_at).toLocaleDateString() })}</p>
+                                    <p className="text-red-500 text-sm mt-1">{t('expiredStep.subMessage', { date: new Date(gift.ts_expired_at).toLocaleDateString() })}</p>
                                 </div>
                             )}
 
@@ -360,7 +360,13 @@ export default function ReceivePage() {
                     {step === "SHIPPED" && gift && (
                         <div className="text-center py-6 space-y-4">
                             <p className="text-green-600 font-medium">{t('shippedStep.message')}</p>
-                            {/* Assuming gift object has shipping details if fetched */}
+                            {/* Assuming gift object has shipping details if fetched */
+                                console.log(gift)
+                            }
+
+                            {gift.delivery_company && (
+                                <p className="text-sm text-gray-500">{t('shippedStep.deliveryCompany', { company: gift.delivery_company })}</p>
+                            )}
                             {gift.tracking_number && (
                                 <p className="text-sm text-gray-500">{t('shippedStep.tracking', { number: gift.tracking_number })}</p>
                             )}
@@ -396,7 +402,7 @@ export default function ReceivePage() {
                                 ) : (
                                     messages.slice().reverse().map((msg) => (
                                         <div key={msg.id} className="bg-white p-2 rounded shadow-sm text-sm">
-                                            <p className="font-bold text-xs text-gray-600 mb-1">{msg.username} <span className="text-gray-400 font-normal">• {new Date(msg.created_at).toLocaleString()}</span></p>
+                                            <p className="font-bold text-xs text-gray-600 mb-1">{msg.username} <span className="text-gray-400 font-normal">• {new Date(msg.ts_created_at).toLocaleString()}</span></p>
                                             <p className="whitespace-pre-wrap">{msg.message}</p>
                                         </div>
                                     ))

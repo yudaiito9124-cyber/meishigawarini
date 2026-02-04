@@ -491,7 +491,7 @@ function QRCodeListSection({ apiUrl, onGeneratePDF }: { apiUrl: string, onGenera
             </CardHeader>
             <CardContent className="space-y-4">
                 <div className="flex gap-2">
-                    {["UNASSIGNED", "LINKED", "ACTIVE", "USED", "SHIPPED", "COMPLETED", "BANNED"].map((s) => (
+                    {["UNASSIGNED", "LINKED", "ACTIVE", "USED", "SHIPPED", "COMPLETED", "EXPIRED", "BANNED"].map((s) => (
                         <Button
                             key={s}
                             variant={status === s ? "default" : "secondary"}
@@ -579,7 +579,7 @@ function QRCodeListSection({ apiUrl, onGeneratePDF }: { apiUrl: string, onGenera
                                                 </span>
                                             </TableCell>
                                             <TableCell className="text-xs text-gray-500">
-                                                {item.updated_at ? new Date(item.updated_at).toLocaleString() : '-'}
+                                                {item.ts_updated_at ? new Date(item.ts_updated_at).toLocaleString() : '-'}
                                             </TableCell>
                                             <TableCell>
                                                 <Button

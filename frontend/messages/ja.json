@@ -1,4 +1,25 @@
 {
+    "Timestamp": {
+        "ts_created_at": "作成日時",
+        "ts_linked_at": "連携日時",
+        "ts_activated_at": "有効化日時",
+        "ts_submitted_at": "住所入力日時",
+        "ts_shipped_at": "発送日時",
+        "ts_completed_at": "完了日時",
+        "ts_expired_at": "期限切れ日時",
+        "ts_banned_at": "BAN日時",
+        "ts_updated_at": "更新日時"
+    },
+    "Status": {
+        "unassigned": "未連携",
+        "linked": "連携済み",
+        "activated": "有効化済み",
+        "used": "住所入力済み",
+        "shipped": "発送済み",
+        "completed": "完了",
+        "expired": "期限切れ",
+        "banned": "BAN済み"
+    },
     "HomePage": {
         "title": "名刺代わりにへようこそ",
         "shopAdmin": "ショップ管理者画面",
@@ -68,7 +89,7 @@
         "incomingOrders": "受信した注文",
         "ordersDesc": "注文と発送を管理します。",
         "orders": {
-            "date": "最終更新日時",
+            "date": "更新日時",
             "recipient": "受取人",
             "address": "住所",
             "status": "ステータス",
@@ -79,11 +100,13 @@
             "ship": "発送する",
             "details": "詳細",
             "userMessage": "購入者へのメッセージ(オプション)",
-            "shopMemo": "ショップ(ショップのみ閲覧可能)",
+            "shopMemo": "メモ(ショップのみ閲覧可能)",
+            "timestamps": "タイムスタンプ",
             "shipDialog": {
                 "title": "発送処理",
                 "description": "{name} 様への発送情報を入力してください。",
-                "label": "追跡番号",
+                "label": "追跡番号(なし等でも可)",
+                "deliveryCompany": "配送会社",
                 "submit": "発送済みにする"
             }
         },
@@ -137,7 +160,7 @@
             "id": "ID",
             "product": "商品",
             "status": "ステータス",
-            "activatedAt": "最終更新日時"
+            "activatedAt": "更新日時"
         }
     },
     "ReceivePage": {
@@ -237,6 +260,7 @@
                 "shipped": "発送済み",
                 "completed": "完了済み",
                 "banned": "BAN済み",
+                "expired": "期限切れ",
                 "search": "UUIDで検索",
                 "undefined": "不明な状態"
             },

@@ -53,7 +53,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                     owner_id: userId, // Link to User
                     GSI2_PK: `USER#${userId}`, // GSI2 for Owner Listing
                     GSI2_SK: new Date().toISOString(),
-                    created_at: new Date().toISOString()
+                    ts_created_at: new Date().toISOString()
                 }
             }));
 
@@ -111,8 +111,8 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 id: item.PK.replace('QR#', ''),
                 status: item.status,
                 product_id: item.product_id,
-                created_at: item.created_at,
-                activated_at: item.activated_at
+                ts_created_at: item.ts_created_at,
+                ts_activated_at: item.ts_activated_at
             }));
 
             return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ items }) };
@@ -197,7 +197,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                     valid_days: validityPeriod,
                     status: 'ACTIVE', // Default status
                     GSI1_PK: 'PRODUCT#ACTIVE', // For listing active products
-                    created_at: new Date().toISOString()
+                    ts_created_at: new Date().toISOString()
                 }
             }));
 
@@ -255,7 +255,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 expiresAt = expirationDate.toISOString();
             }
 
-            let updateExpr = 'SET #status = :status, shop_id = :sid, product_id = :pid, GSI1_PK = :gsi_pk, GSI2_PK = :gsi2_pk, GSI2_SK = :now, updated_at = :now';
+            let updateExpr = 'SET #status = :status, shop_id = :sid, product_id = :pid, GSI1_PK = :gsi_pk, GSI2_PK = :gsi2_pk, GSI2_SK = :now, ts_linked_at = :now, ts_updated_at = :now';
             const attrValues: any = {
                 ':status': status,
                 ':linked': 'LINKED',
@@ -263,7 +263,8 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 ':pid': product_id,
                 ':gsi_pk': gsiPk,
                 ':gsi2_pk': `SHOP#${shopId}`,
-                ':now': new Date().toISOString()
+                ':now': new Date().toISOString(),
+                ':unassigned': 'UNASSIGNED'
             };
 
             if (memo_for_users !== undefined) {
@@ -276,10 +277,10 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             }
 
             if (activate_now) {
-                updateExpr += ', activated_at = :act_at';
+                updateExpr += ', ts_activated_at = :act_at';
                 attrValues[':act_at'] = activatedAt;
                 if (expiresAt) {
-                    updateExpr += ', expires_at = :exp_at';
+                    updateExpr += ', ts_expired_at = :exp_at';
                     attrValues[':exp_at'] = expiresAt;
                 }
             }
@@ -288,7 +289,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 TableName: TABLE_NAME,
                 Key: { PK: `QR#${qr_id}`, SK: 'METADATA' },
                 UpdateExpression: updateExpr,
-                ConditionExpression: '#status = :linked AND shop_id = :sid',
+                ConditionExpression: '(#status = :linked AND shop_id = :sid) OR #status = :unassigned',
                 ExpressionAttributeNames: { '#status': 'status' },
                 ExpressionAttributeValues: attrValues
             }));
@@ -338,7 +339,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             await ddb.send(new UpdateCommand({
                 TableName: TABLE_NAME,
                 Key: { PK: `QR#${qr_id}`, SK: 'METADATA' },
-                UpdateExpression: 'SET #status = :active, activated_at = :now, expires_at = :exp, GSI1_PK = :gsi_pk, updated_at = :now',
+                UpdateExpression: 'SET #status = :active, ts_activated_at = :now, ts_expired_at = :exp, GSI1_PK = :gsi_pk, ts_updated_at = :now',
                 ConditionExpression: '#status = :linked AND shop_id = :sid',
                 ExpressionAttributeNames: { '#status': 'status' },
                 ExpressionAttributeValues: {

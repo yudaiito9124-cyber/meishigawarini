@@ -18,9 +18,9 @@ QRコードの現在の状態や紐付け情報を管理します。
 | **pin** | String | `1234` | 認証用PINコード |
 | **shop_id** | String | `<shop_uuid>` | (LINKED以降) 紐付いたショップID |
 | **product_id** | String | `<product_uuid>` | (LINKED以降) 紐付いた商品ID |
-| **created_at** | ISO8601 | `2024-01-01T00:00:00Z` | 作成日時 |
-| **activated_at** | ISO8601 | `2024-01-02T00:00:00Z` | (ACTIVE以降) 有効化日時 |
-| **shipped_at** | ISO8601 | `2024-01-03T00:00:00Z` | (SHIPPEDのみ) 発送日時 |
+| **ts_created_at** | ISO8601 | `2024-01-01T00:00:00Z` | 作成日時 |
+| **ts_activated_at** | ISO8601 | `2024-01-02T00:00:00Z` | (ACTIVE以降) 有効化日時 |
+| **ts_shipped_at** | ISO8601 | `2024-01-03T00:00:00Z` | (SHIPPEDのみ) 発送日時 |
 | **GSI1_PK** | String | `QR#UNASSIGNED` | **検索用インデックス** (ステータス別) |
 | **GSI1_SK** | String | `2024-01-01T00:00:00Z` | **検索用ソートキー** (作成日時順) |
 
@@ -37,7 +37,7 @@ QRコードの現在の状態や紐付け情報を管理します。
 | **phone** | String | `090-1234-5678` | 電話番号 |
 | **email** | String | `taro@example.com` | メールアドレス |
 | **tracking_number**| String | `123456789012` | (SHIPPEDのみ) 追跡番号 |
-| **submitted_at** | ISO8601 | `2024-01-02T12:00:00Z` | 注文確定日時 |
+| **ts_submitted_at** | ISO8601 | `2024-01-02T12:00:00Z` | 注文確定日時 |
 
 ---
 
@@ -51,7 +51,7 @@ QRコードの現在の状態や紐付け情報を管理します。
 | **SK** | String | `METADATA` | ソートキー |
 | **name** | String | `My Cookie Shop` | ショップ名 |
 | **owner_id** | String | `<cognito_sub>` | オーナーのユーザーID (Cognito) |
-| **created_at** | ISO8601 | `2024-01-01T00:00:00Z` | 作成日時 |
+| **ts_created_at** | ISO8601 | `2024-01-01T00:00:00Z` | 作成日時 |
 
 ---
 

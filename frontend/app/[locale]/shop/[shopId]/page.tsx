@@ -20,6 +20,7 @@ const NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 // --- Effects ---
 export default function ShopPage() {
     const t = useTranslations('ShopPage');
+    const ts = useTranslations('Timestamp');
     const params = useParams();
     const router = useRouter();
     const shopId = Array.isArray(params.shopId) ? params.shopId[0] : params.shopId;
@@ -285,9 +286,9 @@ export default function ShopPage() {
         } catch (e) { console.error(e); }
     };
 
-    const handleShipOrder = async (qrId: string, trackingNumber: string, memoForUsers?: string, memoForShop?: string) => {
+    const handleShipOrder = async (qrId: string, deliveryCompany: string, trackingNumber: string, memoForUsers?: string, memoForShop?: string) => {
         try {
-            const body: any = { tracking_number: trackingNumber };
+            const body: any = { delivery_company: deliveryCompany, tracking_number: trackingNumber, memo_for_users: "", memo_for_shop: "" };
             if (memoForUsers !== undefined) body.memo_for_users = memoForUsers;
             if (memoForShop !== undefined) body.memo_for_shop = memoForShop;
 
@@ -470,21 +471,22 @@ export default function ShopPage() {
                                     <TableHead>{t('orders.date')}</TableHead>
                                     <TableHead>{t('orders.productName')}</TableHead>
                                     <TableHead>{t('orders.status')}</TableHead>
+                                    <TableHead>{t('orders.shopMemo')}</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {orders.filter(o => ['USED', 'SHIPPED'].includes(o.status)).length === 0 ? (
+                                {orders.filter(o => ['LINKED', 'ACTIVE', 'USED', 'SHIPPED'].includes(o.status)).length === 0 ? (
                                     <TableRow><TableCell colSpan={3} className="text-center">{t('orders.noOrders')}</TableCell></TableRow>
                                 ) : (
                                     orders
-                                        .filter(o => ['USED', 'SHIPPED'].includes(o.status))
+                                        .filter(o => ['LINKED', 'ACTIVE', 'USED', 'SHIPPED'].includes(o.status))
                                         .sort((a, b) => {
-                                            // 1. Status: USED > SHIPPED
-                                            if (a.status === 'USED' && b.status !== 'USED') return -1;
-                                            if (a.status !== 'USED' && b.status === 'USED') return 1;
+                                            const sortorder: { [name: string]: number } = { 'LINKED': 0, 'ACTIVE': 1, 'USED': 2, 'SHIPPED': 3 };
+                                            // 1. Status: compare
+                                            if (a.status !== b.status) return sortorder[a.status] - sortorder[b.status];
                                             // 2. Date: Newest first
-                                            const dateA = new Date(a.shipping_info?.submitted_at || a.created_at).getTime();
-                                            const dateB = new Date(b.shipping_info?.submitted_at || b.created_at).getTime();
+                                            const dateA = new Date(a.ts_updated_at || a.ts_created_at).getTime();
+                                            const dateB = new Date(b.ts_updated_at || b.ts_created_at).getTime();
                                             return dateB - dateA;
                                         })
                                         .map((order: any) => {
@@ -495,14 +497,20 @@ export default function ShopPage() {
                                                 <Dialog key={order.qr_id}>
                                                     <DialogTrigger asChild>
                                                         <TableRow className="cursor-pointer hover:bg-gray-100">
-                                                            <TableCell>{new Date(order.shipping_info?.submitted_at || order.created_at).toLocaleString()}</TableCell>
+                                                            <TableCell>{order.ts_updated_at ? new Date(order.ts_updated_at).toLocaleString() : "-"}</TableCell>
                                                             <TableCell className="font-medium">{product?.name || order.product_id}</TableCell>
                                                             <TableCell>
-                                                                <span className={`px-2 py-1 rounded text-xs ${order.status === 'SHIPPED' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'
-                                                                    }`}>
-                                                                    {order.status}
-                                                                </span>
+                                                                <span className={`px-2 py-1 rounded text-xs ${order.status === 'UNASSIGNED' ? 'bg-gray-100' :
+                                                                    order.status === 'LINKED' ? 'bg-brown-100 text-brown-800' :
+                                                                        order.status === 'ACTIVE' ? 'bg-orange-100 text-orange-800' :
+                                                                            order.status === 'USED' ? 'bg-yellow-100 text-yellow-800' :
+                                                                                order.status === 'SHIPPED' ? 'bg-green-100 text-green-800' :
+                                                                                    order.status === 'COMPLETED' ? 'bg-purple-100 text-purple-800' :
+                                                                                        order.status === 'BANNED' ? 'bg-red-100 text-red-800' : // BANNED style
+                                                                                            'bg-green-100 text-green-800'
+                                                                    }`}>{order.status}</span>
                                                             </TableCell>
+                                                            <TableCell className="font-medium">{order.memo_for_shop}</TableCell>
                                                         </TableRow>
                                                     </DialogTrigger>
                                                     <DialogContent className="max-w-md">
@@ -523,10 +531,16 @@ export default function ShopPage() {
                                                             {/* Status */}
                                                             <div>
                                                                 <h4 className="text-sm font-semibold text-gray-500">{t('orders.status')}</h4>
-                                                                <span className={`px-2 py-1 rounded text-xs ${order.status === 'SHIPPED' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'
-                                                                    }`}>
-                                                                    {order.status}
-                                                                </span>
+
+                                                                <span className={`px-2 py-1 rounded text-xs ${order.status === 'UNASSIGNED' ? 'bg-gray-100' :
+                                                                    order.status === 'LINKED' ? 'bg-brown-100 text-brown-800' :
+                                                                        order.status === 'ACTIVE' ? 'bg-orange-100 text-orange-800' :
+                                                                            order.status === 'USED' ? 'bg-yellow-100 text-yellow-800' :
+                                                                                order.status === 'SHIPPED' ? 'bg-green-100 text-green-800' :
+                                                                                    order.status === 'COMPLETED' ? 'bg-purple-100 text-purple-800' :
+                                                                                        order.status === 'BANNED' ? 'bg-red-100 text-red-800' : // BANNED style
+                                                                                            'bg-green-100 text-green-800'
+                                                                    }`}>{order.status}</span>
                                                             </div>
 
                                                             {/* Recipient Info */}
@@ -535,10 +549,6 @@ export default function ShopPage() {
                                                                     <h4 className="text-sm font-semibold text-gray-500">{t('orders.recipient')}</h4>
                                                                     <p>{order.recipient_name}</p>
                                                                 </div>
-                                                                <div>
-                                                                    <h4 className="text-sm font-semibold text-gray-500">{t('orders.date')}</h4>
-                                                                    <p>{new Date(order.shipping_info?.submitted_at || order.created_at).toLocaleString()}</p>
-                                                                </div>
                                                             </div>
 
                                                             <div>
@@ -546,6 +556,17 @@ export default function ShopPage() {
                                                                 {order.postal_code && <p className="text-sm">〒{order.postal_code}</p>}
                                                                 <p className="whitespace-pre-wrap text-sm">{order.address}</p>
                                                                 {order.shipping_info?.phone && <p className="text-sm mt-1">{order.shipping_info.phone}</p>}
+                                                            </div>
+
+                                                            <div>
+                                                                <h4 className="text-sm font-semibold text-gray-500">{t('orders.userMessage')}</h4>
+                                                                <p className="text-sm bg-gray-50 p-2 rounded">{order.memo_for_users || '-'}</p>
+                                                            </div>
+                                                            {/* )}
+                                                                    {order.memo_for_shop && ( */}
+                                                            <div>
+                                                                <h4 className="text-sm font-semibold text-gray-500">{t('orders.shopMemo')}</h4>
+                                                                <p className="text-sm bg-yellow-50 p-2 rounded">{order.memo_for_shop || '-'}</p>
                                                             </div>
 
                                                             {/* Memos (if available) - Assuming these fields might exist on order object or shipping_info */}
@@ -558,6 +579,7 @@ export default function ShopPage() {
                                                                         const fd = new FormData(e.target as HTMLFormElement);
                                                                         handleShipOrder(
                                                                             uuid,
+                                                                            fd.get('delivery_company') as string,
                                                                             fd.get('tracking') as string,
                                                                             fd.get('memo_for_users') as string,
                                                                             fd.get('memo_for_shop') as string
@@ -572,34 +594,42 @@ export default function ShopPage() {
                                                                             <Input id={`memo_shop-${uuid}`} name="memo_for_shop" defaultValue={order.memo_for_shop} placeholder={t('linkQr.memoForShopPlaceholder')} />
                                                                         </div>
                                                                         <div className="space-y-2">
+                                                                            <Label htmlFor={`delivery_company-${uuid}`}>{t('orders.shipDialog.deliveryCompany')}</Label>
+                                                                            <Input id={`delivery_company-${uuid}`} name="delivery_company" placeholder="〇〇運輸" required />
+                                                                        </div>
+                                                                        <div className="space-y-2">
                                                                             <Label htmlFor={`tracking-${uuid}`}>{t('orders.shipDialog.label')}</Label>
-                                                                            <Input id={`tracking-${uuid}`} name="tracking" placeholder="1234-5678" required />
+                                                                            <Input id={`tracking-${uuid}`} name="tracking" placeholder="1234-5678..." required />
                                                                         </div>
                                                                         <Button type="submit" className="w-full">{t('orders.shipDialog.submit')}</Button>
                                                                     </form>
                                                                 </div>
                                                             )}
-                                                            {order.status === 'SHIPPED' && (
+                                                            {order.status !== 'USED' && (
                                                                 <div className="pt-2 space-y-4">
-                                                                    {/* Read-only view for SHIPPED, or we could allow edit. For now keeping read-only as per previous pattern but showing memos */}
-                                                                    {order.memo_for_users && (
-                                                                        <div>
-                                                                            <h4 className="text-sm font-semibold text-gray-500">{t('orders.userMessage')}</h4>
-                                                                            <p className="text-sm bg-gray-50 p-2 rounded">{order.memo_for_users}</p>
-                                                                        </div>
-                                                                    )}
-                                                                    {order.memo_for_shop && (
-                                                                        <div>
-                                                                            <h4 className="text-sm font-semibold text-gray-500">{t('orders.shopMemo')}</h4>
-                                                                            <p className="text-sm bg-yellow-50 p-2 rounded">{order.memo_for_shop}</p>
-                                                                        </div>
-                                                                    )}
+                                                                    <div>
+                                                                        <h4 className="text-sm font-semibold text-gray-500">{t('orders.shipDialog.deliveryCompany')}</h4>
+                                                                        <p className="font-mono">{order.delivery_company || '-'}</p>
+                                                                    </div>
                                                                     <div>
                                                                         <h4 className="text-sm font-semibold text-gray-500">{t('orders.shipDialog.label')}</h4>
-                                                                        <p className="font-mono">{order.tracking_number || order.shipping_info?.tracking_number || '-'}</p>
+                                                                        <p className="font-mono">{order.tracking_number || '-'}</p>
                                                                     </div>
                                                                 </div>
                                                             )}
+                                                            <div className="grid grid-cols-2 gap-4">
+                                                                <div>
+                                                                    <h4 className="text-sm font-semibold text-gray-500">{t('orders.timestamps')}</h4>
+                                                                    <p className="text-sm">{ts('ts_updated_at') + ": " + (order.ts_updated_at ? new Date(order.ts_updated_at).toLocaleString() : "-")}</p>
+                                                                    <p className="text-sm">{ts('ts_linked_at') + ": " + (order.ts_linked_at ? new Date(order.ts_linked_at).toLocaleString() : "-")}</p>
+                                                                    <p className="text-sm">{ts('ts_activated_at') + ": " + (order.ts_activated_at ? new Date(order.ts_activated_at).toLocaleString() : "-")}</p>
+                                                                    <p className="text-sm">{ts('ts_submitted_at') + ": " + (order.ts_submitted_at ? new Date(order.ts_submitted_at).toLocaleString() : "-")}</p>
+                                                                    <p className="text-sm">{ts('ts_shipped_at') + ": " + (order.ts_shipped_at ? new Date(order.ts_shipped_at).toLocaleString() : "-")}</p>
+                                                                    <p className="text-sm">{ts('ts_completed_at') + ": " + (order.ts_completed_at ? new Date(order.ts_completed_at).toLocaleString() : "-")}</p>
+                                                                    <p className="text-sm">{ts('ts_expired_at') + ": " + (order.ts_expired_at ? new Date(order.ts_expired_at).toLocaleString() : "-")}</p>
+                                                                    <p className="text-sm">{ts('ts_banned_at') + ": " + (order.ts_banned_at ? new Date(order.ts_banned_at).toLocaleString() : "-")}</p>
+                                                                </div>
+                                                            </div>
                                                         </div>
                                                     </DialogContent>
                                                 </Dialog>
@@ -699,39 +729,46 @@ export default function ShopPage() {
                         <Table>
                             <TableHeader>
                                 <TableRow>
-                                    <TableHead>{t('history.activatedAt')}</TableHead>
-                                    <TableHead>{t('history.product')}</TableHead>
-                                    <TableHead>{t('history.status')}</TableHead>
+                                    <TableHead>{t('orders.date')}</TableHead>
+                                    <TableHead>{t('orders.productName')}</TableHead>
+                                    <TableHead>{t('orders.status')}</TableHead>
+                                    <TableHead>{t('orders.shopMemo')}</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {qrCodes.filter(q => ['COMPLETED', 'EXPIRED', 'BANNED'].includes(q.status)).length === 0 ? (
-                                    <TableRow><TableCell colSpan={3} className="text-center">{t('history.noLinks')}</TableCell></TableRow>
+                                {orders.filter(o => ['COMPLETED', 'EXPIRED', 'BANNED'].includes(o.status)).length === 0 ? (
+                                    <TableRow><TableCell colSpan={3} className="text-center">{t('orders.noOrders')}</TableCell></TableRow>
                                 ) : (
-                                    qrCodes
-                                        .filter(q => ['COMPLETED', 'EXPIRED', 'BANNED'].includes(q.status))
-                                        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-                                        .map((qr) => {
-                                            const product = products.find(p => p.product_id === qr.product_id);
-                                            const uuid = qr.id;
-                                            // Mock missing order info since qrCodes endpoint does not return it
-                                            const recipientName = "-";
-                                            const address = "-";
+                                    orders
+                                        .filter(o => ['COMPLETED', 'EXPIRED', 'BANNED'].includes(o.status))
+                                        .sort((a, b) => {
+                                            // Date: Newest first
+                                            const dateA = new Date(a.ts_updated_at || a.ts_created_at).getTime();
+                                            const dateB = new Date(b.ts_updated_at || b.ts_created_at).getTime();
+                                            return dateB - dateA;
+                                        })
+                                        .map((order: any) => {
+                                            const product = products.find(p => p.product_id === order.product_id);
+                                            const uuid = order.id || order.qr_id.replace('QR#', '');
 
                                             return (
-                                                <Dialog key={qr.id}>
+                                                <Dialog key={order.qr_id}>
                                                     <DialogTrigger asChild>
                                                         <TableRow className="cursor-pointer hover:bg-gray-100">
-                                                            <TableCell>{qr.activated_at ? new Date(qr.activated_at).toLocaleString() : new Date(qr.created_at).toLocaleDateString()}</TableCell>
-                                                            <TableCell className="font-medium">{product?.name || qr.product_id}</TableCell>
+                                                            <TableCell>{order.ts_updated_at ? new Date(order.ts_updated_at).toLocaleString() : "-"}</TableCell>
+                                                            <TableCell className="font-medium">{product?.name || order.product_id}</TableCell>
                                                             <TableCell>
-                                                                <span className={`px-2 py-1 rounded text-xs ${qr.status === 'COMPLETED' ? 'bg-blue-100 text-blue-800' :
-                                                                    qr.status === 'BANNED' ? 'bg-red-100 text-red-800' :
-                                                                        'bg-gray-100'
-                                                                    }`}>
-                                                                    {qr.status}
-                                                                </span>
+                                                                <span className={`px-2 py-1 rounded text-xs ${order.status === 'UNASSIGNED' ? 'bg-gray-100' :
+                                                                    order.status === 'LINKED' ? 'bg-brown-100 text-brown-800' :
+                                                                        order.status === 'ACTIVE' ? 'bg-orange-100 text-orange-800' :
+                                                                            order.status === 'USED' ? 'bg-yellow-100 text-yellow-800' :
+                                                                                order.status === 'SHIPPED' ? 'bg-green-100 text-green-800' :
+                                                                                    order.status === 'COMPLETED' ? 'bg-purple-100 text-purple-800' :
+                                                                                        order.status === 'BANNED' ? 'bg-red-100 text-red-800' : // BANNED style
+                                                                                            'bg-green-100 text-green-800'
+                                                                    }`}>{order.status}</span>
                                                             </TableCell>
+                                                            <TableCell className="font-medium">{order.memo_for_shop}</TableCell>
                                                         </TableRow>
                                                     </DialogTrigger>
                                                     <DialogContent className="max-w-md">
@@ -746,35 +783,67 @@ export default function ShopPage() {
                                                             {/* Product Info */}
                                                             <div>
                                                                 <h4 className="text-sm font-semibold text-gray-500">{t('orders.productName')}</h4>
-                                                                <p className="font-medium">{product?.name || qr.product_id}</p>
+                                                                <p className="font-medium">{product?.name || order.product_id}</p>
                                                             </div>
 
                                                             {/* Status */}
                                                             <div>
                                                                 <h4 className="text-sm font-semibold text-gray-500">{t('orders.status')}</h4>
-                                                                <span className={`px-2 py-1 rounded text-xs ${qr.status === 'COMPLETED' ? 'bg-blue-100 text-blue-800' :
-                                                                    qr.status === 'BANNED' ? 'bg-red-100 text-red-800' :
-                                                                        'bg-gray-100'
-                                                                    }`}>
-                                                                    {qr.status}
-                                                                </span>
+                                                                <span className={`px-2 py-1 rounded text-xs }`}> {order.status} </span>
                                                             </div>
 
                                                             {/* Recipient Info */}
                                                             <div className="grid grid-cols-2 gap-4">
                                                                 <div>
                                                                     <h4 className="text-sm font-semibold text-gray-500">{t('orders.recipient')}</h4>
-                                                                    <p>{recipientName}</p>
-                                                                </div>
-                                                                <div>
-                                                                    <h4 className="text-sm font-semibold text-gray-500">{t('orders.date')}</h4>
-                                                                    <p>{qr.activated_at ? new Date(qr.activated_at).toLocaleString() : new Date(qr.created_at).toLocaleString()}</p>
+                                                                    <p>{order.recipient_name}</p>
                                                                 </div>
                                                             </div>
 
                                                             <div>
                                                                 <h4 className="text-sm font-semibold text-gray-500">{t('orders.address')}</h4>
-                                                                <p className="whitespace-pre-wrap text-sm">{address}</p>
+                                                                {order.postal_code && <p className="text-sm">〒{order.postal_code}</p>}
+                                                                <p className="whitespace-pre-wrap text-sm">{order.address}</p>
+                                                                {order.shipping_info?.phone && <p className="text-sm mt-1">{order.shipping_info.phone}</p>}
+                                                            </div>
+
+                                                            {/* Order Info */}
+                                                            <div className="pt-2 space-y-4">
+                                                                {/* Read-only view for SHIPPED, or we could allow edit. For now keeping read-only as per previous pattern but showing memos */}
+                                                                {order.memo_for_users && (
+                                                                    <div>
+                                                                        <h4 className="text-sm font-semibold text-gray-500">{t('orders.userMessage')}</h4>
+                                                                        <p className="text-sm bg-gray-50 p-2 rounded">{order.memo_for_users}</p>
+                                                                    </div>
+                                                                )}
+                                                                {order.memo_for_shop && (
+                                                                    <div>
+                                                                        <h4 className="text-sm font-semibold text-gray-500">{t('orders.shopMemo')}</h4>
+                                                                        <p className="text-sm bg-yellow-50 p-2 rounded">{order.memo_for_shop}</p>
+                                                                    </div>
+                                                                )}
+                                                                <div>
+                                                                    <h4 className="text-sm font-semibold text-gray-500">{t('orders.shipDialog.deliveryCompany')}</h4>
+                                                                    <p className="font-mono">{order.delivery_company || '-'}</p>
+                                                                </div>
+                                                                <div>
+                                                                    <h4 className="text-sm font-semibold text-gray-500">{t('orders.shipDialog.label')}</h4>
+                                                                    <p className="font-mono">{order.tracking_number || '-'}</p>
+                                                                </div>
+                                                            </div>
+
+                                                            <div className="grid grid-cols-2 gap-4">
+                                                                <div>
+                                                                    <h4 className="text-sm font-semibold text-gray-500">{t('orders.timestamps')}</h4>
+                                                                    <p className="text-sm">{ts('ts_updated_at') + ": " + (order.ts_updated_at ? new Date(order.ts_updated_at).toLocaleString() : "-")}</p>
+                                                                    <p className="text-sm">{ts('ts_linked_at') + ": " + (order.ts_linked_at ? new Date(order.ts_linked_at).toLocaleString() : "-")}</p>
+                                                                    <p className="text-sm">{ts('ts_activated_at') + ": " + (order.ts_activated_at ? new Date(order.ts_activated_at).toLocaleString() : "-")}</p>
+                                                                    <p className="text-sm">{ts('ts_submitted_at') + ": " + (order.ts_submitted_at ? new Date(order.ts_submitted_at).toLocaleString() : "-")}</p>
+                                                                    <p className="text-sm">{ts('ts_shipped_at') + ": " + (order.ts_shipped_at ? new Date(order.ts_shipped_at).toLocaleString() : "-")}</p>
+                                                                    <p className="text-sm">{ts('ts_completed_at') + ": " + (order.ts_completed_at ? new Date(order.ts_completed_at).toLocaleString() : "-")}</p>
+                                                                    <p className="text-sm">{ts('ts_expired_at') + ": " + (order.ts_expired_at ? new Date(order.ts_expired_at).toLocaleString() : "-")}</p>
+                                                                    <p className="text-sm">{ts('ts_banned_at') + ": " + (order.ts_banned_at ? new Date(order.ts_banned_at).toLocaleString() : "-")}</p>
+                                                                </div>
                                                             </div>
                                                         </div>
                                                     </DialogContent>
@@ -786,6 +855,7 @@ export default function ShopPage() {
                         </Table>
                     </CardContent>
                 </Card>
+
 
             </div>
         </div >

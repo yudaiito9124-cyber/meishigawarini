@@ -61,7 +61,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 ExpressionAttributeValues: {
                     ':pk': `QR#${status}`
                 },
-                ScanIndexForward: false, // Descending by created_at
+                ScanIndexForward: false, // Descending by ts_created_at
                 // Limit: 50 // soft listing limit for now
             }));
         }

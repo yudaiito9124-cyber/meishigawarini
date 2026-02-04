@@ -55,9 +55,9 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         let status = item.status;
 
         // Check Expiration
-        if (status === 'ACTIVE' && item.expires_at) {
+        if (status === 'ACTIVE' && item.ts_expired_at) {
             const now = new Date();
-            const expiresAt = new Date(item.expires_at);
+            const expiresAt = new Date(item.ts_expired_at);
             if (now > expiresAt) {
                 status = 'EXPIRED';
             }
@@ -77,6 +77,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         }
 
         // Fetch Tracking Number if SHIPPED
+        let delivery_company = undefined;
         let tracking_number = undefined;
         if (status === 'SHIPPED') {
             const orderRes = await ddb.send(new GetCommand({
@@ -87,6 +88,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 }
             }));
             if (orderRes.Item) {
+                delivery_company = orderRes.Item.delivery_company;
                 tracking_number = orderRes.Item.tracking_number;
             }
         }
@@ -109,10 +111,11 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 product_id,
                 shop_id,
                 // Do NOT return the PIN in the response, obviously, though they sent it.
+                delivery_company,
                 tracking_number,
                 product,
                 memo_for_users: item.memo_for_users,
-                expires_at: item.expires_at
+                ts_expired_at: item.ts_expired_at
             })
         };
 

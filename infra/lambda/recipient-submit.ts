@@ -49,6 +49,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             return { statusCode: 403, headers: corsHeaders, body: JSON.stringify({ message: 'Invalid PIN' }) };
         }
 
+        const now = new Date().toISOString();
         // 2. Transact Write: Update Status + Create Order
         await ddb.send(new TransactWriteCommand({
             TransactItems: [
@@ -56,10 +57,10 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                     Update: {
                         TableName: TABLE_NAME,
                         Key: { PK: `QR#${qr_id}`, SK: 'METADATA' },
-                        UpdateExpression: 'SET #status = :used, GSI1_PK = :gsi_pk, updated_at = :now',
+                        UpdateExpression: 'SET #status = :used, GSI1_PK = :gsi_pk, ts_updated_at = :now',
                         ConditionExpression: '#status = :active', // Double check race condition
                         ExpressionAttributeNames: { '#status': 'status' },
-                        ExpressionAttributeValues: { ':used': 'USED', ':active': 'ACTIVE', ':gsi_pk': 'QR#USED', ':now': new Date().toISOString() }
+                        ExpressionAttributeValues: { ':used': 'USED', ':active': 'ACTIVE', ':gsi_pk': 'QR#USED', ':now': now }
                     }
                 },
                 {
@@ -69,7 +70,8 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                             PK: `QR#${qr_id}`,
                             SK: 'ORDER',
                             ...shipping_info,
-                            submitted_at: new Date().toISOString()
+                            ts_submitted_at: now,
+                            ts_updated_at: now
                         }
                     }
                 }
