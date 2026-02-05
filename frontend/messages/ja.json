@@ -16,7 +16,7 @@
         "active": "有効化済み",
         "used": "発送待ち",
         "shipped": "発送済み",
-        "completed": "完了",
+        "completed": "受取り完了",
         "expired": "期限切れ",
         "banned": "BAN済み"
     },
@@ -184,9 +184,10 @@
         "titles": {
             "pin": "PINコードを入力してギフトを受け取る",
             "form": "ギフトが届いています！",
-            "success": "ありがとうございます！",
+            "success": "ありがとうございます",
             "shipped": "ギフトが発送されました！",
-            "expired": "有効期限が切れています"
+            "expired": "有効期限が切れています",
+            "completed": "ギフトを受け取りました！"
         },
         "pinStep": {
             "label": "PINコード入力",
@@ -194,7 +195,15 @@
             "submit": "ギフトを見る",
             "verifying": "確認中..."
         },
-        "daysRemaining": "有効期限はあと{days}日です",
+        "restrictedStep": {
+            "title": "パスワード確認",
+            "message": "ギフトの詳細を表示するには、設定したパスワードを入力してください。",
+            "passwordLabel": "パスワード",
+            "unlock": "ロック解除",
+            "verifying": "確認中..."
+        },
+        "daysRemaining": "有効期限まで あと {days}日 と {hours}時間{minutes}分{seconds}秒です",
+        "limitdatetime": "有効期限: {datetime} (延長は一切できません)",
         "formStep": {
             "title": "配送先情報",
             "name": "お名前",
@@ -202,8 +211,15 @@
             "zipCode": "郵便番号",
             "phone": "電話番号 (任意)",
             "email": "メールアドレス (任意)",
+            "emailDescription": "発送状況やチャットの内容に関する通知、ショップからの問い合わせも行います。",
             "submit": "ギフトを受け取る",
-            "submitting": "送信中..."
+            "submitting": "送信中...",
+            "passwordTitle": "パスワード設定 (任意)",
+            "passwordDescription": "プレゼントをくれた方が住所などを閲覧できる可能性があるため、ギフトの詳細情報を保護するためのパスワードを設定します。設定した場合、今後ステータス確認やチャットを行う際に必要となりますので、忘れないようにしてください。",
+            "passwordLabel": "パスワード",
+            "passwordPlaceholder": "4文字以上",
+            "confirmPasswordLabel": "パスワード（確認）",
+            "confirmPasswordPlaceholder": "もう一度入力"
         },
         "successStep": {
             "message": "配送先情報が送信されました！",
@@ -224,7 +240,10 @@
         "errors": {
             "invalidPin": "PINが無効か、ギフトが見つかりません",
             "inactive": "このカードは有効ではありません。",
-            "submitFailed": "住所の送信に失敗しました。"
+            "submitFailed": "住所の送信に失敗しました。",
+            "passwordMismatch": "パスワードが一致しません",
+            "invalidPassword": "パスワードが間違っています",
+            "unlockFailed": "ロック解除に失敗しました"
         },
         "chat": {
             "title": "メッセージチャット",
@@ -234,7 +253,8 @@
             "submit": "送信",
             "submitting": "送信中...",
             "placeholder": "メッセージを入力...",
-            "namePlaceholder": "ニックネーム"
+            "namePlaceholder": "ニックネーム",
+            "notification": "このメッセージは、プレゼントをくれた方(QRコードとPINコードを知っている人)にしか閲覧できません。ショップはこのメッセージを閲覧できません。"
         },
         "shopMessage": "ショップからのメッセージ"
     },

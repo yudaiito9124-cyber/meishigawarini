@@ -2,6 +2,7 @@
 import { APIGatewayProxyHandler } from 'aws-lambda';
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, TransactWriteCommand, GetCommand } from '@aws-sdk/lib-dynamodb';
+import * as bcrypt from 'bcryptjs';
 
 const client = new DynamoDBClient({});
 const ddb = DynamoDBDocumentClient.from(client);
@@ -20,7 +21,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         }
 
         const body = JSON.parse(event.body || '{}');
-        const { qr_id, pin_code, shipping_info } = body;
+        const { qr_id, pin_code, shipping_info, password } = body;
 
         if (!qr_id || !pin_code || !shipping_info) {
             return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Missing required fields' }) };
@@ -49,6 +50,13 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             return { statusCode: 403, headers: corsHeaders, body: JSON.stringify({ message: 'Invalid PIN' }) };
         }
 
+        // Hash password if provided
+        let password_hash: string | undefined;
+        if (password) {
+            const salt = await bcrypt.genSalt(10);
+            password_hash = await bcrypt.hash(password, salt);
+        }
+
         const now = new Date().toISOString();
         // 2. Transact Write: Update Status + Create Order
         await ddb.send(new TransactWriteCommand({
@@ -57,10 +65,16 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                     Update: {
                         TableName: TABLE_NAME,
                         Key: { PK: `QR#${qr_id}`, SK: 'METADATA' },
-                        UpdateExpression: 'SET #status = :used, GSI1_PK = :gsi_pk, ts_updated_at = :now, ts_submitted_at = :now',
+                        UpdateExpression: 'SET #status = :used, GSI1_PK = :gsi_pk, ts_updated_at = :now, ts_submitted_at = :now' + (password_hash ? ', password_hash = :ph' : ''),
                         ConditionExpression: '#status = :active', // Double check race condition
                         ExpressionAttributeNames: { '#status': 'status' },
-                        ExpressionAttributeValues: { ':used': 'USED', ':active': 'ACTIVE', ':gsi_pk': 'QR#USED', ':now': now }
+                        ExpressionAttributeValues: {
+                            ':used': 'USED',
+                            ':active': 'ACTIVE',
+                            ':gsi_pk': 'QR#USED',
+                            ':now': now,
+                            ...(password_hash ? { ':ph': password_hash } : {})
+                        }
                     }
                 },
                 {

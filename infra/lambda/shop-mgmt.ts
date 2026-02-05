@@ -394,7 +394,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             if (!prodRes.Item) return { statusCode: 404, headers: corsHeaders, body: JSON.stringify({ message: 'Product not found' }) };
 
             if (prodRes.Item.status !== 'STOPPED') {
-                return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Cannot delete product unless it is STOPPED (受注停止)' }) };
+                return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Cannot delete product unless it is STOPPED (この商品が受注停止でないと削除できません)' }) };
             }
 
             const usedRes = await ddb.send(new QueryCommand({
@@ -407,7 +407,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             const unshippedOrders = (usedRes.Items || []).filter(item => item.product_id === pid);
 
             if (unshippedOrders.length > 0) {
-                return { statusCode: 409, headers: corsHeaders, body: JSON.stringify({ message: 'Cannot delete product with unshipped orders (未発送の商品があります)' }) };
+                return { statusCode: 409, headers: corsHeaders, body: JSON.stringify({ message: 'Cannot delete product with unshipped orders (この商品には未発送の注文があります)' }) };
             }
 
             await ddb.send(new DeleteCommand({
@@ -426,7 +426,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             return { statusCode: 403, headers: corsHeaders, body: JSON.stringify({ message: 'You do not own this shop' }) };
         }
         if (error.name === 'ConditionalCheckFailedException') {
-            return { statusCode: 409, headers: corsHeaders, body: JSON.stringify({ message: 'Operation failed. QR might not be in correct state or belongs to another shop.' }) };
+            return { statusCode: 409, headers: corsHeaders, body: JSON.stringify({ message: 'Operation failed. QR might not be in correct state or belongs to another shop. (このQRコードはすでに別のショップまたは商品に紐づけられています、上書きはできません)' }) };
         }
         return { statusCode: 500, headers: corsHeaders, body: JSON.stringify({ message: 'Internal Server Error', error: String(error) }) };
     }

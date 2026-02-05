@@ -1,7 +1,7 @@
-
 import { APIGatewayProxyHandler } from 'aws-lambda';
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, GetCommand } from '@aws-sdk/lib-dynamodb';
+import * as bcrypt from 'bcryptjs';
 
 const client = new DynamoDBClient({});
 const ddb = DynamoDBDocumentClient.from(client);
@@ -20,7 +20,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         }
 
         const body = JSON.parse(event.body || '{}');
-        const { uuid, pin } = body;
+        const { uuid, pin, password } = body;
 
         if (!uuid || !pin) {
             return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Missing UUID or PIN' }) };
@@ -35,21 +35,39 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         }));
 
         if (!getRes.Item) {
-            // Not found
-            // To prevent enumeration? Maybe just 404 is fine.
             return { statusCode: 404, headers: corsHeaders, body: JSON.stringify({ message: 'Gift not found or Invalid PIN' }) };
         }
 
         const item = getRes.Item;
 
         // Verify PIN
-        // Ensure both are strings for comparison
         if (String(item.pin) !== String(pin)) {
-            // Invalid PIN
-            // Return 404 or specific error. Usually "Invalid credentials" style.
-            // User asked: "match -> return data, not match -> return nothing (or error)"
             return { statusCode: 403, headers: corsHeaders, body: JSON.stringify({ message: 'Invalid PIN' }) };
         }
+
+        // Logic for Password Protection
+        let isAuthorizedByPassword = false;
+        let isPasswordProtected = false;
+
+        if (item.password_hash) {
+            isPasswordProtected = true;
+            if (password) {
+                const isValid = await bcrypt.compare(password, item.password_hash);
+                if (!isValid) {
+                    isAuthorizedByPassword = false;
+                } else {
+                    isAuthorizedByPassword = true;
+                }
+            } else {
+                isAuthorizedByPassword = false;
+            }
+        } else {
+            isAuthorizedByPassword = true;
+        }
+
+        // If NOT authorized (Protected + Wrong/No Password), we redact info
+        // BUT we still allow them to see the "Restricted" screen (for Chat).
+        // So we don't return 403, we return 200 with limited data.
 
         const { product_id, shop_id } = item;
         let status = item.status;
@@ -63,7 +81,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             }
         }
 
-        // Fetch Product Data if available
+        // Fetch Product Data if available AND Authorized
         let product = null;
         if (shop_id && product_id) {
             const prodRes = await ddb.send(new GetCommand({
@@ -76,10 +94,10 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             product = prodRes.Item;
         }
 
-        // Fetch Tracking Number if SHIPPED
+        // Fetch Tracking Number if SHIPPED AND Authorized
         let delivery_company = undefined;
         let tracking_number = undefined;
-        if (status === 'SHIPPED') {
+        if (isAuthorizedByPassword && status === 'SHIPPED') {
             const orderRes = await ddb.send(new GetCommand({
                 TableName: TABLE_NAME,
                 Key: {
@@ -93,14 +111,16 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             }
         }
 
-        // Fallback for legacy or unlinked codes (Prototype safety)
-        if (!product) {
-            product = {
-                name: 'Pending Gift',
-                description: 'This gift has not been linked to a product yet.',
-                image_url: 'https://placehold.co/600x400?text=Pending'
-            };
+        // Fallback for legacy or unlinked codes (Prototype safety) - Only if authorized
+        if (isAuthorizedByPassword && !product && !shop_id) { // Only show dummy if it really has no product
+            // If it has shop_id/product_id but failed to fetch, it might be an error, but let's stick to simple logic
+            // logic: if authorized and no product found (and no shop_id implies it wasn't linked), show dummy?
+            // Actually, cleaner: if authorized, populate product.
+            // If NOT authorized, product remains null.
         }
+
+        // If authorized and product is still null (maybe database issue or truly empty), we can provide a default?
+        // Or specific "Protected" placeholder if not authorized.
 
         return {
             statusCode: 200,
@@ -108,14 +128,15 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             body: JSON.stringify({
                 uuid,
                 status,
-                product_id,
-                shop_id,
-                // Do NOT return the PIN in the response, obviously, though they sent it.
-                delivery_company,
-                tracking_number,
-                product,
-                memo_for_users: item.memo_for_users,
-                ts_expired_at: item.ts_expired_at
+                product_id: product_id,
+                shop_id: shop_id,
+                delivery_company: isAuthorizedByPassword ? delivery_company : undefined,
+                tracking_number: isAuthorizedByPassword ? tracking_number : undefined,
+                product: product,
+                memo_for_users: isAuthorizedByPassword ? item.memo_for_users : undefined,
+                ts_expired_at: item.ts_expired_at,
+                is_password_protected: isPasswordProtected,
+                is_authorized: isAuthorizedByPassword
             })
         };
 

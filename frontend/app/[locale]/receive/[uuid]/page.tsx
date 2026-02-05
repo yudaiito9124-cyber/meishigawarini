@@ -6,21 +6,21 @@ import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card";
 
 const NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
 // Verify PIN and Fetch Gift Details
-const verifyGiftPin = async (uuid: string, pin: string) => {
+const verifyGiftPin = async (uuid: string, pin: string, password?: string) => {
     const res = await fetch(`${NEXT_PUBLIC_API_URL}/recipient/qrcodes/verify`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ uuid, pin }),
+        body: JSON.stringify({ uuid, pin, password }),
     });
 
     if (!res.ok) {
         if (res.status === 404 || res.status === 403) {
-            throw new Error("Invalid PIN or Gift not found");
+            throw new Error("Invalid PIN, Password, or Gift not found");
         }
         throw new Error("Failed to verify PIN");
     }
@@ -28,14 +28,15 @@ const verifyGiftPin = async (uuid: string, pin: string) => {
 };
 
 // Submit Address
-const submitAddress = async (uuid: string, pin: string, addressData: any) => {
+const submitAddress = async (uuid: string, pin: string, addressData: any, password?: string) => {
     const res = await fetch(`${NEXT_PUBLIC_API_URL}/recipient/submit`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
             qr_id: uuid,
             pin_code: pin,
-            shipping_info: addressData
+            shipping_info: addressData,
+            password
         }),
     });
 
@@ -84,6 +85,7 @@ const postChatMessage = async (uuid: string, pin: string, username: string, mess
 
 export default function ReceivePage() {
     const t = useTranslations('ReceivePage');
+    const tst = useTranslations('Status');
     const params = useParams();
     const uuid = params?.uuid as string;
 
@@ -96,14 +98,20 @@ export default function ReceivePage() {
     const [phone, setPhone] = useState("");
     const [email, setEmail] = useState("");
 
+    // Password Protection State
+    const [password, setPassword] = useState("");
+    const [confirmPassword, setConfirmPassword] = useState("");
+    const [isRestricted, setIsRestricted] = useState(false); // True if password protected and not unlocked
+    const [unlockPassword, setUnlockPassword] = useState(""); // For entering password to view details
+
     // Chat State
     const [messages, setMessages] = useState<any[]>([]);
     const [chatName, setChatName] = useState("");
     const [chatMessage, setChatMessage] = useState("");
     const [chatLoading, setChatLoading] = useState(false);
 
-    // Steps: PIN -> FORM (or SHIPPED/SUCCESS)
-    const [step, setStep] = useState<"PIN" | "FORM" | "SUCCESS" | "SHIPPED" | "EXPIRED" | "COMPLETED">("PIN");
+    // Steps: PIN -> FORM (or SHIPPED/SUCCESS) -> RESTRICTED (if blocked)
+    const [step, setStep] = useState<"PIN" | "FORM" | "SUCCESS" | "SHIPPED" | "EXPIRED" | "COMPLETED" | "RESTRICTED">("PIN");
 
     const [error, setError] = useState<string | null>(null);
     const [pinError, setPinError] = useState("");
@@ -118,20 +126,25 @@ export default function ReceivePage() {
             const data = await verifyGiftPin(uuid, pin);
             setGift(data);
 
-            // Check status
-            if (data.status === 'USED') {
-                setStep("SUCCESS");
-            } else if (data.status === 'COMPLETED') {
-                setStep("COMPLETED");
-            } else if (data.status === 'SHIPPED') {
-                setStep("SHIPPED");
-            } else if (data.status === 'ACTIVE') {
-                setStep("FORM");
-            } else if (data.status === 'EXPIRED') {
-                setStep("EXPIRED");
+            if (data.is_password_protected && !data.is_authorized) {
+                setStep("RESTRICTED");
+                setIsRestricted(true);
             } else {
-                // UNASSIGNED, BANNED, etc.
-                setError(t('errors.inactive'));
+                setIsRestricted(false);
+                // Check status
+                if (data.status === 'USED') {
+                    setStep("SUCCESS");
+                } else if (data.status === 'COMPLETED') {
+                    setStep("COMPLETED");
+                } else if (data.status === 'SHIPPED') {
+                    setStep("SHIPPED");
+                } else if (data.status === 'ACTIVE') {
+                    setStep("FORM");
+                } else if (data.status === 'EXPIRED') {
+                    setStep("EXPIRED");
+                } else {
+                    setError(t('errors.inactive'));
+                }
             }
 
         } catch (err: any) {
@@ -142,11 +155,45 @@ export default function ReceivePage() {
         }
     };
 
-    const handleAddressSubmit = async (e: React.FormEvent) => {
+    const handleUnlock = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
         try {
-            await submitAddress(uuid, pin, { name, zipCode, address, phone, email });
+            const data = await verifyGiftPin(uuid, pin, unlockPassword);
+            if (data.is_authorized) {
+                setGift(data);
+                setIsRestricted(false);
+                // Determine step again
+                if (data.status === 'USED') {
+                    setStep("SUCCESS");
+                } else if (data.status === 'COMPLETED') {
+                    setStep("COMPLETED");
+                } else if (data.status === 'SHIPPED') {
+                    setStep("SHIPPED");
+                } else if (data.status === 'ACTIVE') {
+                    setStep("FORM");
+                } else if (data.status === 'EXPIRED') {
+                    setStep("EXPIRED");
+                }
+            } else {
+                alert(t('errors.invalidPassword'));
+            }
+        } catch (e) {
+            alert(t('errors.unlockFailed'));
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleAddressSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (password !== confirmPassword) {
+            alert(t('errors.passwordMismatch'));
+            return;
+        }
+        setLoading(true);
+        try {
+            await submitAddress(uuid, pin, { name, zipCode, address, phone, email }, password);
             setStep("SUCCESS");
         } catch (error: any) {
             console.error("Submission error:", error);
@@ -203,10 +250,14 @@ export default function ReceivePage() {
         }
     };
 
-    const getRemainingDays = (expiresAt: string) => {
+    const getRemainingTime = (expiresAt: string) => {
         if (!expiresAt) return null;
         const diff = new Date(expiresAt).getTime() - new Date().getTime();
-        return Math.ceil(diff / (1000 * 60 * 60 * 24));
+        const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+        const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+        const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+        const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+        return { days, hours, minutes, seconds };
     };
 
     if (error) {
@@ -233,12 +284,15 @@ export default function ReceivePage() {
                             step === "FORM" ? t('titles.form') :
                                 step === "SUCCESS" ? t('titles.success') :
                                     step === "SHIPPED" ? t('titles.shipped') :
-                                        step === "EXPIRED" ? t('titles.expired') : ""}
+                                        step === "EXPIRED" ? t('titles.expired') :
+                                            step === "COMPLETED" ? t('titles.completed') :
+                                                step === "RESTRICTED" ? tst(gift.status.toLowerCase()) : ""}
                     </CardTitle>
                 </CardHeader>
                 <CardContent>
                     {/* Show Gift Info after PIN verification */}
                     {step !== "PIN" && gift && gift.product && (
+
                         <div className="mb-6 animate-in fade-in duration-500">
                             <img src={gift.product.image_url} alt="Gift" className="w-full h-48 object-cover rounded-md mb-4" />
                             <h2 className="font-bold text-lg">{gift.product.name}</h2>
@@ -246,9 +300,14 @@ export default function ReceivePage() {
 
                             {/* Remaining Days for Active Gift */}
                             {step === "FORM" && gift.ts_expired_at && (
-                                <p className="mt-2 text-sm font-semibold text-green-600 border border-green-200 bg-green-50 p-2 rounded text-center">
-                                    {t('daysRemaining', { days: getRemainingDays(gift.ts_expired_at) ?? 0 })}
-                                </p>
+                                <>
+                                    <p className="mt-8 text-sm font-semibold text-green-600 border border-green-200 bg-green-50 p-2 rounded text-center">
+                                        {t('daysRemaining', getRemainingTime(gift.ts_expired_at)!)}
+                                    </p>
+                                    <p className="text-center text-sm text-gray-500 mt-1">
+                                        {t('limitdatetime', { datetime: new Date(gift.ts_expired_at).toLocaleString() })}
+                                    </p>
+                                </>
                             )}
 
                             {/* Expired Message */}
@@ -265,6 +324,8 @@ export default function ReceivePage() {
                                     <p className="text-sm text-blue-900 whitespace-pre-wrap">{gift.memo_for_users}</p>
                                 </div>
                             )}
+
+
                         </div>
                     )}
 
@@ -290,9 +351,33 @@ export default function ReceivePage() {
                         </form>
                     )}
 
+                    {step === "RESTRICTED" && (
+                        <div className="space-y-6 border-t mt-4">
+                            <div className="text-center space-y-2 mt-4">
+                                <p className="text-yellow-600 font-medium">{t('restrictedStep.title')}</p>
+                                <p className="text-sm text-gray-500">{t('restrictedStep.message')}</p>
+                            </div>
+                            <form onSubmit={handleUnlock} className="space-y-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="unlockPassword">{t('restrictedStep.passwordLabel')}</Label>
+                                    <Input
+                                        id="unlockPassword"
+                                        type="password"
+                                        value={unlockPassword}
+                                        onChange={(e) => setUnlockPassword(e.target.value)}
+                                        required
+                                    />
+                                </div>
+                                <Button type="submit" className="w-full" disabled={loading}>
+                                    {loading ? t('restrictedStep.verifying') : t('restrictedStep.unlock')}
+                                </Button>
+                            </form>
+                        </div>
+                    )}
+
                     {step === "FORM" && (
                         <form onSubmit={handleAddressSubmit} className="space-y-6">
-                            <div className="space-y-4 pt-2 border-t">
+                            <div className="space-y-4 pt-8 mt-16 border-t">
                                 <Label className="font-semibold">{t('formStep.title')}</Label>
                                 <div className="space-y-2">
                                     <Label htmlFor="name">{t('formStep.name')}</Label>
@@ -334,6 +419,7 @@ export default function ReceivePage() {
                                 </div>
                                 <div className="space-y-2">
                                     <Label htmlFor="email">{t('formStep.email')}</Label>
+                                    <p className="text-xs text-gray-500">{t('formStep.emailDescription')}</p>
                                     <Input
                                         id="email"
                                         type="email"
@@ -342,9 +428,37 @@ export default function ReceivePage() {
                                         placeholder="you@example.com"
                                     />
                                 </div>
+
+                                {/* Password Setting Section */}
+                                <div className="space-y-4 pt-8 mt-16 border-t">
+                                    <Label className="font-semibold text-blue-800">{t('formStep.passwordTitle')}</Label>
+                                    <p className="text-xs text-gray-500">
+                                        {t('formStep.passwordDescription')}
+                                    </p>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="password">{t('formStep.passwordLabel')}</Label>
+                                        <Input
+                                            id="password"
+                                            type="password"
+                                            value={password}
+                                            onChange={(e) => setPassword(e.target.value)}
+                                            placeholder={t('formStep.passwordPlaceholder')}
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="confirmPassword">{t('formStep.confirmPasswordLabel')}</Label>
+                                        <Input
+                                            id="confirmPassword"
+                                            type="password"
+                                            value={confirmPassword}
+                                            onChange={(e) => setConfirmPassword(e.target.value)}
+                                            placeholder={t('formStep.confirmPasswordPlaceholder')}
+                                        />
+                                    </div>
+                                </div>
                             </div>
 
-                            <Button type="submit" className="w-full" disabled={loading}>
+                            <Button type="submit" className="w-full mt-8" disabled={loading}>
                                 {loading ? t('formStep.submitting') : t('formStep.submit')}
                             </Button>
                         </form>
@@ -437,6 +551,9 @@ export default function ReceivePage() {
                             </form>
                         </div>
                     </CardContent>
+                    <CardFooter>
+                        <p className="text-xs text-gray-500">{t('chat.notification')}</p>
+                    </CardFooter>
                 </Card>
             )}
 
