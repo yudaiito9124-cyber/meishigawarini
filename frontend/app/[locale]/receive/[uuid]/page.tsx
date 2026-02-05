@@ -275,9 +275,32 @@ export default function ReceivePage() {
         );
     }
 
+    // Subscription
+    const [notificationEmail, setNotificationEmail] = useState("");
+    const [subscribing, setSubscribing] = useState(false);
+
+    const handleSubscribe = async () => {
+        if (!notificationEmail) return;
+        setSubscribing(true);
+        try {
+            await fetch(`${NEXT_PUBLIC_API_URL}/recipient/qrcodes/${uuid}/chat`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ pin, type: 'subscribe', email: notificationEmail }),
+            });
+            alert(t('chat.subscribeSuccess'));
+            setNotificationEmail("");
+        } catch (e) {
+            alert(t('chat.subscribeFailed'));
+        } finally {
+            setSubscribing(false);
+        }
+    };
+
     return (
         <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-4">
             <Card className="w-full max-w-md">
+                {/* ... existing CardHeader/CardContent ... */}
                 <CardHeader>
                     <CardTitle className="text-xl text-center">
                         {step === "PIN" ? t('titles.pin') :
@@ -551,8 +574,27 @@ export default function ReceivePage() {
                             </form>
                         </div>
                     </CardContent>
-                    <CardFooter>
-                        <p className="text-xs text-gray-500">{t('chat.notification')}</p>
+                    <CardFooter className="flex flex-col gap-4 pt-0 items-start border-t p-6 mt-4 bg-gray-50/50">
+                        {/* Privacy Notice */}
+                        <p className="text-xs text-gray-500">{t('chat.privacy')}</p>
+
+                        {/* Email Subscription */}
+                        <div className="w-full space-y-2 pt-2 border-t border-gray-200/50">
+                            <Label className="text-xs text-gray-700 font-semibold">{t('chat.emailTitle')}</Label>
+                            <p className="text-xs text-gray-500">{t('chat.emailDesc')}</p>
+                            <div className="flex w-full gap-2 pt-1">
+                                <Input
+                                    placeholder="you@example.com"
+                                    type="email"
+                                    className="h-8 text-xs bg-white"
+                                    value={notificationEmail}
+                                    onChange={(e) => setNotificationEmail(e.target.value)}
+                                />
+                                <Button size="sm" variant="outline" className="h-8 text-xs whitespace-nowrap bg-white" onClick={handleSubscribe} disabled={subscribing}>
+                                    {subscribing ? "..." : t('chat.subscribe')}
+                                </Button>
+                            </div>
+                        </div>
                     </CardFooter>
                 </Card>
             )}

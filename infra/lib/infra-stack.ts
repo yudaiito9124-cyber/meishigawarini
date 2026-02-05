@@ -8,6 +8,7 @@ import * as apigateway from 'aws-cdk-lib/aws-apigateway';
 import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as path from 'path';
 import * as wafv2 from 'aws-cdk-lib/aws-wafv2';
+import * as iam from 'aws-cdk-lib/aws-iam';
 
 const DEFAULT_VALID_DAYS = process.env.DEFAULT_VALID_DAYS || '1';
 
@@ -421,8 +422,18 @@ export class InfraStack extends cdk.Stack {
     const recipientChatFn = new nodejs.NodejsFunction(this, 'RecipientChatFn', {
       entry: path.join(__dirname, '../lambda/recipient-chat.ts'),
       ...commonProps,
+      environment: {
+        ...commonProps.environment,
+        SOURCE_EMAIL: 'noreply@meishigawarini.com', // Replace with your verified email
+      }
     });
     table.grantReadWriteData(recipientChatFn);
+
+    // Grant SES permissions
+    recipientChatFn.addToRolePolicy(new iam.PolicyStatement({
+      actions: ['ses:SendEmail', 'ses:SendRawEmail'],
+      resources: ['*'], // In production, restrict to specific identities
+    }));
 
     const chatResource = qrResourceRecip.addResource('{uuid}').addResource('chat');
     chatResource.addMethod('GET', new apigateway.LambdaIntegration(recipientChatFn));

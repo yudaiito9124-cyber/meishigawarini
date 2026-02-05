@@ -495,9 +495,9 @@ export default function ShopPage() {
                                     orders
                                         .filter(o => ['LINKED', 'ACTIVE', 'USED', 'SHIPPED'].includes(o.status))
                                         .sort((a, b) => {
-                                            const sortorder: { [name: string]: number } = { 'LINKED': 0, 'ACTIVE': 1, 'USED': 2, 'SHIPPED': 3 };
+                                            const sortorder: { [name: string]: number } = { 'LINKED': 0, 'ACTIVE': 1, 'USED': 3, 'SHIPPED': 2 };
                                             // 1. Status: compare
-                                            if (a.status !== b.status) return sortorder[a.status] - sortorder[b.status];
+                                            if (a.status !== b.status) return sortorder[b.status] - sortorder[a.status];
                                             // 2. Date: Newest first
                                             const dateA = new Date(a.ts_updated_at || a.ts_created_at).getTime();
                                             const dateB = new Date(b.ts_updated_at || b.ts_created_at).getTime();
@@ -698,7 +698,7 @@ export default function ShopPage() {
                                     </CardContent>
                                 </Card>
                             ))}
-                            <Card className="col-span-2 sm:col-span-2 md:col-span-3 lg:col-span-4 ml-16 mr-16 mt-24 mb-8">
+                            <Card className="col-span-2 sm:col-span-2 md:col-span-3 lg:col-span-4 ml-16 mr-16 mt-8 mb-8">
                                 <CardHeader>
                                     <CardTitle>{t('addProduct.title')}</CardTitle>
                                 </CardHeader>

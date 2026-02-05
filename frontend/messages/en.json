@@ -179,7 +179,13 @@
             "submit": "Submit",
             "submitting": "Submitting...",
             "placeholder": "Enter message...",
-            "namePlaceholder": "Nickname"
+            "namePlaceholder": "Nickname",
+            "privacy": "This message is only visible to the sender (who knows the QR code and PIN). The shop cannot view this message.",
+            "emailTitle": "Email Notification Settings",
+            "emailDesc": "Receive email notifications when a new message arrives.",
+            "subscribe": "Subscribe",
+            "subscribeSuccess": "Subscription successful",
+            "subscribeFailed": "Subscription failed"
         },
         "shopMessage": "Shop Message"
     },

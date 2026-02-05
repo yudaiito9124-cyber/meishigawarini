@@ -2,10 +2,13 @@
 import { APIGatewayProxyHandler } from 'aws-lambda';
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, GetCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
+import { SESClient, SendEmailCommand } from '@aws-sdk/client-ses';
 
 const client = new DynamoDBClient({});
 const ddb = DynamoDBDocumentClient.from(client);
+const ses = new SESClient({});
 const TABLE_NAME = process.env.TABLE_NAME || '';
+const SOURCE_EMAIL = process.env.SOURCE_EMAIL || 'noreply@meishigawarini.com';
 
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
@@ -26,13 +29,14 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 
         if (event.httpMethod === 'POST') {
             const body = JSON.parse(event.body || '{}');
-            const { pin, username, message } = body;
+            const { pin, username, message, type, email } = body; // Added type & email
 
-            if (!pin || !username || !message) {
-                return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Missing required fields' }) };
+            // 1. Verify PIN (Required for both Subscribe and Message)
+            // For subscribe, we might need PIN to authorized. Yes.
+            if (!pin) {
+                return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Missing PIN' }) };
             }
 
-            // 1. Verify PIN
             const getRes = await ddb.send(new GetCommand({
                 TableName: TABLE_NAME,
                 Key: { PK: `QR#${uuid}`, SK: 'METADATA' }
@@ -44,6 +48,34 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 
             if (getRes.Item.pin !== pin) {
                 return { statusCode: 403, headers: corsHeaders, body: JSON.stringify({ message: 'Invalid PIN' }) };
+            }
+
+            // === HANDLE SUBSCRIPTION ===
+            if (type === 'subscribe') {
+                if (!email) {
+                    return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Missing email' }) };
+                }
+
+                // Use ADD to manage unique set of emails
+                await ddb.send(new UpdateCommand({
+                    TableName: TABLE_NAME,
+                    Key: { PK: `QR#${uuid}`, SK: 'CHAT' },
+                    UpdateExpression: 'ADD notification_emails :new_email',
+                    ExpressionAttributeValues: {
+                        ':new_email': new Set([email])
+                    }
+                }));
+
+                return {
+                    statusCode: 200,
+                    headers: corsHeaders,
+                    body: JSON.stringify({ message: 'Subscribed successfully' })
+                };
+            }
+
+            // === HANDLE MESSAGE ===
+            if (!username || !message) {
+                return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Missing required fields' }) };
             }
 
             // 2. Append Message to SK=CHAT
@@ -64,6 +96,65 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                     ':new_msg': [newMessage]
                 }
             }));
+
+            // 3. Send Notifications (Fire and forget or await)
+            try {
+                // Fetch the chat item to get emails
+                const chatRes = await ddb.send(new GetCommand({
+                    TableName: TABLE_NAME,
+                    Key: { PK: `QR#${uuid}`, SK: 'CHAT' }
+                }));
+
+                const emailsSet = chatRes.Item?.notification_emails;
+                let recipients: string[] = [];
+                if (emailsSet) {
+                    // DynamoDB Set comes as Set or array depending on marshall options. 
+                    // DocumentClient usually returns Set object.
+                    recipients = Array.from(emailsSet as Set<string>);
+                }
+
+                if (recipients.length > 0) {
+                    const subject = `【名刺がわりに】新着メッセージ (New Message)`;
+                    // Construct a simple link. Ideally should comes from ENV or Origin.
+                    // Assuming Origin is passed or we construct it.
+                    // Recipient URL: https://.../receive/{uuid}
+                    // We'll trust the user knows the URL or add it if we can.
+                    // For now, simple text.
+                    const bodyText = `
+${username} さんからメッセージが届きました。
+From ${username}:
+
+${message}
+
+確認はこちら:
+Check here:
+${process.env.FRONTEND_URL || 'https://meishigawarini.com'}/receive/${uuid}
+PIN: ${pin}
+                    `;
+
+                    // Send individually to hide other recipients (BCC style or individual emails)
+                    // SES Limit: 50 recipients per message if using Bcc/To.
+                    // We'll send one email with Bcc if many, or loop.
+                    // Looping is safer for "To" field personalization if needed, but Bcc is cheaper.
+                    // Let's loop for now as volume is low.
+
+                    const sendPromises = recipients.map(email => {
+                        return ses.send(new SendEmailCommand({
+                            Source: SOURCE_EMAIL,
+                            Destination: { ToAddresses: [email] },
+                            Message: {
+                                Subject: { Data: subject },
+                                Body: { Text: { Data: bodyText } }
+                            }
+                        }));
+                    });
+
+                    await Promise.allSettled(sendPromises);
+                }
+            } catch (err) {
+                console.error("Failed to send notifications:", err);
+                // Don't fail the request just because email failed
+            }
 
             return {
                 statusCode: 200,
