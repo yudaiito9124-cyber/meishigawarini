@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { RefreshCw, ArrowRight, HelpCircle } from 'lucide-react';
 import { notFound, useParams } from 'next/navigation';
 import { useRouter } from '@/i18n/routing';
 import { useTranslations } from 'next-intl';
@@ -21,6 +22,7 @@ const NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 export default function ShopPage() {
     const t = useTranslations('ShopPage');
     const ts = useTranslations('Timestamp');
+    const st = useTranslations('Status');
     const params = useParams();
     const router = useRouter();
     const shopId = Array.isArray(params.shopId) ? params.shopId[0] : params.shopId;
@@ -30,6 +32,7 @@ export default function ShopPage() {
     const [qrCodes, setQrCodes] = useState<any[]>([]);
     const [orders, setOrders] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
+    const [isRefreshing, setIsRefreshing] = useState(false);
     const [error, setError] = useState('');
 
     // Protect Route
@@ -52,7 +55,8 @@ export default function ShopPage() {
         }
     }, [shopId]);
 
-    const fetchShopData = async () => {
+    const fetchShopData = async (refresh = false) => {
+        if (refresh) setIsRefreshing(true);
         // setLoading(true); // Don't block UI on refresh
         try {
             // 1. Get Shop Details
@@ -95,6 +99,7 @@ export default function ShopPage() {
             setError(err.message);
         } finally {
             setLoading(false);
+            if (refresh) setIsRefreshing(false);
             // router.push('/login')
         }
     };
@@ -299,11 +304,12 @@ export default function ShopPage() {
             if (res.ok) {
                 fetchShopData();
             } else {
-                alert('Failed to ship order');
+                const errData = await res.json().catch(() => ({}));
+                alert('Failed to ship order: ' + (errData.message || errData.error || 'Unknown error'));
             }
-        } catch (e) {
+        } catch (e: any) {
             console.error(e);
-            alert('Error shipping order');
+            alert('Error shipping order: ' + (e.message || String(e)));
         }
     };
 
@@ -461,8 +467,16 @@ export default function ShopPage() {
                 {/* Incoming Orders */}
                 <Card>
                     <CardHeader>
-                        <CardTitle>{t('incomingOrders')}</CardTitle>
-                        <CardDescription>{t('ordersDesc')}</CardDescription>
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <CardTitle>{t('incomingOrders')}</CardTitle>
+                                <CardDescription>{t('ordersDesc')}</CardDescription>
+                            </div>
+                            <Button variant="outline" size="sm" onClick={() => fetchShopData(true)} disabled={isRefreshing}>
+                                <RefreshCw className={`mr-2 h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+                                {t('refresh')}
+                            </Button>
+                        </div>
                     </CardHeader>
                     <CardContent>
                         <Table>
@@ -501,14 +515,15 @@ export default function ShopPage() {
                                                             <TableCell className="font-medium">{product?.name || order.product_id}</TableCell>
                                                             <TableCell>
                                                                 <span className={`px-2 py-1 rounded text-xs ${order.status === 'UNASSIGNED' ? 'bg-gray-100' :
-                                                                    order.status === 'LINKED' ? 'bg-brown-100 text-brown-800' :
-                                                                        order.status === 'ACTIVE' ? 'bg-orange-100 text-orange-800' :
-                                                                            order.status === 'USED' ? 'bg-yellow-100 text-yellow-800' :
-                                                                                order.status === 'SHIPPED' ? 'bg-green-100 text-green-800' :
+                                                                    order.status === 'LINKED' ? 'bg-emerald-100 text-emerald-800' :
+                                                                        order.status === 'ACTIVE' ? 'bg-yellow-100 text-yellow-800' :
+                                                                            order.status === 'USED' ? 'bg-orange-100 text-orange-800' :
+                                                                                order.status === 'SHIPPED' ? 'bg-indigo-100 text-indigo-800' :
                                                                                     order.status === 'COMPLETED' ? 'bg-purple-100 text-purple-800' :
-                                                                                        order.status === 'BANNED' ? 'bg-red-100 text-red-800' : // BANNED style
-                                                                                            'bg-green-100 text-green-800'
-                                                                    }`}>{order.status}</span>
+                                                                                        order.status === 'EXPIRED' ? 'bg-gray-100 text-gray-800' :
+                                                                                            order.status === 'BANNED' ? 'bg-red-100 text-red-800' :
+                                                                                                'bg-green-100 text-green-800'
+                                                                    }`}>{st(order.status.toLowerCase())}</span>
                                                             </TableCell>
                                                             <TableCell className="font-medium">{order.memo_for_shop}</TableCell>
                                                         </TableRow>
@@ -533,14 +548,15 @@ export default function ShopPage() {
                                                                 <h4 className="text-sm font-semibold text-gray-500">{t('orders.status')}</h4>
 
                                                                 <span className={`px-2 py-1 rounded text-xs ${order.status === 'UNASSIGNED' ? 'bg-gray-100' :
-                                                                    order.status === 'LINKED' ? 'bg-brown-100 text-brown-800' :
-                                                                        order.status === 'ACTIVE' ? 'bg-orange-100 text-orange-800' :
-                                                                            order.status === 'USED' ? 'bg-yellow-100 text-yellow-800' :
-                                                                                order.status === 'SHIPPED' ? 'bg-green-100 text-green-800' :
+                                                                    order.status === 'LINKED' ? 'bg-emerald-100 text-emerald-800' :
+                                                                        order.status === 'ACTIVE' ? 'bg-yellow-100 text-yellow-800' :
+                                                                            order.status === 'USED' ? 'bg-orange-100 text-orange-800' :
+                                                                                order.status === 'SHIPPED' ? 'bg-indigo-100 text-indigo-800' :
                                                                                     order.status === 'COMPLETED' ? 'bg-purple-100 text-purple-800' :
-                                                                                        order.status === 'BANNED' ? 'bg-red-100 text-red-800' : // BANNED style
-                                                                                            'bg-green-100 text-green-800'
-                                                                    }`}>{order.status}</span>
+                                                                                        order.status === 'EXPIRED' ? 'bg-gray-100 text-gray-800' :
+                                                                                            order.status === 'BANNED' ? 'bg-red-100 text-red-800' :
+                                                                                                'bg-green-100 text-green-800'
+                                                                    }`}>{st(order.status.toLowerCase())}</span>
                                                             </div>
 
                                                             {/* Recipient Info */}
@@ -566,7 +582,7 @@ export default function ShopPage() {
                                                                     {order.memo_for_shop && ( */}
                                                             <div>
                                                                 <h4 className="text-sm font-semibold text-gray-500">{t('orders.shopMemo')}</h4>
-                                                                <p className="text-sm bg-yellow-50 p-2 rounded">{order.memo_for_shop || '-'}</p>
+                                                                <p className="text-sm bg-orange-50 p-2 rounded">{order.memo_for_shop || '-'}</p>
                                                             </div>
 
                                                             {/* Memos (if available) - Assuming these fields might exist on order object or shipping_info */}
@@ -682,7 +698,7 @@ export default function ShopPage() {
                                     </CardContent>
                                 </Card>
                             ))}
-                            <Card className="col-span-2 sm:col-span-2 md:col-span-3 lg:col-span-4">
+                            <Card className="col-span-2 sm:col-span-2 md:col-span-3 lg:col-span-4 ml-16 mr-16 mt-24 mb-8">
                                 <CardHeader>
                                     <CardTitle>{t('addProduct.title')}</CardTitle>
                                 </CardHeader>
@@ -723,7 +739,13 @@ export default function ShopPage() {
                 {/* Order History */}
                 <Card>
                     <CardHeader>
-                        <CardTitle>{t('history.title')}</CardTitle>
+                        <div className="flex items-center justify-between">
+                            <CardTitle>{t('history.title')}</CardTitle>
+                            <Button variant="outline" size="sm" onClick={() => fetchShopData(true)} disabled={isRefreshing}>
+                                <RefreshCw className={`mr-2 h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+                                {t('refresh')}
+                            </Button>
+                        </div>
                     </CardHeader>
                     <CardContent>
                         <Table>
@@ -759,14 +781,15 @@ export default function ShopPage() {
                                                             <TableCell className="font-medium">{product?.name || order.product_id}</TableCell>
                                                             <TableCell>
                                                                 <span className={`px-2 py-1 rounded text-xs ${order.status === 'UNASSIGNED' ? 'bg-gray-100' :
-                                                                    order.status === 'LINKED' ? 'bg-brown-100 text-brown-800' :
-                                                                        order.status === 'ACTIVE' ? 'bg-orange-100 text-orange-800' :
-                                                                            order.status === 'USED' ? 'bg-yellow-100 text-yellow-800' :
-                                                                                order.status === 'SHIPPED' ? 'bg-green-100 text-green-800' :
+                                                                    order.status === 'LINKED' ? 'bg-emerald-100 text-emerald-800' :
+                                                                        order.status === 'ACTIVE' ? 'bg-yellow-100 text-yellow-800' :
+                                                                            order.status === 'USED' ? 'bg-orange-100 text-orange-800' :
+                                                                                order.status === 'SHIPPED' ? 'bg-indigo-100 text-indigo-800' :
                                                                                     order.status === 'COMPLETED' ? 'bg-purple-100 text-purple-800' :
-                                                                                        order.status === 'BANNED' ? 'bg-red-100 text-red-800' : // BANNED style
-                                                                                            'bg-green-100 text-green-800'
-                                                                    }`}>{order.status}</span>
+                                                                                        order.status === 'EXPIRED' ? 'bg-gray-100 text-gray-800' :
+                                                                                            order.status === 'BANNED' ? 'bg-red-100 text-red-800' :
+                                                                                                'bg-green-100 text-green-800'
+                                                                    }`}>{st(order.status.toLowerCase())}</span>
                                                             </TableCell>
                                                             <TableCell className="font-medium">{order.memo_for_shop}</TableCell>
                                                         </TableRow>
@@ -786,10 +809,21 @@ export default function ShopPage() {
                                                                 <p className="font-medium">{product?.name || order.product_id}</p>
                                                             </div>
 
+
                                                             {/* Status */}
                                                             <div>
                                                                 <h4 className="text-sm font-semibold text-gray-500">{t('orders.status')}</h4>
-                                                                <span className={`px-2 py-1 rounded text-xs }`}> {order.status} </span>
+
+                                                                <span className={`px-2 py-1 rounded text-xs ${order.status === 'UNASSIGNED' ? 'bg-gray-100' :
+                                                                    order.status === 'LINKED' ? 'bg-emerald-100 text-emerald-800' :
+                                                                        order.status === 'ACTIVE' ? 'bg-yellow-100 text-yellow-800' :
+                                                                            order.status === 'USED' ? 'bg-orange-100 text-orange-800' :
+                                                                                order.status === 'SHIPPED' ? 'bg-indigo-100 text-indigo-800' :
+                                                                                    order.status === 'COMPLETED' ? 'bg-purple-100 text-purple-800' :
+                                                                                        order.status === 'EXPIRED' ? 'bg-gray-100 text-gray-800' :
+                                                                                            order.status === 'BANNED' ? 'bg-red-100 text-red-800' :
+                                                                                                'bg-green-100 text-green-800'
+                                                                    }`}>{st(order.status.toLowerCase())}</span>
                                                             </div>
 
                                                             {/* Recipient Info */}
@@ -819,7 +853,7 @@ export default function ShopPage() {
                                                                 {order.memo_for_shop && (
                                                                     <div>
                                                                         <h4 className="text-sm font-semibold text-gray-500">{t('orders.shopMemo')}</h4>
-                                                                        <p className="text-sm bg-yellow-50 p-2 rounded">{order.memo_for_shop}</p>
+                                                                        <p className="text-sm bg-orange-50 p-2 rounded">{order.memo_for_shop}</p>
                                                                     </div>
                                                                 )}
                                                                 <div>
@@ -853,6 +887,95 @@ export default function ShopPage() {
                                 )}
                             </TableBody>
                         </Table>
+                    </CardContent>
+                </Card>
+
+                {/* Status Guide */}
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                            <HelpCircle className="w-5 h-5" />
+                            {t('statusGuide.title')}
+                        </CardTitle>
+                        <CardDescription>{t('statusGuide.description')}</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-8">
+                        {/* Flow */}
+                        <div className="space-y-4">
+                            <h3 className="font-bold text-gray-700">{t('statusGuide.flow')}</h3>
+                            <div className="flex flex-wrap items-center gap-2 text-sm">
+                                <span className="px-3 py-1 bg-gray-100 text-gray-700">    {st('unassigned')}</span>                                <ArrowRight className="w-4 h-4 text-gray-400" />
+                                <span className="px-3 py-1 bg-emerald-100 text-emerald-800">  {st('linked')}    </span>                                <ArrowRight className="w-4 h-4 text-gray-400" />
+                                <span className="px-3 py-1 bg-yellow-100 text-yellow-800">{st('active')}    </span>                                <ArrowRight className="w-4 h-4 text-gray-400" />
+                                <span className="px-3 py-1 bg-orange-100 text-orange-800">{st('used')}      </span>                                <ArrowRight className="w-4 h-4 text-gray-400" />
+                                <span className="px-3 py-1 bg-indigo-100 text-indigo-800">  {st('shipped')}   </span>                                <ArrowRight className="w-4 h-4 text-gray-400" />
+                                <span className="px-3 py-1 bg-purple-100 text-purple-800">{st('completed')} </span>
+                            </div>
+                        </div>
+
+                        {/* <span className={`px-2 py-1 rounded text-xs ${order.status === 'UNASSIGNED' ? 'bg-gray-100' :
+                            order.status === 'LINKED' ? 'bg-emerald-100 text-emerald-800' :
+                                order.status === 'ACTIVE' ? 'bg-yellow-100 text-yellow-800' :
+                                    order.status === 'USED' ? 'bg-orange-100 text-orange-800' :
+                                        order.status === 'SHIPPED' ? 'bg-indigo-100 text-indigo-800' :
+                                            order.status === 'COMPLETED' ? 'bg-purple-100 text-purple-800' :
+                                                order.status === 'EXPIRED' ? 'bg-gray-100 text-gray-800' :
+                                                    order.status === 'BANNED' ? 'bg-red-100 text-red-800' :
+                                                        'bg-green-100 text-green-800' */}
+                        {/* List */}
+                        <div className="space-y-4">
+                            <h3 className="font-bold text-gray-700">{t('statusGuide.list')}</h3>
+                            <div className="grid gap-4 sm:grid-cols-2">
+                                <div className="space-y-2">
+                                    <div className="flex items-center gap-2">
+                                        <span className="bg-gray-100 text-gray-700 px-2 py-1 rounded text-xs">{st('unassigned')}</span>
+                                    </div>
+                                    <p className="text-sm text-gray-600 pl-2 border-l-2 border-gray-200">{t('statusGuide.statuses.unassigned')}</p>
+                                </div>
+                                <div className="space-y-2">
+                                    <div className="flex items-center gap-2">
+                                        <span className="bg-emerald-100 text-emerald-800 px-2 py-1 rounded text-xs">{st('linked')}</span>
+                                    </div>
+                                    <p className="text-sm text-gray-600 pl-2 border-l-2 border-emerald-200">{t('statusGuide.statuses.linked')}</p>
+                                </div>
+                                <div className="space-y-2">
+                                    <div className="flex items-center gap-2">
+                                        <span className="bg-yellow-100 text-yellow-800 px-2 py-1 rounded text-xs">{st('active')}</span>
+                                    </div>
+                                    <p className="text-sm text-gray-600 pl-2 border-l-2 border-yellow-200">{t('statusGuide.statuses.active')}</p>
+                                </div>
+                                <div className="space-y-2">
+                                    <div className="flex items-center gap-2">
+                                        <span className="bg-orange-100 text-orange-800 px-2 py-1 rounded text-xs">{st('used')}</span>
+                                    </div>
+                                    <p className="text-sm text-gray-600 pl-2 border-l-2 border-orange-200">{t('statusGuide.statuses.used')}</p>
+                                </div>
+                                <div className="space-y-2">
+                                    <div className="flex items-center gap-2">
+                                        <span className="bg-indigo-100 text-indigo-800 px-2 py-1 rounded text-xs">{st('shipped')}</span>
+                                    </div>
+                                    <p className="text-sm text-gray-600 pl-2 border-l-2 border-indigo-200">{t('statusGuide.statuses.shipped')}</p>
+                                </div>
+                                <div className="space-y-2">
+                                    <div className="flex items-center gap-2">
+                                        <span className="bg-purple-100 text-purple-800 px-2 py-1 rounded text-xs">{st('completed')}</span>
+                                    </div>
+                                    <p className="text-sm text-gray-600 pl-2 border-l-2 border-purple-200">{t('statusGuide.statuses.completed')}</p>
+                                </div>
+                                <div className="space-y-2">
+                                    <div className="flex items-center gap-2">
+                                        <span className="bg-gray-200 text-gray-800 px-2 py-1 rounded text-xs">{st('expired')}</span>
+                                    </div>
+                                    <p className="text-sm text-gray-600 pl-2 border-l-2 border-gray-300">{t('statusGuide.statuses.expired')}</p>
+                                </div>
+                                <div className="space-y-2">
+                                    <div className="flex items-center gap-2">
+                                        <span className="bg-red-100 text-red-800 px-2 py-1 rounded text-xs">{st('banned')}</span>
+                                    </div>
+                                    <p className="text-sm text-gray-600 pl-2 border-l-2 border-red-200">{t('statusGuide.statuses.banned')}</p>
+                                </div>
+                            </div>
+                        </div>
                     </CardContent>
                 </Card>
 

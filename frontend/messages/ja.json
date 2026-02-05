@@ -13,8 +13,8 @@
     "Status": {
         "unassigned": "未連携",
         "linked": "連携済み",
-        "activated": "有効化済み",
-        "used": "住所入力済み",
+        "active": "有効化済み",
+        "used": "発送待ち",
         "shipped": "発送済み",
         "completed": "完了",
         "expired": "期限切れ",
@@ -86,6 +86,7 @@
         "title": "ショップダッシュボード",
         "movetoshops": "ショップ一覧へ戻る",
         "shopId": "ショップID: {id}",
+        "refresh": "更新",
         "incomingOrders": "受信した注文",
         "ordersDesc": "注文と発送を管理します。",
         "orders": {
@@ -161,6 +162,22 @@
             "product": "商品",
             "status": "ステータス",
             "activatedAt": "更新日時"
+        },
+        "statusGuide": {
+            "title": "ステータスガイド",
+            "description": "注文の進捗状況とステータスの意味を確認できます。",
+            "flow": "注文の流れ",
+            "list": "ステータス詳細",
+            "statuses": {
+                "unassigned": "QRコードが生成されましたが、まだショップや商品と紐付けられていません。",
+                "linked": "ショップや商品と紐付けられましたが、まだ使用できるように有効化されていません。",
+                "active": "有効化されており、ギフトとして贈ることができる状態です。",
+                "used": "受取人が住所を入力し、発送待ちの状態です（ショップ側で発送作業が必要です）。",
+                "shipped": "ショップが商品を発送し、追跡番号が登録された状態です。",
+                "completed": "取引が正常に完了しました（受取人が受取完了報告を行った場合など）。",
+                "expired": "有効期限が切れ、ギフトが無効になった状態です。",
+                "banned": "不正利用などにより、システム管理者が利用停止させた状態です。"
+            }
         }
     },
     "ReceivePage": {
@@ -197,7 +214,8 @@
             "tracking": "追跡番号: {number}",
             "receivedMessage": "荷物の受け取りが完了しましたか？",
             "receivedButton": "受け取り完了",
-            "compleatedMessage": "荷物の受け取りが完了しました！"
+            "compleatedMessage": "荷物の受け取りが完了しました！",
+            "deliveryCompany": "配送会社: {company}"
         },
         "expiredStep": {
             "message": "このギフトの有効期限は切れています。",

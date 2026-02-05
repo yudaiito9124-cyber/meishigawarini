@@ -167,7 +167,7 @@ async function handleUpdateOrder(event: any, uuidParam?: string) {
         await ddb.send(new UpdateCommand({
             TableName: TABLE_NAME,
             Key: { PK: `QR#${uuid}`, SK: 'ORDER' },
-            UpdateExpression: 'SET delivery_company = :d tracking_number = :t, ts_shipped_at = :now, ts_updated_at = :now',
+            UpdateExpression: 'SET delivery_company = :d, tracking_number = :t, ts_shipped_at = :now, ts_updated_at = :now',
             ExpressionAttributeValues: {
                 ':d': delivery_company,
                 ':t': tracking_number,
