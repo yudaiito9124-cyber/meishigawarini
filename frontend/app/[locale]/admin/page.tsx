@@ -123,8 +123,8 @@ export default function AdminPage() {
         // Background Image
         const bgImgf = new Image();
         const bgImgb = new Image();
-        bgImgf.src = '/cardimage-f-1.png';
-        bgImgb.src = '/cardimage-b-1.png';
+        bgImgf.src = '/cardimage-f-2.png';
+        bgImgb.src = '/cardimage-b-2.png';
         await new Promise((resolve) => {
             bgImgf.onload = resolve;
             bgImgb.onload = resolve;
