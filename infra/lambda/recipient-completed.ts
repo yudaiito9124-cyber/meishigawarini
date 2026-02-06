@@ -2,6 +2,7 @@
 import { APIGatewayProxyHandler } from 'aws-lambda';
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, TransactWriteCommand, GetCommand } from '@aws-sdk/lib-dynamodb';
+import { sendSystemNotification } from './utils/notification';
 
 const client = new DynamoDBClient({});
 const ddb = DynamoDBDocumentClient.from(client);
@@ -66,12 +67,17 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             ]
         }));
 
+        // Fire and forget notification (or await if we want to ensure it sends)
+        // Since lambda might freeze, better to await or use EventBridge. simple await for now.
+        // await sendCompletionNotification(qr_id, pin_code);
+        await sendSystemNotification(qr_id, 'DeliveryCompleted', pin_code);
+
         return {
             statusCode: 200,
             headers: corsHeaders,
             body: JSON.stringify({
                 message: 'Gift received successfully',
-                order_id: `ORDER#${qr_id}` // logically same ID space or new UUID? Using QR ID is simpler for lookup
+                order_id: `ORDER#${qr_id}`
             })
         };
 

@@ -418,6 +418,12 @@ export class InfraStack extends cdk.Stack {
     const completedResource = recipientResource.addResource('completed');
     completedResource.addMethod('POST', new apigateway.LambdaIntegration(recipientCompletedFn));
 
+    // Grant SES permissions to RecipientCompletedFn
+    recipientCompletedFn.addToRolePolicy(new iam.PolicyStatement({
+      actions: ['ses:SendEmail', 'ses:SendRawEmail'],
+      resources: ['*'],
+    }));
+
     // Lambda: Recipient Chat (NEW)
     const recipientChatFn = new nodejs.NodejsFunction(this, 'RecipientChatFn', {
       entry: path.join(__dirname, '../lambda/recipient-chat.ts'),

@@ -185,7 +185,11 @@
             "emailDesc": "Receive email notifications when a new message arrives.",
             "subscribe": "Subscribe",
             "subscribeSuccess": "Subscription successful",
-            "subscribeFailed": "Subscription failed"
+            "subscribeFailed": "Subscription failed",
+            "system": "System",
+            "systemMessage": {
+                "deliveryCompleted": "Item received. Thank you."
+            }
         },
         "shopMessage": "Shop Message"
     },

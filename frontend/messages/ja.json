@@ -259,7 +259,11 @@
             "emailDesc": "新しいメッセージが届いた際に通知を受け取ることができます。",
             "subscribe": "登録",
             "subscribeSuccess": "通知設定が完了しました",
-            "subscribeFailed": "登録に失敗しました"
+            "subscribeFailed": "登録に失敗しました",
+            "system": "システム",
+            "systemMessage": {
+                "deliveryCompleted": "商品を受け取りました。ありがとうございました。"
+            }
         },
         "shopMessage": "ショップからのメッセージ"
     },

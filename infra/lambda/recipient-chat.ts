@@ -79,6 +79,11 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Missing required fields' }) };
             }
 
+            // Security: Prevent impersonation of System
+            if (username === 'System') {
+                return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Invalid username' }) };
+            }
+
             // 2. Append Message to SK=CHAT
             // Structure: messages: [ { username, message, ts_created_at, id } ]
             const newMessage = {

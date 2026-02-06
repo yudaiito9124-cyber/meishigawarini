@@ -537,12 +537,23 @@ export default function ReceivePage() {
                                 {messages.length === 0 ? (
                                     <p className="text-sm text-gray-500 text-center py-4">{t('chat.noMessages')}</p>
                                 ) : (
-                                    messages.slice().reverse().map((msg) => (
-                                        <div key={msg.id} className="bg-white p-2 rounded shadow-sm text-sm">
-                                            <p className="font-bold text-xs text-gray-600 mb-1">{msg.username} <span className="text-gray-400 font-normal">• {new Date(msg.ts_created_at).toLocaleString()}</span></p>
-                                            <p className="whitespace-pre-wrap">{msg.message}</p>
-                                        </div>
-                                    ))
+                                    messages.slice().reverse().map((msg) => {
+                                        const isSystem = msg.username === 'System';
+                                        const displayUsername = isSystem ? t('chat.system') : msg.username;
+                                        const displayMessage = (isSystem && msg.message === 'DeliveryCompleted')
+                                            ? t('chat.systemMessage.deliveryCompleted')
+                                            : msg.message;
+
+                                        return (
+                                            <div key={msg.id} className={`${isSystem ? 'bg-blue-50 border-blue-100' : 'bg-white'} p-2 rounded shadow-sm text-sm border`}>
+                                                <p className={`font-bold text-xs mb-1 ${isSystem ? 'text-blue-700' : 'text-gray-600'}`}>
+                                                    {displayUsername}
+                                                    <span className="text-gray-400 font-normal ml-2">• {new Date(msg.ts_created_at).toLocaleString()}</span>
+                                                </p>
+                                                <p className={`whitespace-pre-wrap ${isSystem ? 'text-blue-900' : ''}`}>{displayMessage}</p>
+                                            </div>
+                                        );
+                                    })
                                 )}
                             </div>
 

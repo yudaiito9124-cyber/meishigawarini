@@ -6,6 +6,7 @@ export const createMessageNotificationEmail = (params: {
     pin: string;
 }) => {
     const { username, message, uuid, pin } = params;
+    // Use provided URL, or env, or fallback
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL;
 
     const subject = `【名刺がわりに】新着メッセージ (New Message)`;
@@ -13,7 +14,7 @@ export const createMessageNotificationEmail = (params: {
     // Keep the indentation and format clean
     const bodyText = `
 ${username} さんからメッセージが届きました。
-From ${username}:
+You have a new message from ${username}.
 
 ${message}
 
