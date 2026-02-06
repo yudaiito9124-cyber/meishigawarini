@@ -424,7 +424,7 @@ export class InfraStack extends cdk.Stack {
       ...commonProps,
       environment: {
         ...commonProps.environment,
-        SOURCE_EMAIL: 'noreply@meishigawarini.com', // Replace with your verified email
+        SOURCE_EMAIL: process.env.SES_SENDER_EMAIL || 'noreply@meishigawarini.com', // Replace with your verified email
       }
     });
     table.grantReadWriteData(recipientChatFn);

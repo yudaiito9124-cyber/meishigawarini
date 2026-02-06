@@ -3,6 +3,7 @@ import { APIGatewayProxyHandler } from 'aws-lambda';
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, GetCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
 import { SESClient, SendEmailCommand } from '@aws-sdk/client-ses';
+import { createMessageNotificationEmail } from './templates/email';
 
 const client = new DynamoDBClient({});
 const ddb = DynamoDBDocumentClient.from(client);
@@ -114,23 +115,13 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 }
 
                 if (recipients.length > 0) {
-                    const subject = `【名刺がわりに】新着メッセージ (New Message)`;
-                    // Construct a simple link. Ideally should comes from ENV or Origin.
-                    // Assuming Origin is passed or we construct it.
-                    // Recipient URL: https://.../receive/{uuid}
-                    // We'll trust the user knows the URL or add it if we can.
-                    // For now, simple text.
-                    const bodyText = `
-${username} さんからメッセージが届きました。
-From ${username}:
-
-${message}
-
-確認はこちら:
-Check here:
-${process.env.FRONTEND_URL || 'https://meishigawarini.com'}/receive/${uuid}
-PIN: ${pin}
-                    `;
+                    // Construct email content using template
+                    const { subject, bodyText } = createMessageNotificationEmail({
+                        username,
+                        message,
+                        uuid,
+                        pin
+                    });
 
                     // Send individually to hide other recipients (BCC style or individual emails)
                     // SES Limit: 50 recipients per message if using Bcc/To.
@@ -152,7 +143,7 @@ PIN: ${pin}
                     await Promise.allSettled(sendPromises);
                 }
             } catch (err) {
-                console.error("Failed to send notifications:", err);
+                console.error("Failed to send notifications:", JSON.stringify(err, null, 2));
                 // Don't fail the request just because email failed
             }
 
