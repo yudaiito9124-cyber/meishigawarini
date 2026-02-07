@@ -1,11 +1,14 @@
 import { APIGatewayProxyHandler } from 'aws-lambda';
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, GetCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
+import { CognitoIdentityProviderClient, AdminGetUserCommand } from '@aws-sdk/client-cognito-identity-provider';
 import * as bcrypt from 'bcryptjs';
 
 const client = new DynamoDBClient({});
 const ddb = DynamoDBDocumentClient.from(client);
+const cognito = new CognitoIdentityProviderClient({});
 const TABLE_NAME = process.env.TABLE_NAME || '';
+const USER_POOL_ID = process.env.USER_POOL_ID || '';
 
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
@@ -65,10 +68,6 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             isAuthorizedByPassword = true;
         }
 
-        // If NOT authorized (Protected + Wrong/No Password), we redact info
-        // BUT we still allow them to see the "Restricted" screen (for Chat).
-        // So we don't return 403, we return 200 with limited data.
-
         const { product_id, shop_id } = item;
         let status = item.status;
 
@@ -113,6 +112,40 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             product = prodRes.Item;
         }
 
+        // Fetch Shop Metadata for Email
+        let shop_email = undefined;
+        let owner_id = undefined;
+        if (shop_id && isAuthorizedByPassword) {
+            const shopRes = await ddb.send(new GetCommand({
+                TableName: TABLE_NAME,
+                Key: { PK: `SHOP#${shop_id}`, SK: 'METADATA' }
+            }));
+            if (shopRes.Item) {
+                shop_email = shopRes.Item.email;
+                owner_id = shopRes.Item.owner_id;
+            }
+
+            // Fallback: If no email in DynamoDB, fetch from Cognito using owner_id
+            if (!shop_email && owner_id && USER_POOL_ID) {
+                try {
+                    const user = await cognito.send(new AdminGetUserCommand({
+                        UserPoolId: USER_POOL_ID,
+                        Username: owner_id
+                    }));
+                    const emailAttr = user.UserAttributes?.find(attr => attr.Name === 'email');
+                    if (emailAttr) {
+                        shop_email = emailAttr.Value;
+
+                        // OPTIONAL: Heal the data? 
+                        // We could update the shop metadata with this email to avoid future lookups.
+                        // But let's keep it simple for now or do it asynchronously if we cared about perf.
+                    }
+                } catch (e) {
+                    console.error(`Failed to fetch email for owner ${owner_id}:`, e);
+                }
+            }
+        }
+
         // Fetch Tracking Number if SHIPPED AND Authorized
         let delivery_company = undefined;
         let tracking_number = undefined;
@@ -130,17 +163,6 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             }
         }
 
-        // Fallback for legacy or unlinked codes (Prototype safety) - Only if authorized
-        if (isAuthorizedByPassword && !product && !shop_id) { // Only show dummy if it really has no product
-            // If it has shop_id/product_id but failed to fetch, it might be an error, but let's stick to simple logic
-            // logic: if authorized and no product found (and no shop_id implies it wasn't linked), show dummy?
-            // Actually, cleaner: if authorized, populate product.
-            // If NOT authorized, product remains null.
-        }
-
-        // If authorized and product is still null (maybe database issue or truly empty), we can provide a default?
-        // Or specific "Protected" placeholder if not authorized.
-
         return {
             statusCode: 200,
             headers: corsHeaders,
@@ -152,6 +174,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 delivery_company: isAuthorizedByPassword ? delivery_company : undefined,
                 tracking_number: isAuthorizedByPassword ? tracking_number : undefined,
                 product: product,
+                shop_email: shop_email,
                 memo_for_users: isAuthorizedByPassword ? item.memo_for_users : undefined,
                 ts_expired_at: item.ts_expired_at,
                 is_password_protected: isPasswordProtected,

@@ -416,8 +416,17 @@ export class InfraStack extends cdk.Stack {
     const recipientVerifyPinFn = new nodejs.NodejsFunction(this, 'RecipientVerifyPinFn', {
       entry: path.join(__dirname, '../lambda/recipient-verify-pin.ts'),
       ...commonProps,
+      environment: {
+        ...commonProps.environment,
+        USER_POOL_ID: userPool.userPoolId
+      }
     });
     table.grantReadWriteData(recipientVerifyPinFn);
+    // Allow Lambda to fetch user attributes (email) from Cognito
+    recipientVerifyPinFn.addToRolePolicy(new iam.PolicyStatement({
+      actions: ['cognito-idp:AdminGetUser'],
+      resources: [userPool.userPoolArn]
+    }));
 
     const verifyResource = qrResourceRecip.addResource('verify');
     verifyResource.addMethod('POST', new apigateway.LambdaIntegration(recipientVerifyPinFn));

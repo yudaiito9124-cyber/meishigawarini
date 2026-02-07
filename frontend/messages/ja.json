@@ -184,7 +184,7 @@
         "titles": {
             "pin": "PINコードを入力してギフトを受け取る",
             "form": "ギフトが届いています！",
-            "success": "ありがとうございます",
+            "success": "受け取りの準備ができました",
             "shipped": "ギフトが発送されました！",
             "expired": "有効期限が切れています",
             "completed": "ギフトを受け取りました！"
@@ -223,7 +223,7 @@
         },
         "successStep": {
             "message": "配送先情報が送信されました！",
-            "subMessage": "ショップからまもなく発送されます。"
+            "subMessage": "ショップの担当者が発送いたします。"
         },
         "shippedStep": {
             "message": "ギフトは発送済みです！",
@@ -243,7 +243,8 @@
             "submitFailed": "住所の送信に失敗しました。",
             "passwordMismatch": "パスワードが一致しません",
             "invalidPassword": "パスワードが間違っています",
-            "unlockFailed": "ロック解除に失敗しました"
+            "unlockFailed": "ロック解除に失敗しました",
+            "invalidEmailFormat": "メールアドレスの形式が正しくありません"
         },
         "chat": {
             "title": "メッセージチャット",
@@ -265,7 +266,13 @@
                 "deliveryCompleted": "ギフトの受け取りが完了しました。"
             }
         },
-        "shopMessage": "ショップからのメッセージ"
+        "shopMessage": "ショップからのメッセージ",
+        "contactInfo": {
+            "title": "お問い合わせ",
+            "orderId": "注文ID",
+            "shopEmail": "担当ショップの連絡先",
+            "note": "※ショップへ問い合わせる際には注文IDを明記してください。発送後の住所変更など対応ができない場合があります。"
+        }
     },
     "AdminPage": {
         "title": "管理ダッシュボード",

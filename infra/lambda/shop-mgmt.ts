@@ -43,6 +43,8 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             const { name } = body;
             if (!name) return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Missing name' }) };
 
+            const email = claims.email; // Get email from Cognito claims
+
             const newShopId = crypto.randomUUID();
             await ddb.send(new PutCommand({
                 TableName: TABLE_NAME,
@@ -50,6 +52,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                     PK: `SHOP#${newShopId}`,
                     SK: 'METADATA',
                     name,
+                    email, // Store email
                     owner_id: userId, // Link to User
                     GSI2_PK: `USER#${userId}`, // GSI2 for Owner Listing
                     GSI2_SK: new Date().toISOString(),

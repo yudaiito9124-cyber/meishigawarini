@@ -764,6 +764,9 @@ export default function ShopPage() {
                                     orders
                                         .filter(o => ['COMPLETED', 'EXPIRED', 'BANNED'].includes(o.status))
                                         .sort((a, b) => {
+                                            const sortorder: { [name: string]: number } = { 'COMPLETED': 0, 'EXPIRED': 1, 'BANNED': 2 };
+                                            // 1. Status: compare
+                                            if (a.status !== b.status) return sortorder[a.status] - sortorder[b.status];
                                             // Date: Newest first
                                             const dateA = new Date(a.ts_updated_at || a.ts_created_at).getTime();
                                             const dateB = new Date(b.ts_updated_at || b.ts_created_at).getTime();

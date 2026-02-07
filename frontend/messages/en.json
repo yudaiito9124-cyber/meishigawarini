@@ -169,7 +169,8 @@
         "errors": {
             "invalidPin": "Invalid PIN or Gift not found",
             "inactive": "This card is not active.",
-            "submitFailed": "Failed to submit address."
+            "submitFailed": "Failed to submit address.",
+            "invalidEmailFormat": "Invalid email format"
         },
         "chat": {
             "title": "Chat",
@@ -191,7 +192,13 @@
                 "deliveryCompleted": "Item received. Thank you."
             }
         },
-        "shopMessage": "Shop Message"
+        "shopMessage": "Shop Message",
+        "contactInfo": {
+            "title": "Contact / Order Info",
+            "orderId": "Order ID",
+            "shopEmail": "Shop Contact",
+            "note": "Please include your Order ID when contacting the shop. Address changes after shipment may not be possible."
+        }
     },
     "AdminPage": {
         "title": "Admin Dashboard",

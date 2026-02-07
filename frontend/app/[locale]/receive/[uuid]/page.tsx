@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card";
+import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { MessageCircleQuestion } from "lucide-react";
 
 const NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
@@ -286,6 +288,14 @@ export default function ReceivePage() {
 
     const handleSubscribe = async () => {
         if (!notificationEmail) return;
+
+        // Email Validation
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(notificationEmail)) {
+            alert(t('errors.invalidEmailFormat'));
+            return;
+        }
+
         setSubscribing(true);
         try {
             await fetch(`${NEXT_PUBLIC_API_URL}/recipient/qrcodes/${uuid}/chat`, {
@@ -532,6 +542,44 @@ export default function ReceivePage() {
                             <p className="text-green-600 font-medium">{t('shippedStep.compleatedMessage')}</p>
                         </div>
                     )}
+                    {(step === "SUCCESS" || step === "SHIPPED" || step === "COMPLETED") && (
+                        <div className=" text-right">
+                            <Dialog>
+                                <DialogTrigger asChild>
+                                    <Button variant="ghost" size="sm" className="text-gray-500 hover:text-gray-800 text-xs">
+                                        <MessageCircleQuestion className="w-4 h-4" />
+                                        {t('contactInfo.title')}
+                                    </Button>
+                                </DialogTrigger>
+                                <DialogContent className="sm:max-w-md">
+                                    <DialogHeader>
+                                        <DialogTitle>{t('contactInfo.title')}</DialogTitle>
+                                        <DialogDescription className="text-xs text-gray-500">
+                                            {t('contactInfo.note')}
+                                        </DialogDescription>
+                                    </DialogHeader>
+                                    <div className="space-y-4 py-4">
+                                        <div className="space-y-2">
+                                            <Label className="text-xs text-gray-500">{t('contactInfo.orderId')}</Label>
+                                            <div className="p-3 bg-gray-50 rounded-md border border-gray-200 font-mono text-sm select-all text-center">
+                                                {uuid}
+                                            </div>
+                                        </div>
+                                        {gift?.shop_email && (
+                                            <div className="space-y-2">
+                                                <Label className="text-xs text-gray-500">{t('contactInfo.shopEmail')}</Label>
+                                                <div className="p-3 bg-blue-50 rounded-md border border-blue-100 text-center">
+                                                    <a href={`mailto:${gift.shop_email}`} className="text-blue-600 font-medium hover:underline text-sm break-all">
+                                                        {gift.shop_email}
+                                                    </a>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                </DialogContent>
+                            </Dialog>
+                        </div>
+                    )}
                 </CardContent>
             </Card>
 
@@ -540,6 +588,8 @@ export default function ReceivePage() {
                 <Card className="w-full max-w-md mt-6">
                     <CardHeader>
                         <CardTitle className="text-lg">{t('chat.title')}</CardTitle>
+                        {/* Privacy Notice */}
+                        <p className="text-xs text-gray-500">{t('chat.privacy')}</p>
                     </CardHeader>
                     <CardContent>
                         <div className="space-y-4">
@@ -595,12 +645,10 @@ export default function ReceivePage() {
                             </form>
                         </div>
                     </CardContent>
-                    <CardFooter className="flex flex-col gap-4 pt-0 items-start border-t p-6 mt-4 bg-gray-50/50">
-                        {/* Privacy Notice */}
-                        <p className="text-xs text-gray-500">{t('chat.privacy')}</p>
+                    <CardFooter className="flex flex-col gap-4 pt-0 items-start border-t  bg-gray-50/50">
 
                         {/* Email Subscription */}
-                        <div className="w-full space-y-2 pt-2 border-t border-gray-200/50">
+                        <div className="w-full space-y-2 pt-2 ">
                             <Label className="text-xs text-gray-700 font-semibold">{t('chat.emailTitle')}</Label>
                             <p className="text-xs text-gray-500">{t('chat.emailDesc')}</p>
                             <div className="flex w-full gap-2 pt-1">
