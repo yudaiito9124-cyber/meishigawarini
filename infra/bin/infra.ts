@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 import * as cdk from 'aws-cdk-lib';
+import * as path from 'path';
 import * as dotenv from 'dotenv';
-dotenv.config();
+dotenv.config({ path: path.join(__dirname, '../.env') });
 import { InfraStack } from '../lib/infra-stack';
 
 const app = new cdk.App();

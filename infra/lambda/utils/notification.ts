@@ -9,7 +9,7 @@ const ddb = DynamoDBDocumentClient.from(client);
 const ses = new SESClient({});
 
 const TABLE_NAME = process.env.TABLE_NAME || '';
-const SOURCE_EMAIL = process.env.SES_SENDER_EMAIL || '';
+const SES_SENDER_EMAIL = process.env.SES_SENDER_EMAIL || '';
 const SYSTEM_USERNAME = 'System';
 
 /**
@@ -67,27 +67,58 @@ export async function sendSystemNotification(qr_id: string, message: string, pin
             }
         }));
 
-        // 3. Send Emails
-        const { subject, bodyText } = createMessageNotificationEmail({
-            username: SYSTEM_USERNAME,
-            message,
-            uuid: qr_id,
-            pin
-        });
-
-        const sendPromises = recipients.map(email => {
-            return ses.send(new SendEmailCommand({
-                Source: SOURCE_EMAIL,
-                Destination: { ToAddresses: [email] },
-                Message: {
-                    Subject: { Data: subject },
-                    Body: { Text: { Data: bodyText } }
-                }
+        // 2. Send Emails (Fire and Forget)
+        try {
+            const getRes = await ddb.send(new GetCommand({
+                TableName: TABLE_NAME,
+                Key: { PK: `QR#${qr_id}`, SK: 'CHAT' },
+                ProjectionExpression: 'notification_emails, email_preferences' // Fetch preferences
             }));
-        });
 
-        await Promise.allSettled(sendPromises);
-        console.log("System notification sent successfully.");
+            if (getRes.Item && getRes.Item.notification_emails) {
+                const recipients = Array.from(new Set(getRes.Item.notification_emails as string[]));
+                const preferences = getRes.Item.email_preferences || {};
+
+                const sendPromises = recipients.map(email => {
+                    const lang = (preferences[email] === 'en') ? 'en' : 'ja';
+
+                    // Adjust message based on language if it's the specific DeliveryCompleted system message
+                    // However, the caller passes the message. The caller previously passed "Bilingual message".
+                    // Ideally, the caller should pass a key or we interpret it here?
+                    // Or, simply, if the message is "DeliveryCompleted", we select the right text?
+                    // The current implementation in recipient-completed.ts passes "DeliveryCompleted".
+                    // So we can map it here.
+
+                    let displayMessage = message;
+                    const { subject, bodyText } = createMessageNotificationEmail({
+                        username: SYSTEM_USERNAME, // We might want to localize this too? "System" vs "システム通知"
+                        message: displayMessage,
+                        uuid: qr_id,
+                        pin,
+                        lang
+                    });
+
+                    return ses.send(new SendEmailCommand({
+                        Source: SES_SENDER_EMAIL,
+                        Destination: { ToAddresses: [email] },
+                        Message: {
+                            Subject: { Data: subject },
+                            Body: { Text: { Data: bodyText } }
+                        }
+                    }));
+                });
+
+                await Promise.all(sendPromises);
+                console.log("System notification emails sent successfully.");
+            } else {
+                console.log("No recipients found for notification emails.");
+            }
+        } catch (e) {
+            console.error('Failed to send notification emails:', e);
+            // Do not fail the whole process if email fails
+        }
+
+        console.log("System notification process completed.");
 
     } catch (err) {
         console.error("Failed to send system notification:", JSON.stringify(err, null, 2));

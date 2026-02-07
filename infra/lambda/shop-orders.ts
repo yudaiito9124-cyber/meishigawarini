@@ -243,11 +243,16 @@ async function handleListShopOrders(shopId: string) {
             memo_for_shop: meta.memo_for_shop,
             tracking_number: orderDetail.tracking_number,
             delivery_company: orderDetail.delivery_company,
-            ordered_at: orderDetail.ts_submitted_at, // Best effort date
-            ts_created_at: meta.ts_created_at, // QR creation
-            ts_shipped_at: orderDetail.ts_shipped_at,
+
+            ts_created_at: meta.ts_created_at, // QR creation                   
             ts_updated_at: meta.ts_updated_at,
+            ts_linked_at: meta.ts_linked_at,
             ts_activated_at: meta.ts_activated_at,
+            ts_submitted_at: meta.ts_submitted_at,
+            ts_shipped_at: meta.ts_shipped_at,
+            ts_completed_at: meta.ts_completed_at,
+            ts_expired_at: meta.ts_expired_at,
+            ts_banned_at: meta.ts_banned_at,
 
         };
     });

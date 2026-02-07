@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
@@ -110,6 +110,10 @@ export default function ReceivePage() {
     const [chatMessage, setChatMessage] = useState("");
     const [chatLoading, setChatLoading] = useState(false);
 
+    // Subscription
+    const [notificationEmail, setNotificationEmail] = useState("");
+    const [subscribing, setSubscribing] = useState(false);
+
     // Steps: PIN -> FORM (or SHIPPED/SUCCESS) -> RESTRICTED (if blocked)
     const [step, setStep] = useState<"PIN" | "FORM" | "SUCCESS" | "SHIPPED" | "EXPIRED" | "COMPLETED" | "RESTRICTED">("PIN");
 
@@ -218,22 +222,25 @@ export default function ReceivePage() {
     };
 
     // Load messages when step is not PIN (i.e. logged in)
-    const loadMessages = async () => {
+    const loadMessages = useCallback(async () => {
         try {
             const data = await fetchChatMessages(uuid, pin);
             setMessages(data.messages || []);
         } catch (e) {
             console.error(e);
         }
-    };
+    }, [uuid, pin]);
 
     // Toggle chat loading state if needed, or just effect.
     // Effect to reload when step changes to something other than PIN
     const [hasLoadedChat, setHasLoadedChat] = useState(false);
-    if (step !== "PIN" && !hasLoadedChat && pin) {
-        setHasLoadedChat(true);
-        loadMessages();
-    }
+
+    useEffect(() => {
+        if (step !== "PIN" && !hasLoadedChat && pin) {
+            setHasLoadedChat(true);
+            loadMessages();
+        }
+    }, [step, hasLoadedChat, pin, loadMessages]);
 
     const handleChatSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -275,9 +282,7 @@ export default function ReceivePage() {
         );
     }
 
-    // Subscription
-    const [notificationEmail, setNotificationEmail] = useState("");
-    const [subscribing, setSubscribing] = useState(false);
+
 
     const handleSubscribe = async () => {
         if (!notificationEmail) return;
@@ -286,7 +291,12 @@ export default function ReceivePage() {
             await fetch(`${NEXT_PUBLIC_API_URL}/recipient/qrcodes/${uuid}/chat`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ pin, type: 'subscribe', email: notificationEmail }),
+                body: JSON.stringify({
+                    pin,
+                    type: 'subscribe',
+                    email: notificationEmail,
+                    locale: params.locale // Send current language
+                }),
             });
             alert(t('chat.subscribeSuccess'));
             setNotificationEmail("");

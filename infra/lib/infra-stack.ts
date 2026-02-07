@@ -81,9 +81,11 @@ export class InfraStack extends cdk.Stack {
       environment: {
         TABLE_NAME: table.tableName,
         DEFAULT_VALID_DAYS: DEFAULT_VALID_DAYS,
+        SES_SENDER_EMAIL: process.env.SES_SENDER_EMAIL || '',
+        NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL || '',
       },
       bundling: {
-        externalModules: ['@aws-sdk/client-dynamodb', '@aws-sdk/lib-dynamodb', '@aws-sdk/client-s3', '@aws-sdk/s3-request-presigner'],
+        externalModules: ['@aws-sdk/client-dynamodb', '@aws-sdk/lib-dynamodb', '@aws-sdk/client-s3', '@aws-sdk/s3-request-presigner', '@aws-sdk/client-ses'],
       }
     };
 
@@ -145,8 +147,16 @@ export class InfraStack extends cdk.Stack {
     const recipientSubmitFn = new nodejs.NodejsFunction(this, 'RecipientSubmitFn', {
       entry: path.join(__dirname, '../lambda/recipient-submit.ts'),
       ...commonProps,
+      environment: {
+        ...commonProps.environment,
+        SES_SENDER_EMAIL: process.env.SES_SENDER_EMAIL || '',
+      }
     });
     table.grantReadWriteData(recipientSubmitFn);
+    recipientSubmitFn.addToRolePolicy(new iam.PolicyStatement({
+      actions: ['ses:SendEmail', 'ses:SendRawEmail'],
+      resources: ['*'],
+    }));
 
     // Lambda: Recipient Receive completed
     const recipientCompletedFn = new nodejs.NodejsFunction(this, 'RecipientCompletedFn', {
@@ -429,8 +439,7 @@ export class InfraStack extends cdk.Stack {
       entry: path.join(__dirname, '../lambda/recipient-chat.ts'),
       ...commonProps,
       environment: {
-        ...commonProps.environment,
-        SOURCE_EMAIL: process.env.SES_SENDER_EMAIL || 'noreply@meishigawarini.com', // Replace with your verified email
+        ...commonProps.environment
       }
     });
     table.grantReadWriteData(recipientChatFn);

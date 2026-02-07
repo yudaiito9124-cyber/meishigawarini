@@ -9,7 +9,7 @@ const client = new DynamoDBClient({});
 const ddb = DynamoDBDocumentClient.from(client);
 const ses = new SESClient({});
 const TABLE_NAME = process.env.TABLE_NAME || '';
-const SOURCE_EMAIL = process.env.SOURCE_EMAIL || 'noreply@meishigawarini.com';
+const SES_SENDER_EMAIL = process.env.SES_SENDER_EMAIL;
 
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
@@ -30,7 +30,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 
         if (event.httpMethod === 'POST') {
             const body = JSON.parse(event.body || '{}');
-            const { pin, username, message, type, email } = body; // Added type & email
+            const { pin, username, message, type, email, locale } = body; // Added locale
 
             // 1. Verify PIN (Required for both Subscribe and Message)
             // For subscribe, we might need PIN to authorized. Yes.
@@ -57,13 +57,38 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                     return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Missing email' }) };
                 }
 
-                // Use ADD to manage unique set of emails
+                // Use ADD to manage unique set of emails AND Update preferences
+                // We need two operations or a clever update expression.
+                // It's cleaner to just do one update with both.
+                // SET email_preferences.#email = :locale ADD notification_emails :new_email
+                // But #email needs ExpressionAttributeNames because email contains @ which is fine? No, dot is special.
+
+                const safeEmailKey = email.replace(/[^a-zA-Z0-9]/g, '_'); // Just for key name safety if needed, but actually Map keys in DynamoDB are strings.
+                // However, nested path syntax uses dots. better to use ExpressionAttributeNames for the email key.
+
+                const lang = locale === 'ja' ? 'ja' : 'en'; // Default to en if not ja
+
+                // 1. Ensure email_preferences map exists (and add email to set)
                 await ddb.send(new UpdateCommand({
                     TableName: TABLE_NAME,
                     Key: { PK: `QR#${uuid}`, SK: 'CHAT' },
-                    UpdateExpression: 'ADD notification_emails :new_email',
+                    UpdateExpression: 'ADD notification_emails :new_email SET email_preferences = if_not_exists(email_preferences, :empty_map)',
                     ExpressionAttributeValues: {
-                        ':new_email': new Set([email])
+                        ':new_email': new Set([email]),
+                        ':empty_map': {}
+                    }
+                }));
+
+                // 2. Set the language preference for this specific email
+                await ddb.send(new UpdateCommand({
+                    TableName: TABLE_NAME,
+                    Key: { PK: `QR#${uuid}`, SK: 'CHAT' },
+                    UpdateExpression: 'SET email_preferences.#em = :lang',
+                    ExpressionAttributeNames: {
+                        '#em': email
+                    },
+                    ExpressionAttributeValues: {
+                        ':lang': lang
                     }
                 }));
 
@@ -105,39 +130,30 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 
             // 3. Send Notifications (Fire and forget or await)
             try {
-                // Fetch the chat item to get emails
-                const chatRes = await ddb.send(new GetCommand({
+                const getRes = await ddb.send(new GetCommand({
                     TableName: TABLE_NAME,
-                    Key: { PK: `QR#${uuid}`, SK: 'CHAT' }
+                    Key: { PK: `QR#${uuid}`, SK: 'CHAT' },
+                    ProjectionExpression: 'notification_emails, email_preferences'
                 }));
 
-                const emailsSet = chatRes.Item?.notification_emails;
-                let recipients: string[] = [];
-                if (emailsSet) {
-                    // DynamoDB Set comes as Set or array depending on marshall options. 
-                    // DocumentClient usually returns Set object.
-                    recipients = Array.from(emailsSet as Set<string>);
-                }
+                if (getRes.Item && getRes.Item.notification_emails) {
+                    const recipients = Array.from(new Set(getRes.Item.notification_emails as string[]));
+                    const preferences = getRes.Item.email_preferences || {};
 
-                if (recipients.length > 0) {
-                    // Construct email content using template
-                    const { subject, bodyText } = createMessageNotificationEmail({
-                        username,
-                        message,
-                        uuid,
-                        pin
-                    });
+                    const sendPromises = recipients.map(emailTo => {
+                        const langLength = (preferences[emailTo] === 'en') ? 'en' : 'ja';
 
-                    // Send individually to hide other recipients (BCC style or individual emails)
-                    // SES Limit: 50 recipients per message if using Bcc/To.
-                    // We'll send one email with Bcc if many, or loop.
-                    // Looping is safer for "To" field personalization if needed, but Bcc is cheaper.
-                    // Let's loop for now as volume is low.
+                        const { subject, bodyText } = createMessageNotificationEmail({
+                            username,
+                            message,
+                            uuid,
+                            pin,
+                            lang: langLength
+                        });
 
-                    const sendPromises = recipients.map(email => {
                         return ses.send(new SendEmailCommand({
-                            Source: SOURCE_EMAIL,
-                            Destination: { ToAddresses: [email] },
+                            Source: SES_SENDER_EMAIL,
+                            Destination: { ToAddresses: [emailTo] },
                             Message: {
                                 Subject: { Data: subject },
                                 Body: { Text: { Data: bodyText } }
@@ -145,11 +161,11 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                         }));
                     });
 
-                    await Promise.allSettled(sendPromises);
+                    await Promise.all(sendPromises);
                 }
-            } catch (err) {
-                console.error("Failed to send notifications:", JSON.stringify(err, null, 2));
-                // Don't fail the request just because email failed
+            } catch (e) {
+                console.error('Failed to send notification emails:', e);
+                // Do not fail the whole process if email fails
             }
 
             return {

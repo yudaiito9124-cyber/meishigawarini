@@ -262,7 +262,7 @@
             "subscribeFailed": "登録に失敗しました",
             "system": "システム",
             "systemMessage": {
-                "deliveryCompleted": "商品を受け取りました。ありがとうございました。"
+                "deliveryCompleted": "ギフトの受け取りが完了しました。"
             }
         },
         "shopMessage": "ショップからのメッセージ"

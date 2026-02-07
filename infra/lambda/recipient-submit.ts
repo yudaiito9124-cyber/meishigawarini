@@ -1,12 +1,15 @@
 
 import { APIGatewayProxyHandler } from 'aws-lambda';
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
-import { DynamoDBDocumentClient, TransactWriteCommand, GetCommand } from '@aws-sdk/lib-dynamodb';
+import { DynamoDBDocumentClient, TransactWriteCommand, GetCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
+import { SESClient, SendEmailCommand } from '@aws-sdk/client-ses';
 import * as bcrypt from 'bcryptjs';
 
 const client = new DynamoDBClient({});
 const ddb = DynamoDBDocumentClient.from(client);
+const ses = new SESClient({});
 const TABLE_NAME = process.env.TABLE_NAME || '';
+const SES_SENDER_EMAIL = process.env.SES_SENDER_EMAIL;
 
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
@@ -92,14 +95,79 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             ]
         }));
 
-        return {
+        const resultResponse = {
             statusCode: 200,
             headers: corsHeaders,
             body: JSON.stringify({
                 message: 'Address submitted successfully',
-                order_id: `ORDER#${qr_id}` // logically same ID space or new UUID? Using QR ID is simpler for lookup
+                order_id: `ORDER#${qr_id}`
             })
         };
+
+        // 3. Auto-Subscribe to notification if email is provided
+        if (shipping_info.email) {
+            try {
+                const email = shipping_info.email;
+                const lang = 'ja'; // Default to JA for now as we don't track locale in submit yet. Or could be passed.
+
+                await ddb.send(new UpdateCommand({
+                    TableName: TABLE_NAME,
+                    Key: { PK: `QR#${qr_id}`, SK: 'CHAT' },
+                    UpdateExpression: 'ADD notification_emails :new_email SET email_preferences = if_not_exists(email_preferences, :empty_map)',
+                    ExpressionAttributeValues: {
+                        ':new_email': new Set([email]),
+                        ':empty_map': {}
+                    }
+                }));
+
+                await ddb.send(new UpdateCommand({
+                    TableName: TABLE_NAME,
+                    Key: { PK: `QR#${qr_id}`, SK: 'CHAT' },
+                    UpdateExpression: 'SET email_preferences.#em = :lang',
+                    ExpressionAttributeNames: {
+                        '#em': email
+                    },
+                    ExpressionAttributeValues: {
+                        ':lang': lang
+                    }
+                }));
+
+                // 4. Send Confirmation Email
+                if (SES_SENDER_EMAIL) {
+                    const subject = (lang === 'ja') ? '【名刺がわりに】住所登録完了のお知らせ' : '【Meishigawarini】Address Registration Completed';
+                    const bodyText = (lang === 'ja') ? `
+住所の登録が完了しました。
+商品の発送まで今しばらくお待ちください。
+
+確認はこちら:
+${process.env.NEXT_PUBLIC_APP_URL}/receive/${qr_id}
+PIN: ${pin_code}
+`.trim() : `
+Address registration completed.
+Please wait for the item to be shipped.
+
+Check here:
+${process.env.NEXT_PUBLIC_APP_URL}/receive/${qr_id}
+PIN: ${pin_code}
+`.trim();
+
+                    await ses.send(new SendEmailCommand({
+                        Source: SES_SENDER_EMAIL,
+                        Destination: { ToAddresses: [email] },
+                        Message: {
+                            Subject: { Data: subject },
+                            Body: { Text: { Data: bodyText } }
+                        }
+                    }));
+                }
+
+            } catch (e) {
+                console.error('Failed to auto-subscribe/send email:', e);
+                // Non-critical, do not fail the request
+            }
+        }
+
+        return resultResponse;
 
     } catch (error: any) {
         console.error(error);
