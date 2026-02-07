@@ -93,6 +93,11 @@
             "delete": "Delete",
             "deleteConfirm": "Are you sure you want to delete \"{name}\"?"
         },
+        "search": {
+            "placeholder": "Search by UUID...",
+            "go": "Search",
+            "clear": "Clear"
+        },
         "addProduct": {
             "title": "Add New Product",
             "name": "Product Name",
@@ -196,6 +201,7 @@
         "contactInfo": {
             "title": "Contact / Order Info",
             "orderId": "Order ID",
+            "shopName": "Shop Name",
             "shopEmail": "Shop Contact",
             "note": "Please include your Order ID when contacting the shop. Address changes after shipment may not be possible."
         }

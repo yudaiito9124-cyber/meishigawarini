@@ -35,6 +35,8 @@ export default function ShopPage() {
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [error, setError] = useState('');
 
+    const [searchUuid, setSearchUuid] = useState('');
+
     // Protect Route
     useEffect(() => {
         checkAuth();
@@ -467,15 +469,31 @@ export default function ShopPage() {
                 {/* Incoming Orders */}
                 <Card>
                     <CardHeader>
-                        <div className="flex items-center justify-between">
+                        <div className="flex flex-col space-y-4 md:flex-row md:items-center md:justify-between md:space-y-0">
                             <div>
                                 <CardTitle>{t('incomingOrders')}</CardTitle>
                                 <CardDescription>{t('ordersDesc')}</CardDescription>
                             </div>
-                            <Button variant="outline" size="sm" onClick={() => fetchShopData(true)} disabled={isRefreshing}>
-                                <RefreshCw className={`mr-2 h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-                                {t('refresh')}
-                            </Button>
+                            <div className="flex items-center space-x-2">
+                                <div className="flex w-full max-w-sm items-center space-x-2">
+                                    <Input
+                                        placeholder={t('search.placeholder')}
+                                        value={searchUuid}
+                                        onChange={(e) => setSearchUuid(e.target.value)}
+                                        className="w-[200px]"
+                                    />
+                                    {/* Frontend filter only, so no button needed or just visual */}
+                                    {searchUuid && (
+                                        <Button variant="ghost" onClick={() => setSearchUuid('')}>
+                                            {t('search.clear')}
+                                        </Button>
+                                    )}
+                                </div>
+                                <Button variant="outline" size="sm" onClick={() => fetchShopData(true)} disabled={isRefreshing}>
+                                    <RefreshCw className={`mr-2 h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+                                    {t('refresh')}
+                                </Button>
+                            </div>
                         </div>
                     </CardHeader>
                     <CardContent>
@@ -489,11 +507,15 @@ export default function ShopPage() {
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {orders.filter(o => ['LINKED', 'ACTIVE', 'USED', 'SHIPPED'].includes(o.status)).length === 0 ? (
+                                {orders
+                                    .filter(o => ['LINKED', 'ACTIVE', 'USED', 'SHIPPED'].includes(o.status))
+                                    .filter(o => !searchUuid || (o.id || o.qr_id).includes(searchUuid))
+                                    .length === 0 ? (
                                     <TableRow><TableCell colSpan={3} className="text-center">{t('orders.noOrders')}</TableCell></TableRow>
                                 ) : (
                                     orders
                                         .filter(o => ['LINKED', 'ACTIVE', 'USED', 'SHIPPED'].includes(o.status))
+                                        .filter(o => !searchUuid || (o.id || o.qr_id).includes(searchUuid))
                                         .sort((a, b) => {
                                             const sortorder: { [name: string]: number } = { 'LINKED': 0, 'ACTIVE': 1, 'USED': 3, 'SHIPPED': 2 };
                                             // 1. Status: compare
@@ -739,12 +761,29 @@ export default function ShopPage() {
                 {/* Order History */}
                 <Card>
                     <CardHeader>
-                        <div className="flex items-center justify-between">
-                            <CardTitle>{t('history.title')}</CardTitle>
-                            <Button variant="outline" size="sm" onClick={() => fetchShopData(true)} disabled={isRefreshing}>
-                                <RefreshCw className={`mr-2 h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-                                {t('refresh')}
-                            </Button>
+                        <div className="flex flex-col space-y-4 md:flex-row md:items-center md:justify-between md:space-y-0">
+                            <div>
+                                <CardTitle>{t('history.title')}</CardTitle>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                                <div className="flex w-full max-w-sm items-center space-x-2">
+                                    <Input
+                                        placeholder={t('search.placeholder')}
+                                        value={searchUuid}
+                                        onChange={(e) => setSearchUuid(e.target.value)}
+                                        className="w-[200px]"
+                                    />
+                                    {searchUuid && (
+                                        <Button variant="ghost" onClick={() => setSearchUuid('')}>
+                                            {t('search.clear')}
+                                        </Button>
+                                    )}
+                                </div>
+                                <Button variant="outline" size="sm" onClick={() => fetchShopData(true)} disabled={isRefreshing}>
+                                    <RefreshCw className={`mr-2 h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+                                    {t('refresh')}
+                                </Button>
+                            </div>
                         </div>
                     </CardHeader>
                     <CardContent>
@@ -758,11 +797,15 @@ export default function ShopPage() {
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {orders.filter(o => ['COMPLETED', 'EXPIRED', 'BANNED'].includes(o.status)).length === 0 ? (
+                                {orders
+                                    .filter(o => ['COMPLETED', 'EXPIRED', 'BANNED'].includes(o.status))
+                                    .filter(o => !searchUuid || (o.id || o.qr_id).includes(searchUuid))
+                                    .length === 0 ? (
                                     <TableRow><TableCell colSpan={3} className="text-center">{t('orders.noOrders')}</TableCell></TableRow>
                                 ) : (
                                     orders
                                         .filter(o => ['COMPLETED', 'EXPIRED', 'BANNED'].includes(o.status))
+                                        .filter(o => !searchUuid || (o.id || o.qr_id).includes(searchUuid))
                                         .sort((a, b) => {
                                             const sortorder: { [name: string]: number } = { 'COMPLETED': 0, 'EXPIRED': 1, 'BANNED': 2 };
                                             // 1. Status: compare

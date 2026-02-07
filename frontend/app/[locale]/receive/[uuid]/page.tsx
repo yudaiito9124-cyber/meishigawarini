@@ -565,6 +565,14 @@ export default function ReceivePage() {
                                                 {uuid}
                                             </div>
                                         </div>
+                                        {gift?.shop_name && (
+                                            <div className="space-y-2">
+                                                <Label className="text-xs text-gray-500">{t('contactInfo.shopName')}</Label>
+                                                <div className="p-3 bg-gray-50 rounded-md border border-gray-200 text-sm break-all text-center font-medium">
+                                                    {gift.shop_name}
+                                                </div>
+                                            </div>
+                                        )}
                                         {gift?.shop_email && (
                                             <div className="space-y-2">
                                                 <Label className="text-xs text-gray-500">{t('contactInfo.shopEmail')}</Label>

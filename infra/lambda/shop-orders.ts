@@ -183,27 +183,90 @@ async function handleUpdateOrder(event: any, uuidParam?: string) {
     };
 }
 
-async function handleListShopOrders(shopId: string) {
-    // 1. Query GSI2 for all QRs in this shop
-    const queryRes = await ddb.send(new QueryCommand({
-        TableName: TABLE_NAME,
-        IndexName: 'GSI2',
-        KeyConditionExpression: 'GSI2_PK = :sid',
-        ExpressionAttributeValues: { ':sid': `SHOP#${shopId}` }
-    }));
+async function handleListShopOrders(shopId: string, queryParams?: any) {
+    const uuidFilter = queryParams?.uuid;
 
-    if (!queryRes.Items || queryRes.Items.length === 0) {
-        return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ orders: [] }) };
-    }
+    let relevantItems: any[] = [];
 
-    // 2. Filter for status = 'USED' (Ready) or 'SHIPPED'
-    // const relevantItems = queryRes.Items.filter(item =>
-    //     ['USED', 'SHIPPED'].includes(item.status)
-    // );
-    const relevantItems = queryRes.Items
+    if (uuidFilter) {
+        // 1a. Efficient Lookup by UUID
+        // We query by PK = QR#<uuidFilter>
+        // Use Query instead of GetItem to fetch both METADATA and ORDER items if possible?
+        // Actually, our Single Table Design:
+        // PK=QR#uuid, SK=METADATA
+        // PK=QR#uuid, SK=ORDER
+        // So Query with PK=QR#uuid will get both!
+        const queryRes = await ddb.send(new QueryCommand({
+            TableName: TABLE_NAME,
+            KeyConditionExpression: 'PK = :pk',
+            ExpressionAttributeValues: { ':pk': `QR#${uuidFilter}` }
+        }));
 
-    if (relevantItems.length === 0) {
-        return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ orders: [] }) };
+        const items = queryRes.Items || [];
+        // Check ownership
+        // We look for the METADATA item to check shop_id
+        const metadata = items.find(i => i.SK === 'METADATA');
+        if (!metadata || metadata.shop_id !== shopId) {
+            // Not found or not owned by this shop
+            return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ orders: [] }) };
+        }
+
+        // If owned, we have the items. We need to split them into "relevantItems" meta and map order details later?
+        // Or just construct it here.
+        // The existing logic expects "relevantItems" to be metadata items.
+        relevantItems = [metadata];
+
+        // We already have the ORDER item in 'items'. We can pass it or cache it?
+        // To reuse the logic below, we can let the BatchGet happen (it will be 1 item), OR optimize.
+        // Let's optimize: we already have the order details.
+
+        const orderDetail = items.find(i => i.SK === 'ORDER') || {};
+        const meta = metadata;
+
+        const order = {
+            id: meta.PK.replace('QR#', ''),
+            qr_id: meta.PK,
+            product_id: meta.product_id,
+            status: meta.status,
+            recipient_name: orderDetail.name || '-',
+            address: orderDetail.address || '-',
+            postal_code: orderDetail.zipCode || orderDetail.postal_code || '',
+            shipping_info: orderDetail,
+            memo_for_users: meta.memo_for_users,
+            memo_for_shop: meta.memo_for_shop,
+            tracking_number: orderDetail.tracking_number,
+            delivery_company: orderDetail.delivery_company,
+
+            ts_created_at: meta.ts_created_at,
+            ts_updated_at: meta.ts_updated_at,
+            ts_linked_at: meta.ts_linked_at,
+            ts_activated_at: meta.ts_activated_at,
+            ts_submitted_at: meta.ts_submitted_at,
+            ts_shipped_at: meta.ts_shipped_at,
+            ts_completed_at: meta.ts_completed_at,
+            ts_expired_at: meta.ts_expired_at,
+            ts_banned_at: meta.ts_banned_at,
+        };
+
+        return {
+            statusCode: 200,
+            headers: corsHeaders,
+            body: JSON.stringify({ orders: [order] })
+        };
+
+    } else {
+        // 1b. List All (via GSI2)
+        const queryRes = await ddb.send(new QueryCommand({
+            TableName: TABLE_NAME,
+            IndexName: 'GSI2',
+            KeyConditionExpression: 'GSI2_PK = :sid',
+            ExpressionAttributeValues: { ':sid': `SHOP#${shopId}` }
+        }));
+
+        if (!queryRes.Items || queryRes.Items.length === 0) {
+            return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ orders: [] }) };
+        }
+        relevantItems = queryRes.Items;
     }
 
     // 3. BatchGet to get details (ORDER sk)
@@ -214,6 +277,34 @@ async function handleListShopOrders(shopId: string) {
     }));
 
     // Chunking not implemented for prototype (assume < 100)
+    // If keys > 100, we should slice
+    if (keys.length > 100) {
+        // quick fix for prototype safety
+        // keys.length = 100; 
+        // But better to process in chunks if we want to support it. 
+        // For now let's just warn or slice.
+        console.warn("More than 100 items, truncating BatchGet");
+        // We can't easily truncate 'relevantItems' parallel to 'keys' without slicing both.
+        // Let's slice relevantItems first.
+        relevantItems = relevantItems.slice(0, 100);
+        // Reform keys
+        const keysSliced = relevantItems.map(item => ({
+            PK: item.PK,
+            SK: 'ORDER'
+        }));
+
+        const batchRes = await ddb.send(new BatchGetCommand({
+            RequestItems: {
+                [TABLE_NAME]: {
+                    Keys: keysSliced
+                }
+            }
+        }));
+
+        // ... process responses ...
+        return processBatchResponses(batchRes, relevantItems);
+    }
+
     const batchRes = await ddb.send(new BatchGetCommand({
         RequestItems: {
             [TABLE_NAME]: {
@@ -222,6 +313,10 @@ async function handleListShopOrders(shopId: string) {
         }
     }));
 
+    return processBatchResponses(batchRes, relevantItems);
+}
+
+function processBatchResponses(batchRes: any, relevantItems: any[]) {
     const orderDetailsMap = new Map();
     (batchRes.Responses?.[TABLE_NAME] || []).forEach((item: any) => {
         orderDetailsMap.set(item.PK, item);
@@ -253,7 +348,6 @@ async function handleListShopOrders(shopId: string) {
             ts_completed_at: meta.ts_completed_at,
             ts_expired_at: meta.ts_expired_at,
             ts_banned_at: meta.ts_banned_at,
-
         };
     });
 
