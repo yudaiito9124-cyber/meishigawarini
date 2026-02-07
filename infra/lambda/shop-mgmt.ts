@@ -106,14 +106,52 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 }
             }));
 
-            // Map to simpler structure
-            const items = (res.Items || []).map(item => ({
-                id: item.PK.replace('QR#', ''),
-                status: item.status,
-                product_id: item.product_id,
-                ts_created_at: item.ts_created_at,
-                ts_activated_at: item.ts_activated_at
-            }));
+            // Map to simpler structure AND check for expiration
+            const now = new Date();
+            const updatePromises: Promise<any>[] = [];
+
+            const items = (res.Items || []).map(item => {
+                let status = item.status;
+                let ts_expired_at = item.ts_expired_at;
+
+                // Check if expired but still marked as ACTIVE
+                if (status === 'ACTIVE' && ts_expired_at) {
+                    const expiresAt = new Date(ts_expired_at);
+                    if (now > expiresAt) {
+                        status = 'EXPIRED';
+                        // Trigger async update
+                        updatePromises.push(
+                            ddb.send(new UpdateCommand({
+                                TableName: TABLE_NAME,
+                                Key: { PK: item.PK, SK: 'METADATA' },
+                                UpdateExpression: 'SET #status = :expired, GSI1_PK = :gsi_pk, ts_updated_at = :now',
+                                ExpressionAttributeNames: { '#status': 'status' },
+                                ExpressionAttributeValues: {
+                                    ':expired': 'EXPIRED',
+                                    ':gsi_pk': 'QR#EXPIRED',
+                                    ':now': now.toISOString()
+                                }
+                            })).catch(e => console.error(`Failed to update expired status for ${item.PK}`, e))
+                        );
+                    }
+                }
+
+                return {
+                    id: item.PK.replace('QR#', ''),
+                    status: status,
+                    product_id: item.product_id,
+                    ts_created_at: item.ts_created_at,
+                    ts_activated_at: item.ts_activated_at,
+                    ts_expired_at: ts_expired_at
+                };
+            });
+
+            // Wait for all updates to complete (or fail) before returning?
+            // Usually for list API, latency matters. But since we want to be correct, maybe waiting isn't too bad if there are few.
+            // Let's await to be safe and ensure data consistency next refresh.
+            if (updatePromises.length > 0) {
+                await Promise.all(updatePromises);
+            }
 
             return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ items }) };
         }

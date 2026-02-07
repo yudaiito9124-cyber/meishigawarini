@@ -536,7 +536,7 @@ export default function ShopPage() {
                                                             </DialogDescription>
                                                         </DialogHeader>
 
-                                                        <div className="space-y-4 py-4">
+                                                        <div className="space-y-4 py-4 max-h-[70vh] overflow-y-auto">
                                                             {/* Product Info */}
                                                             <div>
                                                                 <h4 className="text-sm font-semibold text-gray-500">{t('orders.productName')}</h4>
@@ -802,7 +802,7 @@ export default function ShopPage() {
                                                             </DialogDescription>
                                                         </DialogHeader>
 
-                                                        <div className="space-y-4 py-4">
+                                                        <div className="space-y-4 py-4 max-h-[70vh] overflow-y-auto">
                                                             {/* Product Info */}
                                                             <div>
                                                                 <h4 className="text-sm font-semibold text-gray-500">{t('orders.productName')}</h4>
