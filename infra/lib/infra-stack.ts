@@ -417,7 +417,7 @@ export class InfraStack extends cdk.Stack {
       entry: path.join(__dirname, '../lambda/recipient-verify-pin.ts'),
       ...commonProps,
     });
-    table.grantReadData(recipientVerifyPinFn);
+    table.grantReadWriteData(recipientVerifyPinFn);
 
     const verifyResource = qrResourceRecip.addResource('verify');
     verifyResource.addMethod('POST', new apigateway.LambdaIntegration(recipientVerifyPinFn));

@@ -1,6 +1,6 @@
 import { APIGatewayProxyHandler } from 'aws-lambda';
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
-import { DynamoDBDocumentClient, GetCommand } from '@aws-sdk/lib-dynamodb';
+import { DynamoDBDocumentClient, GetCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
 import * as bcrypt from 'bcryptjs';
 
 const client = new DynamoDBClient({});
@@ -78,6 +78,25 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             const expiresAt = new Date(item.ts_expired_at);
             if (now > expiresAt) {
                 status = 'EXPIRED';
+
+                // Lazy update: Update DB to EXPIRED so next time it is faster and consistent
+                try {
+                    await ddb.send(new UpdateCommand({
+                        TableName: TABLE_NAME,
+                        Key: { PK: `QR#${uuid}`, SK: 'METADATA' },
+                        UpdateExpression: 'SET #status = :expired, GSI1_PK = :gsi_pk, ts_updated_at = :now',
+                        ExpressionAttributeNames: { '#status': 'status' },
+                        ExpressionAttributeValues: {
+                            ':expired': 'EXPIRED',
+                            ':gsi_pk': 'QR#EXPIRED',
+                            ':now': now.toISOString()
+                        }
+                    }));
+                    console.log(`QR Code ${uuid} expired and updated.`);
+                } catch (e: any) {
+                    console.error('Failed to update expired status:', e.message, e.stack);
+                    // Continue, as we can still return expired status to user
+                }
             }
         }
 

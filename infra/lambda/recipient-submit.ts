@@ -46,7 +46,33 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         }
 
         if (getRes.Item.status !== 'ACTIVE') {
-            return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'QR Code is not active' }) };
+            const msg = getRes.Item.status === 'EXPIRED' ? 'QR Code has expired' : 'QR Code is not active';
+            return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: msg }) };
+        }
+
+        // Check Expiration (Lazy update if caught here)
+        if (getRes.Item.ts_expired_at) {
+            const now = new Date();
+            const expiresAt = new Date(getRes.Item.ts_expired_at);
+            if (now > expiresAt) {
+                // Determine it is expired
+                try {
+                    await ddb.send(new UpdateCommand({
+                        TableName: TABLE_NAME,
+                        Key: { PK: `QR#${qr_id}`, SK: 'METADATA' },
+                        UpdateExpression: 'SET #status = :expired, GSI1_PK = :gsi_pk, ts_updated_at = :now',
+                        ExpressionAttributeNames: { '#status': 'status' },
+                        ExpressionAttributeValues: {
+                            ':expired': 'EXPIRED',
+                            ':gsi_pk': 'QR#EXPIRED',
+                            ':now': now.toISOString()
+                        }
+                    }));
+                } catch (e) {
+                    console.error('Failed to update expired status in submit', e);
+                }
+                return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'QR Code has expired' }) };
+            }
         }
 
         if (getRes.Item.pin !== pin_code) {
