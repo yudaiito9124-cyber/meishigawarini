@@ -1,0 +1,26 @@
+ビルドエラーを解決するために実行した具体的なコマンドの履歴は以下の通りです。
+
+特に重要なのは、
+package-lock.json
+ と node_modules を一度削除して、npm install で再生成した 手順です。これにより、
+package.json
+ との整合性が取れた正しいロックファイルが作成されました。
+
+実行したコマンド一覧（frontend ディレクトリ内）
+整合性チェック（最初のエラー確認）
+powershell
+npm install
+# ここで依然として不整合やエラーが確認されました
+依存関係のクリーンアップと再インストール（修正の核心）
+powershell
+# 既存の依存関係ファイルとフォルダを強制削除
+Remove-Item -Recurse -Force node_modules, package-lock.json
+# 依存関係をゼロから再解決してインストール（これで正しい package-lock.json が生成されます）
+npm install
+修正内容の検証
+powershell
+# クリーンインストールが成功するか確認
+npm ci
+これにより 
+package-lock.json
+ が更新され、CodeBuild での npm ci エラー（同期ズレ）が解消される状態になりました。
