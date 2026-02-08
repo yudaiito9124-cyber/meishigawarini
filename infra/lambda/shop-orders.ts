@@ -1,11 +1,15 @@
 
 import { APIGatewayProxyHandler } from 'aws-lambda';
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
-import { DynamoDBDocumentClient, QueryCommand, BatchGetCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
+import { DynamoDBDocumentClient, QueryCommand, BatchGetCommand, UpdateCommand, GetCommand } from '@aws-sdk/lib-dynamodb';
+import { SESClient, SendEmailCommand } from '@aws-sdk/client-ses';
+import { createShippingNotificationEmail } from './templates/email';
 
 const client = new DynamoDBClient({});
+const ses = new SESClient({});
 const ddb = DynamoDBDocumentClient.from(client);
 const TABLE_NAME = process.env.TABLE_NAME || '';
+const SES_SENDER_EMAIL = process.env.SES_SENDER_EMAIL;
 const INDEX_NAME = 'GSI1';
 
 const corsHeaders = {
@@ -125,17 +129,15 @@ async function handleUpdateOrder(event: any, uuidParam?: string) {
     const body = JSON.parse(event.body || '{}');
     const { delivery_company, tracking_number, memo_for_users, memo_for_shop } = body;
 
-    // Transactionally update METADATA status and ORDER details?
-    // Or just update individually. For SHIPPED, updating METADATA is critical for list removal.
-    // Lets update METADATA status -> SHIPPED.
-    // And update ORDER item -> add tracking number.
-
-    // We can do TransactWriteItems
-    // 1. Update METADATA: status='SHIPPED', ts_shipped_at=now, memos...
-    // 2. Update ORDER: tracking_number=..., ts_shipped_at=now
-
-    // But for simplicity in lambda-nodejs, let's do simple update
-    // Update METADATA is most important for the Dashboard list.
+    // Fetch details for email notification (need PIN from METADATA and Email from ORDER)
+    const metaRes = await ddb.send(new GetCommand({
+        TableName: TABLE_NAME,
+        Key: { PK: `QR#${uuid}`, SK: 'METADATA' }
+    }));
+    const orderRes = await ddb.send(new GetCommand({
+        TableName: TABLE_NAME,
+        Key: { PK: `QR#${uuid}`, SK: 'ORDER' }
+    }));
 
     const updateExpParts = ['SET #status = :s', 'ts_shipped_at = :now', 'GSI1_PK = :gsi_pk'];
     const expAttrValues: any = {
@@ -174,6 +176,36 @@ async function handleUpdateOrder(event: any, uuidParam?: string) {
                 ':now': new Date().toISOString()
             }
         }));
+    }
+
+    // Send Shipping Notification Email
+    const email = orderRes.Item?.email;
+    const pin = metaRes.Item?.pin;
+
+    if (email && pin && SES_SENDER_EMAIL) {
+        try {
+            // Check language preference if available (defaulting to ja for now)
+            // Ideally we should store lang pref in ORDER or METADATA
+            const lang = 'ja';
+
+            const { subject, bodyText } = createShippingNotificationEmail({
+                uuid,
+                pin,
+                lang
+            });
+
+            await ses.send(new SendEmailCommand({
+                Source: SES_SENDER_EMAIL,
+                Destination: { ToAddresses: [email] },
+                Message: {
+                    Subject: { Data: subject },
+                    Body: { Text: { Data: bodyText } }
+                }
+            }));
+        } catch (e) {
+            console.error('Failed to send shipping notification email', e);
+            // Don't fail the request, just log
+        }
     }
 
     return {

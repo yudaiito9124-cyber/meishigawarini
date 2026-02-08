@@ -67,3 +67,39 @@ PIN: ${pin}
 
     return { subject, bodyText };
 };
+
+export const createShippingNotificationEmail = (params: {
+    uuid: string;
+    pin: string;
+    lang?: 'ja' | 'en';
+}) => {
+    const { uuid, pin, lang = 'ja' } = params;
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL;
+
+    let subject = '';
+    let bodyText = '';
+
+    if (lang === 'en') {
+        subject = '【Meishigawarini】Shipping Notification';
+        bodyText = `
+Your item has been shipped.
+Please wait for it to arrive.
+
+Check status here:
+${baseUrl}/receive/${uuid}
+PIN: ${pin}
+`.trim();
+    } else {
+        subject = '【名刺がわりに】発送完了のお知らせ';
+        bodyText = `
+商品の発送が完了しました。
+到着まで今しばらくお待ちください。
+
+確認はこちら:
+${baseUrl}/receive/${uuid}
+PIN: ${pin}
+`.trim();
+    }
+
+    return { subject, bodyText };
+};

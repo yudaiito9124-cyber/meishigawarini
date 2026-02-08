@@ -9,7 +9,7 @@ const client = new DynamoDBClient({});
 const ddb = DynamoDBDocumentClient.from(client);
 const ses = new SESClient({});
 const TABLE_NAME = process.env.TABLE_NAME || '';
-const SES_SENDER_EMAIL = process.env.SES_SENDER_EMAIL;
+const SES_SENDER_EMAIL = process.env.SES_SENDER_EMAIL || '';
 
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',

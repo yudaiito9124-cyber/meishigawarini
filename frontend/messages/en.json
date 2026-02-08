@@ -69,6 +69,7 @@
         "orders": {
             "date": "Last Updated Date Time",
             "recipient": "Recipient",
+            "contact": "Contact",
             "address": "Address",
             "status": "Status",
             "action": "Action",
@@ -274,6 +275,12 @@
             "keyword": {
                 "placeholder": "Enter keyword to search by UUID (at least 8 characters)",
                 "tooShort": "Keyword must be at least 8 characters long."
+            },
+            "shopInfo": {
+                "title": "Shop Information",
+                "id": "Shop ID",
+                "name": "Shop Name",
+                "contact": "Contact"
             }
         }
     },

@@ -587,13 +587,17 @@ export default function ShopPage() {
                                                                     <h4 className="text-sm font-semibold text-gray-500">{t('orders.recipient')}</h4>
                                                                     <p>{order.recipient_name}</p>
                                                                 </div>
+                                                                <div>
+                                                                    <h4 className="text-sm font-semibold text-gray-500">{t('orders.contact')}</h4>
+                                                                    <p className="break-all">{order.shipping_info?.email || '-'}</p>
+                                                                    <p className="text-sm mt-1">{order.shipping_info?.phone || '-'}</p>
+                                                                </div>
                                                             </div>
 
                                                             <div>
                                                                 <h4 className="text-sm font-semibold text-gray-500">{t('orders.address')}</h4>
                                                                 {order.postal_code && <p className="text-sm">〒{order.postal_code}</p>}
                                                                 <p className="whitespace-pre-wrap text-sm">{order.address}</p>
-                                                                {order.shipping_info?.phone && <p className="text-sm mt-1">{order.shipping_info.phone}</p>}
                                                             </div>
 
                                                             <div>
@@ -878,13 +882,17 @@ export default function ShopPage() {
                                                                     <h4 className="text-sm font-semibold text-gray-500">{t('orders.recipient')}</h4>
                                                                     <p>{order.recipient_name}</p>
                                                                 </div>
+                                                                <div>
+                                                                    <h4 className="text-sm font-semibold text-gray-500">{t('orders.contact')}</h4>
+                                                                    <p className="break-all">{order.shipping_info?.email || '-'}</p>
+                                                                    <p className="text-sm mt-1">{order.shipping_info?.phone || '-'}</p>
+                                                                </div>
                                                             </div>
 
                                                             <div>
                                                                 <h4 className="text-sm font-semibold text-gray-500">{t('orders.address')}</h4>
                                                                 {order.postal_code && <p className="text-sm">〒{order.postal_code}</p>}
                                                                 <p className="whitespace-pre-wrap text-sm">{order.address}</p>
-                                                                {order.shipping_info?.phone && <p className="text-sm mt-1">{order.shipping_info.phone}</p>}
                                                             </div>
 
                                                             {/* Order Info */}

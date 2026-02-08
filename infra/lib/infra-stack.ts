@@ -116,8 +116,16 @@ export class InfraStack extends cdk.Stack {
     const adminListFn = new nodejs.NodejsFunction(this, 'AdminListFn', {
       entry: path.join(__dirname, '../lambda/admin-list.ts'),
       ...commonProps,
+      environment: {
+        ...commonProps.environment,
+        USER_POOL_ID: userPool.userPoolId
+      }
     });
     table.grantReadData(adminListFn);
+    adminListFn.addToRolePolicy(new iam.PolicyStatement({
+      actions: ['cognito-idp:AdminGetUser'],
+      resources: [userPool.userPoolArn]
+    }));
 
 
     // // Lambda: Shop Activate
@@ -171,6 +179,10 @@ export class InfraStack extends cdk.Stack {
       ...commonProps,
     });
     table.grantReadWriteData(shopOrdersFn);
+    shopOrdersFn.addToRolePolicy(new iam.PolicyStatement({
+      actions: ['ses:SendEmail', 'ses:SendRawEmail'],
+      resources: ['*'],
+    }));
 
 
     // API Gateway

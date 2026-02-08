@@ -1,0 +1,59 @@
+
+# Prompt for Slide Generation AI
+
+Please create a structure and content for a presentation slide deck introducing the web application "Meishigawarini" (名刺がわりに).
+
+## Project Overview
+"Meishigawarini" (meaning "Instead of a Business Card" in Japanese) is a digital gift delivery system that bridges the physical and digital worlds. It allows senders (shops or individuals) to distribute physical cards with QR codes. Recipients scan the code, enter a PIN, and provide their shipping address to receive a gift. This eliminates the need for the sender to know the recipient's address in advance.
+
+## Target Audience
+- Corporate clients (for promotional gifts)
+- Shop owners (as a catalog gift system)
+- Developers/Stakeholders (interested in the architecture)
+
+## Key Themes
+- Seamless User Experience (Physical to Digital)
+- Serverless Architecture (Scalable & Modern)
+- Security & Privacy (PIN protection, Secure Data Handling)
+
+## Slide Structure Suggestion
+
+### Slide 1: Title
+- **Main Title**: Meishigawarini
+- **Subtitle**: connect physical connections with digital gifts
+- **Visual Idea**: A sleek image of a business card with a QR code next to a smartphone displaying a gift.
+
+### Slide 2: The Problem
+- **Points**:
+    - Sending gifts requires knowing the recipient's address.
+    - Physical gifts are bulky to distribute at events or meetings.
+    - Digital-only gifts lack the personal touch of handing something over.
+
+### Slide 3: The Solution
+- **Concept**: A "Card-First" Gifting Experience.
+- **Process**:
+    1.  **Give**: Sender hands over a card with a unique QR Code & PIN.
+    2.  **Scan**: Recipient scans the QR code.
+    3.  **Claim**: Recipient enters the PIN and their shipping address.
+    4.  **Receive**: Shop ships the item directly to the recipient.
+
+### Slide 4: Key Features
+- **Secure Redemption**: PIN-based verification (with optional password protection).
+- **Order Management**: Comprehensive dashboard for shops to track orders and update shipping status.
+- **Notifications**: Automated emails to recipients when items are shipped.
+- **Global Ready**: Multi-language support (Japanese & English).
+
+### Slide 5: Technical Architecture
+- **Frontend**: Next.js (React), Tailwind CSS.
+- **Backend**: AWS Serverless (Lambda, API Gateway).
+- **Database**: Amazon DynamoDB (Single Table Design).
+- **Auth**: Amazon Cognito.
+- **Infrastructure**: AWS CDK (Infrastructure as Code).
+
+### Slide 6: Future Roadmap
+- **Expansion**: Support for more gift types.
+- **Analytics**: Usage tracking for senders.
+- **Social Features**: Recipient-to-Shop chat/messaging (Partial implementation).
+
+## Tone
+- Professional, Innovative, trustworthy.

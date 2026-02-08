@@ -92,6 +92,7 @@
         "orders": {
             "date": "更新日時",
             "recipient": "受取人",
+            "contact": "連絡先",
             "address": "住所",
             "status": "ステータス",
             "action": "操作",
@@ -351,6 +352,12 @@
                 "placeholder": "UUIDで検索 (8文字以上)",
                 "tooShort": "キーワードは8文字以上で入力してください。"
             }
+        },
+        "shopInfo": {
+            "title": "ショップ情報",
+            "id": "ショップID",
+            "name": "ショップ名",
+            "contact": "連絡先"
         }
     },
     "VerifyPage": {

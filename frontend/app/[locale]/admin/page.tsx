@@ -12,6 +12,15 @@ import jsPDF from 'jspdf';
 import { useTranslations } from 'next-intl';
 const NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 const NEXT_PUBLIC_APP_URL = process.env.NEXT_PUBLIC_APP_URL || "";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 
 export default function AdminPage() {
     const t = useTranslations('AdminPage');
@@ -401,6 +410,9 @@ export default function AdminPage() {
 
 function QRCodeListSection({ apiUrl, onGeneratePDF }: { apiUrl: string, onGeneratePDF: (batch: any) => Promise<void> }) {
     const t = useTranslations('AdminPage');
+    const tShop = useTranslations('ShopPage');
+    const ts = useTranslations('Timestamp');
+    const st = useTranslations('Status');
     const [status, setStatus] = useState("UNASSIGNED");
     const [keyword, setKeyword] = useState("");
     const [codes, setCodes] = useState<any[]>([]);
@@ -557,51 +569,166 @@ function QRCodeListSection({ apiUrl, onGeneratePDF }: { apiUrl: string, onGenera
                                         </TableCell>
                                     </TableRow>
                                 ) : ( // there is some codes
-                                    codes.map((item: any) => (
-                                        <TableRow key={item.PK}>
-                                            <TableCell className="font-mono text-xs select-all">
-                                                {item.PK.replace('QR#', '')}
-                                            </TableCell>
-                                            <TableCell className="font-mono text-xs select-all">
-                                                {item.pin}
-                                            </TableCell>
-                                            <TableCell>
-                                                <span className={`px-2 py-1 rounded text-xs ${item.status === 'UNASSIGNED' ? 'bg-gray-100' :
-                                                    item.status === 'LINKED' ? 'bg-brown-100 text-brown-800' :
-                                                        item.status === 'ACTIVE' ? 'bg-orange-100 text-orange-800' :
-                                                            item.status === 'USED' ? 'bg-yellow-100 text-yellow-800' :
-                                                                item.status === 'SHIPPED' ? 'bg-green-100 text-green-800' :
-                                                                    item.status === 'COMPLETED' ? 'bg-purple-100 text-purple-800' :
-                                                                        item.status === 'BANNED' ? 'bg-red-100 text-red-800' : // BANNED style
-                                                                            'bg-green-100 text-green-800'
-                                                    }`}>
-                                                    {t(`list.status.${item.status ? item.status.toLowerCase() : 'undefined'}`)}
-                                                </span>
-                                            </TableCell>
-                                            <TableCell className="text-xs text-gray-500">
-                                                {item.ts_updated_at ? new Date(item.ts_updated_at).toLocaleString() : '-'}
-                                            </TableCell>
-                                            <TableCell>
-                                                <Button
-                                                    variant="outline"
-                                                    size="sm"
-                                                    className="mr-2 h-6 text-xs"
-                                                    onClick={() => {
-                                                        const uuid = item.PK.replace('QR#', '');
-                                                        onGeneratePDF({
-                                                            id: uuid,
-                                                            codes: [{ uuid, pin: item.pin }]
-                                                        });
-                                                    }}
-                                                >
-                                                    {t('list.ban.pdf')}
-                                                </Button>
-                                                {item.status !== 'BANNED' && (
-                                                    <BanButton uuid={item.PK.replace('QR#', '')} apiUrl={apiUrl} onSuccess={fetchCodes} />
-                                                )}
-                                            </TableCell>
-                                        </TableRow>
-                                    ))
+                                    codes.map((item: any) => {
+                                        const uuid = item.PK.replace('QR#', '');
+                                        return (
+                                            <Dialog key={item.PK}>
+                                                <DialogTrigger asChild>
+                                                    <TableRow className="cursor-pointer hover:bg-gray-100">
+                                                        <TableCell className="font-mono text-xs select-all">
+                                                            {uuid}
+                                                        </TableCell>
+                                                        <TableCell className="font-mono text-xs select-all">
+                                                            {item.pin}
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            <span className={`px-2 py-1 rounded text-xs ${item.status === 'UNASSIGNED' ? 'bg-gray-100' :
+                                                                item.status === 'LINKED' ? 'bg-emerald-100 text-emerald-800' :
+                                                                    item.status === 'ACTIVE' ? 'bg-yellow-100 text-yellow-800' :
+                                                                        item.status === 'USED' ? 'bg-orange-100 text-orange-800' :
+                                                                            item.status === 'SHIPPED' ? 'bg-indigo-100 text-indigo-800' :
+                                                                                item.status === 'COMPLETED' ? 'bg-purple-100 text-purple-800' :
+                                                                                    item.status === 'EXPIRED' ? 'bg-gray-100 text-gray-800' :
+                                                                                        item.status === 'BANNED' ? 'bg-red-100 text-red-800' :
+                                                                                            'bg-green-100 text-green-800'
+                                                                }`}>
+                                                                {st(item.status ? item.status.toLowerCase() : 'active')}
+                                                            </span>
+                                                        </TableCell>
+                                                        <TableCell className="text-xs text-gray-500">
+                                                            {item.ts_updated_at ? new Date(item.ts_updated_at).toLocaleString() : '-'}
+                                                        </TableCell>
+                                                        <TableCell onClick={(e) => e.stopPropagation()}>
+                                                            <Button
+                                                                variant="outline"
+                                                                size="sm"
+                                                                className="mr-2 h-6 text-xs"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation(); // Stop dialog trigger
+                                                                    const uuid = item.PK.replace('QR#', '');
+                                                                    onGeneratePDF({
+                                                                        id: uuid,
+                                                                        codes: [{ uuid, pin: item.pin }]
+                                                                    });
+                                                                }}
+                                                            >
+                                                                {t('list.ban.pdf')}
+                                                            </Button>
+                                                            {item.status !== 'BANNED' && (
+                                                                <BanButton uuid={item.PK.replace('QR#', '')} apiUrl={apiUrl} onSuccess={fetchCodes} />
+                                                            )}
+                                                        </TableCell>
+                                                    </TableRow>
+                                                </DialogTrigger>
+                                                <DialogContent className="max-w-md">
+                                                    <DialogHeader>
+                                                        <DialogTitle>{tShop('orders.details')}</DialogTitle>
+                                                        <DialogDescription className="font-mono text-xs text-gray-500">
+                                                            ID: {uuid}
+                                                        </DialogDescription>
+                                                    </DialogHeader>
+
+                                                    <div className="space-y-4 py-4 max-h-[70vh] overflow-y-auto">
+                                                        {/* Product Info */}
+                                                        <div>
+                                                            <h4 className="text-sm font-semibold text-gray-500">{tShop('orders.productName')}</h4>
+                                                            <p className="font-medium">{item.product_name || item.product_id || '-'}</p>
+                                                        </div>
+
+
+                                                        {/* Shop Info */}
+                                                        <div>
+                                                            <h4 className="text-sm font-semibold text-gray-500">{t('shopInfo.title')}</h4>
+                                                            <div className="text-sm mt-1 grid grid-cols-[80px_1fr] gap-x-2 gap-y-1">
+                                                                <span className="text-gray-400 text-xs">{t('shopInfo.name')}</span>
+                                                                <span className="font-medium">{item.shop_name || '-'}</span>
+
+                                                                <span className="text-gray-400 text-xs">{t('shopInfo.id')}</span>
+                                                                <span className="font-mono text-xs text-gray-600">{item.shop_id || '-'}</span>
+
+                                                                <span className="text-gray-400 text-xs">{t('shopInfo.contact')}</span>
+                                                                <span className="text-gray-600 break-all">{item.shop_email || '-'}</span>
+                                                            </div>
+                                                        </div>
+
+
+                                                        {/* Status */}
+                                                        <div>
+                                                            <h4 className="text-sm font-semibold text-gray-500">{tShop('orders.status')}</h4>
+
+                                                            <span className={`px-2 py-1 rounded text-xs ${item.status === 'UNASSIGNED' ? 'bg-gray-100' :
+                                                                item.status === 'LINKED' ? 'bg-emerald-100 text-emerald-800' :
+                                                                    item.status === 'ACTIVE' ? 'bg-yellow-100 text-yellow-800' :
+                                                                        item.status === 'USED' ? 'bg-orange-100 text-orange-800' :
+                                                                            item.status === 'SHIPPED' ? 'bg-indigo-100 text-indigo-800' :
+                                                                                item.status === 'COMPLETED' ? 'bg-purple-100 text-purple-800' :
+                                                                                    item.status === 'EXPIRED' ? 'bg-gray-100 text-gray-800' :
+                                                                                        item.status === 'BANNED' ? 'bg-red-100 text-red-800' :
+                                                                                            'bg-green-100 text-green-800'
+                                                                }`}>{st(item.status ? item.status.toLowerCase() : 'active')}</span>
+                                                        </div>
+
+                                                        {/* Recipient Info */}
+                                                        <div className="grid grid-cols-2 gap-4">
+                                                            <div>
+                                                                <h4 className="text-sm font-semibold text-gray-500">{tShop('orders.recipient')}</h4>
+                                                                <p>{item.recipient_name || '-'}</p>
+                                                            </div>
+                                                            <div>
+                                                                <h4 className="text-sm font-semibold text-gray-500">{tShop('orders.contact')}</h4>
+                                                                <p className="break-all">{item.shipping_info?.email || '-'}</p>
+                                                                <p className="text-sm mt-1">{item.shipping_info?.phone || '-'}</p>
+                                                            </div>
+                                                        </div>
+
+                                                        <div>
+                                                            <h4 className="text-sm font-semibold text-gray-500">{tShop('orders.address')}</h4>
+                                                            {item.postal_code && <p className="text-sm">〒{item.postal_code}</p>}
+                                                            <p className="whitespace-pre-wrap text-sm">{item.address || '-'}</p>
+                                                        </div>
+
+                                                        {/* Order Info */}
+                                                        <div className="pt-2 space-y-4">
+                                                            {item.memo_for_users && (
+                                                                <div>
+                                                                    <h4 className="text-sm font-semibold text-gray-500">{tShop('orders.userMessage')}</h4>
+                                                                    <p className="text-sm bg-gray-50 p-2 rounded">{item.memo_for_users}</p>
+                                                                </div>
+                                                            )}
+                                                            {item.memo_for_shop && (
+                                                                <div>
+                                                                    <h4 className="text-sm font-semibold text-gray-500">{tShop('orders.shopMemo')}</h4>
+                                                                    <p className="text-sm bg-orange-50 p-2 rounded">{item.memo_for_shop}</p>
+                                                                </div>
+                                                            )}
+                                                            <div>
+                                                                <h4 className="text-sm font-semibold text-gray-500">{tShop('orders.shipDialog.deliveryCompany')}</h4>
+                                                                <p className="font-mono">{item.delivery_company || '-'}</p>
+                                                            </div>
+                                                            <div>
+                                                                <h4 className="text-sm font-semibold text-gray-500">{tShop('orders.shipDialog.label')}</h4>
+                                                                <p className="font-mono">{item.tracking_number || '-'}</p>
+                                                            </div>
+                                                        </div>
+
+                                                        <div className="grid grid-cols-2 gap-4">
+                                                            <div>
+                                                                <h4 className="text-sm font-semibold text-gray-500">{tShop('orders.timestamps')}</h4>
+                                                                <p className="text-sm">{ts('ts_updated_at') + ": " + (item.ts_updated_at ? new Date(item.ts_updated_at).toLocaleString() : "-")}</p>
+                                                                <p className="text-sm">{ts('ts_linked_at') + ": " + (item.ts_linked_at ? new Date(item.ts_linked_at).toLocaleString() : "-")}</p>
+                                                                <p className="text-sm">{ts('ts_activated_at') + ": " + (item.ts_activated_at ? new Date(item.ts_activated_at).toLocaleString() : "-")}</p>
+                                                                <p className="text-sm">{ts('ts_submitted_at') + ": " + (item.ts_submitted_at ? new Date(item.ts_submitted_at).toLocaleString() : "-")}</p>
+                                                                <p className="text-sm">{ts('ts_shipped_at') + ": " + (item.ts_shipped_at ? new Date(item.ts_shipped_at).toLocaleString() : "-")}</p>
+                                                                <p className="text-sm">{ts('ts_completed_at') + ": " + (item.ts_completed_at ? new Date(item.ts_completed_at).toLocaleString() : "-")}</p>
+                                                                <p className="text-sm">{ts('ts_expired_at') + ": " + (item.ts_expired_at ? new Date(item.ts_expired_at).toLocaleString() : "-")}</p>
+                                                                <p className="text-sm">{ts('ts_banned_at') + ": " + (item.ts_banned_at ? new Date(item.ts_banned_at).toLocaleString() : "-")}</p>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </DialogContent>
+                                            </Dialog>
+                                        );
+                                    })
                                 )}
                             </TableBody>
                         </Table>
@@ -643,7 +770,7 @@ function BanButton({ uuid, apiUrl, onSuccess }: { uuid: string, apiUrl: string, 
     };
 
     return (
-        <Button variant="destructive" size="sm" onClick={handleBan} disabled={loading} className="h-6 text-xs bg-red-600 hover:bg-red-700">
+        <Button variant="destructive" size="sm" onClick={(e) => { e.stopPropagation(); handleBan(); }} disabled={loading} className="h-6 text-xs bg-red-600 hover:bg-red-700">
             {loading ? '...' : t('list.ban.button')}
         </Button>
     );
