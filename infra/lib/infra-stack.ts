@@ -479,15 +479,15 @@ export class InfraStack extends cdk.Stack {
     // ######################### ここからIP制限
     // --- WAF Setup for Admin IP Restriction ---
     // 1. IP Set (Allowed IPs)
-    const allowedIpSet = new wafv2.CfnIPSet(this, 'AdminAllowedIPs', {
-      name: 'AdminAllowedIPs',
-      scope: 'REGIONAL',
-      ipAddressVersion: 'IPV4',
-      addresses: [
-        '115.65.249.220/32' // User's IP
-      ],
-      description: 'Allowed IPs for Admin access',
-    });
+    // const allowedIpSet = new wafv2.CfnIPSet(this, 'AdminAllowedIPs', {
+    //   name: 'AdminAllowedIPs',
+    //   scope: 'REGIONAL',
+    //   ipAddressVersion: 'IPV4',
+    //   addresses: [
+    //     '115.65.249.220/32' // User's IP
+    //   ],
+    //   description: 'Allowed IPs for Admin access',
+    // });
 
     // 2. Web ACL
     // const webAcl = new wafv2.CfnWebACL(this, 'MeishiGawariniWebACL', {
