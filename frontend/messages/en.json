@@ -23,6 +23,7 @@
     "RegisterPage": {
         "title": "Create Account",
         "email": "Email",
+        "emailNote": "The email address you enter will be displayed to customers as your contact point.",
         "password": "Password",
         "passwordHint": "Must be at least 8 characters, with uppercase, lowercase, and numbers.",
         "signUp": "Sign Up",
@@ -161,6 +162,7 @@
             "title": "Delivery Details",
             "name": "Full Name",
             "address": "Delivery Address",
+            "privacyPolicy": "The personal information you enter will be used only for shipping and shipping-related communications and will not be used for any other purpose.",
             "submit": "Receive Gift",
             "submitting": "Submitting..."
         },

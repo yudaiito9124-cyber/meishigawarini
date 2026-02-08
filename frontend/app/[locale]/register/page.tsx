@@ -92,6 +92,7 @@ export default function RegisterPage() {
                                 onChange={(e) => setEmail(e.target.value)}
                                 required
                             />
+                            <p className="text-xs text-gray-500">{t('emailNote')}</p>
                         </div>
                         <div className="space-y-2">
                             <Label htmlFor="password">{t('password')}</Label>

@@ -501,9 +501,11 @@ export default function ReceivePage() {
                                 </div>
                             </div>
 
+
                             <Button type="submit" className="w-full mt-8" disabled={loading}>
                                 {loading ? t('formStep.submitting') : t('formStep.submit')}
                             </Button>
+                            <p className="text-xs text-gray-500 text-center">{t('formStep.privacyPolicy')}</p>
                         </form>
                     )}
 
@@ -592,90 +594,92 @@ export default function ReceivePage() {
             </Card>
 
             {/* Chat Section */}
-            {step !== "PIN" && (
-                <Card className="w-full max-w-md mt-6">
-                    <CardHeader>
-                        <CardTitle className="text-lg">{t('chat.title')}</CardTitle>
-                        {/* Privacy Notice */}
-                        <p className="text-xs text-gray-500">{t('chat.privacy')}</p>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="space-y-4">
-                            <div className="max-h-60 overflow-y-auto space-y-3 p-2 border rounded bg-gray-50">
-                                {messages.length === 0 ? (
-                                    <p className="text-sm text-gray-500 text-center py-4">{t('chat.noMessages')}</p>
-                                ) : (
-                                    messages.slice().reverse().map((msg) => {
-                                        const isSystem = msg.username === 'System';
-                                        const displayUsername = isSystem ? t('chat.system') : msg.username;
-                                        const displayMessage = (isSystem && msg.message === 'DeliveryCompleted')
-                                            ? t('chat.systemMessage.deliveryCompleted')
-                                            : msg.message;
+            {
+                step !== "PIN" && (
+                    <Card className="w-full max-w-md mt-6">
+                        <CardHeader>
+                            <CardTitle className="text-lg">{t('chat.title')}</CardTitle>
+                            {/* Privacy Notice */}
+                            <p className="text-xs text-gray-500">{t('chat.privacy')}</p>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="space-y-4">
+                                <div className="max-h-60 overflow-y-auto space-y-3 p-2 border rounded bg-gray-50">
+                                    {messages.length === 0 ? (
+                                        <p className="text-sm text-gray-500 text-center py-4">{t('chat.noMessages')}</p>
+                                    ) : (
+                                        messages.slice().reverse().map((msg) => {
+                                            const isSystem = msg.username === 'System';
+                                            const displayUsername = isSystem ? t('chat.system') : msg.username;
+                                            const displayMessage = (isSystem && msg.message === 'DeliveryCompleted')
+                                                ? t('chat.systemMessage.deliveryCompleted')
+                                                : msg.message;
 
-                                        return (
-                                            <div key={msg.id} className={`${isSystem ? 'bg-blue-50 border-blue-100' : 'bg-white'} p-2 rounded shadow-sm text-sm border`}>
-                                                <p className={`font-bold text-xs mb-1 ${isSystem ? 'text-blue-700' : 'text-gray-600'}`}>
-                                                    {displayUsername}
-                                                    <span className="text-gray-400 font-normal ml-2">• {new Date(msg.ts_created_at).toLocaleString()}</span>
-                                                </p>
-                                                <p className={`whitespace-pre-wrap ${isSystem ? 'text-blue-900' : ''}`}>{displayMessage}</p>
-                                            </div>
-                                        );
-                                    })
-                                )}
-                            </div>
-
-                            <form onSubmit={handleChatSubmit} className="space-y-3 border-t pt-4">
-                                <div>
-                                    <Label htmlFor="chatName" className="text-xs">{t('chat.name')}</Label>
-                                    <Input
-                                        id="chatName"
-                                        placeholder={t('chat.namePlaceholder')}
-                                        value={chatName}
-                                        onChange={(e) => setChatName(e.target.value)}
-                                        required
-                                        className="h-8"
-                                    />
+                                            return (
+                                                <div key={msg.id} className={`${isSystem ? 'bg-blue-50 border-blue-100' : 'bg-white'} p-2 rounded shadow-sm text-sm border`}>
+                                                    <p className={`font-bold text-xs mb-1 ${isSystem ? 'text-blue-700' : 'text-gray-600'}`}>
+                                                        {displayUsername}
+                                                        <span className="text-gray-400 font-normal ml-2">• {new Date(msg.ts_created_at).toLocaleString()}</span>
+                                                    </p>
+                                                    <p className={`whitespace-pre-wrap ${isSystem ? 'text-blue-900' : ''}`}>{displayMessage}</p>
+                                                </div>
+                                            );
+                                        })
+                                    )}
                                 </div>
-                                <div>
-                                    <Label htmlFor="chatMessage" className="text-xs">{t('chat.message')}</Label>
-                                    <Input
-                                        id="chatMessage"
-                                        placeholder={t('chat.placeholder')}
-                                        value={chatMessage}
-                                        onChange={(e) => setChatMessage(e.target.value)}
-                                        required
-                                    />
-                                </div>
-                                <Button type="submit" size="sm" className="w-full" disabled={chatLoading}>
-                                    {chatLoading ? t('chat.submitting') : t('chat.submit')}
-                                </Button>
-                            </form>
-                        </div>
-                    </CardContent>
-                    <CardFooter className="flex flex-col gap-4 pt-0 items-start border-t  bg-gray-50/50">
 
-                        {/* Email Subscription */}
-                        <div className="w-full space-y-2 pt-2 ">
-                            <Label className="text-xs text-gray-700 font-semibold">{t('chat.emailTitle')}</Label>
-                            <p className="text-xs text-gray-500">{t('chat.emailDesc')}</p>
-                            <div className="flex w-full gap-2 pt-1">
-                                <Input
-                                    placeholder="you@example.com"
-                                    type="email"
-                                    className="h-8 text-xs bg-white"
-                                    value={notificationEmail}
-                                    onChange={(e) => setNotificationEmail(e.target.value)}
-                                />
-                                <Button size="sm" variant="outline" className="h-8 text-xs whitespace-nowrap bg-white" onClick={handleSubscribe} disabled={subscribing}>
-                                    {subscribing ? "..." : t('chat.subscribe')}
-                                </Button>
+                                <form onSubmit={handleChatSubmit} className="space-y-3 border-t pt-4">
+                                    <div>
+                                        <Label htmlFor="chatName" className="text-xs">{t('chat.name')}</Label>
+                                        <Input
+                                            id="chatName"
+                                            placeholder={t('chat.namePlaceholder')}
+                                            value={chatName}
+                                            onChange={(e) => setChatName(e.target.value)}
+                                            required
+                                            className="h-8"
+                                        />
+                                    </div>
+                                    <div>
+                                        <Label htmlFor="chatMessage" className="text-xs">{t('chat.message')}</Label>
+                                        <Input
+                                            id="chatMessage"
+                                            placeholder={t('chat.placeholder')}
+                                            value={chatMessage}
+                                            onChange={(e) => setChatMessage(e.target.value)}
+                                            required
+                                        />
+                                    </div>
+                                    <Button type="submit" size="sm" className="w-full" disabled={chatLoading}>
+                                        {chatLoading ? t('chat.submitting') : t('chat.submit')}
+                                    </Button>
+                                </form>
                             </div>
-                        </div>
-                    </CardFooter>
-                </Card>
-            )}
+                        </CardContent>
+                        <CardFooter className="flex flex-col gap-4 pt-0 items-start border-t  bg-gray-50/50">
 
-        </div>
+                            {/* Email Subscription */}
+                            <div className="w-full space-y-2 pt-2 ">
+                                <Label className="text-xs text-gray-700 font-semibold">{t('chat.emailTitle')}</Label>
+                                <p className="text-xs text-gray-500">{t('chat.emailDesc')}</p>
+                                <div className="flex w-full gap-2 pt-1">
+                                    <Input
+                                        placeholder="you@example.com"
+                                        type="email"
+                                        className="h-8 text-xs bg-white"
+                                        value={notificationEmail}
+                                        onChange={(e) => setNotificationEmail(e.target.value)}
+                                    />
+                                    <Button size="sm" variant="outline" className="h-8 text-xs whitespace-nowrap bg-white" onClick={handleSubscribe} disabled={subscribing}>
+                                        {subscribing ? "..." : t('chat.subscribe')}
+                                    </Button>
+                                </div>
+                            </div>
+                        </CardFooter>
+                    </Card>
+                )
+            }
+
+        </div >
     );
 }
