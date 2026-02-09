@@ -145,8 +145,8 @@ export default function AdminPage() {
         const pageHeight = 297; // mm
 
         // Card Size
-        const cardWidth = 85.60 - 4; // mm
-        const cardHeight = 53.98 - 4; // mm
+        const cardWidth = 85.60 - 2; // mm
+        const cardHeight = 53.98 - 2; // mm
 
         const cols = 2;
         const rows = 5;
@@ -269,7 +269,7 @@ export default function AdminPage() {
                 const qrSize = 26; // Slightly smaller to fit better
                 // Position QR: Center horizontally, slightly above center vertically or as per design
                 // Let's place it somewhat centrally
-                doc.addImage(base64data, 'PNG', x + (cardWidth - qrSize) - 4, y + cardHeight / 2 - qrSize / 2 + 8, qrSize, qrSize);
+                doc.addImage(base64data, 'PNG', x + (cardWidth - qrSize) - 3.2, y + cardHeight / 2 - qrSize / 2 + 7.5, qrSize, qrSize);
 
                 doc.setFontSize(12);
                 doc.setTextColor(255, 255, 255); // White text assuming dark background, change if needed
