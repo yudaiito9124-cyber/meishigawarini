@@ -3,7 +3,7 @@ import { APIGatewayProxyHandler } from 'aws-lambda';
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, TransactWriteCommand, GetCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
 import { SESClient, SendEmailCommand } from '@aws-sdk/client-ses';
-import * as bcrypt from 'bcryptjs';
+// import * as bcrypt from 'bcryptjs'; // Lazy loaded
 
 const client = new DynamoDBClient({});
 const ddb = DynamoDBDocumentClient.from(client);
@@ -92,6 +92,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         if (password) {
             try {
                 console.log("Hashing password...");
+                const bcrypt = await import('bcryptjs');
                 const salt = await bcrypt.genSalt(10);
                 password_hash = await bcrypt.hash(password, salt);
                 console.log("Password hashed successfully");
