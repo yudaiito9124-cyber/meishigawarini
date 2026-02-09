@@ -214,16 +214,16 @@ export default function AdminPage() {
                     },
                     dotsOptions: {
                         type: "dots",
-                        color: "#6a1a4c",
-                        roundSize: true,
-                        gradient: {
-                            type: "radial",
-                            rotation: 0,
-                            colorStops: [
-                                { offset: 0, color: "#383838" },
-                                { offset: 1, color: "#000000" }
-                            ]
-                        }
+                        // color: "#6a1a4c",
+                        // roundSize: true,
+                        // gradient: {
+                        //     type: "radial",
+                        //     rotation: 0,
+                        //     colorStops: [
+                        //         { offset: 0, color: "#383838" },
+                        //         { offset: 1, color: "#000000" }
+                        //     ]
+                        // }
                     },
                     backgroundOptions: {
                         round: 0,
