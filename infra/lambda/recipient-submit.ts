@@ -18,12 +18,20 @@ const corsHeaders = {
 };
 
 export const handler: APIGatewayProxyHandler = async (event) => {
+    console.log("Recipient Submit Handler Invoked", JSON.stringify(event));
     try {
         if (event.httpMethod !== 'POST') {
             return { statusCode: 405, headers: corsHeaders, body: 'Method Not Allowed' };
         }
 
-        const body = JSON.parse(event.body || '{}');
+        let body;
+        try {
+            body = JSON.parse(event.body || '{}');
+        } catch (e) {
+            console.error("JSON Parse Error", e);
+            return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Invalid JSON body' }) };
+        }
+
         const { qr_id, pin_code, shipping_info, password } = body;
 
         if (!qr_id || !pin_code || !shipping_info) {
@@ -83,8 +91,10 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         let password_hash: string | undefined;
         if (password) {
             try {
+                console.log("Hashing password...");
                 const salt = await bcrypt.genSalt(10);
                 password_hash = await bcrypt.hash(password, salt);
+                console.log("Password hashed successfully");
             } catch (bcryptError) {
                 console.error("Bcrypt error:", bcryptError);
                 return {
@@ -205,14 +215,14 @@ PIN: ${pin_code}
         return resultResponse;
 
     } catch (error: any) {
-        console.error(error);
+        console.error("Critical/Unexpected Error", error);
         if (error.name === 'TransactionCanceledException') {
             return { statusCode: 409, headers: corsHeaders, body: JSON.stringify({ message: 'Transaction failed (possibly already used)' }) };
         }
         return {
             statusCode: 500,
             headers: corsHeaders,
-            body: JSON.stringify({ message: 'Internal Server Error' })
+            body: JSON.stringify({ message: 'Internal Server Error', error: error.toString() })
         };
     }
 };
