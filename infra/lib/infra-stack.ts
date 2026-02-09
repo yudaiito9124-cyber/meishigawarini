@@ -84,6 +84,7 @@ export class InfraStack extends cdk.Stack {
         SES_SENDER_EMAIL: process.env.SES_SENDER_EMAIL || '',
         NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL || '',
       },
+      timeout: cdk.Duration.seconds(30),
       bundling: {
         externalModules: ['@aws-sdk/client-dynamodb', '@aws-sdk/lib-dynamodb', '@aws-sdk/client-s3', '@aws-sdk/s3-request-presigner', '@aws-sdk/client-ses'],
       }
@@ -239,6 +240,34 @@ export class InfraStack extends cdk.Stack {
       },
       templates: {
         'application/json': '{"message": "Not Found."}'
+      }
+    } as any);
+
+    // --- タイムアウト(504) ---
+    api.addGatewayResponse('IntegrationTimeoutResponse', {
+      type: apigateway.ResponseType.INTEGRATION_TIMEOUT,
+      statusCode: '504',
+      responseParameters: {
+        'gatewayresponse.header.Access-Control-Allow-Origin': "'*'",
+        'gatewayresponse.header.Access-Control-Allow-Headers': "'*'",
+        'gatewayresponse.header.Access-Control-Allow-Methods': "'GET,POST,PUT,DELETE,OPTIONS,PATCH'",
+      },
+      templates: {
+        'application/json': '{"message": "Gateway Timeout"}'
+      }
+    } as any);
+
+    // --- 統合エラー(500) ---
+    api.addGatewayResponse('IntegrationFailureResponse', {
+      type: apigateway.ResponseType.INTEGRATION_FAILURE,
+      statusCode: '500',
+      responseParameters: {
+        'gatewayresponse.header.Access-Control-Allow-Origin': "'*'",
+        'gatewayresponse.header.Access-Control-Allow-Headers': "'*'",
+        'gatewayresponse.header.Access-Control-Allow-Methods': "'GET,POST,PUT,DELETE,OPTIONS,PATCH'",
+      },
+      templates: {
+        'application/json': '{"message": "Internal Server Error"}'
       }
     } as any);
 
