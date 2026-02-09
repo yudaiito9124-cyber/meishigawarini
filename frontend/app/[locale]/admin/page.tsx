@@ -141,12 +141,12 @@ export default function AdminPage() {
 
 
         // Layout Settings for A4
-        const pageWidth = 210 - 1; // mm
-        const pageHeight = 297 - 2; // mm
+        const pageWidth = 210; // mm
+        const pageHeight = 297; // mm
 
         // Card Size
-        const cardWidth = 85.60; // mm
-        const cardHeight = 53.98; // mm
+        const cardWidth = 85.60 - 2; // mm
+        const cardHeight = 53.98 - 2; // mm
 
         const cols = 2;
         const rows = 5;
