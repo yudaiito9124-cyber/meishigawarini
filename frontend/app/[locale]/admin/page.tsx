@@ -145,8 +145,8 @@ export default function AdminPage() {
         const pageHeight = 297; // mm
 
         // Card Size
-        const cardWidth = 85.60 - 2; // mm
-        const cardHeight = 53.98 - 2; // mm
+        const cardWidth = 85.60 - 4; // mm
+        const cardHeight = 53.98 - 4; // mm
 
         const cols = 2;
         const rows = 5;
