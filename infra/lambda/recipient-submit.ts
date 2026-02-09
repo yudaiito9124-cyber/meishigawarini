@@ -82,8 +82,17 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         // Hash password if provided
         let password_hash: string | undefined;
         if (password) {
-            const salt = await bcrypt.genSalt(10);
-            password_hash = await bcrypt.hash(password, salt);
+            try {
+                const salt = await bcrypt.genSalt(10);
+                password_hash = await bcrypt.hash(password, salt);
+            } catch (bcryptError) {
+                console.error("Bcrypt error:", bcryptError);
+                return {
+                    statusCode: 500,
+                    headers: corsHeaders,
+                    body: JSON.stringify({ message: "Error processing password" })
+                };
+            }
         }
 
         const now = new Date().toISOString();
