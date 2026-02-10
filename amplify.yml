@@ -6,7 +6,8 @@ applications:
         preBuild:
           commands:
             - npm ci
-            - printenv | grep -e NEXT_PUBLIC_ > .env.production
+            - npm ci
+            - printenv | grep -e NEXT_PUBLIC_ > .env
         build:
           commands:
             - npm run build
