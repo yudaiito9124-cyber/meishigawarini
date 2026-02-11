@@ -15,6 +15,7 @@ export function middleware(request: NextRequest) {
         const url = request.nextUrl.clone();
         url.host = newDomain;
         url.protocol = 'https';
+        url.port = ""
         return NextResponse.redirect(url, 301);
     }
 
