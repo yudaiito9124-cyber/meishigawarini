@@ -6,10 +6,7 @@ import { createMessageNotificationEmail } from '../templates/email';
 
 const client = new DynamoDBClient({});
 const ddb = DynamoDBDocumentClient.from(client);
-// const ses = new SESClient({}); // Removed SES
-
 const TABLE_NAME = process.env.TABLE_NAME || '';
-// const SENDER_EMAIL = process.env.SENDER_EMAIL || ''; // Handled in email-client
 const SYSTEM_USERNAME = 'System';
 
 /**

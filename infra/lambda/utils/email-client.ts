@@ -4,7 +4,7 @@ import { Resend } from 'resend';
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
 // The sender email address (From: header)
 // This must be verified in Resend Dashboard or belong to a verified domain.
-const SENDER_EMAIL = process.env.SENDER_EMAIL || process.env.SENDER_EMAIL;
+const SENDER_EMAIL = process.env.SENDER_EMAIL;
 
 if (!RESEND_API_KEY) {
     console.warn("Initializing email-client: RESEND_API_KEY is missing. Email sending will fail.");
