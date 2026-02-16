@@ -4,12 +4,11 @@ import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, GetCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
 import { createMessageNotificationEmail } from './templates/email';
 import { sendEmail } from './utils/email-client';
+import { isLocked, getRateLimitUpdate, getResetRateLimitUpdate } from './utils/rate-limit';
 
 const client = new DynamoDBClient({});
 const ddb = DynamoDBDocumentClient.from(client);
-// const ses = new SESClient({}); // Removed SES for Resend
 const TABLE_NAME = process.env.TABLE_NAME || '';
-// const SENDER_EMAIL = process.env.SENDER_EMAIL || ''; // Handled in email-client
 
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
@@ -30,10 +29,9 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 
         if (event.httpMethod === 'POST') {
             const body = JSON.parse(event.body || '{}');
-            const { pin, username, message, type, email, locale } = body; // Added locale
+            const { pin, username, message, type, email, locale } = body;
 
             // 1. Verify PIN (Required for both Subscribe and Message)
-            // For subscribe, we might need PIN to authorized. Yes.
             if (!pin) {
                 return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Missing PIN' }) };
             }
@@ -47,7 +45,22 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 return { statusCode: 404, headers: corsHeaders, body: JSON.stringify({ message: 'QR Code not found' }) };
             }
 
-            if (getRes.Item.pin !== pin) {
+            // Check Lock
+            if (isLocked(getRes.Item)) {
+                return { statusCode: 403, headers: corsHeaders, body: JSON.stringify({ message: 'Too many attempts. Please try again later.' }) };
+            }
+
+            const item = getRes.Item;
+
+            if (item.pin !== pin) {
+                const { UpdateExpression, ExpressionAttributeValues, ExpressionAttributeNames } = getRateLimitUpdate(item);
+                await ddb.send(new UpdateCommand({
+                    TableName: TABLE_NAME,
+                    Key: { PK: `QR#${uuid}`, SK: 'METADATA' },
+                    UpdateExpression,
+                    ExpressionAttributeValues,
+                    ExpressionAttributeNames
+                }));
                 return { statusCode: 403, headers: corsHeaders, body: JSON.stringify({ message: 'Invalid PIN' }) };
             }
 
@@ -57,18 +70,9 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                     return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Missing email' }) };
                 }
 
-                // Use ADD to manage unique set of emails AND Update preferences
-                // We need two operations or a clever update expression.
-                // It's cleaner to just do one update with both.
-                // SET email_preferences.#email = :locale ADD notification_emails :new_email
-                // But #email needs ExpressionAttributeNames because email contains @ which is fine? No, dot is special.
+                const lang = locale === 'ja' ? 'ja' : 'en';
 
-                const safeEmailKey = email.replace(/[^a-zA-Z0-9]/g, '_'); // Just for key name safety if needed, but actually Map keys in DynamoDB are strings.
-                // However, nested path syntax uses dots. better to use ExpressionAttributeNames for the email key.
-
-                const lang = locale === 'ja' ? 'ja' : 'en'; // Default to en if not ja
-
-                // 1. Ensure email_preferences map exists (and add email to set)
+                // reset rate limit implicitly by removing fields
                 await ddb.send(new UpdateCommand({
                     TableName: TABLE_NAME,
                     Key: { PK: `QR#${uuid}`, SK: 'CHAT' },
@@ -79,7 +83,6 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                     }
                 }));
 
-                // 2. Set the language preference for this specific email
                 await ddb.send(new UpdateCommand({
                     TableName: TABLE_NAME,
                     Key: { PK: `QR#${uuid}`, SK: 'CHAT' },
@@ -91,6 +94,21 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                         ':lang': lang
                     }
                 }));
+
+                // Also Reset Rate Limit on METADATA if needed
+                if (item.failed_attempts || item.locked_until) {
+                    try {
+                        const { UpdateExpression, ExpressionAttributeNames } = getResetRateLimitUpdate();
+                        await ddb.send(new UpdateCommand({
+                            TableName: TABLE_NAME,
+                            Key: { PK: `QR#${uuid}`, SK: 'METADATA' },
+                            UpdateExpression,
+                            ExpressionAttributeNames
+                        }));
+                    } catch (e) {
+                        console.error("Failed to reset rate limit on subscribe", e);
+                    }
+                }
 
                 return {
                     statusCode: 200,
@@ -104,13 +122,10 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Missing required fields' }) };
             }
 
-            // Security: Prevent impersonation of System
             if (username === 'System') {
                 return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Invalid username' }) };
             }
 
-            // 2. Append Message to SK=CHAT
-            // Structure: messages: [ { username, message, ts_created_at, id } ]
             const newMessage = {
                 id: crypto.randomUUID(),
                 username,
@@ -128,7 +143,22 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 }
             }));
 
-            // 3. Send Notifications (Fire and forget or await)
+            // Also Reset Rate Limit on METADATA if needed
+            if (item.failed_attempts || item.locked_until) {
+                try {
+                    const { UpdateExpression, ExpressionAttributeNames } = getResetRateLimitUpdate();
+                    await ddb.send(new UpdateCommand({
+                        TableName: TABLE_NAME,
+                        Key: { PK: `QR#${uuid}`, SK: 'METADATA' },
+                        UpdateExpression,
+                        ExpressionAttributeNames
+                    }));
+                } catch (e) {
+                    console.error("Failed to reset rate limit on message", e);
+                }
+            }
+
+            // 3. Send Notifications
             try {
                 const getRes = await ddb.send(new GetCommand({
                     TableName: TABLE_NAME,
@@ -162,7 +192,6 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 }
             } catch (e) {
                 console.error('Failed to send notification emails:', e);
-                // Do not fail the whole process if email fails
             }
 
             return {
@@ -188,8 +217,36 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 return { statusCode: 404, headers: corsHeaders, body: JSON.stringify({ message: 'QR Code not found' }) };
             }
 
+            // Check Lock
+            if (isLocked(getMeta.Item)) {
+                return { statusCode: 403, headers: corsHeaders, body: JSON.stringify({ message: 'Too many attempts. Please try again later.' }) };
+            }
+
             if (getMeta.Item.pin !== pin) {
+                const { UpdateExpression, ExpressionAttributeValues, ExpressionAttributeNames } = getRateLimitUpdate(getMeta.Item);
+                await ddb.send(new UpdateCommand({
+                    TableName: TABLE_NAME,
+                    Key: { PK: `QR#${uuid}`, SK: 'METADATA' },
+                    UpdateExpression,
+                    ExpressionAttributeValues,
+                    ExpressionAttributeNames
+                }));
                 return { statusCode: 403, headers: corsHeaders, body: JSON.stringify({ message: 'Invalid PIN' }) };
+            }
+
+            // Success Reset
+            if (getMeta.Item.failed_attempts || getMeta.Item.locked_until) {
+                try {
+                    const { UpdateExpression, ExpressionAttributeNames } = getResetRateLimitUpdate();
+                    await ddb.send(new UpdateCommand({
+                        TableName: TABLE_NAME,
+                        Key: { PK: `QR#${uuid}`, SK: 'METADATA' },
+                        UpdateExpression,
+                        ExpressionAttributeNames
+                    }));
+                } catch (e) {
+                    console.error("Failed to reset rate limit on GET", e);
+                }
             }
 
             // 2. Get Messages

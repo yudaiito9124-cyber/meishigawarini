@@ -3,6 +3,7 @@ import { APIGatewayProxyHandler } from 'aws-lambda';
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, TransactWriteCommand, GetCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
 import { sendEmail } from './utils/email-client';
+import { isLocked, getRateLimitUpdate } from './utils/rate-limit';
 
 const client = new DynamoDBClient({});
 const ddb = DynamoDBDocumentClient.from(client);
@@ -81,7 +82,20 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             }
         }
 
+        // Check Lock
+        if (isLocked(getRes.Item)) {
+            return { statusCode: 403, headers: corsHeaders, body: JSON.stringify({ message: 'Too many attempts. Please try again later.' }) };
+        }
+
         if (getRes.Item.pin !== pin_code) {
+            const { UpdateExpression, ExpressionAttributeValues, ExpressionAttributeNames } = getRateLimitUpdate(getRes.Item);
+            await ddb.send(new UpdateCommand({
+                TableName: TABLE_NAME,
+                Key: { PK: `QR#${qr_id}`, SK: 'METADATA' },
+                UpdateExpression,
+                ExpressionAttributeValues,
+                ExpressionAttributeNames
+            }));
             return { statusCode: 403, headers: corsHeaders, body: JSON.stringify({ message: 'Invalid PIN' }) };
         }
 
@@ -112,9 +126,13 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                     Update: {
                         TableName: TABLE_NAME,
                         Key: { PK: `QR#${qr_id}`, SK: 'METADATA' },
-                        UpdateExpression: 'SET #status = :used, GSI1_PK = :gsi_pk, ts_updated_at = :now, ts_submitted_at = :now' + (password_hash ? ', password_hash = :ph' : ''),
+                        UpdateExpression: 'SET #status = :used, GSI1_PK = :gsi_pk, ts_updated_at = :now, ts_submitted_at = :now' + (password_hash ? ', password_hash = :ph' : '') + ' REMOVE #fa, #lu',
                         ConditionExpression: '#status = :active', // Double check race condition
-                        ExpressionAttributeNames: { '#status': 'status' },
+                        ExpressionAttributeNames: {
+                            '#status': 'status',
+                            '#fa': 'failed_attempts',
+                            '#lu': 'locked_until'
+                        },
                         ExpressionAttributeValues: {
                             ':used': 'USED',
                             ':active': 'ACTIVE',

@@ -3,6 +3,7 @@ import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, GetCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
 import { CognitoIdentityProviderClient, AdminGetUserCommand } from '@aws-sdk/client-cognito-identity-provider';
 import * as bcrypt from 'bcryptjs';
+import { isLocked, getRateLimitUpdate, getResetRateLimitUpdate } from './utils/rate-limit';
 
 const client = new DynamoDBClient({});
 const ddb = DynamoDBDocumentClient.from(client);
@@ -43,9 +44,37 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 
         const item = getRes.Item;
 
+        // Check Lock
+        if (isLocked(item)) {
+            return { statusCode: 403, headers: corsHeaders, body: JSON.stringify({ message: 'Too many attempts. Please try again later.' }) };
+        }
+
         // Verify PIN
         if (String(item.pin) !== String(pin)) {
+            const { UpdateExpression, ExpressionAttributeValues, ExpressionAttributeNames } = getRateLimitUpdate(item);
+            await ddb.send(new UpdateCommand({
+                TableName: TABLE_NAME,
+                Key: { PK: `QR#${uuid}`, SK: 'METADATA' },
+                UpdateExpression,
+                ExpressionAttributeValues,
+                ExpressionAttributeNames
+            }));
             return { statusCode: 403, headers: corsHeaders, body: JSON.stringify({ message: 'Invalid PIN' }) };
+        }
+
+        // Success: Reset failures if they exist
+        if (item.failed_attempts || item.locked_until) {
+            const { UpdateExpression, ExpressionAttributeNames } = getResetRateLimitUpdate();
+            try {
+                await ddb.send(new UpdateCommand({
+                    TableName: TABLE_NAME,
+                    Key: { PK: `QR#${uuid}`, SK: 'METADATA' },
+                    UpdateExpression,
+                    ExpressionAttributeNames
+                }));
+            } catch (e) {
+                console.error("Failed to reset rate limit:", e);
+            }
         }
 
         // Logic for Password Protection
