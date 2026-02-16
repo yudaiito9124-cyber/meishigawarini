@@ -200,6 +200,17 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             const { filename, contentType } = body;
             if (!filename || !contentType) return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Missing filename or contentType' }) };
 
+            const ALLOWED_CONTENT_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+            if (!ALLOWED_CONTENT_TYPES.includes(contentType)) {
+                return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Invalid content type. Only images are allowed.' }) };
+            }
+
+            const ext = filename.split('.').pop()?.toLowerCase();
+            const ALLOWED_EXTENSIONS = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+            if (!ext || !ALLOWED_EXTENSIONS.includes(ext)) {
+                return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Invalid file extension. Only images are allowed.' }) };
+            }
+
             const key = `shop/${shopId}/products/${filename}`;
             const command = new PutObjectCommand({
                 Bucket: BUCKET_NAME,
