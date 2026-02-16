@@ -121,6 +121,7 @@
             "memoForShopLabel": "Memo (visible only to shop)",
             "memoForShopPlaceholder": "You can enter a memo...",
             "submit": "Link & Activate",
+            "processing": "Processing...",
             "scanDialog": {
                 "title": "Scan QR Code",
                 "description": "Position the QR code within the frame.",

@@ -148,6 +148,7 @@
             "memoForShopLabel": "メモ(ショップのみ閲覧可能)",
             "memoForShopPlaceholder": "メモを入力できます...",
             "submit": "連携して有効化",
+            "processing": "処理中...",
             "scanDialog": {
                 "title": "QRコードスキャン",
                 "description": "枠内にQRコードを合わせてください。",

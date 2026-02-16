@@ -34,6 +34,7 @@ export default function ShopPage() {
     const [loading, setLoading] = useState(true);
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [error, setError] = useState('');
+    const [isLinking, setIsLinking] = useState(false);
 
     const [searchUuid, setSearchUuid] = useState('');
 
@@ -228,6 +229,8 @@ export default function ShopPage() {
 
     const handleLinkQr = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (isLinking) return;
+        setIsLinking(true);
         const form = e.target as HTMLFormElement;
         const formData = new FormData(form);
         const uuid = formData.get('uuid') as string;
@@ -261,6 +264,8 @@ export default function ShopPage() {
             fetchShopData();
         } catch (err: any) {
             alert("Error: " + err.message);
+        } finally {
+            setIsLinking(false);
         }
     };
 
@@ -460,7 +465,9 @@ export default function ShopPage() {
                                         </Dialog>
                                     </div>
                                 </div>
-                                <Button type="submit" className="w-full h-12 space-y-3">{t('linkQr.submit')}</Button>
+                                <Button type="submit" className="w-full h-12 space-y-3" disabled={isLinking}>
+                                    {isLinking ? t('linkQr.processing') : t('linkQr.submit')}
+                                </Button>
                             </form>
                         </CardContent>
                     </Card>

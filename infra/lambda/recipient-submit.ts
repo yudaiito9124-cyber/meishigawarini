@@ -279,7 +279,6 @@ PIN: ${pin_code}
 あなたのショップ「${shopName}」の商品にお届け先住所が登録されました。
 
 商品名: ${productName}
-商品ID: ${productId || '不明'}
 注文ID: ${qr_id}
 登録日時: ${now}
 
