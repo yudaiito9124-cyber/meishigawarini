@@ -160,9 +160,14 @@ export class InfraStack extends cdk.Stack {
       environment: {
         ...commonProps.environment,
         SENDER_EMAIL: process.env.SENDER_EMAIL || '',
+        USER_POOL_ID: userPool.userPoolId,
       }
     });
     table.grantReadWriteData(recipientSubmitFn);
+    recipientSubmitFn.addToRolePolicy(new iam.PolicyStatement({
+      actions: ['cognito-idp:AdminGetUser'],
+      resources: [userPool.userPoolArn]
+    }));
     // recipientSubmitFn.addToRolePolicy(new iam.PolicyStatement({
     //   actions: ['ses:SendEmail', 'ses:SendRawEmail'],
     //   resources: ['*'],

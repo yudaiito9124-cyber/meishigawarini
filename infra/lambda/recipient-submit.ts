@@ -2,10 +2,12 @@
 import { APIGatewayProxyHandler } from 'aws-lambda';
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, TransactWriteCommand, GetCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
+import { CognitoIdentityProviderClient, AdminGetUserCommand } from '@aws-sdk/client-cognito-identity-provider';
 import { sendEmail } from './utils/email-client';
 import { isLocked, getRateLimitUpdate } from './utils/rate-limit';
 
 const client = new DynamoDBClient({});
+const cognito = new CognitoIdentityProviderClient({});
 const ddb = DynamoDBDocumentClient.from(client);
 const TABLE_NAME = process.env.TABLE_NAME || '';
 
@@ -194,8 +196,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                     }
                 }));
 
-                // 4. Send Confirmation Email
-                // if (SENDER_EMAIL) { // Removed check here, email-client checks
+                // 4. Send Confirmation Email to Recipient
                 const subject = (lang === 'ja') ? '【名刺がわりに】住所登録完了のお知らせ' : '【Meishigawarini】Address Registration Completed';
                 const bodyText = (lang === 'ja') ? `
 住所の登録が完了しました。
@@ -218,12 +219,91 @@ PIN: ${pin_code}
                     subject: subject,
                     text: bodyText
                 });
-                // }
 
             } catch (e) {
-                console.error('Failed to auto-subscribe/send email:', e);
+                console.error('Failed to auto-subscribe/send email to recipient:', e);
                 // Non-critical, do not fail the request
             }
+        }
+
+        // 5. Send Notification Email to Shop Owner
+        try {
+            const shopId = getRes.Item.shop_id;
+            const productId = getRes.Item.product_id;
+
+            if (shopId) {
+                // Fetch Shop and Product Metadata in parallel
+                const [shopRes, productRes] = await Promise.all([
+                    ddb.send(new GetCommand({
+                        TableName: TABLE_NAME,
+                        Key: { PK: `SHOP#${shopId}`, SK: 'METADATA' }
+                    })),
+                    productId ? ddb.send(new GetCommand({
+                        TableName: TABLE_NAME,
+                        Key: { PK: `SHOP#${shopId}`, SK: `PRODUCT#${productId}` }
+                    })) : Promise.resolve({ Item: undefined })
+                ]);
+
+                let shopEmail = shopRes.Item?.email;
+                const shopName = shopRes.Item?.name || '不明なショップ';
+                const productName = productRes.Item?.name || '不明な商品';
+
+                // Fallback: If email is missing, try to get from Cognito
+                if (!shopEmail && shopRes.Item?.owner_id) {
+                    try {
+                        console.log(`Shop email missing for ${shopId}, fetching from Cognito user ${shopRes.Item.owner_id}`);
+                        const userPoolId = process.env.USER_POOL_ID;
+                        if (userPoolId) {
+                            const userRes = await cognito.send(new AdminGetUserCommand({
+                                UserPoolId: userPoolId,
+                                Username: shopRes.Item.owner_id
+                            }));
+                            const emailAttr = userRes.UserAttributes?.find(attr => attr.Name === 'email');
+                            if (emailAttr && emailAttr.Value) {
+                                shopEmail = emailAttr.Value;
+                                console.log(`Fetched email from Cognito: ${shopEmail}`);
+                            }
+                        } else {
+                            console.warn("USER_POOL_ID not set, cannot fetch from Cognito");
+                        }
+                    } catch (cognitoError) {
+                        console.error("Failed to fetch user from Cognito:", cognitoError);
+                    }
+                }
+
+                if (shopEmail) {
+                    const subject = '【名刺がわりに】お届け先住所が登録されました';
+                    const bodyText = `
+ショップオーナー様
+
+あなたのショップ「${shopName}」の商品にお届け先住所が登録されました。
+
+商品名: ${productName}
+商品ID: ${productId || '不明'}
+注文ID: ${qr_id}
+登録日時: ${now}
+
+管理画面から注文詳細を確認し、発送準備を進めてください。
+
+管理画面:
+${process.env.NEXT_PUBLIC_APP_URL}/shop/${shopId}
+`.trim();
+
+                    await sendEmail({
+                        to: [shopEmail],
+                        subject: subject,
+                        text: bodyText
+                    });
+                    console.log(`Notification email sent to shop owner: ${shopEmail}`);
+                } else {
+                    console.warn(`Shop owner email not found for shop: ${shopId}`);
+                }
+            } else {
+                console.warn(`No shop_id found for QR: ${qr_id}`);
+            }
+        } catch (e) {
+            console.error('Failed to send notification email to shop owner:', e);
+            // Non-critical
         }
 
         return resultResponse;
