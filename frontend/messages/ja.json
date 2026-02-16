@@ -198,7 +198,7 @@
             "completed": "ギフトを受け取りました！"
         },
         "pinStep": {
-            "label": "PINコード入力",
+            "label": "カード裏のPINコードを入力(5回以上間違えると一定時間ロックされます)",
             "placeholder": "8桁の数字",
             "submit": "ギフトを見る",
             "verifying": "確認中..."
