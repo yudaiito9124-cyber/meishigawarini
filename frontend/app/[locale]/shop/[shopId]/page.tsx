@@ -750,7 +750,8 @@ export default function ShopPage() {
                                         </div>
                                         <div className="space-y-2">
                                             <Label htmlFor="image">{t('addProduct.image')}</Label>
-                                            <Input id="image" name="image" type="file" accept="image/*" />
+                                            <Input id="image" name="image" type="file" accept="image/png, image/jpeg, image/gif, image/webp" />
+                                            <p className="text-xs text-gray-500">{t('addProduct.imagePlaceholder')}</p>
                                         </div>
                                         <Button type="submit" className="w-full">{t('addProduct.submit')}</Button>
                                     </form>

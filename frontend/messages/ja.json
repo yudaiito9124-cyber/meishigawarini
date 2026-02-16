@@ -132,6 +132,7 @@
             "price": "価格 (円)",
             "validDays": "有効期限 (日数)",
             "image": "商品画像",
+            "imagePlaceholder": "対応形式: .jpg, .png, .gif, .webp",
             "submit": "商品を登録"
         },
         "linkQr": {
