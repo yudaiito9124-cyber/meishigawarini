@@ -39,7 +39,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         }));
 
         if (!getRes.Item) {
-            return { statusCode: 404, headers: corsHeaders, body: JSON.stringify({ message: 'Gift not found or Invalid PIN' }) };
+            return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Invalid Gift or PIN' }) };
         }
 
         const item = getRes.Item;
@@ -59,7 +59,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 ExpressionAttributeValues,
                 ExpressionAttributeNames
             }));
-            return { statusCode: 403, headers: corsHeaders, body: JSON.stringify({ message: 'Invalid PIN' }) };
+            return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Invalid Gift or PIN' }) };
         }
 
         // Success: Reset failures if they exist
