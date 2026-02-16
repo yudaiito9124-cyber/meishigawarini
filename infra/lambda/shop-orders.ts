@@ -134,6 +134,18 @@ async function handleUpdateOrder(event: any, uuidParam?: string) {
         TableName: TABLE_NAME,
         Key: { PK: `QR#${uuid}`, SK: 'METADATA' }
     }));
+
+    // Verify ownership (IDOR fix)
+    if (!metaRes.Item) {
+        return { statusCode: 404, headers: corsHeaders, body: 'Order not found' };
+    }
+
+    const shopId = event.pathParameters?.shopId;
+    if (shopId && metaRes.Item.shop_id !== shopId) {
+        console.warn(`IDOR attempt: Shop ${shopId} tried to update order ${uuid} belonging to ${metaRes.Item.shop_id}`);
+        return { statusCode: 403, headers: corsHeaders, body: 'Forbidden' };
+    }
+
     const orderRes = await ddb.send(new GetCommand({
         TableName: TABLE_NAME,
         Key: { PK: `QR#${uuid}`, SK: 'ORDER' }
