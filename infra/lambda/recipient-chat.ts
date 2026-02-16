@@ -2,14 +2,14 @@
 import { APIGatewayProxyHandler } from 'aws-lambda';
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, GetCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
-import { SESClient, SendEmailCommand } from '@aws-sdk/client-ses';
 import { createMessageNotificationEmail } from './templates/email';
+import { sendEmail } from './utils/email-client';
 
 const client = new DynamoDBClient({});
 const ddb = DynamoDBDocumentClient.from(client);
-const ses = new SESClient({});
+// const ses = new SESClient({}); // Removed SES for Resend
 const TABLE_NAME = process.env.TABLE_NAME || '';
-const SES_SENDER_EMAIL = process.env.SES_SENDER_EMAIL || '';
+// const SENDER_EMAIL = process.env.SENDER_EMAIL || ''; // Handled in email-client
 
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
@@ -151,14 +151,11 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                             lang: langLength
                         });
 
-                        return ses.send(new SendEmailCommand({
-                            Source: SES_SENDER_EMAIL,
-                            Destination: { ToAddresses: [emailTo] },
-                            Message: {
-                                Subject: { Data: subject },
-                                Body: { Text: { Data: bodyText } }
-                            }
-                        }));
+                        return sendEmail({
+                            to: [emailTo],
+                            subject: subject,
+                            text: bodyText
+                        });
                     });
 
                     await Promise.all(sendPromises);

@@ -10,7 +10,8 @@
     "aws-cdk": "^2.1104.0",
     "aws-cdk-lib": "^2.236.0",
     "aws-lambda": "^1.0.6",
-    "bcryptjs": "^3.0.3"
+    "bcryptjs": "^3.0.3",
+    "resend": "^6.9.2"
   },
   "devDependencies": {
     "@types/aws-lambda": "^8.10.160",

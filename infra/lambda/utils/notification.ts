@@ -1,15 +1,15 @@
 
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, GetCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
-import { SESClient, SendEmailCommand } from '@aws-sdk/client-ses';
+import { sendEmail } from './email-client';
 import { createMessageNotificationEmail } from '../templates/email';
 
 const client = new DynamoDBClient({});
 const ddb = DynamoDBDocumentClient.from(client);
-const ses = new SESClient({});
+// const ses = new SESClient({}); // Removed SES
 
 const TABLE_NAME = process.env.TABLE_NAME || '';
-const SES_SENDER_EMAIL = process.env.SES_SENDER_EMAIL || '';
+// const SENDER_EMAIL = process.env.SENDER_EMAIL || ''; // Handled in email-client
 const SYSTEM_USERNAME = 'System';
 
 /**
@@ -98,14 +98,11 @@ export async function sendSystemNotification(qr_id: string, message: string, pin
                         lang
                     });
 
-                    return ses.send(new SendEmailCommand({
-                        Source: SES_SENDER_EMAIL,
-                        Destination: { ToAddresses: [email] },
-                        Message: {
-                            Subject: { Data: subject },
-                            Body: { Text: { Data: bodyText } }
-                        }
-                    }));
+                    return sendEmail({
+                        to: [email],
+                        subject: subject,
+                        text: bodyText
+                    });
                 });
 
                 await Promise.all(sendPromises);

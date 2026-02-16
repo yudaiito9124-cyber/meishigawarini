@@ -81,7 +81,8 @@ export class InfraStack extends cdk.Stack {
       environment: {
         TABLE_NAME: table.tableName,
         DEFAULT_VALID_DAYS: DEFAULT_VALID_DAYS,
-        SES_SENDER_EMAIL: process.env.SES_SENDER_EMAIL || '',
+        SENDER_EMAIL: process.env.SENDER_EMAIL || '',
+        RESEND_API_KEY: process.env.RESEND_API_KEY || '', // Added Resend API Key
         NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL || '',
       },
       timeout: cdk.Duration.seconds(30),
@@ -158,14 +159,14 @@ export class InfraStack extends cdk.Stack {
       ...commonProps,
       environment: {
         ...commonProps.environment,
-        SES_SENDER_EMAIL: process.env.SES_SENDER_EMAIL || '',
+        SENDER_EMAIL: process.env.SENDER_EMAIL || '',
       }
     });
     table.grantReadWriteData(recipientSubmitFn);
-    recipientSubmitFn.addToRolePolicy(new iam.PolicyStatement({
-      actions: ['ses:SendEmail', 'ses:SendRawEmail'],
-      resources: ['*'],
-    }));
+    // recipientSubmitFn.addToRolePolicy(new iam.PolicyStatement({
+    //   actions: ['ses:SendEmail', 'ses:SendRawEmail'],
+    //   resources: ['*'],
+    // }));
 
     // Lambda: Recipient Receive completed
     const recipientCompletedFn = new nodejs.NodejsFunction(this, 'RecipientCompletedFn', {
@@ -180,10 +181,10 @@ export class InfraStack extends cdk.Stack {
       ...commonProps,
     });
     table.grantReadWriteData(shopOrdersFn);
-    shopOrdersFn.addToRolePolicy(new iam.PolicyStatement({
-      actions: ['ses:SendEmail', 'ses:SendRawEmail'],
-      resources: ['*'],
-    }));
+    // shopOrdersFn.addToRolePolicy(new iam.PolicyStatement({
+    //   actions: ['ses:SendEmail', 'ses:SendRawEmail'],
+    //   resources: ['*'],
+    // }));
 
 
     // API Gateway
@@ -479,10 +480,10 @@ export class InfraStack extends cdk.Stack {
     completedResource.addMethod('POST', new apigateway.LambdaIntegration(recipientCompletedFn));
 
     // Grant SES permissions to RecipientCompletedFn
-    recipientCompletedFn.addToRolePolicy(new iam.PolicyStatement({
-      actions: ['ses:SendEmail', 'ses:SendRawEmail'],
-      resources: ['*'],
-    }));
+    // recipientCompletedFn.addToRolePolicy(new iam.PolicyStatement({
+    //   actions: ['ses:SendEmail', 'ses:SendRawEmail'],
+    //   resources: ['*'],
+    // }));
 
     // Lambda: Recipient Chat (NEW)
     const recipientChatFn = new nodejs.NodejsFunction(this, 'RecipientChatFn', {
@@ -495,10 +496,10 @@ export class InfraStack extends cdk.Stack {
     table.grantReadWriteData(recipientChatFn);
 
     // Grant SES permissions
-    recipientChatFn.addToRolePolicy(new iam.PolicyStatement({
-      actions: ['ses:SendEmail', 'ses:SendRawEmail'],
-      resources: ['*'], // In production, restrict to specific identities
-    }));
+    // recipientChatFn.addToRolePolicy(new iam.PolicyStatement({
+    //   actions: ['ses:SendEmail', 'ses:SendRawEmail'],
+    //   resources: ['*'], // In production, restrict to specific identities
+    // }));
 
     const chatResource = qrResourceRecip.addResource('{uuid}').addResource('chat');
     chatResource.addMethod('GET', new apigateway.LambdaIntegration(recipientChatFn));

@@ -2,14 +2,14 @@
 import { APIGatewayProxyHandler } from 'aws-lambda';
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, QueryCommand, BatchGetCommand, UpdateCommand, GetCommand } from '@aws-sdk/lib-dynamodb';
-import { SESClient, SendEmailCommand } from '@aws-sdk/client-ses';
 import { createShippingNotificationEmail } from './templates/email';
+import { sendEmail } from './utils/email-client';
 
 const client = new DynamoDBClient({});
-const ses = new SESClient({});
+// const ses = new SESClient({}); // Removed SES for Resend
 const ddb = DynamoDBDocumentClient.from(client);
 const TABLE_NAME = process.env.TABLE_NAME || '';
-const SES_SENDER_EMAIL = process.env.SES_SENDER_EMAIL;
+// const SENDER_EMAIL = process.env.SENDER_EMAIL; // Handled in email-client
 const INDEX_NAME = 'GSI1';
 
 const corsHeaders = {
@@ -182,7 +182,7 @@ async function handleUpdateOrder(event: any, uuidParam?: string) {
     const email = orderRes.Item?.email;
     const pin = metaRes.Item?.pin;
 
-    if (email && pin && SES_SENDER_EMAIL) {
+    if (email && pin) { // Checks are done in email-client
         try {
             // Check language preference if available (defaulting to ja for now)
             // Ideally we should store lang pref in ORDER or METADATA
@@ -194,14 +194,11 @@ async function handleUpdateOrder(event: any, uuidParam?: string) {
                 lang
             });
 
-            await ses.send(new SendEmailCommand({
-                Source: SES_SENDER_EMAIL,
-                Destination: { ToAddresses: [email] },
-                Message: {
-                    Subject: { Data: subject },
-                    Body: { Text: { Data: bodyText } }
-                }
-            }));
+            await sendEmail({
+                to: [email],
+                subject: subject,
+                text: bodyText
+            });
         } catch (e) {
             console.error('Failed to send shipping notification email', e);
             // Don't fail the request, just log
