@@ -200,7 +200,7 @@ export default function AdminPage() {
                     width: 300,
                     height: 300,
                     data: `${NEXT_PUBLIC_APP_URL}/receive/${code.uuid}`,
-                    image: `/presenticon.png`, // Placeholder Logo
+                    image: APP_CONFIG.QR_LOGO_PATH, // Placeholder Logo
                     qrOptions: {
                         typeNumber: 0,
                         mode: "Byte",
