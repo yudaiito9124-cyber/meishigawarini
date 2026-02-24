@@ -273,6 +273,7 @@ PIN: ${pin_code}
 
                 if (shopEmail) {
                     const subject = '【名刺がわりに】お届け先住所が登録されました';
+                    const jstNow = new Date(now).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' });
                     const bodyText = `
 ショップオーナー様
 
@@ -280,7 +281,7 @@ PIN: ${pin_code}
 
 商品名: ${productName}
 注文ID: ${qr_id}
-登録日時: ${now}
+登録日時: ${jstNow}
 
 管理画面から注文詳細を確認し、発送準備を進めてください。
 
