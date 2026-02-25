@@ -38,6 +38,9 @@ export default function ShopPage() {
 
     const [searchUuid, setSearchUuid] = useState('');
     const [shippingOrderId, setShippingOrderId] = useState<string | null>(null);
+    const [isCreatingProduct, setIsCreatingProduct] = useState(false);
+    const [deletingProductId, setDeletingProductId] = useState<string | null>(null);
+    const [togglingProductId, setTogglingProductId] = useState<string | null>(null);
 
     // Protect Route
     useEffect(() => {
@@ -158,6 +161,8 @@ export default function ShopPage() {
 
     const handleCreateProduct = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (isCreatingProduct) return;
+        setIsCreatingProduct(true);
         const form = e.target as HTMLFormElement;
         const formData = new FormData(form);
         const file = formData.get('image') as File;
@@ -225,6 +230,8 @@ export default function ShopPage() {
         } catch (err) {
             console.error(err);
             alert(t('addProduct.error'));
+        } finally {
+            setIsCreatingProduct(false);
         }
     };
 
@@ -272,6 +279,7 @@ export default function ShopPage() {
 
     const handleDeleteProduct = async (productId: string, productName: string) => {
         if (!confirm(t('product.deleteConfirm', { name: productName }))) return;
+        setDeletingProductId(productId);
 
         try {
             const res = await fetchWithAuth(`/shop/${shopId}/products/${productId}`, {
@@ -285,18 +293,23 @@ export default function ShopPage() {
             fetchShopData();
         } catch (err: any) {
             alert(err.message);
+        } finally {
+            setDeletingProductId(null);
         }
     };
 
     const handleToggleStatus = async (productId: string, currentStatus: string) => {
         const newStatus = currentStatus === 'ACTIVE' ? 'STOPPED' : 'ACTIVE';
+        setTogglingProductId(productId);
         try {
             const res = await fetchWithAuth(`/shop/${shopId}/products/${productId}`, {
                 method: 'PATCH',
                 body: JSON.stringify({ status: newStatus })
             });
             if (res.ok) fetchShopData();
-        } catch (e) { console.error(e); }
+        } catch (e) { console.error(e); } finally {
+            setTogglingProductId(null);
+        }
     };
 
     const handleShipOrder = async (qrId: string, deliveryCompany: string, trackingNumber: string, memoForUsers?: string, memoForShop?: string) => {
@@ -730,12 +743,12 @@ export default function ShopPage() {
                                     <CardContent className="px-3 pb-2 pt-0 flex justify-between items-center">
                                         <span className="font-bold text-sm">¥{product.price ? Number(product.price).toLocaleString("ja-JP") : "0"}</span>
                                         <div className="flex gap-2">
-                                            <Button variant="outline" size="sm" className="h-7 text-xs px-2" onClick={() => handleToggleStatus(product.product_id, product.status)}>
-                                                {product.status === 'ACTIVE' ? t('product.stop') : t('product.activate')}
+                                            <Button variant="outline" size="sm" className="h-7 text-xs px-2" onClick={() => handleToggleStatus(product.product_id, product.status)} disabled={togglingProductId === product.product_id}>
+                                                {togglingProductId === product.product_id ? t('linkQr.processing') : (product.status === 'ACTIVE' ? t('product.stop') : t('product.activate'))}
                                             </Button>
                                             {product.status !== 'ACTIVE' && (
-                                                <Button variant="destructive" size="sm" className="h-7 text-xs px-2" onClick={() => handleDeleteProduct(product.product_id, product.name)}>
-                                                    {t('product.delete')}
+                                                <Button variant="destructive" size="sm" className="h-7 text-xs px-2" onClick={() => handleDeleteProduct(product.product_id, product.name)} disabled={deletingProductId === product.product_id}>
+                                                    {deletingProductId === product.product_id ? t('linkQr.processing') : t('product.delete')}
                                                 </Button>
                                             )}
                                         </div>
@@ -771,7 +784,9 @@ export default function ShopPage() {
                                             <Input id="image" name="image" type="file" accept="image/png, image/jpeg, image/gif, image/webp" />
                                             <p className="text-xs text-gray-500">{t('addProduct.imagePlaceholder')}</p>
                                         </div>
-                                        <Button type="submit" className="w-full">{t('addProduct.submit')}</Button>
+                                        <Button type="submit" className="w-full" disabled={isCreatingProduct}>
+                                            {isCreatingProduct ? t('linkQr.processing') : t('addProduct.submit')}
+                                        </Button>
                                     </form>
                                 </CardContent>
                             </Card>
