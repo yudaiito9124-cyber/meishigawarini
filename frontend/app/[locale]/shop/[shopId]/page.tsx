@@ -736,8 +736,11 @@ export default function ShopPage() {
                                     <CardHeader className="px-3 pt-2 pb-1">
                                         <CardTitle className="text-base truncate" title={product.name}>{product.name}</CardTitle>
                                         <CardDescription className="line-clamp-1 text-xs">{product.description}</CardDescription>
-                                        <p className="text-xs text-gray-500 mt-1">
+                                        <p className="text-xs text-gray-500 mt-0.5">
                                             {t('addProduct.validDays')}: {product.valid_days ? product.valid_days : APP_CONFIG.DEFAULT_VALID_DAYS}日
+                                        </p>
+                                        <p className="text-[10px] text-gray-400 font-mono mt-1 truncate" title={product.product_id}>
+                                            ID: {product.product_id}
                                         </p>
                                     </CardHeader>
                                     <CardContent className="px-3 pb-2 pt-0 flex justify-between items-center">
