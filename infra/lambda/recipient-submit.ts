@@ -39,7 +39,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Missing required fields' }) };
         }
 
-        const { name, address, zipCode } = shipping_info;
+        const { name, address, zipCode, preferredDate, preferredTime } = shipping_info;
         if (!name || !address || !zipCode) {
             return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Missing required address fields (name, address, zipCode)' }) };
         }
@@ -202,7 +202,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 住所の登録が完了しました。
 商品の発送まで今しばらくお待ちください。
 
-確認はこちら:
+荷物の状態はこちら:
 ${process.env.NEXT_PUBLIC_APP_URL}/receive/${qr_id}
 PIN: ${pin_code}
 `.trim() : `
@@ -273,15 +273,7 @@ PIN: ${pin_code}
 
                 if (shopEmail) {
                     const subject = '【名刺がわりに】お届け先住所が登録されました';
-
-                    const jstDate = new Date(now);
-                    jstDate.setTime(jstDate.getTime() + 9 * 60 * 60 * 1000);
-                    const yyyy = jstDate.getUTCFullYear();
-                    const mm = String(jstDate.getUTCMonth() + 1).padStart(2, '0');
-                    const dd = String(jstDate.getUTCDate()).padStart(2, '0');
-                    const hh = String(jstDate.getUTCHours()).padStart(2, '0');
-                    const min = String(jstDate.getUTCMinutes()).padStart(2, '0');
-                    const jstNow = `${yyyy}/${mm}/${dd} ${hh}:${min}`;
+                    const jstNow = new Date(now).toLocaleString();
 
                     const bodyText = `
 ショップオーナー様

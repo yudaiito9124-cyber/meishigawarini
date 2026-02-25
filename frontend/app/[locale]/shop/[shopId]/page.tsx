@@ -37,6 +37,7 @@ export default function ShopPage() {
     const [isLinking, setIsLinking] = useState(false);
 
     const [searchUuid, setSearchUuid] = useState('');
+    const [shippingOrderId, setShippingOrderId] = useState<string | null>(null);
 
     // Protect Route
     useEffect(() => {
@@ -215,15 +216,15 @@ export default function ShopPage() {
             });
 
             if (res.ok) {
-                alert("Product created!");
+                alert(t('addProduct.success'));
                 form.reset();
                 fetchShopData(); // Refresh
             } else {
-                alert('Failed to create product');
+                alert(t('addProduct.failed'));
             }
         } catch (err) {
             console.error(err);
-            alert('Error creating product');
+            alert(t('addProduct.error'));
         }
     };
 
@@ -299,6 +300,7 @@ export default function ShopPage() {
     };
 
     const handleShipOrder = async (qrId: string, deliveryCompany: string, trackingNumber: string, memoForUsers?: string, memoForShop?: string) => {
+        setShippingOrderId(qrId);
         try {
             const body: any = { delivery_company: deliveryCompany, tracking_number: trackingNumber, memo_for_users: "", memo_for_shop: "" };
             if (memoForUsers !== undefined) body.memo_for_users = memoForUsers;
@@ -317,6 +319,8 @@ export default function ShopPage() {
         } catch (e: any) {
             console.error(e);
             alert('Error shipping order: ' + (e.message || String(e)));
+        } finally {
+            setShippingOrderId(null);
         }
     };
 
@@ -608,6 +612,11 @@ export default function ShopPage() {
                                                             </div>
 
                                                             <div>
+                                                                <h4 className="text-sm font-semibold text-gray-500">{t('orders.preferredDateTime')}</h4>
+                                                                <p className="text-sm">{order.preferred_date}  /  {order.preferred_time}</p>
+                                                            </div>
+
+                                                            <div>
                                                                 <h4 className="text-sm font-semibold text-gray-500">{t('orders.userMessage')}</h4>
                                                                 <p className="text-sm bg-gray-50 p-2 rounded">{order.memo_for_users || '-'}</p>
                                                             </div>
@@ -650,7 +659,9 @@ export default function ShopPage() {
                                                                             <Label htmlFor={`tracking-${uuid}`}>{t('orders.shipDialog.label')}</Label>
                                                                             <Input id={`tracking-${uuid}`} name="tracking" placeholder="1234-5678..." required />
                                                                         </div>
-                                                                        <Button type="submit" className="w-full">{t('orders.shipDialog.submit')}</Button>
+                                                                        <Button type="submit" className="w-full" disabled={shippingOrderId === uuid}>
+                                                                            {shippingOrderId === uuid ? t('linkQr.processing') : t('orders.shipDialog.submit')}
+                                                                        </Button>
                                                                     </form>
                                                                 </div>
                                                             )}
@@ -901,6 +912,9 @@ export default function ShopPage() {
                                                                 <h4 className="text-sm font-semibold text-gray-500">{t('orders.address')}</h4>
                                                                 {order.postal_code && <p className="text-sm">〒{order.postal_code}</p>}
                                                                 <p className="whitespace-pre-wrap text-sm">{order.address}</p>
+                                                                <p className="text-sm">{order.preferred_date}</p>
+                                                                <p className="text-sm">{order.preferred_time}</p>
+                                                                <p className="text-sm">test</p>
                                                             </div>
 
                                                             {/* Order Info */}

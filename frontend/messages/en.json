@@ -105,8 +105,13 @@
             "name": "Product Name",
             "description": "Description",
             "price": "Price (¥)",
+            "validDays": "Valid Days",
             "image": "Product Image",
-            "submit": "Create Product"
+            "imagePlaceholder": "Supported formats: .jpg, .png, .gif, .webp",
+            "submit": "Create Product",
+            "success": "Product created!",
+            "failed": "Failed to create product",
+            "error": "Error creating product"
         },
         "linkQr": {
             "title": "Link QR Code",
@@ -163,6 +168,14 @@
             "title": "Delivery Details",
             "name": "Full Name",
             "address": "Delivery Address",
+            "preferredDate": "Preferred Delivery Date (Optional)",
+            "preferredTime": "Preferred Delivery Time (Optional)",
+            "noPreference": "No preference",
+            "timeMorning": "Morning",
+            "time1416": "14:00 - 16:00",
+            "time1618": "16:00 - 18:00",
+            "time1820": "18:00 - 20:00",
+            "time1921": "19:00 - 21:00",
             "privacyPolicy": "The personal information you enter will be used only for shipping and shipping-related communications and will not be used for any other purpose.",
             "submit": "Receive Gift",
             "submitting": "Submitting..."

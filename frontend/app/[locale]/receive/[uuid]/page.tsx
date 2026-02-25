@@ -99,6 +99,8 @@ export default function ReceivePage() {
     const [address, setAddress] = useState("");
     const [phone, setPhone] = useState("");
     const [email, setEmail] = useState("");
+    const [preferredDate, setPreferredDate] = useState("");
+    const [preferredTime, setPreferredTime] = useState("");
 
     // Password Protection State
     const [password, setPassword] = useState("");
@@ -199,7 +201,7 @@ export default function ReceivePage() {
         }
         setLoading(true);
         try {
-            await submitAddress(uuid, pin, { name, zipCode, address, phone, email }, password);
+            await submitAddress(uuid, pin, { name, zipCode, address, phone, email, preferredDate, preferredTime }, password);
             setStep("SUCCESS");
         } catch (error: any) {
             console.error("Submission error:", error);
@@ -470,6 +472,42 @@ export default function ReceivePage() {
                                         onChange={(e) => setEmail(e.target.value)}
                                         placeholder="you@example.com"
                                     />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="preferredDate">{t('formStep.preferredDate')}</Label>
+                                    <div className="flex gap-2 items-center">
+                                        <Input
+                                            id="preferredDate"
+                                            type="date"
+                                            value={preferredDate}
+                                            onChange={(e) => setPreferredDate(e.target.value)}
+                                            className="flex-1"
+                                        />
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            onClick={() => setPreferredDate("")}
+                                            className="whitespace-nowrap"
+                                        >
+                                            {t('formStep.noPreference')}
+                                        </Button>
+                                    </div>
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="preferredTime">{t('formStep.preferredTime')}</Label>
+                                    <select
+                                        id="preferredTime"
+                                        value={preferredTime}
+                                        onChange={(e) => setPreferredTime(e.target.value)}
+                                        className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                                    >
+                                        <option value="">{t('formStep.noPreference')}</option>
+                                        <option value="午前中">{t('formStep.timeMorning')}</option>
+                                        <option value="14-16時">{t('formStep.time1416')}</option>
+                                        <option value="16-18時">{t('formStep.time1618')}</option>
+                                        <option value="18-20時">{t('formStep.time1820')}</option>
+                                        <option value="19-21時">{t('formStep.time1921')}</option>
+                                    </select>
                                 </div>
 
                                 {/* Password Setting Section */}
