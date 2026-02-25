@@ -175,7 +175,7 @@ export default function ShopPage() {
                 // Resize Image
                 const resizedBlob = await resizeImage(file);
 
-                // 2. Rename (simple random string)
+                // 2. Rename (use random UUID for image)
                 const ext = file.name.split('.').pop();
                 const randomName = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(7);
                 const filename = `${randomName}.${ext}`;
@@ -427,7 +427,7 @@ export default function ShopPage() {
                                         </div>
                                         <div className="space-y-2">
                                             <Label htmlFor="product_id">{t('linkQr.selectProduct')}</Label>
-                                            <select id="product_id" name="product_id" className="w-full p-2 border rounded-md" required>
+                                            <select id="product_id" name="product_id" className="w-full p-2 border rounded-md">
                                                 <option value="">{t('linkQr.selectPlaceholder')}</option>
                                                 {products.filter(p => p.status === 'ACTIVE').map(p => (
                                                     <option key={p.product_id} value={p.product_id}>{p.name}</option>

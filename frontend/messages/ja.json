@@ -302,6 +302,8 @@
         "generate": {
             "title": "QRコード生成",
             "quantity": "生成数",
+            "shopId": "ショップID (任意)",
+            "productId": "プロダクトID (任意)",
             "button": "生成"
         },
         "batches": {

@@ -112,7 +112,7 @@ export class InfraStack extends cdk.Stack {
       entry: path.join(__dirname, '../lambda/admin-generate.ts'),
       ...commonProps,
     });
-    table.grantWriteData(adminGenerateFn);
+    table.grantReadWriteData(adminGenerateFn);
 
     // Lambda: Admin List
     const adminListFn = new nodejs.NodejsFunction(this, 'AdminListFn', {

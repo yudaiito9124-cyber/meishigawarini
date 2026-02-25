@@ -249,6 +249,9 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                     valid_days: validityPeriod,
                     status: 'ACTIVE', // Default status
                     GSI1_PK: 'PRODUCT#ACTIVE', // For listing active products
+                    GSI1_SK: new Date().toISOString(), // Optional: Sort by creation date
+                    GSI2_PK: productId, // Added for UUID lookup
+                    GSI2_SK: new Date().toISOString(), // Optional: Sort by creation date
                     ts_created_at: new Date().toISOString()
                 }
             }));
@@ -280,8 +283,25 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             await verifyShopOwner();
 
             const body = JSON.parse(event.body || '{}');
-            const { qr_id, product_id, memo_for_users, memo_for_shop, activate_now } = body;
-            if (!qr_id || !product_id) return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Missing qr_id or product_id' }) };
+            let { qr_id, product_id, memo_for_users, memo_for_shop, activate_now } = body;
+            if (!qr_id) return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Missing qr_id' }) };
+
+            // Fetch QR to determine status and existing product_id
+            const qrCheck = await ddb.send(new GetCommand({
+                TableName: TABLE_NAME,
+                Key: { PK: `QR#${qr_id}`, SK: 'METADATA' }
+            }));
+            if (!qrCheck.Item) return { statusCode: 404, headers: corsHeaders, body: JSON.stringify({ message: 'QR not found' }) };
+
+            const qrItem = qrCheck.Item;
+            if (qrItem.status === 'LINKED') {
+                if (qrItem.shop_id !== shopId) return { statusCode: 403, headers: corsHeaders, body: JSON.stringify({ message: 'QR does not belong to this shop' }) };
+                if (!product_id) product_id = qrItem.product_id;
+            } else if (qrItem.status === 'UNASSIGNED') {
+                if (!product_id) return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Missing product_id for unassigned QR' }) };
+            } else {
+                return { statusCode: 409, headers: corsHeaders, body: JSON.stringify({ message: 'QR cannot be linked/activated (not UNASSIGNED or LINKED)' }) };
+            }
 
             // Verify Product belongs to Shop
             const prodCheck = await ddb.send(new GetCommand({

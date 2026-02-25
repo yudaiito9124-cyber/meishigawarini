@@ -26,6 +26,8 @@ export default function AdminPage() {
     const t = useTranslations('AdminPage');
     const [count, setCount] = useState(10);
     const [keyword, setKeyword] = useState("");
+    const [shopId, setShopId] = useState("");
+    const [productId, setProductId] = useState("");
     const [generatedBatches, setGeneratedBatches] = useState<any[]>([]);
     const [isAuthorized, setIsAuthorized] = useState<boolean | null>(null); // null = loading
 
@@ -87,7 +89,7 @@ export default function AdminPage() {
                     "Content-Type": "application/json",
                     "Authorization": `Bearer ${token}`
                 },
-                body: JSON.stringify({ count }),
+                body: JSON.stringify({ count, shopId: shopId || undefined, productId: productId || undefined }),
             });
 
             if (res.ok) {
@@ -112,7 +114,8 @@ export default function AdminPage() {
                 // Automatically download PDF
                 await generatePDF(newBatch);
             } else {
-                alert(t('batches.alerts.failed'));
+                const errData = await res.json().catch(() => null);
+                alert(errData?.message || t('batches.alerts.failed'));
             }
         } catch (e) {
             console.error(e);
@@ -340,7 +343,7 @@ export default function AdminPage() {
                         <CardTitle>{t('generate.title')}</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                        <div className="flex items-end gap-4">
+                        <div className="flex flex-col gap-4">
                             <div className="grid w-full max-w-sm items-center gap-1.5">
                                 <label htmlFor="count" className="text-sm font-medium">{t('generate.quantity')}</label>
                                 <Input
@@ -350,7 +353,29 @@ export default function AdminPage() {
                                     onChange={(e) => setCount(Number(e.target.value))}
                                 />
                             </div>
-                            <Button onClick={handleGenerate}>{t('generate.button')}</Button>
+                            <div className="grid w-full max-w-sm items-center gap-1.5">
+                                <label htmlFor="shopId" className="text-sm font-medium">{t('generate.shopId')}</label>
+                                <Input
+                                    id="shopId"
+                                    type="text"
+                                    value={shopId}
+                                    placeholder="UUID..."
+                                    onChange={(e) => setShopId(e.target.value)}
+                                />
+                            </div>
+                            <div className="grid w-full max-w-sm items-center gap-1.5">
+                                <label htmlFor="productId" className="text-sm font-medium">{t('generate.productId')}</label>
+                                <Input
+                                    id="productId"
+                                    type="text"
+                                    value={productId}
+                                    placeholder="UUID..."
+                                    onChange={(e) => setProductId(e.target.value)}
+                                />
+                            </div>
+                            <div>
+                                <Button onClick={handleGenerate}>{t('generate.button')}</Button>
+                            </div>
                         </div>
                     </CardContent>
                 </Card>
