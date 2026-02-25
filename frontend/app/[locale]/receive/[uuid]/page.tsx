@@ -511,7 +511,7 @@ export default function ReceivePage() {
                                 </div>
 
                                 {/* Password Setting Section */}
-                                <div className="space-y-4 pt-8 mt-16 border-t">
+                                {/* <div className="space-y-4 pt-8 mt-16 border-t">
                                     <Label className="font-semibold text-blue-800">{t('formStep.passwordTitle')}</Label>
                                     <p className="text-xs text-gray-500">
                                         {t('formStep.passwordDescription')}
@@ -536,7 +536,7 @@ export default function ReceivePage() {
                                             placeholder={t('formStep.confirmPasswordPlaceholder')}
                                         />
                                     </div>
-                                </div>
+                                </div> */}
                             </div>
 
 
