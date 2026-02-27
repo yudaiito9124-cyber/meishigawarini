@@ -21,11 +21,11 @@
 *   **バックエンド / インフラ**: AWS CDK v2 (TypeScript)
     *   AWS上に構築されるサーバーやデータベースの設計図をコードで書いています。
 
-👉 **[AWS_ARCHITECTURE.md](./AWS_ARCHITECTURE.md)** を開き、各AWSサービス（API Gateway, Lambda, DynamoDB, Cognito, S3など）の役割と、それがプロジェクトのどのファイルと紐付いているか図解付きで確認してください。（※AWS初心者向けの解説です）
+👉AWSサービスの概要： **[AWS_ARCHITECTURE.md](./documents/AWS_ARCHITECTURE.md)** を開き、各AWSサービス（API Gateway, Lambda, DynamoDB, Cognito, S3など）の役割と、それがプロジェクトのどのファイルと紐付いているか図解付きで確認してください。（※AWS初心者向けの解説です）
 
-👉 **[DYNAMODB_GUIDE.md](./DYNAMODB_GUIDE.md)** には、データベース（DynamoDB）にどのような形でデータ（ショップ情報、商品、QR、注文など）が保存されているかを図解付きで解説しています。（※シングルテーブル設計の解説です）
+👉データベースの概要： **[DYNAMODB_GUIDE.md](./documents/DYNAMODB_GUIDE.md)** には、データベース（DynamoDB）にどのような形でデータ（ショップ情報、商品、QR、注文など）が保存されているかを図解付きで解説しています。（※シングルテーブル設計の解説です）
 
-👉 **[SECURITY_GUIDE.md](./SECURITY_GUIDE.md)** には、このプロジェクトで行われているセキュリティ対策（不正アクセス防止や権限管理など）と、それが実際のコードのどこに書かれているかを解説しています。
+👉セキュリティ対策の概要： **[SECURITY_GUIDE.md](./documents/SECURITY_GUIDE.md)** には、このプロジェクトで行われているセキュリティ対策（不正アクセス防止や権限管理など）と、それが実際のコードのどこに書かれているかを解説しています。
 
 ---
 
@@ -55,13 +55,13 @@ c:\git\meishigawarini\
 開発を始めるには、以下の3つのステップが必要です。これらを順番に進めてください。
 
 ### 3.1 アカウント権限をもらう(管理者が作成する)
-👉 **[ACCOUNT_SETUP.md](./ACCOUNT_SETUP.md)** を開き、**「2. 新規開発者をプロジェクトに招待する手順」** を参考に、管理者（オーナー）からアカウント権限や環境変数などの必要な情報をもらってください。
+👉 **[ACCOUNT_SETUP.md](./documents/ACCOUNT_SETUP.md)** を開き、**「2. 新規開発者をプロジェクトに招待する手順」** を参考に、管理者（オーナー）からアカウント権限や環境変数などの必要な情報をもらってください。
 
 ### 3.2 環境構築
-👉 **[ENVIRONMENT_SETUP.md](./ENVIRONMENT_SETUP.md)** を開き、手順に従ってご自身のPCに専用ツールのインストール（AWS CLIやNode.jsなど）や初期設定を行ってください。（※完全初心者向けにゼロから解説しています）
+👉 **[ENVIRONMENT_SETUP.md](./documents/ENVIRONMENT_SETUP.md)** を開き、手順に従ってご自身のPCに専用ツールのインストール（AWS CLIやNode.jsなど）や初期設定を行ってください。（※完全初心者向けにゼロから解説しています）
 
 ### 3.3 もらったアカウント情報で認証
-👉 再び **[ACCOUNT_SETUP.md](./ACCOUNT_SETUP.md)** の **「3. 開発者側（メンバー）が行う初期設定」** を見ながら、3.1でもらったログイン情報を使ってAWSの認証（`aws configure`）などを完了させてください。
+👉 再び **[ACCOUNT_SETUP.md](./documents/ACCOUNT_SETUP.md)** の **「3. 開発者側（メンバー）が行う初期設定」** を見ながら、3.1でもらったログイン情報を使ってAWSの認証（`aws configure`）などを完了させてください。
 
 ### 3.4 名刺代わりに ユーザーID作成・管理者権限の付与
 名刺代わりにの管理者画面に移行するには、名刺代わりにでアカウントを作成し、Cognitoから管理者権限を付与する(Administratorsグループに入る)必要があります。
@@ -72,7 +72,7 @@ c:\git\meishigawarini\
 
 フロントエンド（画面）とバックエンド（AWS上の仕組み）では、それぞれコードの書き方や「Web上に自分のプログラムを反映する（デプロイする）」手順が異なります。
 
-👉 **[WORKFLOW_GUIDE.md](./WORKFLOW_GUIDE.md)** を開き、フロントエンド／バックエンドそれぞれで使う具体的なコマンドの流れを確認してください。
+👉 **[WORKFLOW_GUIDE.md](./documents/WORKFLOW_GUIDE.md)** を開き、フロントエンド／バックエンドそれぞれで使う具体的なコマンドの流れを確認してください。
 （「画面をプレビューするには？」「自分の変更を本番に反映するには？」といった疑問への答えがまとまっています）
 
 ---
