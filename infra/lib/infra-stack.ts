@@ -25,6 +25,10 @@ export class InfraStack extends cdk.Stack {
       encryption: dynamodb.TableEncryption.AWS_MANAGED,
     });
 
+    const allowedOrigins = process.env.CORS_ALLOWED_ORIGINS
+      ? process.env.CORS_ALLOWED_ORIGINS.split(',')
+      : ['https://meishigawarini.com', 'http://localhost:3000'];
+
     // S3 Bucket for Product Images
     const bucket = new s3.Bucket(this, 'ProductImageBucket', {
       removalPolicy: cdk.RemovalPolicy.DESTROY,
@@ -32,7 +36,7 @@ export class InfraStack extends cdk.Stack {
       cors: [
         {
           allowedMethods: [s3.HttpMethods.GET, s3.HttpMethods.PUT, s3.HttpMethods.HEAD],
-          allowedOrigins: ['*'], // For prototype simplicity. In prod, lock down to domain.
+          allowedOrigins: allowedOrigins, // Locked down to domains
           allowedHeaders: ['*'],
         },
       ],
@@ -129,15 +133,7 @@ export class InfraStack extends cdk.Stack {
       resources: [userPool.userPoolArn]
     }));
 
-
-    // // Lambda: Shop Activate
-    // const shopActivateFn = new nodejs.NodejsFunction(this, 'ShopActivateFn', {
-    //   entry: path.join(__dirname, '../lambda/shop-activate.ts'),
-    //   ...commonProps,
-    // });
-    // table.grantReadWriteData(shopActivateFn);
-
-    // Lambda: Shop & Product Mgmt (NEW)
+    // Lambda: Shop & Product Mgmt
     const shopMgmtFn = new nodejs.NodejsFunction(this, 'ShopMgmtFn', {
       entry: path.join(__dirname, '../lambda/shop-mgmt.ts'),
       handler: 'handler',
@@ -168,10 +164,6 @@ export class InfraStack extends cdk.Stack {
       actions: ['cognito-idp:AdminGetUser'],
       resources: [userPool.userPoolArn]
     }));
-    // recipientSubmitFn.addToRolePolicy(new iam.PolicyStatement({
-    //   actions: ['ses:SendEmail', 'ses:SendRawEmail'],
-    //   resources: ['*'],
-    // }));
 
     // Lambda: Recipient Receive completed
     const recipientCompletedFn = new nodejs.NodejsFunction(this, 'RecipientCompletedFn', {
@@ -186,39 +178,20 @@ export class InfraStack extends cdk.Stack {
       ...commonProps,
     });
     table.grantReadWriteData(shopOrdersFn);
-    // shopOrdersFn.addToRolePolicy(new iam.PolicyStatement({
-    //   actions: ['ses:SendEmail', 'ses:SendRawEmail'],
-    //   resources: ['*'],
-    // }));
+
 
 
     // API Gateway
     const api = new apigateway.RestApi(this, 'MeishiGawariniApi', {
       restApiName: 'MeishiGawarini Service',
       defaultCorsPreflightOptions: {
-        allowOrigins: apigateway.Cors.ALL_ORIGINS,
+        allowOrigins: allowedOrigins,
         allowMethods: apigateway.Cors.ALL_METHODS,
         allowHeaders: apigateway.Cors.DEFAULT_HEADERS,
       },
     });
 
-    // // 認証エラー(401)が発生したときも、404を返すように上書きする設定
-    // api.addGatewayResponse('Default401Response', {
-    //   type: apigateway.ResponseType.UNAUTHORIZED,
-    //   statusCode: '404',
-    //   templates: {
-    //     'application/json': '{"message": "Not Found"}'
-    //   }
-    // });
 
-    // // 権限エラー(403)が発生したときも、404を返すように上書き
-    // api.addGatewayResponse('Default403Response', {
-    //   type: apigateway.ResponseType.ACCESS_DENIED,
-    //   statusCode: '404',
-    //   templates: {
-    //     'application/json': '{"message": "Not Found"}'
-    //   }
-    // });
 
     // --- 認証エラー(401)を 404 に偽装しつつ CORS を許可 ---
     api.addGatewayResponse('Default401Response', {
@@ -348,30 +321,11 @@ export class InfraStack extends cdk.Stack {
 
     // Shop Routes (Legacy & Activation)
     const shopResource = api.root.addResource('shop');
-    // const activateResource = shopResource.addResource('activate');
 
-    // activateResource.addMethod('POST', new apigateway.LambdaIntegration(shopActivateFn), {
-    //   authorizer,
-    //   authorizationType: apigateway.AuthorizationType.COGNITO,
-    // });
-
-    // const ordersResource = shopResource.addResource('orders');
-    // ordersResource.addMethod('GET', new apigateway.LambdaIntegration(shopOrdersFn), {
-    //   authorizer,
-    //   authorizationType: apigateway.AuthorizationType.COGNITO
-    // });
-
-    // const orderDetailResource = ordersResource.addResource('{uuid}');
-    // orderDetailResource.addMethod('PATCH', new apigateway.LambdaIntegration(shopOrdersFn), {
-    //   authorizer,
-    //   authorizationType: apigateway.AuthorizationType.COGNITO
-    // });
 
     // New Shops Resource /shops
     // const shopsResource = api.root.addResource('shops');
     shopResource.addMethod('POST', new apigateway.LambdaIntegration(shopMgmtFn), {
-      // Keeping CREATE SHOP open to allow signup -> create flow? 
-      // Or require Auth? Let's require Auth so they must Register (Cognito) -> Login -> Create Shop.
       authorizer,
       authorizationType: apigateway.AuthorizationType.COGNITO
     });
@@ -447,18 +401,7 @@ export class InfraStack extends cdk.Stack {
     // Recipient Routes
     const recipientResource = api.root.addResource('recipient');
     const qrResourceRecip = recipientResource.addResource('qrcodes');
-    // const qrDetailResource = qrResourceRecip.addResource('{uuid}');
 
-    // Lambda: Recipient Get
-    // const recipientGetFn = new nodejs.NodejsFunction(this, 'RecipientGetFn', {
-    //   entry: path.join(__dirname, '../lambda/recipient-get.ts'),
-    //   ...commonProps,
-    // });
-    // table.grantReadData(recipientGetFn);
-
-    // qrDetailResource.addMethod('GET', new apigateway.LambdaIntegration(recipientGetFn));
-
-    // // Lambda: Recipient Verify PIN (NEW)
     // Lambda: Recipient Verify PIN (NEW)
     const recipientVerifyPinFn = new nodejs.NodejsFunction(this, 'RecipientVerifyPinFn', {
       entry: path.join(__dirname, '../lambda/recipient-verify-pin.ts'),
@@ -484,12 +427,6 @@ export class InfraStack extends cdk.Stack {
     const completedResource = recipientResource.addResource('completed');
     completedResource.addMethod('POST', new apigateway.LambdaIntegration(recipientCompletedFn));
 
-    // Grant SES permissions to RecipientCompletedFn
-    // recipientCompletedFn.addToRolePolicy(new iam.PolicyStatement({
-    //   actions: ['ses:SendEmail', 'ses:SendRawEmail'],
-    //   resources: ['*'],
-    // }));
-
     // Lambda: Recipient Chat (NEW)
     const recipientChatFn = new nodejs.NodejsFunction(this, 'RecipientChatFn', {
       entry: path.join(__dirname, '../lambda/recipient-chat.ts'),
@@ -500,87 +437,9 @@ export class InfraStack extends cdk.Stack {
     });
     table.grantReadWriteData(recipientChatFn);
 
-    // Grant SES permissions
-    // recipientChatFn.addToRolePolicy(new iam.PolicyStatement({
-    //   actions: ['ses:SendEmail', 'ses:SendRawEmail'],
-    //   resources: ['*'], // In production, restrict to specific identities
-    // }));
-
     const chatResource = qrResourceRecip.addResource('{uuid}').addResource('chat');
     chatResource.addMethod('GET', new apigateway.LambdaIntegration(recipientChatFn));
     chatResource.addMethod('POST', new apigateway.LambdaIntegration(recipientChatFn));
-
-
-    // ######################### ここからIP制限
-    // --- WAF Setup for Admin IP Restriction ---
-    // 1. IP Set (Allowed IPs)
-    // const allowedIpSet = new wafv2.CfnIPSet(this, 'AdminAllowedIPs', {
-    //   name: 'AdminAllowedIPs',
-    //   scope: 'REGIONAL',
-    //   ipAddressVersion: 'IPV4',
-    //   addresses: [
-    //     '115.65.249.220/32' // User's IP
-    //   ],
-    //   description: 'Allowed IPs for Admin access',
-    // });
-
-    // 2. Web ACL
-    // const webAcl = new wafv2.CfnWebACL(this, 'MeishiGawariniWebACL', {
-    //   name: 'MeishiGawariniWebACL',
-    //   scope: 'REGIONAL',
-    //   defaultAction: { allow: {} },
-    //   visibilityConfig: {
-    //     cloudWatchMetricsEnabled: true,
-    //     metricName: 'MeishiGawariniWebACL',
-    //     sampledRequestsEnabled: true,
-    //   },
-    //   rules: [
-    //     {
-    //       name: 'BlockAdminOutsideIp',
-    //       priority: 100,
-    //       statement: {
-    //         andStatement: {
-    //           statements: [
-    //             {
-    //               byteMatchStatement: {
-    //                 fieldToMatch: { uriPath: {} },
-    //                 positionalConstraint: 'STARTS_WITH',
-    //                 searchString: '/admin',
-    //                 textTransformations: [{ priority: 0, type: 'NONE' }]
-    //               }
-    //             },
-    //             {
-    //               notStatement: {
-    //                 statement: {
-    //                   ipSetReferenceStatement: {
-    //                     arn: allowedIpSet.attrArn
-    //                   }
-    //                 }
-    //               }
-    //             }
-    //           ]
-    //         }
-    //       },
-    //       action: { block: {} },
-    //       visibilityConfig: {
-    //         cloudWatchMetricsEnabled: true,
-    //         metricName: 'BlockAdminOutsideIp',
-    //         sampledRequestsEnabled: true,
-    //       }
-    //     }
-    //   ]
-    // });
-
-    // 3. Associate with API Gateway
-    // API Gateway deployment stage ARN: arn:aws:apigateway:region::/restapi_id/stages/stage_name
-    // const apiGatewayArn = `arn:aws:apigateway:${this.region}::/restapis/${api.restApiId}/stages/${api.deploymentStage.stageName}`;
-
-    // new wafv2.CfnWebACLAssociation(this, 'ApiGatewayAssociation', {
-    //   resourceArn: apiGatewayArn,
-    //   webAclArn: webAcl.attrArn,
-    // });
-    // ######################### ここまでIP制限
-
 
 
 
