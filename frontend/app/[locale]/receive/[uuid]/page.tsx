@@ -1,3 +1,7 @@
+/**
+ * ファイル概要: ダイナミック受取ページ (QRコードスキャン後)
+ * 目的: スキャンされたQRコード(UUID)に基づいてギフト情報を表示し、PIN認証、受取人の住所入力、チャット機能、およびステータス管理機能を提供します。
+ */
 "use client";
 
 import { useState, useEffect, useCallback } from "react";

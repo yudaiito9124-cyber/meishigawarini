@@ -1,3 +1,7 @@
+/**
+ * ファイル概要: next-intlのルーティング設定ファイル
+ * 目的: サポートするロケール(en, ja)やデフォルトロケールの定義、および国際化対応のナビゲーションAPI(Link, useRouterなど)をエクスポートします。
+ */
 import { defineRouting } from 'next-intl/routing';
 import { createNavigation } from 'next-intl/navigation';
 

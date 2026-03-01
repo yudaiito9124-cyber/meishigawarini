@@ -1,4 +1,8 @@
 
+/**
+ * ファイル概要: 認証付きAPIクライアントユーティリティ
+ * 目的: AWS Amplifyのセッションから取得したトークンをAuthorizationヘッダーに付与し、バックエンドAPIへのリクエストを行います。
+ */
 import { fetchAuthSession } from 'aws-amplify/auth';
 
 const NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || "";

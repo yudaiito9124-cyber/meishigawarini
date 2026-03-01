@@ -1,3 +1,7 @@
+/**
+ * ファイル概要: Next.js ミドルウェア
+ * 目的: リクエストごとに実行され、旧ドメインから新ドメインへのリダイレクト処理、およびnext-intlによる国際化ルーティング処理を行います。
+ */
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import createMiddleware from 'next-intl/middleware';

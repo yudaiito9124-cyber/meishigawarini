@@ -1,3 +1,7 @@
+/**
+ * ファイル概要: アプリケーションのトップページ
+ * 目的: ユーザーに対するサービスの簡単な説明と、ショップ管理者向けページへの遷移リンクを提供します。
+ */
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 

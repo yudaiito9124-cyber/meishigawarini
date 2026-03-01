@@ -1,3 +1,7 @@
+/**
+ * ファイル概要: 個別ショップ管理のダッシュボード
+ * 目的: 指定されたショップのQRコードリンク、商品作成・管理、受注一覧、および発送処理などの機能を提供します。
+ */
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -373,36 +377,8 @@ export default function ShopPage() {
 
             <div className="max-w-7xl mx-auto px-4 py-10 space-y-10">
 
+                {/* Link QR */}
                 <div className="grid grid-cols-1 lg:grid-cols-1 gap-6">
-                    {/* Create Product
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>{t('addProduct.title')}</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <form onSubmit={handleCreateProduct} className="space-y-4">
-                                <div className="space-y-2">
-                                    <Label htmlFor="name">{t('addProduct.name')}</Label>
-                                    <Input id="name" name="name" required />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="description">{t('addProduct.description')}</Label>
-                                    <Input id="description" name="description" required />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="price">{t('addProduct.price')}</Label>
-                                    <Input id="price" name="price" type="number" required />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="image">{t('addProduct.image')}</Label>
-                                    <Input id="image" name="image" type="file" accept="image/*" />
-                                </div>
-                                <Button type="submit" className="w-full">{t('addProduct.submit')}</Button>
-                            </form>
-                        </CardContent>
-                    </Card> */}
-
-                    {/* Link QR */}
                     <Card>
                         <CardHeader>
                             <CardTitle>{t('linkQr.title')}</CardTitle>
@@ -930,9 +906,11 @@ export default function ShopPage() {
                                                                 <h4 className="text-sm font-semibold text-gray-500">{t('orders.address')}</h4>
                                                                 {order.postal_code && <p className="text-sm">〒{order.postal_code}</p>}
                                                                 <p className="whitespace-pre-wrap text-sm">{order.address}</p>
-                                                                <p className="text-sm">{order.preferred_date}</p>
-                                                                <p className="text-sm">{order.preferred_time}</p>
-                                                                <p className="text-sm">test</p>
+                                                            </div>
+
+                                                            <div>
+                                                                <h4 className="text-sm font-semibold text-gray-500">{t('orders.preferredDateTime')}</h4>
+                                                                <p className="text-sm">{order.preferred_date}  /  {order.preferred_time}</p>
                                                             </div>
 
                                                             {/* Order Info */}

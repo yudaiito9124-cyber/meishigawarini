@@ -1,3 +1,7 @@
+/**
+ * ファイル概要: QRコードリーダーコンポーネント
+ * 目的: html5-qrcodeを利用し、デバイスのカメラからQRコードをスキャンして結果をコールバックで返す機能を提供します。
+ */
 'use client';
 
 import { useEffect, useRef, useState } from 'react';

@@ -25,7 +25,17 @@
 
 👉データベースの概要： **[DYNAMODB_GUIDE.md](./documents/DYNAMODB_GUIDE.md)** には、データベース（DynamoDB）にどのような形でデータ（ショップ情報、商品、QR、注文など）が保存されているかを図解付きで解説しています。（※シングルテーブル設計の解説です）
 
+👉データベースの詳細仕様： **[DATABASE_SCHEMA.md](./documents/DATABASE_SCHEMA.md)** には、各データ項目の詳細な型、UUIDや日付フォーマット等の制約、および取りうるステータス値が一覧化されています。
+
 👉セキュリティ対策の概要： **[SECURITY_GUIDE.md](./documents/SECURITY_GUIDE.md)** には、このプロジェクトで行われているセキュリティ対策（不正アクセス防止や権限管理など）と、それが実際のコードのどこに書かれているかを解説しています。
+
+👉画面一覧・ページ遷移図： **[UI_PAGE_TRANSITIONS.md](./documents/UI_PAGE_TRANSITIONS.md)** には、アプリケーション全体のページ構成、各ページでできること（操作一覧）、ページ間の状態遷移を図付きで解説しています。
+
+
+### 開発時の環境
+* **OS** : windows 11
+* **IDE** : Google Antigravity (Visual Studio Code)
+* **言語** : TypeScript (npm)
 
 ---
 
@@ -41,7 +51,7 @@ c:\git\meishigawarini\
 │   └── package.json# 画面を作るために必要な外部ツールのリスト
 │
 ├── infra\          # AWSの環境構築とバックエンドのプログラム (インフラ)
-│   ├── lib\        # AWSのサービス（データベースなど）をどう作るかの定義ファイル
+│   ├── lib\        # AWSのサービス（データベース、セキュリティなど）をどう作るかの定義ファイル
 │   ├── lambda\     # サーバーで動く実際のプログラム（データを保存するなど）
 │   └── package.json# インフラ構築に必要な外部ツールのリスト
 │

@@ -1,3 +1,7 @@
+/**
+ * ファイル概要: 全体で共通利用する Table コンポーネント (shadcn/ui)
+ * 目的: データ一覧を表示するための、スタイリングされたHTMLテーブル要素（ヘッダー、ボディ、行、セルなど）を提供します。
+ */
 "use client"
 
 import * as React from "react"

@@ -1,3 +1,7 @@
+/**
+ * ファイル概要: AWS Amplify の初期化設定
+ * 目的: クライアントサイドでのCognito User Poolを利用した認証機能をセットアップします。
+ */
 'use client'; // サーバーサイドで実行されないようにする　すべてのクライアントサイドで実行される
 
 import { Amplify } from 'aws-amplify';

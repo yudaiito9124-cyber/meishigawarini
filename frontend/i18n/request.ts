@@ -1,3 +1,7 @@
+/**
+ * ファイル概要: next-intlのリクエスト設定ファイル
+ * 目的: ユーザーのロケール判定と対応するメッセージカタログ(JSON)の動的読み込みを行い、国際化の基本設定を提供します。
+ */
 import { getRequestConfig } from 'next-intl/server';
 import { routing } from './routing';
 

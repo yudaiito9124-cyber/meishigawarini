@@ -1,3 +1,7 @@
+/**
+ * ファイル概要: 全体で共通利用する Label コンポーネント (shadcn/ui)
+ * 目的: フォーム要素と紐づくアクセシブルなテキストラベルを提供します。
+ */
 "use client"
 
 import * as React from "react"

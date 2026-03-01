@@ -1,3 +1,7 @@
+/**
+ * ファイル概要: Next.js アプリケーション設定ファイル
+ * 目的: next-intlプラグインの統合、環境変数の公開、および外部画像(S3等)のホストネーム許可設定を行います。
+ */
 import type { NextConfig } from "next";
 import createNextIntlPlugin from 'next-intl/plugin';
 

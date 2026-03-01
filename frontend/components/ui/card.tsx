@@ -1,3 +1,7 @@
+/**
+ * ファイル概要: 全体で共通利用する Card コンポーネント (shadcn/ui)
+ * 目的: 情報を視覚的にまとめるカードビュー（ヘッダー、コンテンツ、フッター）を提供します。
+ */
 import * as React from "react"
 
 import { cn } from "@/lib/utils"

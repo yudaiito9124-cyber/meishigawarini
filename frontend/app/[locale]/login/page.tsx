@@ -1,3 +1,7 @@
+/**
+ * ファイル概要: ユーザーログインページ
+ * 目的: Cognitoを利用した認証機能を提供し、既存ユーザーがショップ管理画面などにアクセスできるようにします。
+ */
 'use client';
 
 import { useState, useEffect } from 'react';

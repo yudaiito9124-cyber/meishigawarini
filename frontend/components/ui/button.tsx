@@ -1,3 +1,7 @@
+/**
+ * ファイル概要: 全体で共通利用する Button コンポーネント (shadcn/ui)
+ * 目的: 一貫したデザインとバリアント (default, destructive, outlineなど) を提供します。
+ */
 import * as React from "react"
 import { Slot } from "@radix-ui/react-slot"
 import { cva, type VariantProps } from "class-variance-authority"

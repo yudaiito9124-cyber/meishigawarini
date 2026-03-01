@@ -46,6 +46,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             const email = claims.email; // Get email from Cognito claims
 
             const newShopId = crypto.randomUUID();
+            const now = new Date().toISOString();
             await ddb.send(new PutCommand({
                 TableName: TABLE_NAME,
                 Item: {
@@ -55,8 +56,8 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                     email, // Store email
                     owner_id: userId, // Link to User
                     GSI2_PK: `USER#${userId}`, // GSI2 for Owner Listing
-                    GSI2_SK: new Date().toISOString(),
-                    ts_created_at: new Date().toISOString()
+                    GSI2_SK: now,
+                    ts_created_at: now
                 }
             }));
 
@@ -192,7 +193,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             return getRes.Item;
         };
 
-        // NEW: Get Upload URL (POST /shop/{shopId}/products/upload-url)
+        // Get Upload URL (POST /shop/{shopId}/products/upload-url)
         if (method === 'POST' && path.endsWith('/upload-url')) {
             await verifyShopOwner(); // Check permissions
 
@@ -236,12 +237,14 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             const productId = crypto.randomUUID();
             // Default valid_days to 1 if not provided
             const validityPeriod = valid_days ? parseInt(valid_days) : DEFAULT_VALID_DAYS;
+            const now = new Date().toISOString();
 
             await ddb.send(new PutCommand({
                 TableName: TABLE_NAME,
                 Item: {
                     PK: `SHOP#${shopId}`,
                     SK: `PRODUCT#${productId}`,
+                    product_id: productId, // Added product_id as per request
                     name,
                     description,
                     image_url,
@@ -249,10 +252,10 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                     valid_days: validityPeriod,
                     status: 'ACTIVE', // Default status
                     GSI1_PK: 'PRODUCT#ACTIVE', // For listing active products
-                    GSI1_SK: new Date().toISOString(), // Optional: Sort by creation date
-                    GSI2_PK: productId, // Added for UUID lookup
-                    GSI2_SK: new Date().toISOString(), // Optional: Sort by creation date
-                    ts_created_at: new Date().toISOString()
+                    GSI1_SK: now, // Optional: Sort by creation date
+                    GSI2_PK: `PRODUCT#${productId}`, // Added for UUID lookup
+                    GSI2_SK: now, // Optional: Sort by creation date
+                    ts_created_at: now
                 }
             }));
 
@@ -469,17 +472,30 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Cannot delete product unless it is STOPPED (この商品が受注停止でないと削除できません)' }) };
             }
 
-            const usedRes = await ddb.send(new QueryCommand({
-                TableName: TABLE_NAME,
-                IndexName: 'GSI1',
-                KeyConditionExpression: 'GSI1_PK = :pk',
-                ExpressionAttributeValues: { ':pk': 'QR#USED' }
-            }));
-
-            const unshippedOrders = (usedRes.Items || []).filter(item => item.product_id === pid);
-
-            if (unshippedOrders.length > 0) {
-                return { statusCode: 409, headers: corsHeaders, body: JSON.stringify({ message: 'Cannot delete product with unshipped orders (この商品には未発送の注文があります)' }) };
+            const [usedRes, activeRes] = await Promise.all([
+                ddb.send(new QueryCommand({
+                    TableName: TABLE_NAME,
+                    IndexName: 'GSI1',
+                    KeyConditionExpression: 'GSI1_PK = :pk',
+                    ExpressionAttributeValues: { ':pk': 'QR#USED' }
+                })),
+                ddb.send(new QueryCommand({
+                    TableName: TABLE_NAME,
+                    IndexName: 'GSI1',
+                    KeyConditionExpression: 'GSI1_PK = :pk',
+                    ExpressionAttributeValues: { ':pk': 'QR#ACTIVE' }
+                }))
+            ]);
+            const activeOrUsedQRs = [...(usedRes.Items || []), ...(activeRes.Items || [])];
+            const relatedQRs = activeOrUsedQRs.filter(item => item.product_id === pid);
+            if (relatedQRs.length > 0) {
+                const qrIds = relatedQRs.map(qr => qr.PK.replace('QR#', '')).join(', ');
+                return {
+                    statusCode: 409, headers: corsHeaders, body: JSON.stringify({
+                        message: `Cannot delete product with active QRs or unshipped orders (この商品に紐づけられた有効なQRコードまたは未発送の注文があります) 対象QR: ${qrIds}`,
+                        relatedQRs: relatedQRs.map(qr => qr.PK.replace('QR#', ''))
+                    })
+                };
             }
 
             await ddb.send(new DeleteCommand({

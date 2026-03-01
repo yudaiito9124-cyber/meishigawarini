@@ -1,3 +1,7 @@
+/**
+ * ファイル概要: 全体で共通利用する Dialog コンポーネント (shadcn/ui)
+ * 目的: モーダルウィンドウ（ダイアログ）の基盤を提供し、各種情報をポップアップ表示します。
+ */
 "use client"
 
 import * as React from "react"

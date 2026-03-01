@@ -1,3 +1,7 @@
+/**
+ * ファイル概要: 全体で共通利用する Input コンポーネント (shadcn/ui)
+ * 目的: 標準化されたスタイルを持つテキスト入力フォーム要素を提供します。
+ */
 import * as React from "react"
 
 import { cn } from "@/lib/utils"

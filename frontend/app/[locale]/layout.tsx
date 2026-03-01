@@ -1,3 +1,7 @@
+/**
+ * ファイル概要: ルートレイアウトコンポーネント
+ * 目的: アプリケーション全体の共通レイアウト、フォント設定、Amplifyの初期化、および多言語対応のProviderを設定します。
+ */
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "../globals.css";

@@ -1,3 +1,7 @@
+/**
+ * ファイル概要: アカウント確認(検証)ページ
+ * 目的: サインアップ後にCognitoから送信される認証コードを入力し、アカウントの確定処理を行います。
+ */
 'use client';
 
 import { useState, Suspense } from 'react';

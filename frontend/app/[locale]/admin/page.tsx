@@ -1,3 +1,7 @@
+/**
+ * ファイル概要: システム管理者向けダッシュボード
+ * 目的: QRコードのバッチ生成機能や生成履歴の確認、およびQRコードの個別ステータス管理やBAN処理を行います。
+ */
 "use client";
 
 import { useState, useEffect } from "react";
@@ -710,6 +714,12 @@ function QRCodeListSection({ apiUrl, onGeneratePDF }: { apiUrl: string, onGenera
                                                             <h4 className="text-sm font-semibold text-gray-500">{tShop('orders.address')}</h4>
                                                             {item.postal_code && <p className="text-sm">〒{item.postal_code}</p>}
                                                             <p className="whitespace-pre-wrap text-sm">{item.address || '-'}</p>
+                                                        </div>
+
+
+                                                        <div>
+                                                            <h4 className="text-sm font-semibold text-gray-500">{tShop('orders.preferredDateTime')}</h4>
+                                                            <p className="text-sm">{item.preferred_date}  /  {item.preferred_time}</p>
                                                         </div>
 
                                                         {/* Order Info */}
