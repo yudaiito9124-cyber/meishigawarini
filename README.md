@@ -20,17 +20,17 @@
 *   **バックエンド / インフラ**: AWS CDK v2 (TypeScript)
     *   AWS上に構築されるサーバーやデータベースの設計図をコードで書いています。
 
-👉AWSサービスの概要： **[AWS_ARCHITECTURE.md](./documents/AWS_ARCHITECTURE.md)** を開き、各AWSサービス（API Gateway, Lambda, DynamoDB, Cognito, S3など）の役割と、それがプロジェクトのどのファイルと紐付いているか図解付きで確認してください。（※AWS初心者向けの解説です）
+👉**AWSサービスの概要**： **[AWS_ARCHITECTURE.md](./documents/AWS_ARCHITECTURE.md)** を開き、各AWSサービス（API Gateway, Lambda, DynamoDB, Cognito, S3など）の役割と、それがプロジェクトのどのファイルと紐付いているか図解付きで確認してください。（※AWS初心者向けの解説です）
 
-👉データベースの概要： **[DYNAMODB_GUIDE.md](./documents/DYNAMODB_GUIDE.md)** には、データベース（DynamoDB）にどのような形でデータ（ショップ情報、商品、QR、注文など）が保存されているかを図解付きで解説しています。（※シングルテーブル設計の解説です）
+👉**データベースの概要**： **[DYNAMODB_GUIDE.md](./documents/DYNAMODB_GUIDE.md)** には、データベース（DynamoDB）にどのような形でデータ（ショップ情報、商品、QR、注文など）が保存されているかを図解付きで解説しています。（※シングルテーブル設計の解説です）
 
-👉データベースの詳細仕様： **[DATABASE_SCHEMA.md](./documents/DATABASE_SCHEMA.md)** には、各データ項目の詳細な型、UUIDや日付フォーマット等の制約、および取りうるステータス値が一覧化されています。
+👉**データベースの詳細仕様**： **[DATABASE_SCHEMA.md](./documents/DATABASE_SCHEMA.md)** には、各データ項目の詳細な型、UUIDや日付フォーマット等の制約、および取りうるステータス値が一覧化されています。
 
-👉APIの入り口（API Gateway）の概要： **[APIGATEWAY_GUIDE.md](./documents/APIGATEWAY_GUIDE.md)** には、API Gatewayの役割と、プロジェクト内（CDK）での実装方法を解説しています。
+👉**API Gatewayの概要**： **[APIGATEWAY_GUIDE.md](./documents/APIGATEWAY_GUIDE.md)** には、API Gatewayの役割と、プロジェクト内（CDK）での実装方法を解説しています。
 
-👉セキュリティ対策の概要： **[SECURITY_GUIDE.md](./documents/SECURITY_GUIDE.md)** には、このプロジェクトで行われているセキュリティ対策（不正アクセス防止や権限管理など）と、それが実際のコードのどこに書かれているかを解説しています。
+👉**セキュリティ対策の概要**： **[SECURITY_GUIDE.md](./documents/SECURITY_GUIDE.md)** には、このプロジェクトで行われているセキュリティ対策（不正アクセス防止や権限管理など）と、それが実際のコードのどこに書かれているかを解説しています。
 
-👉画面一覧・ページ遷移図： **[UI_PAGE_TRANSITIONS.md](./documents/UI_PAGE_TRANSITIONS.md)** には、アプリケーション全体のページ構成、各ページでできること（操作一覧）、ページ間の状態遷移を図付きで解説しています。
+👉**画面一覧・ページ遷移図**： **[UI_PAGE_TRANSITIONS.md](./documents/UI_PAGE_TRANSITIONS.md)** には、アプリケーション全体のページ構成、各ページでできること（操作一覧）、ページ間の状態遷移を図付きで解説しています。
 
 
 
