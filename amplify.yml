@@ -1,23 +1,30 @@
-version: 1
+version: 1 # Amplifyビルド設定のバージョン
 applications:
-  - appRoot: frontend
+  - appRoot: frontend # モノレポ構成の指定。ソースコードがfrontendディレクトリ内にあることを示します
     frontend:
-      phases:
+      phases: # ビルドの各フェーズの設定
         preBuild:
           commands:
+            # package-lock.jsonに基づいて依存パッケージをクリーンインストール
             - npm ci
+            # 環境変数から NEXT_PUBLIC_ で始まるものを抽出し、.envファイルとして書き出す（Next.jsで環境変数を読み込むため）
             - printenv | grep -e NEXT_PUBLIC_ > .env
+            # --- ここから下はデバッグ用: .envファイルの中身をAmplifyのビルドログに出力して確認するためのコマンド ---
             - echo "--- CHECKING .env FILE ---"
             - ls -la .env
             - cat .env
             - echo "--------------------------"
         build:
           commands:
+            # Next.jsアプリケーションのビルド実行
             - npm run build
-      artifacts:
+      artifacts: # ビルド成果物の指定
+        # Next.jsのデフォルトのビルド出力先である .next ディレクトリを公開の対象とする
         baseDirectory: .next
         files:
+          # .next ディレクトリ内のすべてのファイルをデプロイ対象にする
           - '**/*'
-      cache:
+      cache: # キャッシュの指定
         paths:
+          # 次回以降のビルドを高速化するために node_modules の中身をキャッシュする
           - node_modules/**/*
