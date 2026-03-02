@@ -95,20 +95,20 @@ PK:SHOP#[shop2], SK:PRODUCT#[123-aaa], ...
 #### データベース見直し案
 1. PKを PRODUCT#[product UUID]とする商品単体のレコードを追加し、SHOP#[shop ID]において、products要素を追加して、その中にproduct UUIDを配列として格納する(この場合、商品から扱っているショップは検索できない…)
 ```
-PK:PRODUCT#[123-aaa],SK:Metadata
-PK:PRODUCT#[456-bbb],SK:Metadata
+PK:PRODUCT#[123-aaa], SK:Metadata
+PK:PRODUCT#[456-bbb], SK:Metadata
 PK:SHOP#[shop1], { products: ["PRODUCT#123-aaa", "PRODUCT#456-bbb"] }, ...
 PK:SHOP#[shop2], { products: ["PRODUCT#123-aaa", "PRODUCT#456-bbb"] }, ...
 ```
 
 2. PKを PRODUCT#[product UUID]とする商品単体のレコードを追加することに加えて、各商品のIDとSHOPのIDの対応を表すだけのレコードを大量に追加する?
 ```
-PK:PRODUCT#[123-aaa],SK:Metadata
-PK:PRODUCT#[456-bbb],SK:Metadata
-PK:SHOP#[shop1],SK:Metadata, ...
-PK:SHOP#[shop2],SK:Metadata ...
-PK:SHOPPRODUCT#[shop1], SK:PRODUCT#[123-aaa], GSI2_PK:PRODUCT#[123-aaa], GSI2_SK:SHOP#[shop1]
-PK:SHOPPRODUCT#[shop1], SK:PRODUCT#[456-bbb], GSI2_PK:PRODUCT#[456-bbb], GSI2_SK:SHOP#[shop1]
-PK:SHOPPRODUCT#[shop2], SK:PRODUCT#[123-aaa], GSI2_PK:PRODUCT#[123-aaa], GSI2_SK:SHOP#[shop2]
-PK:SHOPPRODUCT#[shop2], SK:PRODUCT#[456-bbb], GSI2_PK:PRODUCT#[456-bbb], GSI2_SK:SHOP#[shop2]  #GSI2を用いることで商品からショップを検索可能
+PK:PRODUCT#[123-aaa], SK:Metadata
+PK:PRODUCT#[456-bbb], SK:Metadata
+PK:SHOP#[shop1], SK:Metadata, ...
+PK:SHOP#[shop2], SK:Metadata ...
+PK:SHOP#[shop1], SK:PRODUCT#[123-aaa], GSI2_PK:PRODUCT#[123-aaa], GSI2_SK:SHOP#[shop1]
+PK:SHOP#[shop1], SK:PRODUCT#[456-bbb], GSI2_PK:PRODUCT#[456-bbb], GSI2_SK:SHOP#[shop1]
+PK:SHOP#[shop2], SK:PRODUCT#[123-aaa], GSI2_PK:PRODUCT#[123-aaa], GSI2_SK:SHOP#[shop2]
+PK:SHOP#[shop2], SK:PRODUCT#[456-bbb], GSI2_PK:PRODUCT#[456-bbb], GSI2_SK:SHOP#[shop2]  #GSI2を用いることで商品からショップを検索可能
 ```
