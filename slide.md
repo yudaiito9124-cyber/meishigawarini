@@ -3,410 +3,622 @@ marp: true
 theme: default
 paginate: true
 size: 16:9
-header: '"名刺代わりに" 開発・オンボーディング'
+header: '"名刺代わりに" 開発説明'
 style: |
-  section { font-size: 22px; padding: 40px; }
-  h1 { font-size: 34px; color: #2c3e50; margin-bottom: 20px; }
-  h2 { font-size: 26px; color: #34495e; border-bottom: 2px solid #bdc3c7; padding-bottom: 5px; margin-bottom: 15px; }
-  h3 { font-size: 22px; color: #34495e; margin-bottom: 10px; }
+  section { font-size: 24px; padding: 40px; }
+  h1 { font-size: 40px; color: #2c3e50; margin-bottom: 20px; }
+  h2 { font-size: 30px; color: #34495e; border-bottom: 2px solid #bdc3c7; padding-bottom: 5px; margin-bottom: 15px; }
   ul { margin-bottom: 10px; line-height: 1.35; }
   li { margin-bottom: 5px; }
-  table { font-size: 14px; width: 100%; border-collapse: collapse; }
+  table { font-size: 16px; width: 100%; border-collapse: collapse; }
   th, td { border: 1px solid #bdc3c7; padding: 4px; }
   th { background-color: #ecf0f1; }
-  pre { font-size: 14px; }
 ---
 
-# 1. 共同開発にあたってのAWS環境・権限設定ガイド
+# 「名刺代わりに」 開発資料
 
-## 1. AWSアカウントの基本構造（親子関係）
-本プロジェクトでは、1つの **AWSメインアカウント** を共有し、その中に開発者ごとの **IAMユーザー** を作成して運用します。
-
-* **メインアカウント (親)**:
-    * 支払い（請求）が一括管理される場所。
-    * DynamoDB, S3, Cognito などの実リソースが存在する場所。
-* **IAMユーザー (子)**:
-    * 開発者個人のログインID。
-    * 「誰がどの操作をしたか」を識別するために、開発者ごとに作成します。
+詳細仕様・システムアーキテクチャ・運用ガイド体系化資料
+(詳細はdocumentのmdファイルを参考)
 
 ---
 
-## 2. 新規開発者をプロジェクトに招待する手順（管理者向け）
-管理者は新規メンバーに対して以下を用意し、Slack等の安全なツールで渡してください。
+## プロジェクトの全体コンセプト
 
-1. **GitHubリポジトリの招待**: `yudaiito9124-cyber/meishigawarini` への Write 権限付き招待。
-2. **AWS IAMユーザーの発行**: AWS IAM Identity Center 等で新規ユーザーを作成します。発行された `ログインURL` `ユーザー名` `初期パスワード`。
-3. **環境変数 (`.env.local` / `.env`)**: API URLや各種シークレットなどの動作に必要な設定値。
-4. *(必要に応じて)* **Resend (メール送信) のテスト用APIキー**
-
----
-
-## 3. 開発者側（メンバー）が行う初期設定
-
-**① AWS CLIのインストールと認証（SSOログイン）**
-ローカル環境からCDKコマンド等を実行するために必要です。
-```bash
-aws login
-```
-*(※初回設定時や、SSO環境が未構築の場合は、管理者に共有されたスタートURLを用いて `aws configure sso` コマンドで初期セットアップを完了させてから `aws login` を実行してください。)*
-
-**② CDK Bootstrap の実行**
-その環境（リージョン）で初めてCDKを使う際、デプロイ用の管理リソース（S3バケット等）を作成する必要があります。
-```bash
-npx cdk bootstrap
-```
+- 物理的なQRコードを用いたギフト・商品贈受システム
+- ユーザー体験 (UX) のシームレス化
+  - 物理カードのQRからWebへ誘導し、商品の確認から配送先入力まで完結
+- システム利用者の3分類と役割
+  1. 受取人 (エンドユーザー): QR読取、PIN入力によるギフト要求・受領
+  2. ショップ管理者: 商品カタログ登録、QRと商品の紐付け、注文・発送管理
+  3. システム管理者: 権限グループ所属者。基盤管理とQR一括生成・監視
+- インフラアーキテクチャの基本方針
+  - AWSマネージドサービスを連携した完全サーバーレス構成
 
 ---
 
-# 2. API Gateway 実装ガイド
+## アプリケーション・インフラ構成
 
-## 1. API Gatewayとは？
-フロントエンド（React/Next.jsなど）からのHTTPリクエストを受け取り、適切なバックエンド処理（Lambda関数）へ振り分ける「受付窓口」の役割を果たします。
-
-主に以下の3つの機能をAPI Gatewayで設定しています。
-1. **ルーティング**: URLパスパス（例: `/shop`, `/admin`）に応じたLambdaの呼び出し
-2. **CORS設定**: フロントエンド（異なるドメイン）からの安全なアクセス許可
-3. **認証 (Authorizer)**: ログイン済みユーザー（Cognito）のみアクセスできるルートの保護
+- `frontend/` ディレクトリ (画面側)
+  - Next.js (App Router, React 19), Tailwind CSS, Shadcn/ui
+  - AWS Amplifyによる自動ホスティング（`main` ブランチPUSH連動）
+  - 動的ルーティング (`/[locale]/`) による言語切り替え機能
+- `infra/` ディレクトリ (バックエンド側)
+  - AWS CDK v2 (TypeScript) による Infrastructure as Code
+  - AWS Lambda: 機能ごとに細分化されたAPIロジック本体 (`infra/lambda/`)
+  - Amazon API Gateway: HTTPリクエストのエンドポイント・ルーティング
+  - Amazon DynamoDB: シングルテーブル設計によるフルマネージドNoSQL
+  - Amazon Cognito: IAM連携によるユーザー認証および権限(Group)管理
+  - Amazon S3: 商品画像等のアップロード用ストレージ
 
 ---
 
-## 2. API Gatewayの基本構成とCORS設定
-`infra/lib/infra-stack.ts` にて定義されています。
-デフォルトでCORSのPreflightリクエスト（`OPTIONS`）に応答する設定が行われています。
+## DB設計: DynamoDB シングルテーブル設計
 
-**特殊なCORSエラー対策（Gateway Responses）**
-認証エラー（401）などでLambdaに到達する前にAPI Gatewayがエラーを返す場合、デフォルトではCORSヘッダーが付与されず、フロントエンドで原因不明のCORSエラーになります。これを防ぐためにセキュリティ上、APIの存在自体を隠蔽するため404を返しています。
+- 採用する唯一のテーブル: `MeishiGawariniTableV2`
+- テーブル統合の概念（単一テーブル）
+  - ショップ情報、商品、QR状態、注文などの異なる性質のデータを混在
+  - メリット: 大量アクセスへの耐性と、最速・最安のパフォーマンス
+- カギ（キー）の組み合わせによる特定
+  - PK (Partition Key): データが入っている「大きな箱」の名前
+  - SK (Sort Key): 箱の中にある「個々の書類」の名前
+- クエリの効率化
+  - 1回の検索（同一PKへのアクセス）で、親データと関連の全子データを一括取得可能
+
+---
+
+## DynamoDBのGSI（グローバルセカンダリインデックス）とは
+
+- GSIの概念と目的
+  - PKとSKでしか検索できないというDynamoDBの特性を補う「裏口」
+  - メインの箱（PK）以外の、別の切り口や条件でデータを素早く集めるための仕組み
+- システム要件への対応
+  - 「自分がオーナーの全ショップを見たい」「未発送のQR一覧を見たい」などの横断的検索
+- インデックスキーの設定
+  - GSI専用のPKとSK（本システムでは `GSI1_PK`, `GSI1_SK`, `GSI2_PK`, `GSI2_SK`）をレコードに別途コピー保存して検索軸を提供
+
+---
+
+## バックエンド実装解説1: DynamoDBとGSIのCDK構成
+
+- シングルテーブル (`MeishiGawariniTableV2`) の生成とGSI（検索用裏口）の定義
 
 ```typescript
-// 認証エラー(401)を 404 に偽装しつつ CORS を許可
-api.addGatewayResponse('Default401Response', {
-  type: apigateway.ResponseType.UNAUTHORIZED,
-  statusCode: '404',
+const table = new dynamodb.Table(this, 'MeishiGawariniTableV2', {
+  partitionKey: { name: 'PK', type: dynamodb.AttributeType.STRING },
+  sortKey: { name: 'SK', type: dynamodb.AttributeType.STRING },
+  billingMode: dynamodb.BillingMode.PAY_PER_REQUEST, // サーバレス課金(従量制)
+});
+// 状態等で検索するための検索用裏口(GSI)の定義
+table.addGlobalSecondaryIndex({
+  indexName: 'GSI1', // ステータス検索用
+  partitionKey: { name: 'GSI1_PK', type: dynamodb.AttributeType.STRING },
+  sortKey: { name: 'GSI1_SK', type: dynamodb.AttributeType.STRING },
+  projectionType: dynamodb.ProjectionType.ALL, // 全属性を射影
 });
 ```
 
 ---
 
-## 3. Cognito認証（Authorizer）との連携
-「ショップオーナー」や「管理者」のみが実行できるAPIを守るために、Cognito User Poolを利用したオーソライザーを設定しています。
+## バックエンド実装解説2: API GatewayのURLマッピング
+
+- `infra-stack.ts` でのREST APIエンドポイントとLambda関数(`shopMgmtFn`)のリンク
 
 ```typescript
-const authorizer = new apigateway.CognitoUserPoolsAuthorizer(this, 'ShopAuthorizer', {
-  cognitoUserPools: [userPool],
-});
-```
+// /shop/{shopId}/products にPOSTメソッドを追加し、shop-mgmt.tsへ送る設定
+const shopResource = api.root.addResource('shop');
+const shopIdResource = shopResource.addResource('{shopId}');
+const productsResource = shopIdResource.addResource('products');
 
-## 4. ルーティングとLambdaの統合
-**① 認証が不要なAPI（一般ユーザー向け）**
-`submitResource.addMethod('POST', new apigateway.LambdaIntegration(recipientSubmitFn));`
-
-**② 認証が必要なAPI（管理者・オーナー向け）**
-ログイン必須のAPIには `authorizer` をアタッチします。
-```typescript
 productsResource.addMethod('POST', new apigateway.LambdaIntegration(shopMgmtFn), {
-  authorizer, // Cognito Authorizerの適用
+  authorizer, // Cognito認証を通過条件として必須化
   authorizationType: apigateway.AuthorizationType.COGNITO
 });
 ```
 
 ---
 
-# 3. データベース仕様および操作一覧
+## バックエンド実装解説3: DynamoDBデータの追加と取得
 
-Amazon DynamoDB (テーブル名: `MeishiGawariniTableV2`) のシングルテーブルデザインが採用されています。`PK` (パーティションキー) と `SK` (ソートキー)、および2つのGSI (グローバルセカンダリインデックス) を活用して一つのテーブルに格納されています。
+- `shop-mgmt.ts` におけるデータ書き込み (`PutCommand`) と取得 (`GetCommand`) 処理
 
-## 1. データの種類（エンティティ一覧）
+```typescript
+// データの追加 (商品登録の例)
+await ddb.send(new PutCommand({
+    TableName: process.env.TABLE_NAME,
+    Item: {
+        PK: `SHOP#${shopId}`,
+        SK: `PRODUCT#${productId}`,
+        name, price, valid_days,
+        GSI1_PK: 'PRODUCT#ACTIVE', // 検索用インデックスも同時に紐付け保存
+    }
+}));
 
-| エンティティ種別 | PK (Partition Key) | SK (Sort Key) |
-| --- | --- | --- |
-| **Shop Metadata (ショップ情報)** | `SHOP#{shopId}` | `METADATA` |
-| **Shop Product (商品情報)** | `SHOP#{shopId}` | `PRODUCT#{productId}` |
-| **QR Metadata (QRコード及び注文ステータス)** | `QR#{uuid}` | `METADATA` |
-| **QR Order (受取人入力の配送先情報)** | `QR#{uuid}` | `ORDER` |
-| **QR Chat (チャット履歴)** | `QR#{uuid}` | `CHAT` |
+
+// データの取得 (QR内容検証の例)
+const qrRes = await ddb.send(new GetCommand({
+    TableName: process.env.TABLE_NAME,
+    Key: { PK: `QR#${qr_id}`, SK: 'METADATA' }
+}));
+```
 
 ---
 
-## 2. 各データ構造の詳細（Shop, Product）
+## バックエンド実装解説4: 抽出データ出力(プリント)とJSON返却
 
-**2.1 Shop (ショップ情報)**
+- `shop-mgmt.ts` で取得・整形したデータをフロントエンドへ返す処理
+
+```typescript
+// QueryCommand等で取得した結果(res)から不要なプレフィックスを取り除き整形
+const items = (res.Items || []).map(item => ({
+    ...item,
+    product_id: item.SK.replace('PRODUCT#', '')
+}));
+
+// HTTPステータス、CORSヘッダーと共に、JSON出力(オブジェクトを文字列化してプリント)
+return { 
+    statusCode: 200, 
+    headers: corsHeaders, 
+    body: JSON.stringify({ items }) // API Gateway経由でクライアントへそのまま返却される
+};
+```
+
+---
+
+## 本システムにおけるGSIの活用 (1)
+
+- GSI1: 「状態や種類ごとの一覧」の取得
+  - 用途: ステータスによる絞り込み検索に利用
+  - GSI1_PKの例: `QR#UNASSIGNED`, `QR#ACTIVE`, `QR#USED`, `PRODUCT#ACTIVE`など
+  - 検索の例: 管理画面において「未発送状態（USED）」のQRをズラッと一覧表示する操作
+- GSI2: 「逆引き」や「所有者の検索」の実現
+  - GSI2_PKの例1: `USER#{userId}`
+    - ユーザー（オーナー）が所有する複数のショップのリストを一発で検索
+  - GSI2_PKの例2: `SHOP#{shopId}`
+    - 特定のショップ向けに発行された全QRのリストを一括取得
+
+---
+
+## 本システムにおけるGSIの活用 (2)
+
+- 複数インデックスを利用した複雑なクエリの実現
+  - GSI2の活用例（続き）
+  - GSI2_PKの例3: `PRODUCT#{productId}`
+    - システム全体のUUIDから、該当の商品情報を逆引き検索
+- ソートキー (SK) による並び替え
+  - それぞれのGSIに対応する `GSI1_SK` や `GSI2_SK` には「作成日時」等の日時文字列を保存
+  - インデックス検索時に時系列などの自動ソートが可能となり、最新データの取得を容易化
+
+---
+
+## データ構造: 1. Shop (ショップ情報)
+
 | 属性名 | 型 | 説明 |
-| --- | --- | --- |
-| `PK` / `SK`| String | `SHOP#{shopId}` / `METADATA` |
-| `name` / `email`| String | ショップ名 / ショップの連絡先メールアドレス |
+|---|---|---|
+| `PK` | String | `SHOP#{shopId}` （`shopId` はUUID形式） |
+| `SK` | String | 常に固定値 `METADATA` |
+| `name` | String | ショップ名 （任意の文字列） |
+| `email` | String | ショップの連絡先メールアドレス |
 | `owner_id` | String | オーナーのCognitoユーザーID （UUID形式の `sub` 属性） |
-| `GSI2_PK` / `GSI2_SK`| String | `USER#{owner_id}` / 作成日時等ソートキー |
-
-**2.2 Product (商品情報)**
-| 属性名 | 型 | 説明 |
-| --- | --- | --- |
-| `PK` / `SK`| String | `SHOP#{shopId}` / `PRODUCT#{productId}` |
-| `name` / `description` | String | 商品名 / 商品説明 |
-| `image_url` / `price` | String / Number | 商品画像のURL / 価格 |
-| `valid_days` / `status`| Number / String | QRコードの有効日数設定 / 商品の販売状態 (`ACTIVE` または `STOPPED`) |
-| `GSI1_PK` / `GSI1_SK` | String | `PRODUCT#{status}` / 作成日時等のソートキー |
-| `GSI2_PK` / `GSI2_SK` | String | `PRODUCT#{productId}` / 作成日時等のソートキー |
+| `ts_created_at` | String | 作成日時 （ISO 8601形式のUTC日時文字列） |
+| `GSI2_PK` | String | `USER#{owner_id}` （オーナーのショップ一覧取得用） |
+| `GSI2_SK` | String | 作成日時等ソートキー （ISO 8601形式のUTC日時文字列） |
 
 ---
 
-## 2. 各データ構造の詳細（QR Metadata）
+## データ構造: 2. Product (商品情報) ①
 
-**2.3 QR Metadata (QRコード及び注文ステータス)**
 | 属性名 | 型 | 説明 |
-| --- | --- | --- |
-| `PK` / `SK` | String | `QR#{uuid}` / `METADATA` |
+|---|---|---|
+| `PK` | String | `SHOP#{shopId}` （`shopId` はUUID形式） |
+| `SK` | String | `PRODUCT#{productId}` （`productId` はUUID形式） |
+| `product_id` | String | 商品自身のUUID （逆引きや参照用） |
+| `name` | String | 商品名 （任意の文字列） |
+| `description` | String | 商品説明 （任意のシングルライン文字列） |
+| `image_url` | String | 商品画像のURL （S3への完全URLパス等） |
+| `price` | Number | 価格 （0以上の正の数値） |
+| `valid_days` | Number | QRコードの有効日数設定 （整数値） |
+| `status` | String | 商品の販売状態 (`ACTIVE` または `STOPPED`) |
+
+---
+
+## データ構造: 2. Product (商品情報) ②
+
+| 属性名 | 型 | 説明 |
+|---|---|---|
+| `ts_created_at` | String | 作成日時 （ISO 8601形式のUTC日時文字列） |
+| `GSI1_PK` | String | `PRODUCT#{status}` （アクティブな商品一覧取得用） |
+| `GSI1_SK` | String | 作成日時等のソートキー （ISO 8601形式のUTC日時文字列） |
+| `GSI2_PK` | String | `PRODUCT#{productId}` （UUIDからの逆引き用） |
+| `GSI2_SK` | String | 作成日時等のソートキー （ISO 8601形式のUTC日時文字列） |
+
+---
+
+## データ構造: 3. QR Metadata (QRコード) ①
+
+| 属性名 | 型 | 説明 |
+|---|---|---|
+| `PK` | String | `QR#{uuid}` （QRコード自体のUUID形式の識別子） |
+| `SK` | String | 常に固定値 `METADATA` |
 | `pin` | String | 本人確認用の8桁のランダムな数字文字列 |
 | `status` | String | QRの進行状態 (`UNASSIGNED` 〜 `BANNED`) |
-| `shop_id` / `product_id`| String | 紐付け先のショップID / 紐付け先の商品ID |
-| `memo_for_users` / `memo_for_shop` | String | ショップからの受取人向けメッセージ / ショップ自身の検索・管理用メモ欄 |
-| `ts_*_at` | String | 各種タイムスタンプ（ISO 8601形式のUTC日時文字列） |
-| `GSI1_PK` / `GSI1_SK` | String | `QR#{status}` / 作成日時等のソートキー |
-| `GSI2_PK` / `GSI2_SK` | String | `SHOP#{shopId}` / 作成日時等のソートキー |
+| `shop_id` | String | 紐付け先のショップID （未連携時は空） |
+| `product_id` | String | 紐付け先の商品ID （未連携時は空） |
+| `memo_for_users` | String | ショップからの受取人向けメッセージ |
+| `memo_for_shop` | String | ショップ自身の検索・管理用メモ欄 |
 
 ---
 
-## 2. 各データ構造の詳細（Order, Chat）
+## データ構造: 3. QR Metadata (QRコード) ②
 
-**2.4 Order (受取人による配送先・注文詳細)**
 | 属性名 | 型 | 説明 |
-| --- | --- | --- |
-| `PK` / `SK` | String | `QR#{uuid}` / `ORDER` |
-| `name` / `address` | String | 受取人氏名 / 配送先の完全な住所 |
-| `zipCode` / `preferredDate`| String | 郵便番号 / 配達希望日付 |
-| `preferredTime` / `phone`| String | 配達希望時間帯 / 受取人の電話番号 |
-| `delivery_company` / `tracking_number`| String | 発送業者の名称 / 荷物の伝票番号・追跡番号 |
+|---|---|---|
+| `password_hash` | String | ユーザー設定の追加パスワードハッシュ値 (現在無効化中) |
+| `ts_activated_at` | String | 有効化日時 （ISO 8601形式のUTC日時文字列） |
+| `ts_banned_at` | String | 無効化(BAN)日時 （ISO 8601形式のUTC日時文字列） |
+| `ts_created_at` | String | QRバッチ一括生成日時 （ISO 8601形式のUTC日時文字列） |
+| `ts_linked_at` | String | 商品を選択して紐付けた日時 （ISO 8601形式のUTC日時文字列） |
+| `ts_submitted_at` | String | 受取人が配送先情報を送信した日時 （ISO 8601形式のUTC日時文字列） |
 
-**2.5 Chat (チャット履歴)**
+---
+
+## データ構造: 3. QR Metadata (QRコード) ③
+
 | 属性名 | 型 | 説明 |
-| --- | --- | --- |
-| `PK` / `SK` | String | `QR#{uuid}` / `CHAT` |
-| `messages` | Array | チャット本文の配列 |
-| `notification_emails` | StringSet | 新着通知の設定先メールリスト |
-| `email_preferences` | Map | メール通知の設定情報マップ |
+|---|---|---|
+| `ts_shipped_at` | String | ショップが商品を発送した日時 （ISO 8601形式のUTC日時文字列） |
+| `ts_completed_at` | String | 取引が完了した日時 （ISO 8601形式のUTC日時文字列） |
+| `ts_expired_at` | String | 有効期限日時 （有効化日時に商品のvalid_daysを加算した日時） |
+| `ts_updated_at` | String | レコードの最終変更日時 （ISO 8601形式のUTC日時文字列） |
+| `GSI1_PK` | String | `QR#{status}` （ステータスごとの一覧取得用） |
+| `GSI1_SK` | String | 作成日時等のソートキー （ISO 8601形式のUTC日時文字列） |
+| `GSI2_PK` | String | `SHOP#{shopId}` （担当ショップが持つQR一覧取得用） |
+| `GSI2_SK` | String | 作成日時等のソートキー （ISO 8601形式のUTC日時文字列） |
 
 ---
 
-## 2.6 レコードが保持可能な状態 (ステータス) 一覧
+## データ構造: 4. Order (配送先・注文詳細) ①
 
-**QR Metadata のステータス (`status`)**
-* **`UNASSIGNED` (未連携)**: 生成されましたが、まだショップや商品と紐付けられていません。
-* **`LINKED` (連携済み)**: 紐付けられましたが、まだ有効化されていません。
-* **`ACTIVE` (有効化済み)**: ギフトとして贈ることができる状態です。
-* **`USED` (発送待ち)**: 受取人が住所を入力し、発送待ちの状態です。
-* **`SHIPPED` (発送済み)**: ショップが商品を発送し、追跡番号が登録された状態。
-* **`COMPLETED` (受取り完了)**: 取引が正常に完了しました。
-* **`EXPIRED` (期限切れ)**: 有効期限が切れ、ギフトが無効になった状態です。
-* **`BANNED` (BAN済み)**: システム管理者が利用停止させた状態です。
-
-**Product のステータス (`status`)**
-* **`ACTIVE` (販売中・有効)**: 新しいQRコードに紐付けることが可能な状態です。
-* **`STOPPED` (受注停止)**: 新規のQRコードへの紐付け一覧には表示されなくなります。
+| 属性名 | 型 | 説明 |
+|---|---|---|
+| `PK` | String | `QR#{uuid}` （関連するQRコードのUUID） |
+| `SK` | String | 常に固定値 `ORDER` |
+| `name` | String | 受取人氏名 （任意の文字列） |
+| `address` | String | 配送先の完全な住所 （任意の文字列） |
+| `zipCode` | String | 郵便番号 （書式チェックなし・無効な文字列の可能性あり） |
+| `preferredDate` | String | 配達希望日付 （YYYY-MM-DD形式等の文字列） |
+| `preferredTime` | String | 配達希望時間帯 （システム定義された時間帯区分の文字列） |
 
 ---
 
-## 3. 主なデータベース操作パターン (Lambda関数との対応)
+## データ構造: 4. Order (配送先・注文詳細) ②
 
-1. **ショップ管理 (`shop-mgmt.ts`)**
-   - ショップの作成: `PutCommand` (Shop)
-   - ショップ一覧の取得: `QueryCommand` (GSI2 使用, Owner IDで絞り込み)
-   - 商品の作成・更新・削除: `PutCommand`, `UpdateCommand`, `DeleteCommand` (Product)
-   - QRコードの紐付け/有効化: `UpdateCommand` (QR Metadata)
-2. **QR生成/管理者 (`admin-generate.ts` 等)**
-   - QRコードの一括生成: `BatchWriteItemCommand` (QR Metadata を一括作成)
-3. **受取人アクション (`recipient-submit.ts`, `recipient-verify-pin.ts`)**
-   - PINコードの照合: `GetCommand` (QR Metadata)
-   - 配送先情報の登録: `PutCommand` または `UpdateCommand` (Order および QR Metadataのステータス更新)
-4. **注文管理/発送処理 (`shop-orders.ts`)**
-   - 注文一覧の取得: `QueryCommand` (GSI2 使用で特定のショップのQR) + `BatchGetCommand`
-   - 発送ステータスへの更新: `UpdateCommand`
+| 属性名 | 型 | 説明 |
+|---|---|---|
+| `email` | String | 連絡先メールアドレス （書式チェックなし・無効な文字列の可能性あり） |
+| `phone` | String | 受取人の電話番号 （書式チェックなし・無効な文字列の可能性あり） |
+| `delivery_company` | String | 発送業者の名称/運送会社等 （発送時にショップが追記） |
+| `tracking_number` | String | 荷物の伝票番号・追跡番号 （発送時にショップが追記） |
+| `ts_shipped_at` | String | 発送完了処理が行われた日時 （ISO 8601形式のUTC日時文字列） |
+| `ts_submitted_at` | String | 受取人がこのフォームを送信した日時 （ISO 8601形式のUTC日時文字列） |
+| `ts_updated_at` | String | レコードの最終変更日時 （ISO 8601形式のUTC日時文字列） |
 
 ---
 
-# 4. DynamoDB データ設計ガイド
+## データ構造: 5. Chat (チャット履歴)
 
-## 1. DynamoDBとは？
-AWSが提供する**NoSQL型（非リレーショナル）のデータベース**です。「大量のアクセスがあってもどんなデータでも一瞬で取り出せる」ことに特化しています。
-* **PK (Partition Key / パーティションキー)**: データが入っている「大きな箱」の名前。
-* **SK (Sort Key / ソートキー)**: 箱の中にある「個々の書類」の名前。
-
-## 2. 「シングルテーブル設計」という考え方
-「全く形の違うデータでも、工夫して全部1つの巨大なテーブルに突っ込む」という特殊な設計です。本プロジェクトも `MeishiGawariniTableV2` という1つのテーブルだけですべてのデータを管理しています。
-
----
-
-## 3. このプロジェクトのデータの保存ルール（PKとSKの書き方）
-
-* **① ショップの情報 (Shop)**: PK: `SHOP#<ショップのID>`, SK: `METADATA`
-* **② 商品の情報 (Product)**: PK: `SHOP#<ショップのID>`, SK: `PRODUCT#<商品のID>`
-  * PKに `SHOP#1234` を指定して検索するだけで、ショップ本体の情報と全ての商品を1回のリクエストで一気に取得できます。
-* **③ QRコードの情報 (QR)**: PK: `QR#<QRのID>`, SK: `METADATA`
-* **④ 注文・配送先の情報 (Order)**: PK: `QR#<QRのID>`, SK: `ORDER`
-  * QRのIDをキーにするだけで、QR自体の情報と入力された送り先を一度に取り出せます。
+| 属性名 | 型 | 説明 |
+|---|---|---|
+| `PK` | String | `QR#{uuid}` （関連するQRコードのUUID） |
+| `SK` | String | 常に固定値 `CHAT` |
+| `messages` | Array | 本文の配列 （包含例: `sender`, `content`, `timestamp`） |
+| `notification_emails` | StringSet | 新着通知の設定先メールリスト （購読を希望したメールアドレス集合） |
+| `email_preferences` | Map | メール通知の設定情報マップ （言語情報等） |
 
 ---
 
-## 4. GSI (グローバルセカンダリインデックス) について
-PK以外の条件で検索したくなることを解決するための「裏口」が GSI です。
+## QRコードの状態管理とライフサイクル
 
-* **GSI1: 「状態や種類ごとの一覧」を見たいとき**
-  * ステータスによる絞り込み検索で使われます。
-  * `GSI1_PK`: `QR#UNASSIGNED`, `QR#ACTIVE`, `QR#USED`, `PRODUCT#ACTIVE` などのステータス値を保存。
-* **GSI2: 「逆引き」や「所有者の検索」をしたいとき**
-  * ショップのオーナー検索: `GSI2_PK` に `USER#<ユーザーID>` を保存。→ あるユーザーが持つ複数のショップを一発で探せます。
-  * ショップに紐づくQRの検索: `GSI2_PK` に `SHOP#<ショップID>` を保存。→ そのショップ向けに発行された全QRのリストを一括で取得します。
+QRの `status` 属性は一方通行(一部例外)で以下の状態を遷移する
+
+1. `UNASSIGNED`: システム管理者が生成した直後（未連携）
+2. `LINKED`: 特定ショップ・商品と紐付け完了（有効化前）
+3. `ACTIVE`: 受取人への配付可能。有効化済・アクセス待ち
+4. `USED`: 受取人が住所入力完了。ショップの発送作業待ち
+5. `SHIPPED`: ショップが追跡番号を登録し発送処理完了
+6. `COMPLETED`: 荷物が到着し、エンドユーザーが受取完了報告
+- (例外1) `EXPIRED`: 有効期限切れ（アクセス不可）
+- (例外2) `BANNED`: 管理者による不正利用強制停止
 
 ---
 
-# 5. 開発環境おまかせセットアップガイド（完全初心者向け）
+## 一般・受取人向けの機能フロー (`/receive`)
 
-## ステップ 1: 必要なソフトウェア（ツール）をインストールする
-1. **Visual Studio Code (VS Code)**
-2. **Git (ギット)**
-3. **Node.js (ノード・ジェイエス)**: 「LTS (推奨版)」のボタンをクリック。
-4. **AWS CLI**
+- ギフト要求と認証解除
+  - カメラ起動後のアクセスで8桁のPINコード認証。不正ミスはバックエンドで防止
+  - パスワード保護 (`RESTRICTED` 状態) の解除要求の対応
+- デバイス操作: 受取手続き (`ACTIVE` → `USED`)
+  - 氏名、配送先、連絡先の送信処理
+- 発送待機と受取完了の報告 (`SHIPPED` → `COMPLETED`)
+  - 追跡番号へのリンク追跡。荷物受領後の利用確定処理
+- 問い合わせ（チャット）機能
+  - 受注ID確認、チャットによる直接の連絡（システム自動イベントログ混在）
+  - Eメールによる新着通知購読の対応設定
 
-## ステップ 3: プロジェクトのコードを自分のPCに持ってくる
-```bash
-git clone https://github.com/yudaiito9124-cyber/meishigawarini.git
-cd meishigawarini
+---
+
+## ショップ管理者向けの機能フロー (`/shop`)
+
+- デバイス操作: ショップ管理と商品の追加
+  - S3アップロード画像の16:9比率等へのクライアント側リサイズ実行
+- デバイス操作: QRコード紐付けと稼働 (Activate)
+  - カメラ・キー入力でのQR(UUID)の特定と状態の結合
+  - 受取人側へのメッセージ登録処理（`memo_for_users`）
+- デバイス操作: 配送機能の実行
+  - `USED` 状態注文の一覧データ取得
+  - 配送業者名・追跡番号の一括・個別登録処理と `SHIPPED` への状態の移行
+
+---
+
+## システム管理者向けの機能フロー (`/admin`)
+
+- アクセス制限と一括管理の実行
+  - 運用側グループ(Administrators)によるQRコード一括生成（最大10枚バッチ）
+  - `{shopId}`、`{productId}`の事前指定状態(`LINKED`状態)での発行処理対応
+- オフライン媒体支援の自動化
+  - バッチ完了処理と同時の即時的なQR印刷用両面PDFの自動書き出し、ダウンロード
+- 不正処理とステータスデータの排除機能
+  - データ内の一致検索。漏洩疑義QRデータの `BANNED` 変更
+  - BANNED状態のデータの永続的な抹消（完全データ削除処理）
+
+---
+
+## セキュリティ実装 (権限管理・エラーの隠蔽化)
+
+- クライアント情報の検証
+  - Lambda内でのテナントID (`owner_id`) の完全一致チェック (`403` 返却)
+- エラー等の動的隠蔽 (APIステルス化設計)
+  - API Gatewayでの権限不足一括変換 (`404 Not Found` への偽装変更)
+  - セキュリティ攻撃に対するエンドポイントの存在秘匿
+- IAM Roleの分離設計と最小権限構成
+  - 各Lambdaへの関数単位での「読取専用」「S3書込のみ」権限個別定義の運用
+- 強固なパスワードポリシー制約
+  - 最低8文字構成(英大/小・数字必須)。MFAオプションの事前定義への対応設計
+
+---
+
+## バックエンド実装解説5: API Gatewayの認可設定とIAM
+
+- `CognitoUserPoolsAuthorizer` を経由する保護と最小権限 (Least Privilege) の原則
+
+```typescript
+// API Gateway: 特定リソースに対するCognito認可の組み込み例
+generateResource.addMethod('POST', new apigateway.LambdaIntegration(adminGenerateFn), {
+  authorizer, // Cognitoでのログイン・トークン認証をAPI通過条件に必須化
+  authorizationType: apigateway.AuthorizationType.COGNITO
+});
+
+// IAM Role: 管理APIに「テーブル読み書き」等の最小限のシステム実行権限のみ付与
+table.grantReadWriteData(shopMgmtFn);
+// ※一覧等API(adminListFn)には .grantReadData() のみ付与して悪用の被害を最小化
 ```
 
 ---
 
-## ステップ 4: 必要なプログラム部品をダウンロードする
-```bash
-cd frontend
-npm install
+## バックエンド実装解説6: テナント分離（所有者権限）の検証
 
-cd ../infra
-npm install
-```
+- 他の所有者のデータを操作できないようにするLambda内でのプロテクト (`shop-mgmt.ts`)
 
-## ステップ 5: 環境変数（秘密のパスワードなど）を設定する
-`frontend` フォルダに `.env.local` を作り、指定された文字列を貼り付けてください。
+```typescript
+// Cognitoの認証トークン(authorizer)からアクセス元ユーザーの真のIDを確証
+const claims = event.requestContext?.authorizer?.claims;
+const userId = claims?.sub;
 
-## ステップ 6: 自分のPCでアプリの画面を動かしてみる！
-```bash
-cd ../frontend 
-npm run dev
-```
-ブラウザを開き、`http://localhost:3000` にアクセスします。
+// 対象データの所有者がアクセスユーザーと合致しているかを検証
+const getRes = await ddb.send(new GetCommand({ /*...省略...*/ }));
+const targetShopOwner = getRes.Item.owner_id;
 
----
-
-## トラブルシューティング（よくあるエラーと解決法）
-
-「`npm install` や `npm ci` でエラーが出る」「Amplifyのビルドが失敗する」場合、設定ファイルと実際のバージョンの間に不整合が生じることがあります。「関連ファイルを一度すべて削除し、ゼロから再インストール」することで解決します。
-
-```bash
-# Windows の場合 (PowerShell)
-Remove-Item -Recurse -Force node_modules, package-lock.json
-
-# Mac / Linux の場合
-rm -rf node_modules package-lock.json
-```
-
-```bash
-npm install
-npm ci
+// 所有者が異なる場合は例外をスローして実行をブロック（テナントの分離）
+if (targetShopOwner && targetShopOwner !== userId) {
+    throw new Error('Forbidden'); // 以降の更新(Update)や削除(Delete)を中止
+}
 ```
 
 ---
 
-# 6. セキュリティとコードの実装ガイド
+## バックエンド実装解説7: APIエラー隠蔽化のコード例
 
-## 1. 権限管理とエンドポイントの保護
-* **① API全体のアクセス制限**: AWS Cognitoによる認証機能（Authorizer）をAPI Gatewayに設定。
-* **② 管理者(Admin)権限の厳格なチェック**: `cognito:groups` をチェックし、「403 Forbidden」ではなく「404 Not Found」を返しています。悪意のあるユーザーにAPIが存在する事実すら悟らせないようにしています（ステルス化）。
-* **③ データ所有権のチェック (Tenant Isolation)**: 「このショップの作成者と、今APIを叩いているユーザーが一致するか」を確認します。`owner_id` が `userId` と一致しない場合は `403 Forbidden` で処理を遮断します。
+- ステルス化通信: エラーレスポンスでの意図的な404偽装処理 (`infra-stack.ts`)
 
----
-
-## 2. ブルートフォース（総当たり）攻撃対策
-PINコードの入力時に「5回連続で失敗すると、そのQRコードを30分間ロック（操作不能）にする」という強力なレートリミット（回数制限）を設けています。
-
-## 3. ファイルアップロードの安全性
-「短時間（5分間）だけ有効な、特定のファイル名しかアップロードできない専用の片道切符（署名付きURL / Pre-signed URL）」を発行しています。画像ファイル以外のアップロードを許可せず、フロント側はこのURLに対してのみ直接画像を配置します。
-
----
-
-## 4. トランザクション処理 (データの整合性担保)
-「QRコードを【使用済】にする」処理と「住所情報を【注文データ】として保存する」処理は、絶対にセットで同時に行われなければなりません。DynamoDBの「トランザクション（TransactWriteCommand）」を使用しています。
-`ConditionExpression: '#status = :active'` を指定し、同時に複数回「送信」ボタンを押されるようなレースコンディション（二重登録）もデータベースレベルで完全に弾いています。
-
-## 5. インフラレベルの防御 (最小権限の原則 / IAM)
-APIの役割ごとにプログラム（Lambda）を細かく分割し、それぞれに別々のIAM Role（権限）を割り当てています。
-（例：`table.grantReadData(adminListFn)`, `bucket.grantPut(shopMgmtFn)`）
+```typescript
+api.addGatewayResponse('Default401Response', {
+  type: apigateway.ResponseType.UNAUTHORIZED,
+  statusCode: '404', // ← 401(未認証)をあえて404であると見せかけ秘匿
+  responseParameters: {
+    'gatewayresponse.header.Access-Control-Allow-Origin': "'*'",
+    'gatewayresponse.header.Access-Control-Allow-Headers': "'*'",
+    'gatewayresponse.header.Access-Control-Allow-Methods': "'GET,POST,PUT,DELETE,OPTIONS,PATCH'",
+  },
+  templates: {
+    'application/json': '{"message": "Not Found."}' // メッセージも404風に変更
+  }
+} as any);
+```
 
 ---
 
-## 6. APIエラーの隠蔽化によるステルス化 (API Gateway)
-API Gatewayで認証エラーや権限エラーが起きると、レスポンスを強制的に上書きし、一律で `404 Not Found` に偽装してフロントエンドに返却しています。
+## セキュリティ実装 (改ざん・攻撃への防御)
 
-## 7. 強固なパスワードポリシー (Cognito)
-* **パスワード強度**: 最低8文字以上、大文字、小文字、数字をすべて含むことを必須 (`require***: true`) としています。
-* **MFA (二段階認証)**: オプションとして有効化できる設計（`mfa: cognito.Mfa.OPTIONAL`）になっています。
-
----
-
-# 7. 画面一覧とページ遷移・操作ガイド
-
-アプリケーションは大きく「一般・認証関連ページ」「ショップ管理者向けページ」「システム管理者向けページ」「受取人・エンドユーザー向けページ」の4つに分かれます。
-
-## 1. 一般・認証関連ページ
-* **a. トップページ (`/[locale]/`)**: ユーザーに対するサービスの簡単な説明を行うランディングページです。ログインページへの遷移、言語切り替え。
-* **b. ログイン (`/[locale]/login`)**: Cognitoを利用した既存ユーザーのサインイン用ページ。サインイン処理実行。未確認ユーザーの自動遷移。新規登録ページへの遷移。
-* **c. 新規登録 (`/[locale]/register`)**: 新規アカウント作成（サインアップ処理）、ログインページへの遷移。
-* **d. アカウント認証 (`/[locale]/verify`)**: メールに届いた確認コード（検証コード）を入力してアカウント有効化。検証コードの入力とアカウント本登録（認証処理）。
+- PIN入力のブルートフォース（総当たり攻撃）防止処理
+  - 検証実行時の失敗記録。5回エラーで `locked_until` を用いる30分間一時ロックの適用
+- 整合性維持のためのトランザクション化
+  - 住所登録(`Put`)とQR更新(`Update`)の同時処理と `TransactWriteCommand` の指定
+  - `ConditionExpression` 指定の動的処理による二重登録（レースコンディション）完全無効化
+- ファイルストレージの保護制限処理
+  - バッチからの期限付き(5分)・署名付きURLを用いたS3大容量ファイル制限対応の構築
 
 ---
 
-## 2. ショップ管理者向けページ
-* **a. ショップ一覧 (`/[locale]/shop`)**: 所有するショップの一覧表示と選択、新規ショップの作成、ログアウト処理。
-* **b. 個別ショップ管理 (`/[locale]/shop/[shopId]`)**:
-  * **商品の新規作成 (Create Product)**: 画像を選択した場合、システム内で自動的に規定比率（16:9等）へリサイズされ、S3へアップロードされます。
-  * **商品一覧の閲覧とステータス管理**: ステータストグル機能 (`ACTIVE` ↔ `STOPPED`)。
-  * **商品の削除**: `STOPPED` であり、かつ、QRコードが一つも紐づいていない場合のみ削除を実行できます。
-  * **QRコードと商品の紐付け処理**: QRコードのスキャンまたは手入力。商品紐付けとアクティベート。一言メモの付与。
-  * **受注 (Orders) の管理と発送手続き**: 受注一覧の表示とソート。絞り込み検索とリフレッシュ。受注詳細情報の確認。発送処理の実行 (Ship Order)。
+## バックエンド実装解説8: S3・Cognito保護のコード例
+
+- S3大容量ファイル攻撃防御 (CORS制限)とCognitoのパスワードポリシー
+
+```typescript
+// S3: 許可されたドメインのクライアントからのみ直接アップロードを許可
+cors: [{
+    allowedMethods: [s3.HttpMethods.GET, s3.HttpMethods.PUT],
+    allowedOrigins: ['https://meishigawarini.com', 'http://localhost:3000'],
+}],
+
+// Cognito: 堅牢なユーザー保護ポリシーの強制
+passwordPolicy: {
+  minLength: 8,
+  requireLowercase: true,
+  requireUppercase: true,
+requireDigits: true, // 英大小文字・数字を必須化して強度を担保
+},
+mfa: cognito.Mfa.OPTIONAL, // 二要素認証(MFA)も利用可能に設定
+```
 
 ---
 
-## 3. システム管理者向けページ
-* **a. システム管理ダッシュボード (`/[locale]/admin`)**: リンク直打ちでしかアクセスできない。
-  * **QRコードの一括生成 (Batch Generate)**: 指定してバッチ処理を実行します。予め `shopId` と `productId` を紐付けた状態で発行することが可能です。
-  * **印刷用PDFの生成とダウンロード**: QR画像とPINコードをレイアウトした「両面印刷用PDFファイル」を自動生成・ダウンロードします。過去バッチの再ダウンロード機能。
-  * **QRコードのステータス別監視機能**: ステータス別一覧表示、個別検索機能 (`SEARCH`)。
-  * **詳細確認と不正処理 (Ban)**: バン (`BANNED`) 処理により機能が完全に停止されます。単発QRの再ダウンロード、クリーンアップ実行。
+## バックエンド実装解説9: S3への直接アップロード(署名付きURL)
+
+- `shop-mgmt.ts` にて、S3へ画像を書き込むための一時的な許可URLを生成し返却する処理
+
+```typescript
+// 1. S3への書き込みを指示するコマンドの定義 (PutObject)
+const command = new PutObjectCommand({
+    Bucket: BUCKET_NAME,
+    Key: `shop/${shopId}/products/${filename}`, // 保存先の完全パス
+    ContentType: contentType
+});
+
+// 2. 5分間(300秒)のみ有効な書き込み専用の「署名付きURL」を生成
+const uploadUrl = await getSignedUrl(s3, command, { expiresIn: 300 });
+
+// 3. フロントで画像を表示するためのパブリックな固定URLも構築して、2つ同時にJSONで返却
+const publicUrl = `https://${BUCKET_NAME}.s3.${region}.amazonaws.com/${key}`;
+return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ uploadUrl, publicUrl }) };
+// ※フロントエンドは受け取ったuploadUrlに向けてPUTリクエストで画像を直接送信する
+```
 
 ---
 
-## 4. 受取人・エンドユーザー向けページ
-* **a. ギフト受取ページ (`/[locale]/receive/[uuid]`)**
-  * **PIN入力ステップ**: PINの整合性がチェックされ、正しい場合のみ後続へ進行できます。
-  * **パスワード認証解除ステップ (`RESTRICTED`状態)**: パスワード保護の制限を解除し商品情報が閲覧可能になります。
-  * **ギフト情報の閲覧と配送先入力**: 情報がバックエンドへ安全に送信・保存され、ステータスが `USED` に移行します。
-  * **配送待機ステップ**: ショップの発送手配をお待ちください待機案内画面。
-  * **発送済み・追跡・受取報告ステップ**: 配送業者名と荷物の追跡番号が明示され、追跡システムへ遷移して状況を確認することが可能です。
-  * **チャット連絡 / メール通知の購読設定**
+## バックエンド実装解説10: 外部API (Resend) によるメール送信
+
+- `email-client.ts` における、Resend APIを利用したメールの一斉送信処理の実装
+
+```typescript
+import { Resend } from 'resend';
+
+// infra-stack.ts 等のCDK経由で渡された環境変数からAPIキー等を読み込み
+const RESEND_API_KEY = process.env.RESEND_API_KEY;
+const SENDER_EMAIL = process.env.SENDER_EMAIL;
+const resend = new Resend(RESEND_API_KEY);
+
+// Lambda内から呼び出すための非同期メール送信関数
+export async function sendEmail({ to, subject, text, html }: SendEmailParams) {
+    const data = await resend.emails.send({
+        from: SENDER_EMAIL,
+        to: Array.isArray(to) ? to : [to], // 複数の宛先にも対応
+        subject: subject,
+        text: text,
+        html: html,
+    });
+    // API連携エラー時のハンドリングも実装・管理
+    if (data.error) throw new Error(`Resend Error: ${data.error.message}`);
+    return data;
+}
+```
 
 ---
 
-# 8. 開発・デプロイ手順書（フロントエンド＆バックエンド）
+## ローカル開発環境のセットアップと運用
 
-## 1. フロントエンド（画面）の開発とデプロイ
-* **ローカルサーバーを起動する**: `npm run dev` (`http://localhost:3000` にアクセス)
-* **デプロイの手順**: GitHubの `main` ブランチにコードを統合（マージ）するだけで自動的にデプロイされます。AWS Amplifyが自動で最新のコードを読み取り反映されます。
-  1. `git add .` -> `git commit -m` -> `git push origin 作業ブランチ名`
-  2. GitHub上でPull Request (PR) を作成し、`main` にマージする
+- ツールの導入とAWS設定手順
+  - GitHub権限設定、環境ファイル (`.env.local`)
+  - AWS IAM Identity Centerベースのセッション (`aws login`) 及び `npm install`
+- CD/CIの運用の仕組み
+  - フロント側設定: GitHubの `main` 統合に伴うAmplifyプラットフォーム上での自動デプロイ
+  - バックエンド側処理1: `npx cdk synth` での生成検証、`npx cdk diff`の構成削除リスク確認
+  - バックエンド側処理2: コマンドラインからの手動構成変更適用 (`npx cdk deploy`)
+- トラブルシューティング（依存関係競合への自動対応）
+  - パッケージロック等の物理ファイルの全削除および `npm ci` でのクリーン実装再構築
 
 ---
 
-## 2. バックエンド（インフラ・API）の開発とデプロイ
-バックエンドのプログラムを変更した場合、手元でコードの整合性をチェックします。`aws login` でAWS環境を操作するための権限を取得します。
+## 開発時セットアップ: アカウント作成チェックリスト
 
-* **コードをテスト・検証する**: `npx cdk synth` (コードをAWSが理解できるかチェック)
-* **手元のコードの「差分」を確認する**: `npx cdk diff` (どこが追加され、どこが削除されるかが表示されます)
-* **デプロイを実行する**: `npx cdk deploy`
-  * 途中 `Do you wish to deploy these changes (y/n)?` と聞かれたら `y`。
-  * ※バックエンドのデプロイによって APIのURL や CognitoのID などが新しくなった場合は、フロントエンド側の環境変数を新しい値に書き換える必要があります。
+- [ ] (参加者) 管理者(オーナー)へアカウント作成依頼とGitHubアカウントの共有連絡
+- [ ] (管理者) AWS IAM Identity Center等にて新メンバーのアカウント発行
+- [ ] (管理者) Slack等にて以下の必須「4点セット」を参加者へ共有
+  1. AWSログイン用「スタートURL」「初期ユーザー名」「初期パスワード」
+  2. GitHubリポジトリ ([yudaiito9124-cyber/meishigawarini](https://github.com/yudaiito9124-cyber/meishigawarini)) の招待
+  3. 必須環境変数群 (`.env.local`, `.env` ファイル等の内容)
+  4. (必要時) Resend等のテスト用外部APIキー
+- [ ] (参加者) 共有情報を基にローカル環境から `aws login` による初期認証完了
+
+---
+
+## 開発時セットアップ: 頻出コマンド早見表
+
+- フロントエンド操作 (`cd frontend`)
+  - `npm install` : 初期構築時の依存パッケージの取得
+  | `npm run dev` : ローカルPCでの開発用画面起動 (`localhost:3000`)
+- バックエンド・インフラ操作 (`cd infra`)
+  - `npx cdk synth` : コードエラー確認用のAWSリソース定義ビルド
+  - `npx cdk diff`  : AWS現行環境と修正コード間の差分（追加・削除）の確認
+  - `npx cdk deploy`: AWS本番環境への変更内容の直接適用・デプロイ処理
+- 共通のトラシュー・初期化操作
+  - `npm ci` : 競合・エラー発生時の `package-lock.json` 依存のクリーンインストール
+
+---
+
+## フロントエンド実装: UIとCSS技術スタック
+
+- `Tailwind CSS` によるユーティリティファーストなスタイリング
+  - CSSファイルを分けず、クラス名 (`className="flex p-4 text-center"`) 内でデザイン完結
+- `Shadcn/ui` によるモダンなコンポーネント構成 (`@radix-ui` ベース)
+  - コピー＆ペーストベースの非依存型UI。システム全体で統一されたデザインシステムを提供
+- その他重要な機能ライブラリ
+  - `html5-qrcode` / `qrcode`: QRコードのカメラ読み取りおよび画像生成
+  - `jspdf`: バッチ作成時のクライアント側での両面・ラベル用PDF即時生成
+  - `next-intl`: `/[locale]/` などを用いたi18n(多言語)ルーティングと文字列切り替え
+
+---
+
+## フロントエンド実装解説: UIとCSSコード例
+
+- `Tailwind CSS` と `Shadcn/ui` を組み合わせた記述例 (`app/[locale]/admin/page.tsx` より)
+
+```tsx
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+
+// Tailwindのユーティリティクラス(flex, gap-2, bg-white等)で直接レイアウト・装飾を指定
+<Card>
+    <CardHeader>
+        <CardTitle className="flex justify-between items-center">
+            <span>タイトル</span>
+            <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={...}>更新</Button>
+            </div>
+        </CardTitle>
+    </CardHeader>
+    <CardContent className="space-y-4 bg-white border rounded-md p-4">
+        ...
+    </CardContent>
+</Card>
+```
+
+---
+
+## 【今後の展開】 ショップ間の商品インポート機能
+
+- 同一オーナー（別ショップ間）でのインポート
+  - 要件: 自身が所有する別店舗(`shopId`)を指定し、商品を複製
+  - 解決策: 複製元と先、両ショップの `owner_id` と `userId` を検証。合致すれば新レコード (`PK: SHOP#{新shopId}`, `SK: PRODUCT#{新Id}`) として保存し複製
+- 異なるオーナー間でのインポート（承認システム）
+  - 要件: 他オーナー商品のインポートを、明示的な許可ベースで実現
+  - 解決策(案1: トークン方式): 複製元がDBに「共有用トークン」を発行・保存。複製先が入力して認証を通過した場合に複製を許可
+  - 解決策(案2: 申請・承認方式): 複製先がDBに `IMPORT_REQUEST` レコードを作成。複製元が管理画面で「承認」した場合に限り、複製APIの実行を許可
