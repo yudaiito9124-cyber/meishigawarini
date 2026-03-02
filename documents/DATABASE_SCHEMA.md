@@ -121,6 +121,7 @@ QRコードのライフサイクルや注文ステータス、商品との紐付
 
 #### QR Metadata のステータス (`status`)
 QRコードのライフサイクルや注文の進捗状況を表します。
+![alt text](/documents/data/image-QRstatus.png)
 
 - **`UNASSIGNED` (未連携)**
   QRコードが生成されましたが、まだショップや商品と紐付けられていません。
