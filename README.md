@@ -20,18 +20,18 @@
 *   **バックエンド / インフラ**: AWS CDK v2 (TypeScript)
     *   AWS上に構築されるサーバーやデータベースの設計図をコードで書いています。
 
-👉**AWSサービスの概要**： **[AWS_ARCHITECTURE.md](./documents/AWS_ARCHITECTURE.md)** を開き、各AWSサービス（API Gateway, Lambda, DynamoDB, Cognito, S3など）の役割と、それがプロジェクトのどのファイルと紐付いているか図解付きで確認してください。（※AWS初心者向けの解説です）
 
-👉**データベースの概要**： **[DYNAMODB_GUIDE.md](./documents/DYNAMODB_GUIDE.md)** には、データベース（DynamoDB）にどのような形でデータ（ショップ情報、商品、QR、注文など）が保存されているかを図解付きで解説しています。（※シングルテーブル設計の解説です）
+- 👉**AWSサービスの概要**： **[AWS_ARCHITECTURE.md](./documents/AWS_ARCHITECTURE.md)** を開き、各AWSサービス（API Gateway, Lambda, DynamoDB, Cognito, S3など）の役割と、それがプロジェクトのどのファイルと紐付いているか図解付きで確認してください。（※AWS初心者向けの解説です）
 
-👉**データベースの詳細仕様**： **[DATABASE_SCHEMA.md](./documents/DATABASE_SCHEMA.md)** には、各データ項目の詳細な型、UUIDや日付フォーマット等の制約、および取りうるステータス値が一覧化されています。
+- 👉**データベースの概要**： **[DYNAMODB_GUIDE.md](./documents/DYNAMODB_GUIDE.md)** には、データベース（DynamoDB）にどのような形でデータ（ショップ情報、商品、QR、注文など）が保存されているかを図解付きで解説しています。（※シングルテーブル設計の解説です）
 
-👉**API Gatewayの概要**： **[APIGATEWAY_GUIDE.md](./documents/APIGATEWAY_GUIDE.md)** には、API Gatewayの役割と、プロジェクト内（CDK）での実装方法を解説しています。
+- 👉**データベースの詳細仕様**： **[DATABASE_SCHEMA.md](./documents/DATABASE_SCHEMA.md)** には、各データ項目の詳細な型、UUIDや日付フォーマット等の制約、および取りうるステータス値が一覧化されています。
 
-👉**セキュリティ対策の概要**： **[SECURITY_GUIDE.md](./documents/SECURITY_GUIDE.md)** には、このプロジェクトで行われているセキュリティ対策（不正アクセス防止や権限管理など）と、それが実際のコードのどこに書かれているかを解説しています。
+- 👉**API Gatewayの概要**： **[APIGATEWAY_GUIDE.md](./documents/APIGATEWAY_GUIDE.md)** には、API Gatewayの役割と、プロジェクト内（CDK）での実装方法を解説しています。
 
-👉**画面一覧・ページ遷移図**： **[UI_PAGE_TRANSITIONS.md](./documents/UI_PAGE_TRANSITIONS.md)** には、アプリケーション全体のページ構成、各ページでできること（操作一覧）、ページ間の状態遷移を図付きで解説しています。
+- 👉**セキュリティ対策の概要**： **[SECURITY_GUIDE.md](./documents/SECURITY_GUIDE.md)** には、このプロジェクトで行われているセキュリティ対策（不正アクセス防止や権限管理など）と、それが実際のコードのどこに書かれているかを解説しています。
 
+- 👉**画面一覧・ページ遷移図**： **[UI_PAGE_TRANSITIONS.md](./documents/UI_PAGE_TRANSITIONS.md)** には、アプリケーション全体のページ構成、各ページでできること（操作一覧）、ページ間の状態遷移を図付きで解説しています。
 
 
 ### 開発時の環境
@@ -67,13 +67,13 @@ c:\git\meishigawarini\
 開発を始めるには、以下の3つのステップが必要です。これらを順番に進めてください。
 
 ### 3.1 アカウント権限をもらう(管理者が作成する)
-👉 **[ACCOUNT_SETUP.md](./documents/ACCOUNT_SETUP.md)** を開き、**「2. 新規開発者をプロジェクトに招待する手順」** を参考に、管理者（オーナー）からアカウント権限や環境変数などの必要な情報をもらってください。
+- 👉 **[ACCOUNT_SETUP.md](./documents/ACCOUNT_SETUP.md)** を開き、**「2. 新規開発者をプロジェクトに招待する手順」** を参考に、管理者（オーナー）からアカウント権限や環境変数などの必要な情報をもらってください。
 
 ### 3.2 環境構築
-👉 **[ENVIRONMENT_SETUP.md](./documents/ENVIRONMENT_SETUP.md)** を開き、手順に従ってご自身のPCに専用ツールのインストール（AWS CLIやNode.jsなど）や初期設定を行ってください。（※完全初心者向けにゼロから解説しています）
+- 👉 **[ENVIRONMENT_SETUP.md](./documents/ENVIRONMENT_SETUP.md)** を開き、手順に従ってご自身のPCに専用ツールのインストール（AWS CLIやNode.jsなど）や初期設定を行ってください。（※完全初心者向けにゼロから解説しています）
 
 ### 3.3 もらったアカウント情報で認証
-👉 再び **[ACCOUNT_SETUP.md](./documents/ACCOUNT_SETUP.md)** の **「3. 開発者側（メンバー）が行う初期設定」** を見ながら、3.1でもらったログイン情報を使ってAWSの認証（`aws configure`）などを完了させてください。
+- 👉 再び **[ACCOUNT_SETUP.md](./documents/ACCOUNT_SETUP.md)** の **「3. 開発者側（メンバー）が行う初期設定」** を見ながら、3.1でもらったログイン情報を使ってAWSの認証（`aws configure`）などを完了させてください。
 
 ### 3.4 名刺代わりに ユーザーID作成・管理者権限の付与
 名刺代わりにの管理者画面に移行するには、名刺代わりにでアカウントを作成し、Cognitoから管理者権限を付与する(Administratorsグループに入る)必要があります。
@@ -84,7 +84,7 @@ c:\git\meishigawarini\
 
 フロントエンド（画面）とバックエンド（AWS上の仕組み）では、それぞれコードの書き方や「Web上に自分のプログラムを反映する（デプロイする）」手順が異なります。
 
-👉 **[WORKFLOW_GUIDE.md](./documents/WORKFLOW_GUIDE.md)** を開き、フロントエンド／バックエンドそれぞれで使う具体的なコマンドの流れを確認してください。
+- 👉 **[WORKFLOW_GUIDE.md](./documents/WORKFLOW_GUIDE.md)** を開き、フロントエンド／バックエンドそれぞれで使う具体的なコマンドの流れを確認してください。
 （「画面をプレビューするには？」「自分の変更を本番に反映するには？」といった疑問への答えがまとまっています）
 
 ---
@@ -102,6 +102,10 @@ c:\git\meishigawarini\
 * **情報の共有**: サイトのURL、テスト用アカウント、重要な環境変数（`.env` に書く値）はセキュリティの観点からリポジトリに記載していません。**プロジェクト参加時に、管理者からSlack等の安全な経路で直接受け取ってください。**
 * **メール送信 (Resend)**: ギフト受取通知などのシステムメールには「Resend」を使用しています（Amazon SESの審査で落ちたため…）。
     *   バックエンドでメール機能をテストする場合は、管理者からテスト用APIキー（`RESEND_API_KEY`）を共有してもらうか、各自で無料枠アカウントを作成して利用してください。
+
+### 💰 運用費用
+
+- 👉 **[RUNNING_COSTS.md](./documents/RUNNING_COSTS.md)** 
 
 ---
 不明点があれば気軽にチームメンバーにお声がけください！
