@@ -38,6 +38,7 @@
 * **OS** : windows 11
 * **IDE** : Google Antigravity (Visual Studio Code)
 * **言語** : TypeScript (npm)
+* **AWS region** : ap-northeast-1 (東京)
 
 ---
 
