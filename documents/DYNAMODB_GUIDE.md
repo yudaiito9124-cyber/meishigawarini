@@ -23,12 +23,14 @@ DynamoDBでは、データを引き出すための「カギ（Key）」と、そ
 しかし、DynamoDBを最速・最安で使うためのベストプラクティスとして**「シングルテーブル設計（Single Table Design）」**という手法があります。
 これは**「全く形の違うデータでも、工夫して全部1つの巨大なテーブルに突っ込む」**という特殊な設計です。
 本プロジェクトも `MeishiGawariniTableV2` という1つのテーブルだけですべてのデータを管理しています。
+![table image](/documents/data/image-table.png)
+**[実際のデータの例はこちら](/documents/data/sampletabledata.csv)**
 
 ---
 
 ## 3. このプロジェクトのデータの保存ルール（PKとSKの書き方）
 
-1つのテーブルに色々なデータを混在させるため、PKとSKの「名前の付け方」でデータを分類しています。プロジェクトのコード（`infra/lambda/` の中身）で実際に使われているルールを紹介します。
+1つのテーブルに色々なデータを混在させるため、PKとSKの「名前の付け方」でデータを分類しています。プロジェクトのコード（[`infra/lambda/`](../infra/lambda/) の中身）で実際に使われているルールを紹介します。
 
 ### 🏢 ① ショップの情報 (Shop)
 *   **PK**: `SHOP#<ショップのID>` (例: `SHOP#1234-abcd`)
@@ -80,3 +82,116 @@ QRコードを読み取ったユーザーが住所を入力すると、そのQR�
 1. AWSコンソールで **「DynamoDB」** を検索。
 2. 左メニューの **「テーブル」**（または **「項目を探索」**）を開く。
 3. `MeishiGawariniTableV2` を選択すると、エクセルのような画面で「実際のPKやSKにどんな文字が入っているか」を直接見ることができます。
+
+---
+
+## 6. 実装コードのサンプル
+
+このプロジェクトのバックエンド（[`infra/lambda/`](../infra/lambda/)）やインフラ定義（[`infra/lib/`](../infra/lib/)）で実際に使用されているコードの抜粋です。
+
+### ① DynamoDBへのデータ追加・更新 (PutCommand)
+`PutCommand`を使用して、新しいアイテムを作成したり、既存のアイテムを丸ごと上書きします。
+([`shop-mgmt.ts`](../infra/lambda/shop-mgmt.ts) より抜粋)
+
+```typescript
+import { DynamoDBDocumentClient, PutCommand } from '@aws-sdk/lib-dynamodb';
+
+const now = new Date().toISOString();
+await ddb.send(new PutCommand({
+    TableName: process.env.TABLE_NAME,
+    Item: {
+        PK: `SHOP#${shopId}`,
+        SK: `PRODUCT#${productId}`,
+        name: "商品名",
+        price: 1500,
+        status: 'ACTIVE',
+        ts_created_at: now
+    }
+}));
+```
+
+### ② DynamoDBからのデータ読み取り (GetCommand / QueryCommand)
+PKとSKが完全にわかっている場合は `GetCommand` が最速です。特定の条件に合致する複数アイテムの一覧を取りたい場合は `QueryCommand` を使用します。
+
+**GetCommandの例 (1件取得):**
+```typescript
+import { DynamoDBDocumentClient, GetCommand } from '@aws-sdk/lib-dynamodb';
+
+const getRes = await ddb.send(new GetCommand({
+    TableName: process.env.TABLE_NAME,
+    Key: { PK: `SHOP#${shopId}`, SK: 'METADATA' }
+}));
+
+console.log(getRes.Item); // 取得したデータ
+console.log(getRes.Item.owner_id); // 検索に合致したデータのowner_id
+```
+
+**QueryCommandの例 (一覧取得):**
+```typescript
+import { DynamoDBDocumentClient, QueryCommand } from '@aws-sdk/lib-dynamodb';
+
+const res = await ddb.send(new QueryCommand({
+    TableName: process.env.TABLE_NAME,
+    KeyConditionExpression: 'PK = :pk AND begins_with(SK, :sk)',
+    ExpressionAttributeValues: {
+        ':pk': `SHOP#${shopId}`,
+        ':sk': 'PRODUCT#'
+    }
+}));
+
+console.log(res.Items); // 検索に合致したデータの配列
+console.log(res.Items[0].owner_id); // 検索に合致したデータの配列の最初の要素のowner_id
+```
+
+### ③ CDKでのDynamoDBの権限付与 (IAMロール)
+Lambda関数がDynamoDBを読み書きできるようにするには、CDK（インフラ構築コード）側で権限（IAM）を設定する必要があります。
+([`infra-stack.ts`](../infra/lib/infra-stack.ts) より抜粋)
+
+```typescript
+import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
+import * as nodejs from 'aws-cdk-lib/aws-lambda-nodejs';
+
+// テーブルの定義
+const table = new dynamodb.Table(this, 'MeishiGawariniTableV2', { /* 省略 */ });
+
+// Lambda関数の定義
+const shopMgmtFn = new nodejs.NodejsFunction(this, 'ShopMgmtFn', { /* 省略 */ });
+
+// 読み書き権限をLambdaに付与する (Put, Get, Update, Deleteなどすべて可能)
+table.grantReadWriteData(shopMgmtFn);
+
+// もし読み取り専用権限だけを付与したい場合は以下のように記述します
+// table.grantReadData(adminListFn);
+```
+
+### ④ CDKでのテーブル定義 (GSI含む)
+`MeishiGawariniTableV2` テーブル本体とGSI（グローバルセカンダリインデックス）は以下のように定義されています。どんなデータ構造でも保存できるように、PKとSKは単純な「文字列型」として定義されています。
+([`infra-stack.ts`](../infra/lib/infra-stack.ts) より抜粋)
+
+```typescript
+import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
+
+// DynamoDB Table本体の定義
+const table = new dynamodb.Table(this, 'MeishiGawariniTableV2', {
+  partitionKey: { name: 'PK', type: dynamodb.AttributeType.STRING },
+  sortKey: { name: 'SK', type: dynamodb.AttributeType.STRING },
+  billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+  removalPolicy: cdk.RemovalPolicy.DESTROY,
+});
+
+// GSI1: ステータス別の検索用インデックス
+table.addGlobalSecondaryIndex({
+  indexName: 'GSI1',
+  partitionKey: { name: 'GSI1_PK', type: dynamodb.AttributeType.STRING },
+  sortKey: { name: 'GSI1_SK', type: dynamodb.AttributeType.STRING },
+  projectionType: dynamodb.ProjectionType.ALL,
+});
+
+// GSI2: オーナーごとのショップ検索・ショップごとの商品/QR検索用
+table.addGlobalSecondaryIndex({
+  indexName: 'GSI2',
+  partitionKey: { name: 'GSI2_PK', type: dynamodb.AttributeType.STRING },
+  sortKey: { name: 'GSI2_SK', type: dynamodb.AttributeType.STRING },
+  projectionType: dynamodb.ProjectionType.ALL,
+});
+```

@@ -21,7 +21,7 @@
 ## 2. 各データ構造の詳細（スキーマ）
 
 ### 2.1 Shop (ショップ情報)
-ショップの基本情報とオーナー情報を保持します。
+ショップの基本情報とオーナー情報を保持します。現在はショップユーザーのメールアドレスがそのまま問い合わせ先となっています。
 
 | 属性名 | 型 | 説明 |
 | --- | --- | --- |
@@ -36,6 +36,8 @@
 
 ### 2.2 Product (商品情報)
 各ショップに紐づく商品カタログ情報です。
+
+すでに有効化されたQRコードと紐づけられている商品などを変更すると混乱のもとになるため、基本的には作成後の変更操作は想定していません。また、同様の理由で、商品を削除する際には、statusがSTOPPED、かつすべての紐づけられたQRコードに対して発送されている必要があります(有効化済みでもなく発送待ちでもない)。
 
 | 属性名 | 型 | 説明 |
 | --- | --- | --- |
@@ -149,20 +151,20 @@ QRコードのライフサイクルや注文の進捗状況を表します。
 
 ## 3. 主なデータベース操作パターン (Lambda関数との対応)
 
-1. **ショップ管理 (`shop-mgmt.ts`)**
+1. **ショップ管理 ([`shop-mgmt.ts`](../infra/lambda/shop-mgmt.ts))**
    - ショップの作成: `PutCommand` (Shop)
    - ショップ一覧の取得: `QueryCommand` (GSI2 使用, Owner IDで絞り込み)
    - 商品の作成・更新・削除: `PutCommand`, `UpdateCommand`, `DeleteCommand` (Product)
    - QRコードの紐付け/有効化: `UpdateCommand` (QR Metadata)
 
-2. **QR生成/管理者 (`admin-generate.ts` 等)**
+2. **QR生成/管理者 ([`admin-generate.ts`](../infra/lambda/admin-generate.ts) 等)**
    - QRコードの一括生成: `BatchWriteItemCommand` (QR Metadata を一括作成)
 
-3. **受取人アクション (`recipient-submit.ts`, `recipient-verify-pin.ts`)**
+3. **受取人アクション ([`recipient-submit.ts`](../infra/lambda/recipient-submit.ts), [`recipient-verify-pin.ts`](../infra/lambda/recipient-verify-pin.ts))**
    - PINコードの照合: `GetCommand` (QR Metadata)
    - 配送先情報の登録: `PutCommand` または `UpdateCommand` (Order および QR Metadataのステータス更新)
 
-4. **注文管理/発送処理 (`shop-orders.ts`)**
+4. **注文管理/発送処理 ([`shop-orders.ts`](../infra/lambda/shop-orders.ts))**
    - 注文一覧の取得: `QueryCommand` (GSI2 使用で特定のショップのQR) + `BatchGetCommand` (対応するOrder情報を取得)
    - 発送ステータスへの更新: `UpdateCommand` (QR Metadata のステータスと、Order の追跡番号を更新)
 

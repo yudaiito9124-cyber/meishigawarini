@@ -22,7 +22,7 @@
 
 ### 必要な情報の共有・招待
 管理者は新規メンバーに対して以下を用意し、Slack等の安全なツールで渡してください。
-1.  **GitHubリポジトリの招待**: `yudaiito9124-cyber/meishigawarini` への Write 権限付き招待。
+1.  **GitHubリポジトリの招待**: [yudaiito9124-cyber/meishigawarini](https://github.com/yudaiito9124-cyber/meishigawarini) への Write 権限付き招待。
 2.  **AWS IAMユーザーの発行**: (手順は後述) 発行された `ログインURL` `ユーザー名` `初期パスワード`。
 3.  **環境変数 (`.env.local` / `.env`)**: API URLや各種シークレットなどの動作に必要な設定値。
 4.  *(必要に応じて)* **Resend (メール送信) のテスト用APIキー**

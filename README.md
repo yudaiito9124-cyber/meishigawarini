@@ -11,9 +11,8 @@
 
 「名刺代わりに」は、QRコードを用いて簡単にギフトや商品を贈る・受け取ることができるサービスです。
 
-![alt text](image.png)
+![alt text](/documents/data/image.png)
 
-本システムは、モダンなWebフロントエンドと、サーバー側の処理をAWSに任せる構成（サーバーレスアーキテクチャ）を組み合わせています。
 
 ### 主な技術スタック
 *   **フロントエンド**: Next.js (App Router, React 19), Tailwind CSS, Shadcn/ui
@@ -27,9 +26,12 @@
 
 👉データベースの詳細仕様： **[DATABASE_SCHEMA.md](./documents/DATABASE_SCHEMA.md)** には、各データ項目の詳細な型、UUIDや日付フォーマット等の制約、および取りうるステータス値が一覧化されています。
 
+👉APIの入り口（API Gateway）の概要： **[APIGATEWAY_GUIDE.md](./documents/APIGATEWAY_GUIDE.md)** には、API Gatewayの役割と、プロジェクト内（CDK）での実装方法を解説しています。
+
 👉セキュリティ対策の概要： **[SECURITY_GUIDE.md](./documents/SECURITY_GUIDE.md)** には、このプロジェクトで行われているセキュリティ対策（不正アクセス防止や権限管理など）と、それが実際のコードのどこに書かれているかを解説しています。
 
 👉画面一覧・ページ遷移図： **[UI_PAGE_TRANSITIONS.md](./documents/UI_PAGE_TRANSITIONS.md)** には、アプリケーション全体のページ構成、各ページでできること（操作一覧）、ページ間の状態遷移を図付きで解説しています。
+
 
 
 ### 開発時の環境
