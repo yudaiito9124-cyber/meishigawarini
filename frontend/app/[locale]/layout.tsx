@@ -10,6 +10,7 @@ import { NextIntlClientProvider } from 'next-intl';
 import { getMessages } from 'next-intl/server';
 import { notFound } from 'next/navigation';
 import { routing } from '../../i18n/routing';
+import { HelpButton } from '@/components/HelpButton';
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -59,6 +60,7 @@ export default async function RootLayout({
         <NextIntlClientProvider messages={messages}>
           <ConfigureAmplify />
           {children}
+          <HelpButton />
         </NextIntlClientProvider>
       </body>
     </html>
