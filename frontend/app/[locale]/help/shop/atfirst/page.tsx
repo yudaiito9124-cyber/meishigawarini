@@ -89,7 +89,7 @@ export default function ShopHelpPage() {
                                 </p>
                                 <p className="mb-4 text-muted-foreground">
                                     送信元アドレス：no-reply@verificationemail.components<br />
-                                    件名：【名刺がわりに】【名刺がわりに】認証コードのお知らせ (2FA Notification for Meishigawarini)
+                                    件名：【名刺がわりに】認証コードのお知らせ (2FA Notification for Meishigawarini)
                                 </p>
                                 <p className="mb-4 text-muted-foreground">
                                     ※迷惑メール設定等を確認してください。場合によっては迷惑メールフォルダなどに移動されている可能性があります。
@@ -136,7 +136,7 @@ export default function ShopHelpPage() {
                                     任意のショップを選択すると、③に示す各ショップの管理画面に移動できます。
                                 </p>
                                 <p className="mb-4 text-muted-foreground">
-                                    初期状態ではショップが存在しないため、右上にあるの「ショップ新規作成」ボタンを押下して、以下の②に進んでください。
+                                    初期状態ではショップが存在しないため、右上にある「ショップ新規作成」ボタンを押下して、以下の②に進んでください。
                                 </p>
                                 <div className="overflow-hidden rounded-lg border shadow-sm mb-10 mt-5">
                                     <Link href="/shop" className="ml-2 text-primary hover:underline text-sm">https://meishigawarini.com/shop</Link>
