@@ -20,6 +20,16 @@
 *   **バックエンド / インフラ**: AWS CDK v2 (TypeScript)
     *   AWS上に構築されるサーバーやデータベースの設計図をコードで書いています。
 
+### 初期開発時の環境
+* **OS** : windows 11
+* **IDE** : Google Antigravity (Visual Studio Code)
+* **言語** : TypeScript (npm)
+* **AWS region** : ap-northeast-1 (東京)
+
+
+### 技術的な概要
+
+- **画面一覧・ページ遷移図**： **[UI_PAGE_TRANSITIONS.md](./documents/UI_PAGE_TRANSITIONS.md)** には、アプリケーション全体のページ構成、各ページでできること（操作一覧）、ページ間の状態遷移を図付きで解説しています。
 
 - **AWSサービスの概要**： **[AWS_ARCHITECTURE.md](./documents/AWS_ARCHITECTURE.md)** を開き、各AWSサービス（API Gateway, Lambda, DynamoDB, Cognito, S3など）の役割と、それがプロジェクトのどのファイルと紐付いているか図解付きで確認してください。（※AWS初心者向けの解説です）
 
@@ -31,14 +41,7 @@
 
 - **セキュリティ対策の概要**： **[SECURITY_GUIDE.md](./documents/SECURITY_GUIDE.md)** には、このプロジェクトで行われているセキュリティ対策（不正アクセス防止や権限管理など）と、それが実際のコードのどこに書かれているかを解説しています。
 
-- **画面一覧・ページ遷移図**： **[UI_PAGE_TRANSITIONS.md](./documents/UI_PAGE_TRANSITIONS.md)** には、アプリケーション全体のページ構成、各ページでできること（操作一覧）、ページ間の状態遷移を図付きで解説しています。
 
-
-### 開発時の環境
-* **OS** : windows 11
-* **IDE** : Google Antigravity (Visual Studio Code)
-* **言語** : TypeScript (npm)
-* **AWS region** : ap-northeast-1 (東京)
 
 ---
 
@@ -49,7 +52,7 @@
 ```text
 c:\git\meishigawarini\
 ├── frontend\       # Next.js アプリケーション (フロントエンド)
-│   ├── app\        # ページごとのファイル（画面）
+│   ├── app\        # ページごとのファイル（画面）Webサイトのルーティングそのままの構造
 │   ├── components\ # ボタンや入力枠など、使い回せる画面の部品
 │   └── package.json# 画面を作るために必要な外部ツールのリスト
 │
@@ -90,7 +93,7 @@ c:\git\meishigawarini\
 
 ---
 
-## 5. 運用ルール・環境・外部サービスについて
+## 5. 運用ルール・環境・外部サービス・費用について
 
 チーム開発を安全・円滑に行うため、以下の点にご注意ください。
 
@@ -105,8 +108,19 @@ c:\git\meishigawarini\
     *   バックエンドでメール機能をテストする場合は、管理者からテスト用APIキー（`RESEND_API_KEY`）を共有してもらうか、各自で無料枠アカウントを作成して利用してください。
 
 ### 💰 運用費用
-
 -  **[RUNNING_COSTS.md](./documents/RUNNING_COSTS.md)** 
+
+---
+
+## 6. 今後の改善策・課題
+### ✅ TODO
+-  **[TODO.md](./TODO.md)** 
+
+---
+
+## 7. 議事録
+### 🖊議事録
+-  **[minutes.md](./minutes.md)** 
 
 ---
 不明点があれば気軽にチームメンバーにお声がけください！
