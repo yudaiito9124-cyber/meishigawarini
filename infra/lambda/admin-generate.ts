@@ -1,6 +1,6 @@
 import { APIGatewayProxyHandler } from 'aws-lambda';
 import { DynamoDBClient, BatchWriteItemCommand } from '@aws-sdk/client-dynamodb';
-import { DynamoDBDocumentClient, GetCommand } from '@aws-sdk/lib-dynamodb';
+import { DynamoDBDocumentClient, GetCommand, QueryCommand } from '@aws-sdk/lib-dynamodb';
 import * as crypto from 'crypto';
 import { verifyAdmin } from './share/admin-auth-inlambda';
 
@@ -11,7 +11,7 @@ const TABLE_NAME = process.env.TABLE_NAME || '';
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'Content-Type,Authorization',
-    'Access-Control-Allow-Methods': 'OPTIONS,POST'
+    'Access-Control-Allow-Methods': 'POST'
 };
 
 export const handler: APIGatewayProxyHandler = async (event) => {
@@ -30,17 +30,9 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 
         const body = JSON.parse(event.body || '{}');
         const count = body.count || 1;
-        const shopId = body.shopId;
-        const productId = body.productId;
+        let shopId = body.shopId;
+        let productId = body.productId;
 
-        // Validation for shopId and productId
-        if ((shopId && !productId) || (!shopId && productId)) {
-            return {
-                statusCode: 400,
-                headers: corsHeaders,
-                body: JSON.stringify({ message: 'Both shopId and productId must be provided, or both must be empty (ショップIDとプロダクトIDは両方指定するか、両方空にする必要があります)' })
-            };
-        }
 
         // Limit max count for safety
         if (count > 10) { // DynamoDB BatchWrite limit is 25 items
@@ -48,7 +40,6 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         }
 
         let isLinked = false;
-
         if (shopId && productId) {
             // Verify if the shop and product exist
             const getRes = await ddbDocClient.send(new GetCommand({
@@ -67,6 +58,45 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 };
             }
             isLinked = true;
+        }
+        // Validation for shopId and productId
+        else if (shopId && !productId) {
+            // Verify if the shop exists
+            const shopRes = await ddbDocClient.send(new GetCommand({
+                TableName: TABLE_NAME,
+                Key: {
+                    PK: `SHOP#${shopId}`,
+                    SK: 'METADATA'
+                }
+            }));
+            if (!shopRes.Item) {
+                return {
+                    statusCode: 400,
+                    headers: corsHeaders,
+                    body: JSON.stringify({ message: '指定されたショップIDは存在しません' })
+                };
+            }
+            productId = ""
+            isLinked = true;
+        } else if (!shopId && productId) {
+            // Verify if the product exists using GSI2
+            const prodRes = await ddbDocClient.send(new QueryCommand({
+                TableName: TABLE_NAME,
+                IndexName: 'GSI2',
+                KeyConditionExpression: 'GSI2_PK = :pk',
+                ExpressionAttributeValues: {
+                    ':pk': `PRODUCT#${productId}`
+                }
+            }));
+            if (!prodRes.Items || prodRes.Items.length === 0) {
+                return {
+                    statusCode: 400,
+                    headers: corsHeaders,
+                    body: JSON.stringify({ message: '指定されたプロダクトIDは存在しません' })
+                };
+            }
+            shopId = ""
+            isLinked = false;
         }
 
         const items = [];
@@ -90,20 +120,23 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 ts_updated_at: { S: now }
             };
 
-            if (isLinked) {
-                item.GSI1_PK = { S: 'QR#LINKED' };
-                item.GSI1_SK = { S: now };
+            if (shopId) {
                 item.GSI2_PK = { S: `SHOP#${shopId}` };
                 item.GSI2_SK = { S: now };
-                item.status = { S: 'LINKED' };
                 item.shop_id = { S: shopId };
+            }
+            if (productId) {
                 item.product_id = { S: productId };
+            }
+            if (isLinked) {
+                item.GSI1_PK = { S: 'QR#LINKED' };
+                item.status = { S: 'LINKED' };
                 item.ts_linked_at = { S: now };
             } else {
                 item.GSI1_PK = { S: 'QR#UNASSIGNED' };
-                item.GSI1_SK = { S: now };
                 item.status = { S: 'UNASSIGNED' };
             }
+            item.GSI1_SK = { S: now };
 
             items.push({
                 PutRequest: {

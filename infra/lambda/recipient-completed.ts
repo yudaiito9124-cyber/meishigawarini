@@ -11,7 +11,7 @@ const TABLE_NAME = process.env.TABLE_NAME || '';
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'Content-Type,Authorization',
-    'Access-Control-Allow-Methods': 'OPTIONS,POST'
+    'Access-Control-Allow-Methods': 'POST'
 };
 
 export const handler: APIGatewayProxyHandler = async (event) => {

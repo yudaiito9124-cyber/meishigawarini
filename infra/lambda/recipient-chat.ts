@@ -13,14 +13,11 @@ const TABLE_NAME = process.env.TABLE_NAME || '';
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'Content-Type,Authorization',
-    'Access-Control-Allow-Methods': 'OPTIONS,POST,GET'
+    'Access-Control-Allow-Methods': 'POST,GET'
 };
 
 export const handler: APIGatewayProxyHandler = async (event) => {
     try {
-        if (event.httpMethod === 'OPTIONS') {
-            return { statusCode: 200, headers: corsHeaders, body: '' };
-        }
 
         const { uuid } = event.pathParameters || {};
         if (!uuid) {

@@ -319,86 +319,114 @@ export class InfraStack extends cdk.Stack {
       authorizationType: apigateway.AuthorizationType.COGNITO
     });
 
-    // Shop Routes (Legacy & Activation)
-    const shopResource = api.root.addResource('shop');
 
 
-    // New Shops Resource /shops
-    // const shopsResource = api.root.addResource('shops');
+    //////////////////////////////////////
+    // Shop Routes
+
+    const shopResource = api.root.addResource('shop'); // shop
+    // shop POST #CreateShop
     shopResource.addMethod('POST', new apigateway.LambdaIntegration(shopMgmtFn), {
       authorizer,
       authorizationType: apigateway.AuthorizationType.COGNITO
     });
+    // shop GET #ListShops
     shopResource.addMethod('GET', new apigateway.LambdaIntegration(shopMgmtFn), {
       authorizer,
       authorizationType: apigateway.AuthorizationType.COGNITO
-    }); // List My Shops
+    });
 
-    const shopIdResource = shopResource.addResource('{shopId}');
+    const shopIdResource = shopResource.addResource('{shopId}'); // shop/{shopId}
+    // shop/{shopId} GET #GetShop
     shopIdResource.addMethod('GET', new apigateway.LambdaIntegration(shopMgmtFn), {
       authorizer,
       authorizationType: apigateway.AuthorizationType.COGNITO
-    }); // Get Shop
+    });
 
-    const productsResource = shopIdResource.addResource('products');
+    const productsResource = shopIdResource.addResource('products'); // shop/{shopId}/products
+    // shop/{shopId}/products POST #CreateProducts
     productsResource.addMethod('POST', new apigateway.LambdaIntegration(shopMgmtFn), {
       authorizer,
       authorizationType: apigateway.AuthorizationType.COGNITO
-    }); // Create Product
+    });
+    // shop/{shopId}/products GET #ListProducts
     productsResource.addMethod('GET', new apigateway.LambdaIntegration(shopMgmtFn), {
       authorizer,
       authorizationType: apigateway.AuthorizationType.COGNITO
-    }); // List Products
+    });
 
-    const uploadUrlResource = productsResource.addResource('upload-url');
+    const importProductsResource = productsResource.addResource('import'); // shop/{shopId}/products/import
+    // shop/{shopId}/products/import GET #ListImportableShops
+    importProductsResource.addMethod('GET', new apigateway.LambdaIntegration(shopMgmtFn), {
+      authorizer,
+      authorizationType: apigateway.AuthorizationType.COGNITO
+    });
+    // shop/{shopId}/products/import POST #ImportProducts
+    importProductsResource.addMethod('POST', new apigateway.LambdaIntegration(shopMgmtFn), {
+      authorizer,
+      authorizationType: apigateway.AuthorizationType.COGNITO
+    });
+
+    const uploadUrlResource = productsResource.addResource('upload-url'); // shop/{shopId}/products/upload-url
+    // shop/{shopId}/products/upload-url POST #GetUploadUrl
     uploadUrlResource.addMethod('POST', new apigateway.LambdaIntegration(shopMgmtFn), {
       authorizer,
       authorizationType: apigateway.AuthorizationType.COGNITO
-    }); // Get Upload URL
+    });
 
-    const productIdResource = productsResource.addResource('{productId}');
+    const productIdResource = productsResource.addResource('{productId}'); // shop/{shopId}/products/{productId}
+    // shop/{shopId}/products/{productId} PATCH #UpdateProductStatus
     productIdResource.addMethod('PATCH', new apigateway.LambdaIntegration(shopMgmtFn), {
       authorizer,
       authorizationType: apigateway.AuthorizationType.COGNITO
-    }); // Update Status
+    });
+    // shop/{shopId}/products/{productId} DELETE #DeleteProduct
     productIdResource.addMethod('DELETE', new apigateway.LambdaIntegration(shopMgmtFn), {
       authorizer,
       authorizationType: apigateway.AuthorizationType.COGNITO
-    }); // Delete Product
+    });
 
     const linkResource = shopIdResource.addResource('link');
+    // shop/{shopId}/link POST #LinkQR
     linkResource.addMethod('POST', new apigateway.LambdaIntegration(shopMgmtFn), {
       authorizer,
       authorizationType: apigateway.AuthorizationType.COGNITO
-    }); // Link QR
+    });
 
     const shopActivateResource = shopIdResource.addResource('activate');
+    // shop/{shopId}/activate POST #ActivateQR
     shopActivateResource.addMethod('POST', new apigateway.LambdaIntegration(shopMgmtFn), {
       authorizer,
       authorizationType: apigateway.AuthorizationType.COGNITO
-    }); // Activate QR
+    });
 
     const shopQrsResource = shopIdResource.addResource('qrcodes');
+    // shop/{shopId}/qrcodes GET #ListQRs
     shopQrsResource.addMethod('GET', new apigateway.LambdaIntegration(shopMgmtFn), {
       authorizer,
       authorizationType: apigateway.AuthorizationType.COGNITO
-    }); // List QRs
+    });
 
     const shopOrdersResource = shopIdResource.addResource('orders');
+    // shop/{shopId}/orders GET #ListShopOrders
     shopOrdersResource.addMethod('GET', new apigateway.LambdaIntegration(shopOrdersFn), {
       authorizer,
       authorizationType: apigateway.AuthorizationType.COGNITO
-    }); // List Shop Orders
+    });
 
     const shopOrderResource = shopOrdersResource.addResource('{qrId}');
+    // shop/{shopId}/orders/{qrId} PATCH #ShipOrder
     shopOrderResource.addMethod('PATCH', new apigateway.LambdaIntegration(shopOrdersFn), {
       authorizer,
       authorizationType: apigateway.AuthorizationType.COGNITO
-    }); // Ship Order
+    });
 
 
-    // Recipient Routes
-    // Recipient Routes
+
+
+
+
+    // Receiver(Recipient) Routes
     const recipientResource = api.root.addResource('recipient');
     const qrResourceRecip = recipientResource.addResource('qrcodes');
 

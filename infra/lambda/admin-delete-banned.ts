@@ -10,7 +10,7 @@ const INDEX_NAME = 'GSI1';
 
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'OPTIONS,POST,GET,DELETE',
+    'Access-Control-Allow-Methods': 'POST,GET,DELETE',
     'Access-Control-Allow-Headers': 'Content-Type',
 };
 
@@ -23,11 +23,6 @@ export const handler: APIGatewayProxyHandler = async (event) => {
     }
 
     console.log('Event:', JSON.stringify(event));
-
-    if (event.httpMethod === 'OPTIONS') {
-        return { statusCode: 200, headers: corsHeaders, body: '' };
-    }
-
     if (event.httpMethod !== 'DELETE') {
         return {
             statusCode: 405,

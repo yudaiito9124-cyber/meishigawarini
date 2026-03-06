@@ -1,7 +1,7 @@
 import { APIGatewayProxyHandler } from 'aws-lambda';
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, PutCommand, QueryCommand, GetCommand, UpdateCommand, DeleteCommand } from '@aws-sdk/lib-dynamodb';
-import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, PutObjectCommand, CopyObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import * as crypto from 'crypto';
 
@@ -15,24 +15,37 @@ const BUCKET_NAME = process.env.BUCKET_NAME || '';
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'Content-Type,Authorization',
-    'Access-Control-Allow-Methods': 'OPTIONS,POST,GET,PATCH,DELETE'
+    'Access-Control-Allow-Methods': 'POST,GET,PATCH,DELETE'
 };
 
 const DEFAULT_VALID_DAYS = parseInt(process.env.DEFAULT_VALID_DAYS || '1');
+
+async function checkShopOwner(shopuuid: string | undefined, userid: string) {
+    if (!shopuuid || !userid) return false;
+
+    const shopRes = await ddb.send(new GetCommand({
+        TableName: TABLE_NAME,
+        Key: { PK: `SHOP#${shopuuid}`, SK: 'METADATA' }
+    }));
+    if (!shopRes.Item || shopRes.Item.owner_id !== userid) return false;
+
+    return shopRes.Item;
+}
 
 export const handler: APIGatewayProxyHandler = async (event) => {
     try {
         const path = event.path;
         const method = event.httpMethod;
         const shopId = event.pathParameters?.shopId;
-
         // Get User ID from Cognito
         const claims = event.requestContext?.authorizer?.claims;
         const userId = claims?.sub; // 'sub' is the unique user ID in Cognito
 
-        if (method === 'OPTIONS') {
-            return { statusCode: 200, headers: corsHeaders, body: '' };
-        }
+
+        // 認証済みか確認
+        if (!userId) return { statusCode: 401, headers: corsHeaders, body: 'Unauthorized' };
+        //////////// ここから下は 認証済みの場合のみアクセス可能
+
 
         // 1. Create Shop (POST /shop)
         // Requires Auth
@@ -64,16 +77,8 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             return { statusCode: 201, headers: corsHeaders, body: JSON.stringify({ shop_id: newShopId, message: 'Shop created' }) };
         }
 
-        // 1b. List My Shops (GET /shop)
-        // Requires Auth
-        // Note: infra-stack defines GET /shop/{shopId}, but usually GET /shop maps to List if no ID.
-        // If event.pathParameters is empty or shopId is undefined...
-        // But APIGW resource is /shop/{shopId}. To support /shop list, we need a root /shop GET method in infra.
-        // Let's assume we added GET /shop in infra (List My Shops).
-        // Check if path ends with /shop exactly
+        // 2. List My Shops (GET /shop)
         if (method === 'GET' && path.endsWith('/shop') && !shopId) {
-            if (!userId) return { statusCode: 401, headers: corsHeaders, body: 'Unauthorized' };
-
             const res = await ddb.send(new QueryCommand({
                 TableName: TABLE_NAME,
                 IndexName: 'GSI2',
@@ -87,116 +92,145 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         }
 
 
-        // Validate Shop ID for subsequent routes
-        if (!shopId) {
-            // Should be caught by APIGW routing usually, but just in case
-            return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Missing shopId' }) };
+
+        let shopMetadata: any = null;
+        shopMetadata = await checkShopOwner(shopId, userId);
+        if (shopMetadata === false) {
+            return { statusCode: 401, headers: corsHeaders, body: JSON.stringify({ message: 'Unauthorized' }) };
+        }
+        //////////// ここから下は 認証済みかつ指定されたショップ(shopId)のオーナーのみアクセス可能
+
+
+
+
+        // 2. Get Shop Details (GET /shop/{shopId})
+        if (method === 'GET' && (path.endsWith(`/shop/${shopId}`) || path.endsWith(`/shop/${shopId}/`))) {
+            return { statusCode: 200, headers: corsHeaders, body: JSON.stringify(shopMetadata) };
         }
 
-        // 9. List Shop QRs ((GET /shop/{shopId}/qrcodes)
-        if (method === 'GET' && path.endsWith('/qrcodes')) {
-            // Verify Ownership (Optimization: Query Shop first? Or assumes product access check implies ownership?)
-            // Better to check ownership for security.
-            const shopRes = await ddb.send(new GetCommand({ TableName: TABLE_NAME, Key: { PK: `SHOP#${shopId}`, SK: 'METADATA' } }));
-            if (!shopRes.Item) return { statusCode: 404, headers: corsHeaders, body: 'Shop not found' };
-            if (shopRes.Item.owner_id && shopRes.Item.owner_id !== userId) return { statusCode: 403, headers: corsHeaders, body: 'Forbidden' };
+        // 3. Create Product (POST /shop/{shopId}/products)
+        if (method === 'POST' && path.endsWith('/products')) {
 
+            const body = JSON.parse(event.body || '{}');
+            const { name, description, image_url, price, valid_days } = body;
+            if (!name) return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Missing product name' }) };
+
+            const productId = crypto.randomUUID();
+            // Default valid_days to 1 if not provided
+            const validityPeriod = valid_days ? parseInt(valid_days) : DEFAULT_VALID_DAYS;
+            const now = new Date().toISOString();
+
+            await ddb.send(new PutCommand({
+                TableName: TABLE_NAME,
+                Item: {
+                    PK: `SHOP#${shopId}`,
+                    SK: `PRODUCT#${productId}`,
+                    product_id: productId, // Added product_id as per request
+                    name,
+                    description,
+                    image_url,
+                    price,
+                    valid_days: validityPeriod,
+                    status: 'ACTIVE', // Default status
+                    GSI1_PK: 'PRODUCT#ACTIVE', // For listing active products
+                    GSI1_SK: now, // Optional: Sort by creation date
+                    GSI2_PK: `PRODUCT#${productId}`, // Added for UUID lookup
+                    GSI2_SK: `SHOP#${shopId}`, // Optional: 
+                    ts_created_at: now
+                }
+            }));
+
+            return { statusCode: 201, headers: corsHeaders, body: JSON.stringify({ product_id: productId, message: 'Product created' }) };
+        }
+
+        // 3. My Shop list for Import Product (GET /shop/{shopId}/products/import)
+        if (method === 'GET' && path.endsWith('/products/import')) {
             const res = await ddb.send(new QueryCommand({
                 TableName: TABLE_NAME,
                 IndexName: 'GSI2',
-                KeyConditionExpression: 'GSI2_PK = :sid',
+                KeyConditionExpression: 'GSI2_PK = :uid',
                 ExpressionAttributeValues: {
-                    ':sid': `SHOP#${shopId}`
+                    ':uid': `USER#${userId}`
+                }
+            }));
+            return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ shops: res.Items }) };
+        }
+
+        // 3. Import Product From My Shop (POST /shop/{shopId}/products/import)
+        if (method === 'POST' && path.endsWith('/products/import')) {
+
+            const body = JSON.parse(event.body || '{}');
+            let { importShopId } = body;
+
+            if (!importShopId) return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Missing importShopId' }) };
+
+            let importShopMetadata = await checkShopOwner(importShopId, userId)
+            if (importShopMetadata === false) {
+                return { statusCode: 401, headers: corsHeaders, body: JSON.stringify({ message: 'Unauthorized for import source shop' }) };
+            }
+
+            const prodsRes = await ddb.send(new QueryCommand({
+                TableName: TABLE_NAME,
+                KeyConditionExpression: 'PK = :pk AND begins_with(SK, :sk)',
+                ExpressionAttributeValues: {
+                    ':pk': `SHOP#${importShopId}`,
+                    ':sk': 'PRODUCT#'
                 }
             }));
 
-            // Map to simpler structure AND check for expiration
-            const now = new Date();
-            const updatePromises: Promise<any>[] = [];
+            const productsToImport = prodsRes.Items || [];
+            if (productsToImport.length === 0) {
+                return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ message: "The source shop has no products", imported: 0 }) };
+            }
 
-            const items = (res.Items || []).map(item => {
-                let status = item.status;
-                let ts_expired_at = item.ts_expired_at;
+            const region = process.env.AWS_REGION || 'ap-northeast-1';
+            let importedCount = 0;
 
-                // Check if expired but still marked as ACTIVE
-                if (status === 'ACTIVE' && ts_expired_at) {
-                    const expiresAt = new Date(ts_expired_at);
-                    if (now > expiresAt) {
-                        status = 'EXPIRED';
-                        // Trigger async update
-                        updatePromises.push(
-                            ddb.send(new UpdateCommand({
-                                TableName: TABLE_NAME,
-                                Key: { PK: item.PK, SK: 'METADATA' },
-                                UpdateExpression: 'SET #status = :expired, GSI1_PK = :gsi_pk, ts_updated_at = :now',
-                                ExpressionAttributeNames: { '#status': 'status' },
-                                ExpressionAttributeValues: {
-                                    ':expired': 'EXPIRED',
-                                    ':gsi_pk': 'QR#EXPIRED',
-                                    ':now': now.toISOString()
-                                }
-                            })).catch(e => console.error(`Failed to update expired status for ${item.PK}`, e))
-                        );
+            for (const prod of productsToImport) {
+                let newImageUrl = prod.image_url;
+
+                if (prod.image_url && prod.image_url.includes(BUCKET_NAME)) {
+                    try {
+                        const urlObj = new URL(prod.image_url);
+                        const sourceKey = decodeURIComponent(urlObj.pathname.substring(1));
+
+                        const ext = sourceKey.split('.').pop() || 'jpg';
+                        const newFilename = `${crypto.randomUUID()}.${ext}`;
+                        const newKey = `shop/${shopId}/products/${newFilename}`;
+
+                        await s3.send(new CopyObjectCommand({
+                            Bucket: BUCKET_NAME,
+                            CopySource: encodeURI(`${BUCKET_NAME}/${sourceKey}`),
+                            Key: newKey
+                        }));
+
+                        newImageUrl = `https://${BUCKET_NAME}.s3.${region}.amazonaws.com/${newKey}`;
+                    } catch (e) {
+                        console.error('Failed to copy image for product', prod.product_id, e);
                     }
                 }
 
-                return {
-                    id: item.PK.replace('QR#', ''),
-                    status: status,
-                    product_id: item.product_id,
-                    ts_created_at: item.ts_created_at,
-                    ts_activated_at: item.ts_activated_at,
-                    ts_expired_at: ts_expired_at
-                };
-            });
+                const copyItem = { ...prod };
+                copyItem.PK = `SHOP#${shopId}`;
+                copyItem.image_url = newImageUrl;
 
-            // Wait for all updates to complete (or fail) before returning?
-            // Usually for list API, latency matters. But since we want to be correct, maybe waiting isn't too bad if there are few.
-            // Let's await to be safe and ensure data consistency next refresh.
-            if (updatePromises.length > 0) {
-                await Promise.all(updatePromises);
+                if (copyItem.GSI2_SK && copyItem.GSI2_SK.startsWith('SHOP#')) {
+                    copyItem.GSI2_SK = `SHOP#${shopId}`;
+                }
+
+                await ddb.send(new PutCommand({
+                    TableName: TABLE_NAME,
+                    Item: copyItem
+                }));
+
+                importedCount++;
             }
 
-            return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ items }) };
+            return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ message: "Products imported successfully", imported: importedCount }) };
         }
 
-        // 2. Get Shop Details (GET /shop/{shopId})
-        if (method === 'GET' && !path.endsWith('/products')) {
-            const getRes = await ddb.send(new GetCommand({
-                TableName: TABLE_NAME,
-                Key: { PK: `SHOP#${shopId}`, SK: 'METADATA' }
-            }));
-            if (!getRes.Item) return { statusCode: 404, headers: corsHeaders, body: JSON.stringify({ message: 'Shop not found' }) };
-
-            // Check Ownership
-            // If shop was created BEFORE auth was added, owner_id might be missing.
-            // Strict mode: deny if not owner.
-            // Legacy mode: allow if owner_id missing? No, let's enforce.
-            if (getRes.Item.owner_id && getRes.Item.owner_id !== userId) {
-                return { statusCode: 403, headers: corsHeaders, body: JSON.stringify({ message: 'You do not own this shop' }) };
-            }
-
-            return { statusCode: 200, headers: corsHeaders, body: JSON.stringify(getRes.Item) };
-        }
-
-        // Common Ownership Check for Write Operations could be here, but let's do inline for now.
-        // Actually, we should check ownership before allowing add product etc.
-
-        // Shared Shop Check function
-        const verifyShopOwner = async () => {
-            const getRes = await ddb.send(new GetCommand({
-                TableName: TABLE_NAME,
-                Key: { PK: `SHOP#${shopId}`, SK: 'METADATA' }
-            }));
-            if (!getRes.Item) throw new Error('Shop not found');
-            if (getRes.Item.owner_id && getRes.Item.owner_id !== userId) throw new Error('Forbidden');
-            return getRes.Item;
-        };
-
-        // Get Upload URL (POST /shop/{shopId}/products/upload-url)
+        //    Get Upload URL for 3. Create product (POST /shop/{shopId}/products/upload-url)
         if (method === 'POST' && path.endsWith('/upload-url')) {
-            await verifyShopOwner(); // Check permissions
-
             const body = JSON.parse(event.body || '{}');
             const { filename, contentType } = body;
             if (!filename || !contentType) return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Missing filename or contentType' }) };
@@ -226,45 +260,8 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ uploadUrl, publicUrl }) };
         }
 
-        // 3. Create Product (POST /shop/{shopId}/products)
-        if (method === 'POST' && path.endsWith('/products')) {
-            await verifyShopOwner();
-
-            const body = JSON.parse(event.body || '{}');
-            const { name, description, image_url, price, valid_days } = body;
-            if (!name) return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Missing product name' }) };
-
-            const productId = crypto.randomUUID();
-            // Default valid_days to 1 if not provided
-            const validityPeriod = valid_days ? parseInt(valid_days) : DEFAULT_VALID_DAYS;
-            const now = new Date().toISOString();
-
-            await ddb.send(new PutCommand({
-                TableName: TABLE_NAME,
-                Item: {
-                    PK: `SHOP#${shopId}`,
-                    SK: `PRODUCT#${productId}`,
-                    product_id: productId, // Added product_id as per request
-                    name,
-                    description,
-                    image_url,
-                    price,
-                    valid_days: validityPeriod,
-                    status: 'ACTIVE', // Default status
-                    GSI1_PK: 'PRODUCT#ACTIVE', // For listing active products
-                    GSI1_SK: now, // Optional: Sort by creation date
-                    GSI2_PK: `PRODUCT#${productId}`, // Added for UUID lookup
-                    GSI2_SK: now, // Optional: Sort by creation date
-                    ts_created_at: now
-                }
-            }));
-
-            return { statusCode: 201, headers: corsHeaders, body: JSON.stringify({ product_id: productId, message: 'Product created' }) };
-        }
-
         // 4. List Products (GET /shop/{shopId}/products)
         if (method === 'GET' && path.endsWith('/products')) {
-            await verifyShopOwner(); // Even listing should be protected for private shop data? Yes.
 
             const res = await ddb.send(new QueryCommand({
                 TableName: TABLE_NAME,
@@ -283,7 +280,6 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 
         // 5. Link QR (POST /shop/{shopId}/link)
         if (method === 'POST' && path.endsWith('/link')) {
-            await verifyShopOwner();
 
             const body = JSON.parse(event.body || '{}');
             let { qr_id, product_id, memo_for_users, memo_for_shop, activate_now } = body;
@@ -298,8 +294,9 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 
             const qrItem = qrCheck.Item;
             if (qrItem.status === 'LINKED') {
-                if (qrItem.shop_id !== shopId) return { statusCode: 403, headers: corsHeaders, body: JSON.stringify({ message: 'QR does not belong to this shop' }) };
-                if (!product_id) product_id = qrItem.product_id;
+                if (qrItem.shop_id && qrItem.shop_id !== shopId) return { statusCode: 403, headers: corsHeaders, body: JSON.stringify({ message: 'QR does not belong to this shop' }) };
+                if (product_id && product_id !== qrItem.product_id) return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Product ID cannot be changed for linked QR' }) };
+                product_id = qrItem.product_id;
             } else if (qrItem.status === 'UNASSIGNED') {
                 if (!product_id) return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Missing product_id for unassigned QR' }) };
             } else {
@@ -377,7 +374,6 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 
         // 6. Activate QR (POST /shop/{shopId}/activate)
         if (method === 'POST' && path.endsWith('/activate')) {
-            await verifyShopOwner();
 
             const body = JSON.parse(event.body || '{}');
             const { qr_id } = body;
@@ -432,7 +428,6 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 
         // 7. Update Product Status
         if (method === 'PATCH' && path.includes('/products/')) {
-            await verifyShopOwner();
 
             const pid = event.pathParameters?.productId;
             if (!pid) return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Missing product ID' }) };
@@ -456,7 +451,6 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 
         // 8. Delete Product
         if (method === 'DELETE' && path.includes('/products/')) {
-            await verifyShopOwner();
 
             const pid = event.pathParameters?.productId;
             if (!pid) return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Missing product ID' }) };
@@ -487,7 +481,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 }))
             ]);
             const activeOrUsedQRs = [...(usedRes.Items || []), ...(activeRes.Items || [])];
-            const relatedQRs = activeOrUsedQRs.filter(item => item.product_id === pid);
+            const relatedQRs = activeOrUsedQRs.filter(item => item.product_id === pid && item.shop_id === shopId);
             if (relatedQRs.length > 0) {
                 const qrIds = relatedQRs.map(qr => qr.PK.replace('QR#', '')).join(', ');
                 return {
@@ -506,13 +500,71 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ message: 'Product deleted' }) };
         }
 
+        // 9. List Shop QRs ((GET /shop/{shopId}/qrcodes)
+        if (method === 'GET' && path.endsWith('/qrcodes')) {
+            const res = await ddb.send(new QueryCommand({
+                TableName: TABLE_NAME,
+                IndexName: 'GSI2',
+                KeyConditionExpression: 'GSI2_PK = :sid',
+                ExpressionAttributeValues: {
+                    ':sid': `SHOP#${shopId}`
+                }
+            }));
+
+            // Map to simpler structure AND check for expiration
+            const now = new Date();
+            const updatePromises: Promise<any>[] = [];
+
+            const items = (res.Items || []).map(item => {
+                let status = item.status;
+                let ts_expired_at = item.ts_expired_at;
+
+                // Check if expired but still marked as ACTIVE
+                if (status === 'ACTIVE' && ts_expired_at) {
+                    const expiresAt = new Date(ts_expired_at);
+                    if (now > expiresAt) {
+                        status = 'EXPIRED';
+                        // Trigger async update
+                        updatePromises.push(
+                            ddb.send(new UpdateCommand({
+                                TableName: TABLE_NAME,
+                                Key: { PK: item.PK, SK: 'METADATA' },
+                                UpdateExpression: 'SET #status = :expired, GSI1_PK = :gsi_pk, ts_updated_at = :now',
+                                ExpressionAttributeNames: { '#status': 'status' },
+                                ExpressionAttributeValues: {
+                                    ':expired': 'EXPIRED',
+                                    ':gsi_pk': 'QR#EXPIRED',
+                                    ':now': now.toISOString()
+                                }
+                            })).catch(e => console.error(`Failed to update expired status for ${item.PK}`, e))
+                        );
+                    }
+                }
+
+                return {
+                    id: item.PK.replace('QR#', ''),
+                    status: status,
+                    product_id: item.product_id,
+                    ts_created_at: item.ts_created_at,
+                    ts_activated_at: item.ts_activated_at,
+                    ts_expired_at: ts_expired_at
+                };
+            });
+
+            // Wait for all updates to complete (or fail) before returning?
+            // Usually for list API, latency matters. But since we want to be correct, maybe waiting isn't too bad if there are few.
+            // Let's await to be safe and ensure data consistency next refresh.
+            if (updatePromises.length > 0) {
+                await Promise.all(updatePromises);
+            }
+
+            return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ items }) };
+        }
+
         return { statusCode: 404, headers: corsHeaders, body: 'Not Found' };
 
     } catch (error: any) {
         console.error(error);
-        if (error.message === 'Forbidden') {
-            return { statusCode: 403, headers: corsHeaders, body: JSON.stringify({ message: 'You do not own this shop' }) };
-        }
         if (error.name === 'ConditionalCheckFailedException') {
             return { statusCode: 409, headers: corsHeaders, body: JSON.stringify({ message: 'Operation failed. QR might not be in correct state or belongs to another shop. (このQRコードはすでに別のショップまたは商品に紐づけられています、上書きはできません)' }) };
         }

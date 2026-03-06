@@ -15,7 +15,7 @@ const INDEX_NAME = 'GSI1';
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'Content-Type,Authorization',
-    'Access-Control-Allow-Methods': 'OPTIONS,GET'
+    'Access-Control-Allow-Methods': 'GET'
 };
 
 export const handler: APIGatewayProxyHandler = async (event) => {

@@ -15,7 +15,7 @@ const INDEX_NAME = 'GSI1';
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'Content-Type,Authorization',
-    'Access-Control-Allow-Methods': 'OPTIONS,GET,PATCH'
+    'Access-Control-Allow-Methods': 'GET,PATCH'
 };
 
 export const handler: APIGatewayProxyHandler = async (event) => {
@@ -23,32 +23,38 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         const path = event.path;
         const method = event.httpMethod;
 
+        const claims = event.requestContext?.authorizer?.claims;
+        const userId = claims?.sub;
+        const shopId = event.pathParameters?.shopId;
+
+        if (!userId || !shopId) {
+            return { statusCode: 401, headers: corsHeaders, body: 'Unauthorized' };
+        }
+
+        // Verify Shop Ownership
+        const shopRes = await ddb.send(new GetCommand({
+            TableName: TABLE_NAME,
+            Key: { PK: `SHOP#${shopId}`, SK: 'METADATA' }
+        }));
+
+        if (!shopRes.Item || shopRes.Item.owner_id !== userId) {
+            return { statusCode: 401, headers: corsHeaders, body: 'Unauthorized' };
+        }
+        //////////// ここから下は 認証済みかつショップオーナーのみアクセス可能
+
+
         // Route: GET /shop/{shopId}/orders
         if (method === 'GET' && path.includes('/shop/')) {
-            const shopId = event.pathParameters?.shopId;
-            if (!shopId) return { statusCode: 400, headers: corsHeaders, body: 'Missing Shop ID' };
-            return handleListShopOrders(shopId);
+            return handleListShopOrders(shopId); //権限確認なし注意
         }
 
-        // Route: PATCH /shop/{shopId}/orders/{qrId}
+        // Route: PATCH /shop/{shopId}/orders/{qrId} // 配送情報入力
         if (method === 'PATCH' && path.includes('/shop/')) {
-            const qrId = event.pathParameters?.qrId; // mapped from {qrId} resource
-            if (!qrId) return { statusCode: 400, headers: corsHeaders, body: 'Missing QR ID' };
-            return handleUpdateOrder(event, qrId);
+            return handleUpdateOrder(event); //権限確認なし注意
         }
 
-        // Legacy / Global behavior (if any) or existing implementation
-        // if (method === 'GET') {
-        //     // Fallback to global list (prototype only, should be removed or restricted)
-        //     // return handleListOrders();
-        //     return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ orders: [] }) };
-        // } else 
-        // if (method === 'PATCH') {
-        //     const uuid = event.pathParameters?.uuid;
-        //     return handleUpdateOrder(event, uuid);
-        // } else {
         return { statusCode: 405, headers: corsHeaders, body: 'Method Not Allowed' };
-        // }
+
     } catch (error) {
         console.error(error);
         return {
@@ -59,171 +65,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
     }
 };
 
-async function handleListOrders() {
-    // // 1. Find all items with status = 'USED' using GSI
-    // // Note: detailed Access control (filtering by shop_id) is skipped for this prototype
-    // const queryRes = await ddb.send(new QueryCommand({
-    //     TableName: TABLE_NAME,
-    //     IndexName: INDEX_NAME,
-    //     KeyConditionExpression: 'GSI1_PK = :pk',
-    //     ExpressionAttributeValues: { ':pk': 'QR#USED' }
-    // }));
-
-    // if (!queryRes.Items || queryRes.Items.length === 0) {
-    //     return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ orders: [] }) };
-    // }
-
-    // // 2. We have METADATA items (PK=QR#uuid, SK=METADATA).
-    // // We need ORDER items (PK=QR#uuid, SK=ORDER) to get address.
-    // // We will do a BatchGet (handling max 100 items limitation simply for now).
-
-    // // Construct keys for BatchGet
-    // const keys = queryRes.Items.map(item => ({
-    //     PK: item.PK,
-    //     SK: 'ORDER'
-    // }));
-
-    // // In a real app we would chunk 'keys' into batches of 100 (or 25 for BatchWrite). BatchGet limit is 100.
-    // // Ideally we merge metadata (product_id) with order data (address).
-
-    // // For simplicity, let's assume < 100 pending orders for this prototype step.
-    // const batchRes = await ddb.send(new BatchGetCommand({
-    //     RequestItems: {
-    //         [TABLE_NAME]: {
-    //             Keys: keys
-    //         }
-    //     }
-    // }));
-
-    // const orderDetailsMap = new Map();
-    // (batchRes.Responses?.[TABLE_NAME] || []).forEach((item: any) => {
-    //     orderDetailsMap.set(item.PK, item);
-    // });
-
-    // // Merge
-    // const orders = queryRes.Items.map(meta => {
-    //     const orderDetail = orderDetailsMap.get(meta.PK) || {};
-    //     return {
-    //         id: meta.PK.replace('QR#', ''), // uuid
-    //         qr_id: meta.PK,
-    //         product_id: meta.product_id,
-    //         status: meta.status,
-    //         recipient_name: orderDetail.name || 'Unknown',
-    //         address: orderDetail.address || 'Unknown',
-    //         postal_code: orderDetail.postal_code,
-    //         shipping_info: orderDetail // full object
-    //     };
-    // });
-
-    // return {
-    //     statusCode: 200,
-    //     headers: corsHeaders,
-    //     body: JSON.stringify({ orders })
-    // };
-}
-
-async function handleUpdateOrder(event: any, uuidParam?: string) {
-    const uuid = uuidParam || event.pathParameters?.uuid;
-    if (!uuid) return { statusCode: 400, headers: corsHeaders, body: 'Missing UUID' };
-
-    const body = JSON.parse(event.body || '{}');
-    const { delivery_company, tracking_number, memo_for_users, memo_for_shop } = body;
-
-    // Fetch details for email notification (need PIN from METADATA and Email from ORDER)
-    const metaRes = await ddb.send(new GetCommand({
-        TableName: TABLE_NAME,
-        Key: { PK: `QR#${uuid}`, SK: 'METADATA' }
-    }));
-
-    // Verify ownership (IDOR fix)
-    if (!metaRes.Item) {
-        return { statusCode: 404, headers: corsHeaders, body: 'Order not found' };
-    }
-
-    const shopId = event.pathParameters?.shopId;
-    if (shopId && metaRes.Item.shop_id !== shopId) {
-        console.warn(`IDOR attempt: Shop ${shopId} tried to update order ${uuid} belonging to ${metaRes.Item.shop_id}`);
-        return { statusCode: 403, headers: corsHeaders, body: 'Forbidden' };
-    }
-
-    const orderRes = await ddb.send(new GetCommand({
-        TableName: TABLE_NAME,
-        Key: { PK: `QR#${uuid}`, SK: 'ORDER' }
-    }));
-
-    const updateExpParts = ['SET #status = :s', 'ts_shipped_at = :now', 'GSI1_PK = :gsi_pk'];
-    const expAttrValues: any = {
-        ':s': 'SHIPPED',
-        ':now': new Date().toISOString(),
-        ':gsi_pk': 'QR#SHIPPED'
-    };
-    const expAttrNames: any = { '#status': 'status' };
-
-    if (memo_for_users !== undefined) {
-        updateExpParts.push('memo_for_users = :mu');
-        expAttrValues[':mu'] = memo_for_users;
-    }
-    if (memo_for_shop !== undefined) {
-        updateExpParts.push('memo_for_shop = :ms');
-        expAttrValues[':ms'] = memo_for_shop;
-    }
-
-    await ddb.send(new UpdateCommand({
-        TableName: TABLE_NAME,
-        Key: { PK: `QR#${uuid}`, SK: 'METADATA' },
-        UpdateExpression: updateExpParts.join(', '),
-        ExpressionAttributeNames: expAttrNames,
-        ExpressionAttributeValues: expAttrValues
-    }));
-
-    // Update ORDER if tracking provided
-    if (tracking_number) {
-        await ddb.send(new UpdateCommand({
-            TableName: TABLE_NAME,
-            Key: { PK: `QR#${uuid}`, SK: 'ORDER' },
-            UpdateExpression: 'SET delivery_company = :d, tracking_number = :t, ts_shipped_at = :now, ts_updated_at = :now',
-            ExpressionAttributeValues: {
-                ':d': delivery_company,
-                ':t': tracking_number,
-                ':now': new Date().toISOString()
-            }
-        }));
-    }
-
-    // Send Shipping Notification Email
-    const email = orderRes.Item?.email;
-    const pin = metaRes.Item?.pin;
-
-    if (email && pin) { // Checks are done in email-client
-        try {
-            // Check language preference if available (defaulting to ja for now)
-            // Ideally we should store lang pref in ORDER or METADATA
-            const lang = 'ja';
-
-            const { subject, bodyText } = createShippingNotificationEmail({
-                uuid,
-                pin,
-                lang
-            });
-
-            await sendEmail({
-                to: [email],
-                subject: subject,
-                text: bodyText
-            });
-        } catch (e) {
-            console.error('Failed to send shipping notification email', e);
-            // Don't fail the request, just log
-        }
-    }
-
-    return {
-        statusCode: 200,
-        headers: corsHeaders,
-        body: JSON.stringify({ message: 'Order marked as shipped' })
-    };
-}
-
+// 内部で権限確認なし注意
 async function handleListShopOrders(shopId: string, queryParams?: any) {
     const uuidFilter = queryParams?.uuid;
 
@@ -400,5 +242,86 @@ function processBatchResponses(batchRes: any, relevantItems: any[]) {
         statusCode: 200,
         headers: corsHeaders,
         body: JSON.stringify({ orders })
+    };
+}
+
+//内部で権限確認なし注意
+async function handleUpdateOrder(event: any) {
+    const uuid = event.pathParameters?.uuid;
+    if (!uuid) return { statusCode: 400, headers: corsHeaders, body: 'Missing UUID' };
+    const shopId = event.pathParameters?.shopId;
+    if (!shopId) return { statusCode: 400, headers: corsHeaders, body: 'Missing shopID' };
+
+    const body = JSON.parse(event.body || '{}');
+    const { delivery_company, tracking_number, memo_for_users, memo_for_shop } = body;
+    const metaRes = await ddb.send(new GetCommand({
+        TableName: TABLE_NAME,
+        Key: { PK: `QR#${uuid}`, SK: 'METADATA' }
+    }));
+    if (!metaRes.Item) {
+        return { statusCode: 404, headers: corsHeaders, body: 'Order not found' };
+    }
+    if (metaRes.Item.status !== 'USED') {
+        return { statusCode: 400, headers: corsHeaders, body: 'Order must be in USED status to ship' };
+    }
+
+    // update metadata
+    const updateExpParts = ['SET #status = :s', 'ts_shipped_at = :now', 'GSI1_PK = :gsi_pk'];
+    const expAttrValues: any = {
+        ':s': 'SHIPPED',
+        ':now': new Date().toISOString(),
+        ':gsi_pk': 'QR#SHIPPED'
+    };
+    if (memo_for_users !== undefined) {
+        updateExpParts.push('memo_for_users = :mu');
+        expAttrValues[':mu'] = memo_for_users;
+    }
+    if (memo_for_shop !== undefined) {
+        updateExpParts.push('memo_for_shop = :ms');
+        expAttrValues[':ms'] = memo_for_shop;
+    }
+    await ddb.send(new UpdateCommand({
+        TableName: TABLE_NAME,
+        Key: { PK: `QR#${uuid}`, SK: 'METADATA' },
+        UpdateExpression: updateExpParts.join(', '),
+        ExpressionAttributeValues: expAttrValues,
+        ExpressionAttributeNames: { '#status': 'status' }, // 予約語回避
+    }));
+
+    // Update ORDER if tracking provided
+    if (tracking_number || delivery_company) {
+        await ddb.send(new UpdateCommand({
+            TableName: TABLE_NAME,
+            Key: { PK: `QR#${uuid}`, SK: 'ORDER' },
+            UpdateExpression: 'SET delivery_company = :d, tracking_number = :t, ts_shipped_at = :now, ts_updated_at = :now',
+            ExpressionAttributeValues: {
+                ':d': delivery_company,
+                ':t': tracking_number,
+                ':now': new Date().toISOString()
+            }
+        }));
+    }
+
+    // Send Shipping Notification Email
+    const orderRes = await ddb.send(new GetCommand({
+        TableName: TABLE_NAME,
+        Key: { PK: `QR#${uuid}`, SK: 'ORDER' }
+    }));
+    const email = orderRes.Item?.email;
+    const pin = metaRes.Item?.pin;
+    if (email && pin) {
+        try {
+            const lang = 'ja';
+            const { subject, bodyText } = createShippingNotificationEmail({ uuid, pin, lang });
+            await sendEmail({ to: [email], subject: subject, text: bodyText });
+        } catch (e) {
+            console.error('Failed to send shipping notification email', e);
+        }
+    }
+
+    return {
+        statusCode: 200,
+        headers: corsHeaders,
+        body: JSON.stringify({ message: 'Order marked as shipped' })
     };
 }

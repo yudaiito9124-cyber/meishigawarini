@@ -5,7 +5,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { RefreshCw, ArrowRight, HelpCircle } from 'lucide-react';
+import { RefreshCw, ArrowRight, HelpCircle, Camera } from 'lucide-react';
 import { notFound, useParams } from 'next/navigation';
 import { useRouter } from '@/i18n/routing';
 import { useTranslations } from 'next-intl';
@@ -45,6 +45,12 @@ export default function ShopPage() {
     const [isCreatingProduct, setIsCreatingProduct] = useState(false);
     const [deletingProductId, setDeletingProductId] = useState<string | null>(null);
     const [togglingProductId, setTogglingProductId] = useState<string | null>(null);
+
+    // Import Product State
+    const [isImporting, setIsImporting] = useState(false);
+    const [importShops, setImportShops] = useState<any[]>([]);
+    const [selectedImportShopId, setSelectedImportShopId] = useState('');
+    const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
 
     // Protect Route
     useEffect(() => {
@@ -114,6 +120,25 @@ export default function ShopPage() {
             // router.push('/login')
         }
     };
+
+    const fetchImportShops = async () => {
+        try {
+            const res = await fetchWithAuth(`/shop/${shopId}/products/import`);
+            if (res.ok) {
+                const data = await res.json();
+                // Filter out the current shop
+                setImportShops((data.shops || []).filter((s: any) => s.PK !== `SHOP#${shopId}`));
+            }
+        } catch (error) {
+            console.error('Failed to fetch import shops', error);
+        }
+    };
+
+    useEffect(() => {
+        if (isImportDialogOpen) {
+            fetchImportShops();
+        }
+    }, [isImportDialogOpen, shopId]);
 
     const handleShops = async () => {
         try {
@@ -341,6 +366,37 @@ export default function ShopPage() {
         }
     };
 
+    const handleImportProducts = async () => {
+        if (!selectedImportShopId) {
+            alert(t('importProduct.selectShop'));
+            return;
+        }
+
+        setIsImporting(true);
+        try {
+            const res = await fetchWithAuth(`/shop/${shopId}/products/import`, {
+                method: 'POST',
+                body: JSON.stringify({ importShopId: selectedImportShopId.replace('SHOP#', '') })
+            });
+
+            const data = await res.json();
+
+            if (res.ok) {
+                alert(`${data.message} (${data.imported} items)`);
+                setIsImportDialogOpen(false);
+                setSelectedImportShopId('');
+                fetchShopData(); // Refresh product list
+            } else {
+                alert(`Error: ${data.message}`);
+            }
+        } catch (error: any) {
+            console.error('Import failed', error);
+            alert('Failed to import products: ' + error.message);
+        } finally {
+            setIsImporting(false);
+        }
+    };
+
     const [isScanning, setIsScanning] = useState(false);
     const [scannedUuid, setScannedUuid] = useState('');
 
@@ -375,7 +431,7 @@ export default function ShopPage() {
 
 
 
-            <div className="max-w-7xl mx-auto px-4 py-10 space-y-10">
+            <div className="max-w-7xl mx-auto px-8 py-10 space-y-10">
 
                 {/* Link QR */}
                 <div className="grid grid-cols-1 lg:grid-cols-1 gap-6">
@@ -387,6 +443,34 @@ export default function ShopPage() {
                         <CardContent>
                             <form onSubmit={handleLinkQr} className="space-y-4">
                                 <div className="flex gap-4">
+                                    <div className="flex-[3] flex mt-5">
+                                        <Dialog open={isScanning} onOpenChange={setIsScanning}>
+                                            <DialogTrigger asChild>
+                                                <Button type="button" variant="secondary" className="flex-[3] h-auto flex flex-col gap-2 text-xl">
+                                                    <div style={{ width: '50%', aspectRatio: '1' }}>
+                                                        <Camera style={{ width: '100%', height: '100%', display: 'block' }} />
+                                                    </div>
+                                                    <span>{t('linkQr.scan')}</span>
+                                                </Button>
+                                            </DialogTrigger>
+                                            <DialogContent>
+                                                <DialogHeader>
+                                                    <DialogTitle>{t('linkQr.scanDialog.title')}</DialogTitle>
+                                                    <DialogDescription>{t('linkQr.scanDialog.description')}</DialogDescription>
+                                                </DialogHeader>
+                                                <div className="p-4 min-h-[300px]">
+                                                    <QRScanner
+                                                        qrCodeSuccessCallback={handleScanSuccess}
+                                                        qrbox={250}
+                                                        disableFlip={false}
+                                                    />
+                                                </div>
+                                                <DialogFooter>
+                                                    <Button type="button" variant="ghost" onClick={() => setIsScanning(false)}>{t('linkQr.scanDialog.cancel')}</Button>
+                                                </DialogFooter>
+                                            </DialogContent>
+                                        </Dialog>
+                                    </div>
                                     <div className="flex-[7] space-y-4">
                                         <div className="space-y-2">
                                             <Label htmlFor="uuid">{t('linkQr.uuidLabel')}</Label>
@@ -431,34 +515,8 @@ export default function ShopPage() {
                                             </div>
                                         </div>
                                     </div>
-                                    <div className="flex-[3] flex mt-5">
-                                        <Dialog open={isScanning} onOpenChange={setIsScanning}>
-                                            <DialogTrigger asChild>
-                                                <Button type="button" variant="secondary" className="flex-[3] h-auto flex flex-col gap-2 text-xl">
-                                                    <span>📷</span>
-                                                    <span>{t('linkQr.scan')}</span>
-                                                </Button>
-                                            </DialogTrigger>
-                                            <DialogContent>
-                                                <DialogHeader>
-                                                    <DialogTitle>{t('linkQr.scanDialog.title')}</DialogTitle>
-                                                    <DialogDescription>{t('linkQr.scanDialog.description')}</DialogDescription>
-                                                </DialogHeader>
-                                                <div className="p-4 min-h-[300px]">
-                                                    <QRScanner
-                                                        qrCodeSuccessCallback={handleScanSuccess}
-                                                        qrbox={250}
-                                                        disableFlip={false}
-                                                    />
-                                                </div>
-                                                <DialogFooter>
-                                                    <Button type="button" variant="ghost" onClick={() => setIsScanning(false)}>{t('linkQr.scanDialog.cancel')}</Button>
-                                                </DialogFooter>
-                                            </DialogContent>
-                                        </Dialog>
-                                    </div>
                                 </div>
-                                <Button type="submit" className="w-full h-12 space-y-3" disabled={isLinking}>
+                                <Button type="submit" className="mt-5 w-full font-bold text-xl" style={{ height: '80px' }} disabled={isLinking}>
                                     {isLinking ? t('linkQr.processing') : t('linkQr.submit')}
                                 </Button>
                             </form>
@@ -496,9 +554,9 @@ export default function ShopPage() {
                             </div>
                         </div>
                     </CardHeader>
-                    <CardContent>
-                        <Table>
-                            <TableHeader>
+                    <CardContent className="p-4 w-full">
+                        <Table wrapperStyle={{ maxHeight: 'calc(100vh - 200px)' }}>
+                            <TableHeader className="sticky top-0 bg-white z-10 drop-shadow-sm">
                                 <TableRow>
                                     <TableHead>{t('orders.date')}</TableHead>
                                     <TableHead>{t('orders.productName')}</TableHead>
@@ -691,11 +749,11 @@ export default function ShopPage() {
                 </Card>
 
                 {/* Existing Products */}
-                <Card>
-                    <CardHeader>
+                <Card style={{ height: 'calc(100vh - 100px)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                    <CardHeader className="flex flex-row items-center justify-between shrink-0">
                         <CardTitle>{t('products')}</CardTitle>
                     </CardHeader>
-                    <CardContent>
+                    <div style={{ flex: '1 1 auto', overflowY: 'auto', minHeight: 0 }} className="p-4 w-full">
                         <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                             {products.map((product) => (
                                 <Card key={product.product_id} className="overflow-hidden">
@@ -734,9 +792,48 @@ export default function ShopPage() {
                                     </CardContent>
                                 </Card>
                             ))}
-                            <Card className="col-span-2 sm:col-span-2 md:col-span-3 lg:col-span-4 ml-16 mr-16 mt-8 mb-8">
-                                <CardHeader>
+                            {/* フォーム部分の幅を制限し、中央寄せにするために max-w-md と mx-auto を追加 */}
+                            <Card className="col-span-2 sm:col-span-2 md:col-span-3 lg:col-span-4 max-w-lg mx-auto mt-8 mb-8 w-full">
+                                <CardHeader className="flex flex-row items-center justify-between">
                                     <CardTitle>{t('addProduct.title')}</CardTitle>
+
+
+                                    <Dialog open={isImportDialogOpen} onOpenChange={setIsImportDialogOpen}>
+                                        <DialogTrigger asChild>
+                                            <Button variant="outline" size="sm">{t('importProduct.button')}</Button>
+                                        </DialogTrigger>
+                                        <DialogContent>
+                                            <DialogHeader>
+                                                <DialogTitle>{t('importProduct.dialogTitle')}</DialogTitle>
+                                                <DialogDescription>{t('importProduct.dialogDesc')}</DialogDescription>
+                                            </DialogHeader>
+                                            <div className="space-y-4 py-4">
+                                                <div className="space-y-2">
+                                                    <Label htmlFor="importShop">{t('importProduct.selectShop')}</Label>
+                                                    <select
+                                                        id="importShop"
+                                                        className="w-full p-2 border rounded-md"
+                                                        value={selectedImportShopId}
+                                                        onChange={(e) => setSelectedImportShopId(e.target.value)}
+                                                    >
+                                                        <option value="">{t('importProduct.placeholder')}</option>
+                                                        {importShops.map(s => (
+                                                            <option key={s.PK} value={s.PK}>{s.name || s.PK}</option>
+                                                        ))}
+                                                    </select>
+                                                </div>
+                                            </div>
+                                            <DialogFooter>
+                                                <Button variant="ghost" onClick={() => setIsImportDialogOpen(false)} disabled={isImporting}>
+                                                    {t('importProduct.cancel')}
+                                                </Button>
+                                                <Button onClick={handleImportProducts} disabled={isImporting || !selectedImportShopId}>
+                                                    {isImporting ? t('linkQr.processing') : t('importProduct.submit')}
+                                                </Button>
+                                            </DialogFooter>
+                                        </DialogContent>
+                                    </Dialog>
+
                                 </CardHeader>
                                 <CardContent>
                                     <form onSubmit={handleCreateProduct} className="space-y-4">
@@ -770,7 +867,7 @@ export default function ShopPage() {
                                 </CardContent>
                             </Card>
                         </div>
-                    </CardContent>
+                    </div>
                 </Card>
 
 
@@ -803,9 +900,9 @@ export default function ShopPage() {
                             </div>
                         </div>
                     </CardHeader>
-                    <CardContent>
-                        <Table>
-                            <TableHeader>
+                    <CardContent className="p-4 w-full">
+                        <Table wrapperStyle={{ maxHeight: 'calc(100vh - 200px)' }}>
+                            <TableHeader className="sticky top-0 bg-white z-10 drop-shadow-sm">
                                 <TableRow>
                                     <TableHead>{t('orders.date')}</TableHead>
                                     <TableHead>{t('orders.productName')}</TableHead>

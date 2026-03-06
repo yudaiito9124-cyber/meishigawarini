@@ -8,11 +8,12 @@ import * as React from "react"
 
 import { cn } from "@/lib/utils"
 
-function Table({ className, ...props }: React.ComponentProps<"table">) {
+function Table({ className, wrapperClassName, wrapperStyle, ...props }: React.ComponentProps<"table"> & { wrapperClassName?: string, wrapperStyle?: React.CSSProperties }) {
   return (
     <div
       data-slot="table-container"
-      className="relative w-full overflow-x-auto"
+      className={cn("relative w-full overflow-auto", wrapperClassName)}
+      style={wrapperStyle}
     >
       <table
         data-slot="table"

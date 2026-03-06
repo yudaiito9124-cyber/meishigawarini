@@ -139,18 +139,27 @@
             "failed": "商品の追加に失敗しました",
             "error": "商品の追加中にエラーが発生しました"
         },
+        "importProduct": {
+            "button": "商品を一括インポート",
+            "dialogTitle": "別ショップから商品をインポート",
+            "dialogDesc": "コピー元のショップを選択してください。対象ショップのすべての商品がこのショップに追加されます。商品のIDは同一です。",
+            "selectShop": "インポート元のショップ",
+            "placeholder": "ショップを選択してください...",
+            "submit": "インポート",
+            "cancel": "キャンセル"
+        },
         "linkQr": {
             "title": "QRコード連携",
             "description": "会計後，カードと商品を紐付けし，有効化します。",
-            "uuidLabel": "QR UUID (スキャンまたは入力)",
+            "uuidLabel": "QRコード (スキャンまたは入力)",
             "placeholder": "例: 123e4567-...",
             "scan": "QRコードをスキャン",
-            "selectProduct": "商品を選択",
+            "selectProduct": "商品 (カードに商品名が記載されていない場合)",
             "selectPlaceholder": "商品を選択してください...",
-            "memoForUsersLabel": "ショップからのメッセージ(購入者・受取者が閲覧可能)",
-            "memoForUsersPlaceholder": "メッセージを入力できます...",
-            "memoForShopLabel": "メモ(ショップのみ閲覧可能)",
-            "memoForShopPlaceholder": "メモを入力できます...",
+            "memoForUsersLabel": "(オプション) ショップメッセージ",
+            "memoForUsersPlaceholder": "購入者・受取者にメッセージ",
+            "memoForShopLabel": "(オプション) メモ",
+            "memoForShopPlaceholder": "ショップのみ閲覧可能",
             "submit": "連携して有効化",
             "processing": "処理中...",
             "scanDialog": {
