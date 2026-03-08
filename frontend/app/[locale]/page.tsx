@@ -575,7 +575,7 @@ export default function HomePage() {
           </h2>
           <p className="text-gray-400 mb-12 leading-relaxed max-w-lg mx-auto">
             商品を「誰かへの贈り物」として届ける、新しい販売チャネル。<br />
-            ショップ登録・QRコード発行まですべて無料で始められます。
+            {/* ショップ登録・QRコード発行まですべて無料で始められます。 */}
           </p>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-12 text-left">
             {shopBenefits.map(({ icon: Icon, title, desc }) => (
