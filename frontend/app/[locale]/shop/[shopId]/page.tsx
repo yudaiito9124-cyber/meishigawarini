@@ -27,6 +27,7 @@ export default function ShopPage() {
     const t = useTranslations('ShopPage');
     const ts = useTranslations('Timestamp');
     const st = useTranslations('Status');
+    const tb = useTranslations('BackendError');
     const params = useParams();
     const router = useRouter();
     const shopId = Array.isArray(params.shopId) ? params.shopId[0] : params.shopId;
@@ -298,6 +299,8 @@ export default function ShopPage() {
             alert(t('linkQr.success'));
             form.reset();
             setScannedUuid(''); // Reset state driven input
+            setQrStatusDetails(null);
+            setShowOptions(false);
             fetchShopData();
         } catch (err: any) {
             alert("Error: " + err.message);
@@ -399,17 +402,38 @@ export default function ShopPage() {
 
     const [isScanning, setIsScanning] = useState(false);
     const [scannedUuid, setScannedUuid] = useState('');
+    const [qrStatusDetails, setQrStatusDetails] = useState<any>(null);
+    const [showOptions, setShowOptions] = useState(false);
+    const [shipOptionOpenId, setShipOptionOpenId] = useState<string | null>(null);
+    const [isManualInput, setisManualInput] = useState(false);
+    const [manualInput, setManualInput] = useState('');
 
-    const handleScanSuccess = (decodedText: string) => {
-        // Assuming decodedText is the UUID or a URL containing the UUID
-        // If it's a URL like https://.../r/UUID, extract UUID.
-        // For now assume raw UUID or simple parsing.
+    const handleScanSuccess = async (decodedText: string) => {
         let uuid = decodedText;
         if (decodedText.includes('/')) {
             uuid = decodedText.split('/').pop() || decodedText;
         }
-        setScannedUuid(uuid);
-        setIsScanning(false);
+        setScannedUuid('');
+        setQrStatusDetails(null);
+        try {
+            const res = await fetchWithAuth(`/shop/${shopId}/qrcodecheck`, {
+                method: 'POST',
+                body: JSON.stringify({ qr_id: uuid })
+            });
+            if (!res.ok) {
+                const errData = await res.json().catch(() => ({}));
+                alert(t('linkQr.foreignQrError', { defaultValue: 'このカードは使えません。' }) + (errData.message ? ` (${tb(errData.message)})` : '') + (errData.detail ? ` (${errData.detail})` : ''));
+                return;
+            }
+            const data = await res.json();
+            setScannedUuid(uuid);
+            setQrStatusDetails(data);
+        } catch (error: any) {
+            console.error('Failed to get QR status', error);
+            alert(t('linkQr.foreignQrError', { defaultValue: 'このカードは使えません。' }) + (error.message ? ` (${tb(error.message)})` : '') + (error.detail ? ` (${error.detail})` : ''));
+        } finally {
+            setIsScanning(false);
+        }
     };
 
     if (loading) return <div className="p-8">{t('loading')}</div>;
@@ -419,12 +443,12 @@ export default function ShopPage() {
         <div className="min-h-screen bg-gray-50 pb-12">
             {/* Header */}
             <div className="bg-white shadow">
-                <div className="max-w-7xl mx-auto px-4 py-6 flex justify-between items-center">
+                <div className="max-w-7xl mx-auto px-4 py-6 flex justify-between items-center flex flex-col space-y-4 md:flex-row md:items-center md:justify-between md:space-y-0">
                     <div>
                         <h1 className="text-2xl font-bold text-gray-900">{shop?.name || t('title')}</h1>
                         <p className="text-sm text-gray-500">{t('shopId', { id: String(shopId || '') })}</p>
                     </div>
-                    <Button variant="outline" size="lg" onClick={handleShops}>{t('movetoshops')}</Button>
+                    <Button variant="outline" className="text-xs md:text-sm" onClick={handleShops}>{t('movetoshops')}</Button>
                 </div>
 
             </div>
@@ -442,18 +466,18 @@ export default function ShopPage() {
                         </CardHeader>
                         <CardContent>
                             <form onSubmit={handleLinkQr} className="space-y-4">
-                                <div className="flex gap-4">
-                                    <div className="flex-[3] flex mt-5">
-                                        <Dialog open={isScanning} onOpenChange={setIsScanning}>
+                                {!scannedUuid ? (
+                                    <div className="flex flex-col gap-4">
+                                        <Dialog open={isScanning} onOpenChange={(open) => { setIsScanning(open); if (open) setManualInput(''); }}>
                                             <DialogTrigger asChild>
-                                                <Button type="button" variant="secondary" className="flex-[3] h-auto flex flex-col gap-2 text-xl">
-                                                    <div style={{ width: '50%', aspectRatio: '1' }}>
+                                                <Button type="button" variant="outline" className="w-full h-auto flex flex-col justify-center items-center gap-4 text-xl py-16 bg-gray-300">
+                                                    <div style={{ width: '100px', aspectRatio: '1' }}>
                                                         <Camera style={{ width: '100%', height: '100%', display: 'block' }} />
                                                     </div>
                                                     <span>{t('linkQr.scan')}</span>
                                                 </Button>
                                             </DialogTrigger>
-                                            <DialogContent>
+                                            <DialogContent >
                                                 <DialogHeader>
                                                     <DialogTitle>{t('linkQr.scanDialog.title')}</DialogTitle>
                                                     <DialogDescription>{t('linkQr.scanDialog.description')}</DialogDescription>
@@ -465,60 +489,96 @@ export default function ShopPage() {
                                                         disableFlip={false}
                                                     />
                                                 </div>
+
                                                 <DialogFooter>
-                                                    <Button type="button" variant="ghost" onClick={() => setIsScanning(false)}>{t('linkQr.scanDialog.cancel')}</Button>
+                                                    {isManualInput ? (
+                                                        <div className="flex w-full flex-col sm:flex-row gap-3">
+                                                            <Input
+                                                                id="uuid_manual"
+                                                                name="uuid_manual"
+                                                                placeholder={t('linkQr.placeholder')}
+                                                                value={manualInput}
+                                                                onChange={(e) => setManualInput(e.target.value)}
+                                                                className="bg-gray-100"
+                                                            />
+                                                            <Button type="button" variant="default" disabled={!manualInput} onClick={() => handleScanSuccess(manualInput)} className="shrink-0">
+                                                                {t('linkQr.scanDialog.apply')}
+                                                            </Button>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="flex justify-start">
+                                                            <Button type="button" variant="ghost" size="sm" onClick={() => setisManualInput(true)} className="h-8 text-xs text-gray-500 hover:text-gray-900 px-2 -ml-2 right">
+                                                                {t('linkQr.manualinput')}
+                                                            </Button>
+                                                        </div>
+                                                    )}
+
+                                                    {/* <Button type="button" variant="ghost" onClick={() => setIsScanning(false)}>
+                                                        {t('linkQr.scanDialog.cancel')}
+                                                    </Button> */}
                                                 </DialogFooter>
                                             </DialogContent>
                                         </Dialog>
                                     </div>
-                                    <div className="flex-[7] space-y-4">
-                                        <div className="space-y-2">
-                                            <Label htmlFor="uuid">{t('linkQr.uuidLabel')}</Label>
-                                            <div className="flex gap-2">
-                                                <Input
-                                                    id="uuid"
-                                                    name="uuid"
-                                                    placeholder={t('linkQr.placeholder')}
-                                                    required
-                                                    value={scannedUuid}
-                                                    onChange={(e) => setScannedUuid(e.target.value)}
-                                                />
+                                ) : (
+                                    <div className="space-y-4">
+                                        <div className="flex flex-col sm:flex-row sm:items-center justify-between bg-gray-50 px-3 py-2 rounded-md border gap-2">
+                                            <div className="truncate">
+                                                <span className="text-xs text-gray-500 mr-2">{t('linkQr.uuidLabel')}:</span>
+                                                <span className="font-mono text-sm font-medium">{scannedUuid}</span>
                                             </div>
+                                            <Button type="button" variant="ghost" size="sm" onClick={() => { setScannedUuid(''); setQrStatusDetails(null); setShowOptions(false); }} className="h-8 px-2 text-gray-500 hover:text-gray-900 w-full sm:w-auto shrink-0">
+                                                {t('linkQr.clear')}
+                                            </Button>
                                         </div>
-                                        <div className="space-y-2">
-                                            <Label htmlFor="product_id">{t('linkQr.selectProduct')}</Label>
-                                            <select id="product_id" name="product_id" className="w-full p-2 border rounded-md">
-                                                <option value="">{t('linkQr.selectPlaceholder')}</option>
+
+                                        {(!qrStatusDetails || !qrStatusDetails.product_linked) ? (
+                                            <select
+                                                id="product_id"
+                                                name="product_id"
+                                                className="flex h-12 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                                required
+                                                defaultValue=""
+                                            >
+                                                <option value="" disabled>{t('linkQr.selectPlaceholder')}</option>
                                                 {products.filter(p => p.status === 'ACTIVE').map(p => (
                                                     <option key={p.product_id} value={p.product_id}>{p.name}</option>
                                                 ))}
                                             </select>
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label htmlFor="memo_for_users">{t('linkQr.memoForUsersLabel')}</Label>
-                                            <div className="flex gap-2">
+                                        ) : (
+                                            <div className="flex items-center justify-center h-12 border border-emerald-200 rounded-md bg-emerald-50 text-emerald-900 font-bold">
+                                                {qrStatusDetails.product_name}
+                                            </div>
+                                        )}
+
+                                        {showOptions ? (
+                                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                                                 <Input
                                                     id="memo_for_users"
                                                     name="memo_for_users"
                                                     placeholder={t('linkQr.memoForUsersPlaceholder')}
+                                                    className="h-10 border-gray-300"
                                                 />
-                                            </div>
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label htmlFor="memo_for_shop">{t('linkQr.memoForShopLabel')}</Label>
-                                            <div className="flex gap-2">
                                                 <Input
                                                     id="memo_for_shop"
                                                     name="memo_for_shop"
                                                     placeholder={t('linkQr.memoForShopPlaceholder')}
+                                                    className="h-10 border-gray-300"
                                                 />
                                             </div>
-                                        </div>
+                                        ) : (
+                                            <div className="flex justify-start">
+                                                <Button type="button" variant="ghost" size="sm" onClick={() => setShowOptions(true)} className="h-8 text-xs text-gray-500 hover:text-gray-900 px-2 -ml-2">
+                                                    + {t('linkQr.option')}
+                                                </Button>
+                                            </div>
+                                        )}
+
+                                        <Button type="submit" className="w-full font-bold text-lg h-30" disabled={isLinking}>
+                                            {isLinking ? t('linkQr.processing') : t('linkQr.submit')}
+                                        </Button>
                                     </div>
-                                </div>
-                                <Button type="submit" className="mt-5 w-full font-bold text-xl" style={{ height: '80px' }} disabled={isLinking}>
-                                    {isLinking ? t('linkQr.processing') : t('linkQr.submit')}
-                                </Button>
+                                )}
                             </form>
                         </CardContent>
                     </Card>
@@ -532,22 +592,21 @@ export default function ShopPage() {
                                 <CardTitle>{t('incomingOrders')}</CardTitle>
                                 <CardDescription>{t('ordersDesc')}</CardDescription>
                             </div>
-                            <div className="flex items-center space-x-2">
-                                <div className="flex w-full max-w-sm items-center space-x-2">
+                            <div className="flex flex-col w-full space-y-2 md:flex-row md:items-center md:space-x-2 md:space-y-0 md:w-auto">
+                                <div className="flex w-full items-center space-x-2 md:max-w-sm">
                                     <Input
                                         placeholder={t('search.placeholder')}
                                         value={searchUuid}
                                         onChange={(e) => setSearchUuid(e.target.value)}
-                                        className="w-[200px]"
+                                        className="w-full"
                                     />
-                                    {/* Frontend filter only, so no button needed or just visual */}
                                     {searchUuid && (
-                                        <Button variant="ghost" onClick={() => setSearchUuid('')}>
+                                        <Button variant="ghost" onClick={() => setSearchUuid('')} className="shrink-0">
                                             {t('search.clear')}
                                         </Button>
                                     )}
                                 </div>
-                                <Button variant="outline" size="sm" onClick={() => fetchShopData(true)} disabled={isRefreshing}>
+                                <Button variant="outline" size="sm" className="w-full shrink-0 md:w-auto" onClick={() => fetchShopData(true)} disabled={isRefreshing}>
                                     <RefreshCw className={`mr-2 h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
                                     {t('refresh')}
                                 </Button>
@@ -558,21 +617,21 @@ export default function ShopPage() {
                         <Table wrapperStyle={{ maxHeight: 'calc(100vh - 200px)' }}>
                             <TableHeader className="sticky top-0 bg-white z-10 drop-shadow-sm">
                                 <TableRow>
-                                    <TableHead>{t('orders.date')}</TableHead>
-                                    <TableHead>{t('orders.productName')}</TableHead>
-                                    <TableHead>{t('orders.status')}</TableHead>
-                                    <TableHead>{t('orders.shopMemo')}</TableHead>
+                                    <TableHead className="text-xs md:text-sm">{t('orders.date')}</TableHead>
+                                    <TableHead className="text-xs md:text-sm hidden sm:table-cell">{t('orders.productName')}</TableHead>
+                                    <TableHead className="text-xs md:text-sm">{t('orders.status')}</TableHead>
+                                    <TableHead className="text-xs md:text-sm hidden md:table-cell">{t('orders.shopMemo')}</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
                                 {orders
-                                    .filter(o => ['LINKED', 'ACTIVE', 'USED', 'SHIPPED'].includes(o.status))
+                                    .filter(o => ['USED'].includes(o.status))
                                     .filter(o => !searchUuid || (o.id || o.qr_id).includes(searchUuid))
                                     .length === 0 ? (
                                     <TableRow><TableCell colSpan={3} className="text-center">{t('orders.noOrders')}</TableCell></TableRow>
                                 ) : (
                                     orders
-                                        .filter(o => ['LINKED', 'ACTIVE', 'USED', 'SHIPPED'].includes(o.status))
+                                        .filter(o => ['USED'].includes(o.status))
                                         .filter(o => !searchUuid || (o.id || o.qr_id).includes(searchUuid))
                                         .sort((a, b) => {
                                             const sortorder: { [name: string]: number } = { 'LINKED': 0, 'ACTIVE': 1, 'USED': 3, 'SHIPPED': 2 };
@@ -591,8 +650,16 @@ export default function ShopPage() {
                                                 <Dialog key={order.qr_id}>
                                                     <DialogTrigger asChild>
                                                         <TableRow className="cursor-pointer hover:bg-gray-100">
-                                                            <TableCell>{order.ts_updated_at ? new Date(order.ts_updated_at).toLocaleString() : "-"}</TableCell>
-                                                            <TableCell className="font-medium">{product?.name || order.product_id}</TableCell>
+                                                            {/* <TableCell className="text-xs md:text-sm">{order.ts_updated_at ? new Date(order.ts_updated_at).toLocaleString() : "-"}</TableCell> */}
+                                                            <TableCell className="text-xs md:text-sm">
+                                                                {order.ts_updated_at ? (
+                                                                    <div className="flex flex-col">
+                                                                        <span className="whitespace-nowrap">{new Date(order.ts_updated_at).toLocaleDateString()}</span>
+                                                                        <span className="text-[10px] text-gray-500 whitespace-nowrap">{new Date(order.ts_updated_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                                                    </div>
+                                                                ) : "-"}
+                                                            </TableCell>
+                                                            <TableCell className="text-xs md:text-sm font-bold hidden sm:table-cell">{product?.name || order.product_id}</TableCell>
                                                             <TableCell>
                                                                 <span className={`px-2 py-1 rounded text-xs ${order.status === 'UNASSIGNED' ? 'bg-gray-100' :
                                                                     order.status === 'LINKED' ? 'bg-emerald-100 text-emerald-800' :
@@ -605,7 +672,7 @@ export default function ShopPage() {
                                                                                                 'bg-green-100 text-green-800'
                                                                     }`}>{st(order.status.toLowerCase())}</span>
                                                             </TableCell>
-                                                            <TableCell className="font-medium">{order.memo_for_shop}</TableCell>
+                                                            <TableCell className="text-xs md:text-sm hidden md:table-cell">{order.memo_for_shop}</TableCell>
                                                         </TableRow>
                                                     </DialogTrigger>
                                                     <DialogContent className="max-w-md">
@@ -616,7 +683,7 @@ export default function ShopPage() {
                                                             </DialogDescription>
                                                         </DialogHeader>
 
-                                                        <div className="space-y-4 py-4 max-h-[70vh] overflow-y-auto">
+                                                        <div className="space-y-4 py-4 max-h-[70vh] overflow-y-auto p-2">
                                                             {/* Product Info */}
                                                             <div>
                                                                 <h4 className="text-sm font-semibold text-gray-500">{t('orders.productName')}</h4>
@@ -640,16 +707,14 @@ export default function ShopPage() {
                                                             </div>
 
                                                             {/* Recipient Info */}
-                                                            <div className="grid grid-cols-2 gap-4">
-                                                                <div>
-                                                                    <h4 className="text-sm font-semibold text-gray-500">{t('orders.recipient')}</h4>
-                                                                    <p>{order.recipient_name}</p>
-                                                                </div>
-                                                                <div>
-                                                                    <h4 className="text-sm font-semibold text-gray-500">{t('orders.contact')}</h4>
-                                                                    <p className="break-all">{order.shipping_info?.email || '-'}</p>
-                                                                    <p className="text-sm mt-1">{order.shipping_info?.phone || '-'}</p>
-                                                                </div>
+                                                            <div>
+                                                                <h4 className="text-sm font-semibold text-gray-500">{t('orders.recipient')}</h4>
+                                                                <p>{order.recipient_name}</p>
+                                                            </div>
+                                                            <div>
+                                                                <h4 className="text-sm font-semibold text-gray-500">{t('orders.contact')}</h4>
+                                                                <p className="break-all">{order.shipping_info?.email || '-'}</p>
+                                                                <p className="text-sm mt-1">{order.shipping_info?.phone || '-'}</p>
                                                             </div>
 
                                                             <div>
@@ -665,20 +730,23 @@ export default function ShopPage() {
 
                                                             <div>
                                                                 <h4 className="text-sm font-semibold text-gray-500">{t('orders.userMessage')}</h4>
-                                                                <p className="text-sm bg-gray-50 p-2 rounded">{order.memo_for_users || '-'}</p>
+                                                                <p className="text-sm bg-blue-50 p-2 rounded">{order.memo_for_users || '-'}</p>
                                                             </div>
                                                             {/* )}
                                                                     {order.memo_for_shop && ( */}
                                                             <div>
                                                                 <h4 className="text-sm font-semibold text-gray-500">{t('orders.shopMemo')}</h4>
-                                                                <p className="text-sm bg-orange-50 p-2 rounded">{order.memo_for_shop || '-'}</p>
+                                                                <p className="text-sm bg-gray-50 p-2 rounded">{order.memo_for_shop || '-'}</p>
                                                             </div>
 
                                                             {/* Memos (if available) - Assuming these fields might exist on order object or shipping_info */}
                                                             {/* These are now handled within the shipping form for 'USED' status and read-only for 'SHIPPED' */}
                                                             {order.status === 'USED' && (
-                                                                <div className="pt-4 border-t">
-                                                                    <h4 className="text-sm font-bold mb-2">{t('orders.action')}</h4>
+                                                                <div className="mt-4 p-4 border-2 border-orange-200 rounded-lg bg-orange-50/50">
+                                                                    <div className="flex items-center gap-2 mb-4">
+                                                                        <div className="w-2 h-2 rounded-full bg-orange-500 animate-pulse" />
+                                                                        <h4 className="text-sm font-bold text-orange-900">{t('orders.action')}</h4>
+                                                                    </div>
                                                                     <form onSubmit={(e) => {
                                                                         e.preventDefault();
                                                                         const fd = new FormData(e.target as HTMLFormElement);
@@ -691,14 +759,6 @@ export default function ShopPage() {
                                                                         );
                                                                     }} className="space-y-4">
                                                                         <div className="space-y-2">
-                                                                            <Label htmlFor={`memo_users-${uuid}`}>{t('orders.userMessage')}</Label>
-                                                                            <Input id={`memo_users-${uuid}`} name="memo_for_users" defaultValue={order.memo_for_users} placeholder={t('linkQr.memoForUsersPlaceholder')} />
-                                                                        </div>
-                                                                        <div className="space-y-2">
-                                                                            <Label htmlFor={`memo_shop-${uuid}`}>{t('orders.shopMemo')}</Label>
-                                                                            <Input id={`memo_shop-${uuid}`} name="memo_for_shop" defaultValue={order.memo_for_shop} placeholder={t('linkQr.memoForShopPlaceholder')} />
-                                                                        </div>
-                                                                        <div className="space-y-2">
                                                                             <Label htmlFor={`delivery_company-${uuid}`}>{t('orders.shipDialog.deliveryCompany')}</Label>
                                                                             <Input id={`delivery_company-${uuid}`} name="delivery_company" placeholder="〇〇運輸" required />
                                                                         </div>
@@ -706,6 +766,24 @@ export default function ShopPage() {
                                                                             <Label htmlFor={`tracking-${uuid}`}>{t('orders.shipDialog.label')}</Label>
                                                                             <Input id={`tracking-${uuid}`} name="tracking" placeholder="1234-5678..." required />
                                                                         </div>
+                                                                        {shipOptionOpenId === uuid ? (
+                                                                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                                                                <div className="space-y-2">
+                                                                                    <Label htmlFor={`memo_users-${uuid}`}>{t('orders.userMessage')}</Label>
+                                                                                    <Input id={`memo_users-${uuid}`} name="memo_for_users" defaultValue={order.memo_for_users} placeholder={t('linkQr.memoForUsersPlaceholder')} />
+                                                                                </div>
+                                                                                <div className="space-y-2">
+                                                                                    <Label htmlFor={`memo_shop-${uuid}`}>{t('orders.shopMemo')}</Label>
+                                                                                    <Input id={`memo_shop-${uuid}`} name="memo_for_shop" defaultValue={order.memo_for_shop} placeholder={t('linkQr.memoForShopPlaceholder')} />
+                                                                                </div>
+                                                                            </div>
+                                                                        ) : (
+                                                                            <div className="flex justify-start">
+                                                                                <Button type="button" variant="ghost" size="sm" onClick={() => setShipOptionOpenId(uuid)} className="h-8 text-xs text-gray-500 hover:text-gray-900 px-2 -ml-2">
+                                                                                    + {t('linkQr.option')}
+                                                                                </Button>
+                                                                            </div>
+                                                                        )}
                                                                         <Button type="submit" className="w-full" disabled={shippingOrderId === uuid}>
                                                                             {shippingOrderId === uuid ? t('linkQr.processing') : t('orders.shipDialog.submit')}
                                                                         </Button>
@@ -724,7 +802,7 @@ export default function ShopPage() {
                                                                     </div>
                                                                 </div>
                                                             )}
-                                                            <div className="grid grid-cols-2 gap-4">
+                                                            <div className="">
                                                                 <div>
                                                                     <h4 className="text-sm font-semibold text-gray-500">{t('orders.timestamps')}</h4>
                                                                     <p className="text-sm">{ts('ts_updated_at') + ": " + (order.ts_updated_at ? new Date(order.ts_updated_at).toLocaleString() : "-")}</p>
@@ -879,21 +957,21 @@ export default function ShopPage() {
                             <div>
                                 <CardTitle>{t('history.title')}</CardTitle>
                             </div>
-                            <div className="flex items-center space-x-2">
-                                <div className="flex w-full max-w-sm items-center space-x-2">
+                            <div className="flex flex-col w-full space-y-2 md:flex-row md:items-center md:space-x-2 md:space-y-0 md:w-auto">
+                                <div className="flex w-full items-center space-x-2 md:max-w-sm">
                                     <Input
                                         placeholder={t('search.placeholder')}
                                         value={searchUuid}
                                         onChange={(e) => setSearchUuid(e.target.value)}
-                                        className="w-[200px]"
+                                        className="w-full"
                                     />
                                     {searchUuid && (
-                                        <Button variant="ghost" onClick={() => setSearchUuid('')}>
+                                        <Button variant="ghost" onClick={() => setSearchUuid('')} className="shrink-0">
                                             {t('search.clear')}
                                         </Button>
                                     )}
                                 </div>
-                                <Button variant="outline" size="sm" onClick={() => fetchShopData(true)} disabled={isRefreshing}>
+                                <Button variant="outline" size="sm" className="w-full shrink-0 md:w-auto" onClick={() => fetchShopData(true)} disabled={isRefreshing}>
                                     <RefreshCw className={`mr-2 h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
                                     {t('refresh')}
                                 </Button>
@@ -904,24 +982,24 @@ export default function ShopPage() {
                         <Table wrapperStyle={{ maxHeight: 'calc(100vh - 200px)' }}>
                             <TableHeader className="sticky top-0 bg-white z-10 drop-shadow-sm">
                                 <TableRow>
-                                    <TableHead>{t('orders.date')}</TableHead>
-                                    <TableHead>{t('orders.productName')}</TableHead>
-                                    <TableHead>{t('orders.status')}</TableHead>
-                                    <TableHead>{t('orders.shopMemo')}</TableHead>
+                                    <TableHead className="text-xs md:text-sm">{t('orders.date')}</TableHead>
+                                    <TableHead className="text-xs md:text-sm hidden sm:table-cell">{t('orders.productName')}</TableHead>
+                                    <TableHead className="text-xs md:text-sm">{t('orders.status')}</TableHead>
+                                    <TableHead className="text-xs md:text-sm hidden md:table-cell">{t('orders.shopMemo')}</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
                                 {orders
-                                    .filter(o => ['COMPLETED', 'EXPIRED', 'BANNED'].includes(o.status))
+                                    .filter(o => ['LINKED', 'ACTIVE', 'SHIPPED', 'COMPLETED', 'EXPIRED', 'BANNED'].includes(o.status))
                                     .filter(o => !searchUuid || (o.id || o.qr_id).includes(searchUuid))
                                     .length === 0 ? (
                                     <TableRow><TableCell colSpan={3} className="text-center">{t('orders.noOrders')}</TableCell></TableRow>
                                 ) : (
                                     orders
-                                        .filter(o => ['COMPLETED', 'EXPIRED', 'BANNED'].includes(o.status))
+                                        .filter(o => ['LINKED', 'ACTIVE', 'SHIPPED', 'COMPLETED', 'EXPIRED', 'BANNED'].includes(o.status))
                                         .filter(o => !searchUuid || (o.id || o.qr_id).includes(searchUuid))
                                         .sort((a, b) => {
-                                            const sortorder: { [name: string]: number } = { 'COMPLETED': 0, 'EXPIRED': 1, 'BANNED': 2 };
+                                            const sortorder: { [name: string]: number } = { 'LINKED': 3, 'ACTIVE': 2, 'SHIPPED': 0, 'COMPLETED': 1, 'EXPIRED': 4, 'BANNED': 5 };
                                             // 1. Status: compare
                                             if (a.status !== b.status) return sortorder[a.status] - sortorder[b.status];
                                             // Date: Newest first
@@ -937,8 +1015,15 @@ export default function ShopPage() {
                                                 <Dialog key={order.qr_id}>
                                                     <DialogTrigger asChild>
                                                         <TableRow className="cursor-pointer hover:bg-gray-100">
-                                                            <TableCell>{order.ts_updated_at ? new Date(order.ts_updated_at).toLocaleString() : "-"}</TableCell>
-                                                            <TableCell className="font-medium">{product?.name || order.product_id}</TableCell>
+                                                            <TableCell className="text-xs md:text-sm">
+                                                                {order.ts_updated_at ? (
+                                                                    <div className="flex flex-col">
+                                                                        <span className="whitespace-nowrap">{new Date(order.ts_updated_at).toLocaleDateString()}</span>
+                                                                        <span className="text-[10px] text-gray-500 whitespace-nowrap">{new Date(order.ts_updated_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                                                    </div>
+                                                                ) : "-"}
+                                                            </TableCell>
+                                                            <TableCell className="text-xs md:text-sm font-bold hidden md:table-cell">{product?.name || order.product_id}</TableCell>
                                                             <TableCell>
                                                                 <span className={`px-2 py-1 rounded text-xs ${order.status === 'UNASSIGNED' ? 'bg-gray-100' :
                                                                     order.status === 'LINKED' ? 'bg-emerald-100 text-emerald-800' :
@@ -951,7 +1036,7 @@ export default function ShopPage() {
                                                                                                 'bg-green-100 text-green-800'
                                                                     }`}>{st(order.status.toLowerCase())}</span>
                                                             </TableCell>
-                                                            <TableCell className="font-medium">{order.memo_for_shop}</TableCell>
+                                                            <TableCell className="font-medium hidden md:table-cell">{order.memo_for_shop}</TableCell>
                                                         </TableRow>
                                                     </DialogTrigger>
                                                     <DialogContent className="max-w-md">
@@ -987,16 +1072,14 @@ export default function ShopPage() {
                                                             </div>
 
                                                             {/* Recipient Info */}
-                                                            <div className="grid grid-cols-2 gap-4">
-                                                                <div>
-                                                                    <h4 className="text-sm font-semibold text-gray-500">{t('orders.recipient')}</h4>
-                                                                    <p>{order.recipient_name}</p>
-                                                                </div>
-                                                                <div>
-                                                                    <h4 className="text-sm font-semibold text-gray-500">{t('orders.contact')}</h4>
-                                                                    <p className="break-all">{order.shipping_info?.email || '-'}</p>
-                                                                    <p className="text-sm mt-1">{order.shipping_info?.phone || '-'}</p>
-                                                                </div>
+                                                            <div>
+                                                                <h4 className="text-sm font-semibold text-gray-500">{t('orders.recipient')}</h4>
+                                                                <p>{order.recipient_name}</p>
+                                                            </div>
+                                                            <div>
+                                                                <h4 className="text-sm font-semibold text-gray-500">{t('orders.contact')}</h4>
+                                                                <p className="break-all">{order.shipping_info?.email || '-'}</p>
+                                                                <p className="text-sm mt-1">{order.shipping_info?.phone || '-'}</p>
                                                             </div>
 
                                                             <div>
@@ -1016,13 +1099,13 @@ export default function ShopPage() {
                                                                 {order.memo_for_users && (
                                                                     <div>
                                                                         <h4 className="text-sm font-semibold text-gray-500">{t('orders.userMessage')}</h4>
-                                                                        <p className="text-sm bg-gray-50 p-2 rounded">{order.memo_for_users}</p>
+                                                                        <p className="text-sm bg-blue-50 p-2 rounded">{order.memo_for_users}</p>
                                                                     </div>
                                                                 )}
                                                                 {order.memo_for_shop && (
                                                                     <div>
                                                                         <h4 className="text-sm font-semibold text-gray-500">{t('orders.shopMemo')}</h4>
-                                                                        <p className="text-sm bg-orange-50 p-2 rounded">{order.memo_for_shop}</p>
+                                                                        <p className="text-sm bg-gray-50 p-2 rounded">{order.memo_for_shop}</p>
                                                                     </div>
                                                                 )}
                                                                 <div>
@@ -1035,7 +1118,7 @@ export default function ShopPage() {
                                                                 </div>
                                                             </div>
 
-                                                            <div className="grid grid-cols-2 gap-4">
+                                                            <div className="">
                                                                 <div>
                                                                     <h4 className="text-sm font-semibold text-gray-500">{t('orders.timestamps')}</h4>
                                                                     <p className="text-sm">{ts('ts_updated_at') + ": " + (order.ts_updated_at ? new Date(order.ts_updated_at).toLocaleString() : "-")}</p>

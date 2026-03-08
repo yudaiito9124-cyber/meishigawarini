@@ -10,7 +10,7 @@ if (!RESEND_API_KEY) {
     console.warn("Initializing email-client: RESEND_API_KEY is missing. Email sending will fail.");
 }
 
-const resend = new Resend(RESEND_API_KEY);
+const resend = RESEND_API_KEY ? new Resend(RESEND_API_KEY) : null;
 
 interface SendEmailParams {
     to: string | string[];
@@ -41,6 +41,8 @@ export async function sendEmail({ to, subject, text, html, from }: SendEmailPara
 
     try {
         console.log(`Sending email via Resend to: ${recipients.join(', ')}`);
+
+        if (!resend) throw new Error("Resend is not initialized");
 
         const data = await resend.emails.send({
             from: fromAddress,

@@ -500,6 +500,58 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ message: 'Product deleted' }) };
         }
 
+        // 8.5 Get Single Shop QR (GET /shop/{shopId}/qrcodecheck)
+        if (method === 'POST' && path.endsWith('/qrcodecheck')) {
+            const body = JSON.parse(event.body || '{}');
+            const { qr_id } = body;
+
+            const qrRes = await ddb.send(new GetCommand({
+                TableName: TABLE_NAME,
+                Key: { PK: `QR#${qr_id}`, SK: 'METADATA' }
+            }));
+            if (!qrRes.Item) {
+                return { statusCode: 404, headers: corsHeaders, body: JSON.stringify({ message: 'QR not found', detail: `QRcode:${qr_id}` }) };
+            }
+
+            const qrItem = qrRes.Item;
+            const qrstatus = qrItem.status;
+            const qrshopId = qrItem.shop_id;
+            const qrproductId = qrItem.product_id;
+
+            if (qrshopId && qrshopId !== shopId) {
+                return { statusCode: 403, headers: corsHeaders, body: JSON.stringify({ message: 'QR does not belong to this shop', detail: `QRcode:${qr_id}, shop:${qrshopId}` }) };
+            }
+
+            if (qrstatus !== 'UNASSIGNED' && qrstatus !== 'LINKED') {
+                return { statusCode: 403, headers: corsHeaders, body: JSON.stringify({ message: `QR is not in a valid state`, detail: `QRcode:${qr_id}, status:${qrstatus}` }) };
+            }
+
+            let qrproductName = '';
+            let productLinked = false;
+            if (qrproductId) {
+                const productRes = await ddb.send(new GetCommand({
+                    TableName: TABLE_NAME,
+                    Key: { PK: `SHOP#${shopId}`, SK: `PRODUCT#${qrproductId}` }
+                }));
+                if (!productRes.Item) {
+                    return { statusCode: 404, headers: corsHeaders, body: JSON.stringify({ message: 'Product not found', detail: `QRcode:${qr_id}, product:${qrproductId}` }) };
+                }
+                if (productRes.Item.status === 'STOPPED') {
+                    return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Product is stopped', detail: `QRcode:${qr_id}, product:${qrproductId}, product_name:${productRes.Item.name}` }) };
+                }
+                qrproductName = productRes.Item.name;
+                productLinked = true;
+            }
+
+            return {
+                statusCode: 200, headers: corsHeaders, body: JSON.stringify({
+                    product_id: qrproductId,
+                    product_name: qrproductName,
+                    product_linked: productLinked
+                })
+            };
+        }
+
         // 9. List Shop QRs ((GET /shop/{shopId}/qrcodes)
         if (method === 'GET' && path.endsWith('/qrcodes')) {
             const res = await ddb.send(new QueryCommand({

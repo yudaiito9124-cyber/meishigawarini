@@ -95,43 +95,15 @@ export default function ShopListPage() {
     return (
         <div className="min-h-screen bg-gray-50 p-6 flex flex-col items-center">
             <div className="w-full max-w-4xl space-y-8">
-                <div className="flex justify-between items-center">
+                <div className="flex justify-between items-center flex flex-col space-y-4 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
                     <div>
-                        <h1 className="text-3xl font-bold text-gray-900">{t('title')}</h1>
-                        <p className="text-gray-500">{t('subtitle')}</p>
+                        <div>
+                            <h1 className="text-3xl font-bold text-gray-900">{t('title')}</h1>
+                            <p className="text-gray-500">{t('subtitle')}</p>
+                        </div>
                         {userId && <p className="text-xs text-gray-400 mt-1">{t('userId', { id: userId })}</p>}
                     </div>
-                    <div className="flex gap-4">
-                        <Button variant="outline" size="lg" onClick={handleLogout}>{t('logout')}</Button>
-                        <Dialog>
-                            <DialogTrigger asChild>
-                                <Button size="lg">{t('createShop')}</Button>
-                            </DialogTrigger>
-                            <DialogContent>
-                                <DialogHeader>
-                                    <DialogTitle>{t('createDialog.title')}</DialogTitle>
-                                    <DialogDescription>{t('createDialog.description')}</DialogDescription>
-                                </DialogHeader>
-                                <form onSubmit={handleCreateShop}>
-                                    <div className="grid gap-4 py-4">
-                                        <Label htmlFor="name">{t('createDialog.label')}</Label>
-                                        <Input
-                                            id="name"
-                                            value={createName}
-                                            onChange={(e) => setCreateName(e.target.value)}
-                                            placeholder={t('createDialog.placeholder')}
-                                            required
-                                        />
-                                    </div>
-                                    <DialogFooter>
-                                        <Button type="submit" disabled={creating}>
-                                            {creating ? t('createDialog.submitting') : t('createDialog.submit')}
-                                        </Button>
-                                    </DialogFooter>
-                                </form>
-                            </DialogContent>
-                        </Dialog>
-                    </div>
+                    <Button variant="outline" size="lg" className="text-xs md:text-sm" onClick={handleLogout}>{t('logout')}</Button>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -160,6 +132,38 @@ export default function ShopListPage() {
                         ))
                     )}
                 </div>
+
+                <div className="gap-4 flex flex-col sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
+                    <Dialog>
+                        <DialogTrigger asChild>
+                            <Button size="lg" className="text-xs md:text-sm" >{t('createShop')}</Button>
+                        </DialogTrigger>
+                        <DialogContent>
+                            <DialogHeader>
+                                <DialogTitle>{t('createDialog.title')}</DialogTitle>
+                                <DialogDescription>{t('createDialog.description')}</DialogDescription>
+                            </DialogHeader>
+                            <form onSubmit={handleCreateShop}>
+                                <div className="grid gap-4 py-4">
+                                    <Label htmlFor="name">{t('createDialog.label')}</Label>
+                                    <Input
+                                        id="name"
+                                        value={createName}
+                                        onChange={(e) => setCreateName(e.target.value)}
+                                        placeholder={t('createDialog.placeholder')}
+                                        required
+                                    />
+                                </div>
+                                <DialogFooter>
+                                    <Button type="submit" disabled={creating}>
+                                        {creating ? t('createDialog.submitting') : t('createDialog.submit')}
+                                    </Button>
+                                </DialogFooter>
+                            </form>
+                        </DialogContent>
+                    </Dialog>
+                </div>
+
             </div>
         </div>
     );

@@ -407,6 +407,13 @@ export class InfraStack extends cdk.Stack {
       authorizationType: apigateway.AuthorizationType.COGNITO
     });
 
+    const shopQrResource = shopIdResource.addResource('qrcodecheck');
+    // shop/{shopId}/qrcodecheck POST #CheckQR
+    shopQrResource.addMethod('POST', new apigateway.LambdaIntegration(shopMgmtFn), {
+      authorizer,
+      authorizationType: apigateway.AuthorizationType.COGNITO
+    });
+
     const shopOrdersResource = shopIdResource.addResource('orders');
     // shop/{shopId}/orders GET #ListShopOrders
     shopOrdersResource.addMethod('GET', new apigateway.LambdaIntegration(shopOrdersFn), {
