@@ -387,8 +387,8 @@ export default function HomePage() {
       <nav className="fixed top-0 w-full flex justify-between items-center px-8 py-5 z-50 bg-white/90 backdrop-blur-sm border-b border-gray-50">
         <span className="font-black text-lg tracking-tight">名刺代わりに。</span>
         <div className="flex items-center gap-6">
-          <a href="#howto" className="text-sm text-gray-500 hover:text-black transition-colors">使い方</a>
-          <a href="#shops" className="text-sm text-gray-500 hover:text-black transition-colors">ショップ一覧</a>
+          <a href="#howto" className="hidden md:block text-sm text-gray-500 hover:text-black transition-colors">使い方</a>
+          <a href="#shops" className="hidden md:block text-sm text-gray-500 hover:text-black transition-colors">ショップ一覧</a>
           <Link
             href="/login"
             className="ml-2 bg-black text-white px-5 py-2 rounded-full text-sm font-medium hover:bg-gray-800 transition-colors"
@@ -416,7 +416,7 @@ export default function HomePage() {
         </h1>
 
         <p className="text-gray-500 text-lg max-w-lg mb-12 leading-relaxed">
-          QRコード付きのカードを一言添えて手渡せば、<br />
+          QRコード付きのカードを一言添えて手渡せば、
           相手の自宅へ、プレゼントが届きます。
         </p>
 
