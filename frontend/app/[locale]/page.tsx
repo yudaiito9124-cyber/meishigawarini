@@ -380,34 +380,33 @@ import { useTranslations } from 'next-intl';
 
 export default function HomePage() {
   const t = useTranslations('HomePage');
+  const ts = useTranslations('Site');
   return (
     <main className="bg-white text-black">
 
       {/* ━━━ Nav ━━━ */}
-      <nav className="fixed top-0 w-full flex justify-between items-center px-8 py-5 z-50 bg-white/90 backdrop-blur-sm border-b border-gray-50">
-        <span className="font-black text-lg tracking-tight">名刺代わりに。</span>
+      <nav className="fixed top-0 w-full flex justify-between items-center px-8 py-5 z-50 bg-white/80 backdrop-blur-sm border-b border-gray-50">
+        <a href="#" className="font-black text-lg tracking-tight hover:opacity-80 transition-opacity">{ts("name")}</a>
         <div className="flex items-center gap-6">
           <a href="#howto" className="hidden md:block text-sm text-gray-500 hover:text-black transition-colors">使い方</a>
           <a href="#shops" className="hidden md:block text-sm text-gray-500 hover:text-black transition-colors">ショップ一覧</a>
+          <a href="#for-shops" className="hidden md:block text-sm text-gray-500 hover:text-black transition-colors">ショップ開設</a>
           <Link
             href="/login"
             className="ml-2 bg-black text-white px-5 py-2 rounded-full text-sm font-medium hover:bg-gray-800 transition-colors"
           >
             {t('shopAdmin')}
           </Link>
-        </div>
-      </nav>
+        </div >
+      </nav >
 
       {/* ━━━ Hero ━━━ */}
-      <section className="flex flex-col items-center justify-center min-h-screen text-center px-6 pt-20 ">
+      < section className="flex flex-col items-center justify-center min-h-screen text-center px-6 pt-20 " >
         <p className="text-xs text-gray-400 uppercase tracking-[0.2em] mb-7 font-medium">
           Digital Gift Service
         </p>
 
-        {/*
-          句読点補正:
-          日本語の「、」「。」はフォント上で約 0.45em の右余白を持つため、
-          center 揃えでも視覚重心が左にズレて見える。
+        {/*  center 揃えでも視覚重心が左にズレて見える。
           句読点を <span> で囲んで -mr-[0.45em] を当てることで相殺する。
         */}
         <h1 className="text-6xl md:text-8xl font-black leading-tight mb-8">
@@ -440,10 +439,10 @@ export default function HomePage() {
           <span className="text-[10px] tracking-widest">SCROLL</span>
           <ChevronDown className="w-4 h-4" />
         </div> */}
-      </section>
+      </section >
 
       {/* ━━━ How it works ━━━ */}
-      <section id="howto" className="py-28 px-6 bg-gray-50">
+      < section id="howto" className="py-28 px-6 bg-gray-50" >
         <div className="max-w-4xl mx-auto">
           <SectionLabel>How it works</SectionLabel>
           <SectionHeading>たった3ステップ</SectionHeading>
@@ -492,10 +491,10 @@ export default function HomePage() {
             </Link>
           </div>
         </div>
-      </section>
+      </section >
 
       {/* ━━━ Use Cases ━━━ */}
-      <section id="usecases" className="py-28 px-6">
+      < section id="usecases" className="py-28 px-6" >
         <div className="max-w-4xl mx-auto">
           <SectionLabel>Use Cases</SectionLabel>
           <SectionHeading>こんな場面で使えます</SectionHeading>
@@ -522,10 +521,10 @@ export default function HomePage() {
             ))}
           </div>
         </div>
-      </section>
+      </section >
 
       {/* ━━━ Shops ━━━ */}
-      <section id="shops" className="py-28 bg-gray-50 px-6">
+      < section id="shops" className="py-28 bg-gray-50 px-6" >
         <div className="max-w-4xl mx-auto">
           <SectionLabel>Shops</SectionLabel>
           <SectionHeading>対応ショップ</SectionHeading>
@@ -544,10 +543,10 @@ export default function HomePage() {
             ))}
           </div>
         </div>
-      </section>
+      </section >
 
       {/* ━━━ FAQ ━━━ */}
-      <section className="py-28 px-6">
+      < section className="py-28 px-6" >
         <div className="max-w-2xl mx-auto">
           <SectionLabel>FAQ</SectionLabel>
           <SectionHeading>よくある質問</SectionHeading>
@@ -563,10 +562,10 @@ export default function HomePage() {
             ))}
           </div>
         </div>
-      </section>
+      </section >
 
       {/* ━━━ For Shop Owners ━━━ */}
-      <section id="for-shops" className="py-28 px-6 bg-black text-white">
+      < section id="for-shops" className="py-28 px-6 bg-black text-white" >
         <div className="max-w-3xl mx-auto text-center">
           <p className="text-xs text-gray-500 uppercase tracking-[0.2em] mb-4 font-medium">
             For Shop Owners
@@ -594,19 +593,18 @@ export default function HomePage() {
             ショップを開設する
           </Link> */}
         </div>
-      </section>
+      </section >
 
-      {/* ━━━ Footer ━━━ */}
-      <footer className="py-10 border-t border-gray-100 flex flex-col md:flex-row items-center justify-between px-8 text-sm text-gray-400">
+      {/* ━━━ Footer ━━━   ここはlayout.tsxに実装 */}
+      {/* < footer className="py-10 border-t border-gray-100 flex flex-col md:flex-row items-center justify-between px-8 text-sm text-gray-400" >
         <span className="font-black text-black text-base mb-4 md:mb-0">名刺代わりに。</span>
         <div className="flex gap-6">
           <a href="#howto" className="hover:text-black transition-colors">使い方</a>
           <a href="#shops" className="hover:text-black transition-colors">ショップ一覧</a>
           <a href="#for-shops" className="hover:text-black transition-colors">ショップ開設</a>
-          {/* <Link href="/privacy" className="hover:text-black transition-colors">プライバシー</Link> */}
         </div>
         <span className="mt-4 md:mt-0">© 2025 MeishiGawarini</span>
-      </footer>
+      </footer > */}
 
     </main >
   )

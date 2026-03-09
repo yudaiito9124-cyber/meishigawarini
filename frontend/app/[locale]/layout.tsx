@@ -11,6 +11,7 @@ import { getMessages } from 'next-intl/server';
 import { notFound } from 'next/navigation';
 import { routing } from '../../i18n/routing';
 import { HelpButton } from '@/components/HelpButton';
+import { SiteFooter } from '@/components/SiteFooter';
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -51,9 +52,10 @@ export default async function RootLayout({
   // Providing all messages to the client
   // side is the easiest way to get started
   const messages = await getMessages();
+  const ts = await getTranslations('Site');
 
   return (
-    <html lang={locale}>
+    <html lang={locale} className="scroll-smooth">
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
@@ -61,6 +63,7 @@ export default async function RootLayout({
           <ConfigureAmplify />
           {children}
           <HelpButton />
+          <SiteFooter siteName={ts('name')} />
         </NextIntlClientProvider>
       </body>
     </html>

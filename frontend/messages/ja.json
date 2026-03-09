@@ -1,4 +1,7 @@
 {
+    "Site": {
+        "name": "名刺代わりに。"
+    },
     "Timestamp": {
         "ts_created_at": "作成日時",
         "ts_linked_at": "連携日時",
