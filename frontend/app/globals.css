@@ -119,7 +119,53 @@
   * {
     @apply border-border outline-ring/50;
   }
+
   body {
     @apply bg-background text-foreground;
+  }
+
+  /* Restore basic HTML styles for Rich Text inside .prose (Tailwind resets them by default) */
+  .prose h1 {
+    @apply text-2xl font-bold mt-6 mb-4;
+  }
+
+  .prose h2 {
+    @apply text-xl font-bold mt-5 mb-3;
+  }
+
+  .prose h3 {
+    @apply text-lg font-bold mt-4 mb-2;
+  }
+
+  .prose p {
+    @apply my-3 leading-relaxed;
+  }
+
+  .prose ul {
+    @apply list-disc list-outside ml-5 my-3;
+  }
+
+  .prose ol {
+    @apply list-decimal list-outside ml-5 my-3;
+  }
+
+  .prose li {
+    @apply my-1;
+  }
+
+  .prose a {
+    @apply text-blue-600 underline hover:text-blue-800;
+  }
+
+  .prose strong {
+    @apply font-bold;
+  }
+
+  .prose blockquote {
+    @apply border-l-4 border-gray-300 pl-4 py-1 my-4 italic text-gray-700 bg-gray-50;
+  }
+
+  .prose hr {
+    @apply my-6 border-t border-gray-200;
   }
 }

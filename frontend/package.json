@@ -19,6 +19,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "html5-qrcode": "^2.3.8",
+    "isomorphic-dompurify": "^2.19.0",
     "jspdf": "^4.1.0",
     "lucide-react": "^0.562.0",
     "next": "^16.1.4",

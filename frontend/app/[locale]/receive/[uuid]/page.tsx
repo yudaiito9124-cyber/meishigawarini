@@ -13,6 +13,8 @@ import { Label } from "@/components/ui/label";
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card";
 import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { MessageCircleQuestion } from "lucide-react";
+import SandboxedHtml from "@/components/SandboxedHtml";
+
 
 const NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
@@ -324,9 +326,39 @@ export default function ReceivePage() {
     };
 
     return (
-        <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-4">
-            <Card className="w-full max-w-md">
-                {/* ... existing CardHeader/CardContent ... */}
+        <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center py-8 px-4">
+
+            {/* ========== Full-width Product Content Section ========== */}
+            {step !== "PIN" && gift && gift.product && gift.product.detail_html && (
+                <>
+                    <Card className="w-full max-w-xl mb-10">
+                        <CardHeader>
+                            <CardTitle className="text-xl text-center">
+                                {step === "FORM" ? t('titles.form') :
+                                    step === "SUCCESS" ? t('titles.success') :
+                                        step === "SHIPPED" ? t('titles.shipped') :
+                                            step === "EXPIRED" ? t('titles.expired') :
+                                                step === "COMPLETED" ? t('titles.completed') :
+                                                    step === "RESTRICTED" ? tst(gift.status.toLowerCase()) : ""}
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <img src={gift.product.image_url} alt="Gift" className="w-full max-h-72 object-cover rounded-xl mb-6 shadow" />
+                            <h1 className="text-2xl font-bold mb-1">{gift.product.name}</h1>
+                            <p className="text-gray-500 mb-6">{gift.product.description}</p>
+                        </CardContent>
+                    </Card>
+                    <div className="w-full max-w-3xl mb-8 animate-in fade-in duration-500">
+                        {/* Rich Text HTML Content — rendered in an isolated iframe so CSS cannot leak out */}
+                        {gift.product.detail_html && (
+                            <SandboxedHtml html={gift.product.detail_html} />
+                        )}
+                    </div>
+                </>
+            )}
+
+            {/* ========== Interactive Card Section ========== */}
+            <Card className="w-full max-w-xl">
                 <CardHeader>
                     <CardTitle className="text-xl text-center">
                         {step === "PIN" ? t('titles.pin') :
@@ -339,45 +371,42 @@ export default function ReceivePage() {
                     </CardTitle>
                 </CardHeader>
                 <CardContent>
-                    {/* Show Gift Info after PIN verification */}
                     {step !== "PIN" && gift && gift.product && (
+                        <div>
+                            {/* Hero Image */}
+                            <img src={gift.product.image_url} alt="Gift" className="w-full max-h-72 object-cover rounded-xl mb-6 shadow" />
+                            <h1 className="text-2xl font-bold mb-1">{gift.product.name}</h1>
+                            <p className="text-gray-500 mb-6">{gift.product.description}</p>
 
-                        <div className="mb-6 animate-in fade-in duration-500">
-                            <img src={gift.product.image_url} alt="Gift" className="w-full h-48 object-cover rounded-md mb-4" />
-                            <h2 className="font-bold text-lg">{gift.product.name}</h2>
-                            <p className="text-gray-600 text-sm">{gift.product.description}</p>
-
-                            {/* Remaining Days for Active Gift */}
-                            {step === "FORM" && gift.ts_expired_at && (
-                                <>
-                                    <p className="mt-8 text-sm font-semibold text-green-600 border border-green-200 bg-green-50 p-2 rounded text-center">
-                                        {t('daysRemaining', getRemainingTime(gift.ts_expired_at)!)}
-                                    </p>
-                                    <p className="text-center text-sm text-gray-500 mt-1">
-                                        {t('limitdatetime', { datetime: new Date(gift.ts_expired_at).toLocaleString() })}
-                                    </p>
-                                </>
-                            )}
-
-                            {/* Expired Message */}
-                            {step === "EXPIRED" && (
-                                <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded text-center">
-                                    <p className="text-red-600 font-bold">{t('expiredStep.message')}</p>
-                                    <p className="text-red-500 text-sm mt-1">{t('expiredStep.subMessage', { date: new Date(gift.ts_expired_at).toLocaleDateString() })}</p>
-                                </div>
-                            )}
-
+                            {/* Shop memo */}
                             {gift.memo_for_users && (
-                                <div className="mt-4 p-3 bg-blue-50 rounded-md border border-blue-100">
+                                <div className="mt-6 p-3 bg-blue-50 rounded-md border border-blue-100">
                                     <h3 className="font-semibold text-sm text-blue-800 mb-1">{t('shopMessage')}</h3>
                                     <p className="text-sm text-blue-900 whitespace-pre-wrap">{gift.memo_for_users}</p>
                                 </div>
                             )}
 
+                            {/* Remaining Days for Active Gift */}
+                            {step === "FORM" && gift.ts_expired_at && (
+                                <div className="mt-4">
+                                    <p className="text-sm font-semibold text-green-600 border border-green-200 bg-green-50 p-2 rounded text-center">
+                                        {t('daysRemaining', getRemainingTime(gift.ts_expired_at)!)}
+                                    </p>
+                                    <p className="text-center text-sm text-gray-500 mt-1">
+                                        {t('limitdatetime', { datetime: new Date(gift.ts_expired_at).toLocaleString() })}
+                                    </p>
+                                </div>
+                            )}
 
+                            {/* Expired Message */}
+                            {step === "EXPIRED" && (
+                                <div className="mt-6 p-4 bg-red-50 border border-red-200 rounded text-center">
+                                    <p className="text-red-600 font-bold">{t('expiredStep.message')}</p>
+                                    <p className="text-red-500 text-sm mt-1">{t('expiredStep.subMessage', { date: new Date(gift.ts_expired_at).toLocaleDateString() })}</p>
+                                </div>
+                            )}
                         </div>
                     )}
-
                     {step === "PIN" && (
                         <form onSubmit={handleVerifyPin} className="space-y-6">
                             <div className="space-y-2 p-4 bg-gray-50 rounded-lg">
@@ -638,7 +667,7 @@ export default function ReceivePage() {
             {/* Chat Section */}
             {
                 step !== "PIN" && (
-                    <Card className="w-full max-w-md mt-6">
+                    <Card className="w-full max-w-xl mt-6">
                         <CardHeader>
                             <CardTitle className="text-lg">{t('chat.title')}</CardTitle>
                             {/* Privacy Notice */}

@@ -274,6 +274,7 @@ export default function ShopPage() {
                 body: JSON.stringify({
                     name: formData.get('name'),
                     description: formData.get('description'),
+                    detail_html: formData.get('detail_html'),
                     price: Number(formData.get('price')),
                     valid_days: formData.get('valid_days'),
                     image_url: imageUrl,
@@ -302,7 +303,8 @@ export default function ShopPage() {
         setIsLinking(true);
         const form = e.target as HTMLFormElement;
         const formData = new FormData(form);
-        const uuid = formData.get('uuid') as string;
+        // const uuid = formData.get('uuid') as string;
+        const uuid = scannedUuid;
         const productId = formData.get('product_id') as string;
         const memo_for_users = formData.get('memo_for_users') as string;
         const memo_for_shop = formData.get('memo_for_shop') as string;
@@ -316,6 +318,8 @@ export default function ShopPage() {
             };
             if (memo_for_users) body.memo_for_users = memo_for_users;
             if (memo_for_shop) body.memo_for_shop = memo_for_shop;
+
+            console.debug(body)
 
             const res = await fetchWithAuth(`/shop/${shopId}/link`, {
                 method: 'POST',
@@ -958,6 +962,15 @@ export default function ShopPage() {
                                         <div className="space-y-2">
                                             <Label htmlFor="description">{t('addProduct.description')}</Label>
                                             <Input id="description" name="description" required />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="detail_html">{t('addProduct.detailHtml')}</Label>
+                                            <textarea
+                                                id="detail_html"
+                                                name="detail_html"
+                                                className="flex min-h-[120px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                                placeholder={t('addProduct.detailHtmlPlaceholder')}
+                                            />
                                         </div>
                                         <div className="grid grid-cols-2 gap-4">
                                             <div className="space-y-2">

@@ -133,6 +133,8 @@
             "title": "商品追加",
             "name": "商品名",
             "description": "説明",
+            "detailHtml": "詳細(HTML)",
+            "detailHtmlPlaceholder": "詳細(HTML)",
             "price": "価格 (円)",
             "validDays": "有効期限 (日数)",
             "image": "商品画像",
