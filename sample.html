@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>創業百余年 煎餅処「極」- こだわりの手焼き煎餅</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        /* 基本設定 */
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Noto Serif JP', serif;
+            background-color: #fdfcf0;
+            /* 生成り色 */
+            color: #333;
+            line-height: 1.8;
+        }
+
+        /* ヘッダー */
+        header {
+            height: 100vh;
+            background: linear-gradient(rgba(0, 0, 0, 0.3), rgba(0, 0, 0, 0.3)),
+                url('https://images.unsplash.com/photo-1599599810694-b5b37304c041?auto=format&fit=crop&q=80&w=2000') no-repeat center center/cover;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+            text-align: center;
+            position: relative;
+        }
+
+        .hero-text {
+            writing-mode: vertical-rl;
+            /* 縦書き */
+            text-orientation: upright;
+            font-size: 3rem;
+            letter-spacing: 0.5em;
+            text-shadow: 2px 2px 10px rgba(0, 0, 0, 0.5);
+        }
+
+        /* セクション共通 */
+        section {
+            padding: 100px 20px;
+            max-width: 1000px;
+            margin: 0 auto;
+            text-align: center;
+        }
+
+        .section-title {
+            font-size: 2rem;
+            margin-bottom: 50px;
+            position: relative;
+            display: inline-block;
+            padding-bottom: 10px;
+        }
+
+        .section-title::after {
+            content: "";
+            position: absolute;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 50px;
+            height: 2px;
+            background-color: #8b0000;
+            /* 茜色 */
+        }
+
+        /* こだわりセクション */
+        .commitment-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 40px;
+            margin-top: 40px;
+        }
+
+        .commitment-item img {
+            width: 100%;
+            height: 200px;
+            object-fit: cover;
+            border-radius: 2px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .commitment-item h3 {
+            color: #8b0000;
+            margin-top: 20px;
+        }
+
+        /* 紹介文 */
+        .intro-text {
+            font-size: 1.2rem;
+            max-width: 700px;
+            margin: 0 auto 60px;
+            text-align: left;
+        }
+
+        /* 商品ラインナップ */
+        .product-card {
+            background: #fff;
+            padding: 20px;
+            border: 1px solid #e0e0e0;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            text-align: left;
+        }
+
+        .product-info {
+            padding-left: 30px;
+        }
+
+        /* フッター */
+        footer {
+            background-color: #2c2c2c;
+            color: #fff;
+            padding: 50px 20px;
+            text-align: center;
+        }
+
+        .footer-logo {
+            font-size: 1.5rem;
+            margin-bottom: 20px;
+            letter-spacing: 0.2em;
+        }
+
+        /* 装飾的なクラス */
+        .accent {
+            color: #8b0000;
+            font-weight: bold;
+        }
+    </style>
+</head>
+
+<body>
+
+    <header>
+        <div class="hero-text">
+            一、火。一、米。一、心。
+        </div>
+    </header>
+
+    <section id="intro">
+        <h2 class="section-title">創業百余年の誇り</h2>
+        <div class="intro-text">
+            <p>
+                明治の世から変わらぬ暖簾を掲げ、煎餅処「極」は歩んでまいりました。
+                私たちが守り続けているのは、効率ではなく「<span class="accent">本物の味</span>」です。
+            </p>
+            <p>
+                時代は移ろえど、職人が一枚一枚、炭火の機嫌を伺いながら手返しで焼き上げるその姿は、百年前と何ら変わりません。
+                噛みしめるほどに広がる米の旨みと、秘伝のタレの香ばしさをお愉しみください。
+            </p>
+        </div>
+    </section>
+
+    <section id="commitment" style="background-color: #f7f3e9;">
+        <h2 class="section-title">三つのこだわり</h2>
+        <div class="commitment-grid">
+            <div class="commitment-item">
+                <img src="https://images.unsplash.com/photo-1586201327102-3375871fead6?auto=format&fit=crop&q=80&w=800"
+                    alt="厳選された米">
+                <h3>一、厳選された国産米</h3>
+                <p>その年で最も煎餅に適した国内産のうるち米を厳選。精米したての風味を活かしています。</p>
+            </div>
+            <div class="commitment-item">
+                <img src="https://images.unsplash.com/photo-1519708227418-c8fd9a32b7a2?auto=format&fit=crop&q=80&w=800"
+                    alt="炭火手焼き">
+                <h3>二、伝統の炭火手焼き</h3>
+                <p>機械任せにせず、熟練の職人が炭火の熱を操り、ぷっくりと膨らむ瞬間を見逃さず焼き上げます。</p>
+            </div>
+            <div class="commitment-item">
+                <img src="https://images.unsplash.com/photo-1584269600464-37b1b58a9fe7?auto=format&fit=crop&q=80&w=800"
+                    alt="秘伝のタレ">
+                <h3>三、秘伝の二段仕込み醤油</h3>
+                <p>創業当時より継ぎ足されてきたタレは、深いコクとキレのある後味が特徴です。</p>
+            </div>
+        </div>
+    </section>
+
+    <section id="products">
+        <h2 class="section-title">品書き</h2>
+
+        <div class="product-card">
+            <div style="width: 150px; height: 150px; background: #eee;"></div>
+            <div class="product-info">
+                <h3>特選 大丸醤油</h3>
+                <p>当店の看板商品。炭火の香ばしさと醤油の深みが調和した逸品です。</p>
+                <p class="accent">三枚入り 650円（税込）</p>
+            </div>
+        </div>
+
+        <div class="product-card">
+            <div style="width: 150px; height: 150px; background: #eee;"></div>
+            <div class="product-info">
+                <h3>堅焼き げんこつ</h3>
+                <p>あえてひびを入れ、中までしっかりとタレを染み込ませた、歯ごたえ自慢の煎餅です。</p>
+                <p class="accent">一袋 800円（税込）</p>
+            </div>
+        </div>
+    </section>
+
+    <footer>
+        <div class="footer-logo">煎餅処「極」</div>
+        <p>東京都〇〇区△△町 1-2-3</p>
+        <p>電話：03-xxxx-xxxx</p>
+        <p style="margin-top: 30px; font-size: 0.8rem; opacity: 0.7;">&copy; 2024 Senbei Kiwami All Rights Reserved.</p>
+    </footer>
+
+</body>
+
+</html>
+
+
+<iframe width="560" height="315" src="https://www.youtube.com/embed/g37CsTf6GdI?si=kk6jwC32aIrmjQCe"
+    title="YouTube video player" frameborder="0"
+    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+    referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+
+<iframe
+    src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d1978.359992247953!2d140.09570613545!3d39.75014873131079!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x5f8fdd60dd7ac4bd%3A0x763495584aa92ea7!2z44KJ44O844KB44KT6YymIOeni-eUsOacrOW6lw!5e1!3m2!1sja!2sjp!4v1773035233085!5m2!1sja!2sjp"
+    width="600" height="450" style="border:0;" allowfullscreen="" loading="lazy"
+    referrerpolicy="no-referrer-when-downgrade"></iframe>

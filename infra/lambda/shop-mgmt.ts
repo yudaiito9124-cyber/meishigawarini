@@ -112,7 +112,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         if (method === 'POST' && path.endsWith('/products')) {
 
             const body = JSON.parse(event.body || '{}');
-            const { name, description, image_url, price, valid_days } = body;
+            const { name, description, image_url, price, valid_days, detail_html } = body;
             if (!name) return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Missing product name' }) };
 
             const productId = crypto.randomUUID();
@@ -128,6 +128,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                     product_id: productId, // Added product_id as per request
                     name,
                     description,
+                    detail_html: detail_html || '', // Store the HTML code
                     image_url,
                     price,
                     valid_days: validityPeriod,
@@ -213,6 +214,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 const copyItem = { ...prod };
                 copyItem.PK = `SHOP#${shopId}`;
                 copyItem.image_url = newImageUrl;
+                if (prod.detail_html) copyItem.detail_html = prod.detail_html;
 
                 if (copyItem.GSI2_SK && copyItem.GSI2_SK.startsWith('SHOP#')) {
                     copyItem.GSI2_SK = `SHOP#${shopId}`;
