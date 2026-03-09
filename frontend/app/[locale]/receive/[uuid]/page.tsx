@@ -767,7 +767,7 @@ export default function ReceivePage() {
             {/* Chat Section */}
             {
                 step !== "PIN" && (
-                    <Card className="w-full max-w-xl mt-20 flex flex-col max-h-[calc(100vh-12rem)] overflow-hidden">
+                    <Card className="w-full max-w-xl mt-20 flex flex-col min-h-[1500px] max-h-[calc(100vh-12rem)] overflow-hidden">
                         <CardHeader>
                             <CardTitle className="text-lg">{t('chat.title')}</CardTitle>
                             {/* Privacy Notice */}
@@ -939,11 +939,11 @@ export default function ReceivePage() {
                                         <div className="px-1 flex justify-end items-center text-[10px]">
                                             <span className={cn(
                                                 "font-medium ",
-                                                totalSizeInfo > 75 * 1024 * 1024 ? "text-red-500" : "text-gray-400"
+                                                totalSizeInfo > 60 * 1024 * 1024 ? "text-red-500" : "text-gray-400"
                                             )}>
                                                 {t('chat.usage')}: {(totalSizeInfo / 1024 / 1024).toFixed(1)} / 100 MB
                                             </span>
-                                            {totalSizeInfo > 400 * 1024 * 1024 && (
+                                            {totalSizeInfo > 80 * 1024 * 1024 && (
                                                 <span className="text-amber-500 flex items-center gap-1">
                                                     <Loader2 className="w-2 h-2 animate-spin" />
                                                     {t('chat.limitNear')}
