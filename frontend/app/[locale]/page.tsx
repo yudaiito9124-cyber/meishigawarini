@@ -337,7 +337,7 @@ const shopBenefits = [
 const faqs = [
   {
     q: '住所情報は誰に提供されますか？',
-    a: '入力された住所は、その商品を扱うショップのみに提供されます。これは、配送処理を各ショップが対応しているためです。第三者への提供や不必要な利用は行いません。',
+    a: '入力された住所は、その商品を扱うショップのみに提供されます。これは、配送処理を各ショップが対応しているためです。本来の目的以外への利用は行いません。',
   },
   {
     q: '受け取り側はアプリのインストールが必要ですか？',
@@ -353,7 +353,7 @@ const faqs = [
   },
   {
     q: '送料は受け取る人が支払うの？',
-    a: '店頭でカードを購入する際に、送料を含めた商品代金をカード代金としてお支払いいただきます。受け取る方が支払う必要はありません。',
+    a: '着払いではありません。店頭でカードを購入する際に、送料を含めた商品代金をカード代金としてお支払いいただきます。',
   },
 ]
 
@@ -481,6 +481,16 @@ export default function HomePage() {
               </div>
             ))}
           </div>
+
+          <div className="mt-10 text-center">
+            <Link
+              href="/help"
+              className="inline-flex items-center text-sm font-medium text-gray-500 hover:text-black transition-colors"
+            >
+              ヘルプセンターでさらに詳しくみる
+              <span className="ml-1">→</span>
+            </Link>
+          </div>
         </div>
       </section>
 
@@ -551,15 +561,6 @@ export default function HomePage() {
                 <p className="text-gray-500 text-sm leading-relaxed mt-3 pr-8">{a}</p>
               </details>
             ))}
-          </div>
-          <div className="mt-10 text-center">
-            <Link
-              href="/help"
-              className="inline-flex items-center text-sm font-medium text-gray-500 hover:text-black transition-colors"
-            >
-              ヘルプセンターでさらに詳しくみる
-              <span className="ml-1">→</span>
-            </Link>
           </div>
         </div>
       </section>
