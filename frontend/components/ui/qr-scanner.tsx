@@ -6,6 +6,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { Html5Qrcode } from 'html5-qrcode';
+import { useTranslations } from 'next-intl';
 
 interface QRScannerProps {
     fps?: number;
@@ -18,6 +19,7 @@ interface QRScannerProps {
 }
 
 const QRScanner = (props: QRScannerProps) => {
+    const t = useTranslations('UI');
     // Unique ID for this instance to prevent collisions in Strict Mode
     const scannerRegionId = useRef(`html5qr-code-${Math.random().toString(36).substring(7)}`).current;
     const scannerRef = useRef<Html5Qrcode | null>(null);
@@ -63,7 +65,7 @@ const QRScanner = (props: QRScannerProps) => {
                 if (isMounted) {
                     // Filter out AbortError which happens on unmount
                     if (err.name !== 'AbortError') {
-                        console.error("Error starting scanner", err);
+                        console.error(t("Error starting scanner"), err);
                         setPermissionError(true);
                     }
                 }
@@ -102,7 +104,7 @@ const QRScanner = (props: QRScannerProps) => {
     }, []);
 
     if (permissionError) {
-        return <div className="p-4 text-red-500">Camera permission denied or error starting scanner.</div>;
+        return <div className="p-4 text-red-500">{t("Camera permission denied or error starting scanner")}</div>;
     }
 
     return (

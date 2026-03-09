@@ -84,7 +84,7 @@
     },
     "ShopPage": {
         "loading": "ショップの管理画面を読み込み中...",
-        "title": "ショップダッシュボード",
+        "title": "-",
         "movetoshops": "ショップ一覧へ戻る",
         "shopId": "ショップID: {id}",
         "refresh": "更新",
@@ -407,6 +407,10 @@
             "failed": "確認に失敗しました",
             "incomplete": "確認が完了していません。次のステップ: {step}"
         }
+    },
+    "UI": {
+        "Error starting scanner": "QRコードスキャナーを起動できませんでした。",
+        "Camera permission denied or error starting scanner": "カメラを起動できませんでした。カメラの使用を許可してください。または、ほかのアプリケーション(Web会議等)でカメラを使用している場合は、そのアプリケーションを閉じるか、カメラの使用を中断し、もう一度スキャンボタンを押してください。"
     },
     "BackendError": {
         "QR not found": "QRコードが見つかりません。",

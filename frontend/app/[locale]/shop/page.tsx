@@ -5,6 +5,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { RefreshCw } from 'lucide-react';
 import { useRouter } from '@/i18n/routing';
 import { useTranslations } from 'next-intl';
 import { getCurrentUser, signOut } from 'aws-amplify/auth';
@@ -25,17 +26,12 @@ export default function ShopListPage() {
     const [userId, setUserId] = useState('');
 
     useEffect(() => {
-        const init = async () => {
-            try {
-                // Check session
-                const user = await getCurrentUser();
-                setUserId(user.userId);
-                fetchShops();
-            } catch (e) {
-                router.push('/login');
-            }
-        };
-        init();
+        // Check session and fetch shops in parallel
+        getCurrentUser()
+            .then(user => setUserId(user.userId))
+            .catch(() => router.push('/login'));
+
+        fetchShops();
     }, []);
 
     const fetchShops = async () => {
@@ -90,8 +86,6 @@ export default function ShopListPage() {
         }
     };
 
-    if (loading) return <div className="p-8">{t('loading')}</div>;
-
     return (
         <div className="min-h-screen bg-gray-50 p-6 flex flex-col items-center">
             <div className="w-full max-w-4xl space-y-8">
@@ -107,7 +101,11 @@ export default function ShopListPage() {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {shops.length === 0 ? (
+                    {loading ? (
+                        <div className="col-span-full py-12 flex justify-center text-gray-400 bg-white rounded-lg border border-dashed">
+                            <RefreshCw className="h-6 w-6 animate-spin" />
+                        </div>
+                    ) : shops.length === 0 ? (
                         <div className="col-span-full text-center py-12 text-gray-500 bg-white rounded-lg border border-dashed">
                             {t('noShops')}
                         </div>

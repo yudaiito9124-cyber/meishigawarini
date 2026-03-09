@@ -36,7 +36,9 @@ export default function ShopPage() {
     const [products, setProducts] = useState<any[]>([]);
     const [qrCodes, setQrCodes] = useState<any[]>([]);
     const [orders, setOrders] = useState<any[]>([]);
-    const [loading, setLoading] = useState(true);
+    const [shopLoading, setShopLoading] = useState(true);
+    const [productsLoading, setProductsLoading] = useState(true);
+    const [ordersLoading, setOrdersLoading] = useState(true);
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [error, setError] = useState('');
     const [isLinking, setIsLinking] = useState(false);
@@ -75,50 +77,79 @@ export default function ShopPage() {
 
     const fetchShopData = async (refresh = false) => {
         if (refresh) setIsRefreshing(true);
-        // setLoading(true); // Don't block UI on refresh
+        if (!refresh) {
+            setShopLoading(true);
+            setProductsLoading(true);
+            setOrdersLoading(true);
+        }
+
+        const fetchShop = async () => {
+            try {
+                const res = await fetchWithAuth(`/shop/${shopId}`);
+                if (!res.ok) throw new Error('Failed to fetch shop');
+                const data = await res.json();
+                setShop(data);
+            } catch (err: any) {
+                if (err.statusCode === 401) {
+                    router.push('/login');
+                    throw err;
+                }
+                setError(err.message);
+                throw err;
+            } finally {
+                setShopLoading(false);
+            }
+        };
+
+        const fetchProducts = async () => {
+            try {
+                const res = await fetchWithAuth(`/shop/${shopId}/products`);
+                if (res.ok) {
+                    const data = await res.json();
+                    setProducts(data.products || data.items || []);
+                }
+            } catch (e) {
+                console.error(e);
+            } finally {
+                setProductsLoading(false);
+            }
+        };
+
+        const fetchQRCodes = async () => {
+            try {
+                const res = await fetchWithAuth(`/shop/${shopId}/qrcodes`);
+                if (res.ok) {
+                    const data = await res.json();
+                    setQrCodes(data.items || []);
+                }
+            } catch (e) {
+                console.error(e);
+            }
+        };
+
+        const fetchOrders = async () => {
+            try {
+                const res = await fetchWithAuth(`/shop/${shopId}/orders`);
+                if (res.ok) {
+                    const data = await res.json();
+                    setOrders(data.orders || data.items || []); // robust check
+                }
+            } catch (e) {
+                console.error(e);
+            } finally {
+                setOrdersLoading(false);
+            }
+        };
+
         try {
-            // 1. Get Shop Details
-            const shopRes = await fetchWithAuth(`/shop/${shopId}`);
-            if (!shopRes.ok) throw new Error('Failed to fetch shop');
-            const shopData = await shopRes.json();
-            setShop(shopData);
-
-            // 2. Get Products
-            const prodRes = await fetchWithAuth(`/shop/${shopId}/products`);
-            if (prodRes.ok) {
-                const prodData = await prodRes.json();
-                setProducts(prodData.products || prodData.items || []);
-            }
-
-            // 3. Get QR Codes
-            const qrRes = await fetchWithAuth(`/shop/${shopId}/qrcodes`);
-            if (qrRes.ok) {
-                const qrData = await qrRes.json();
-                setQrCodes(qrData.items || []);
-            }
-
-            // 4. Get Orders
-            const orderRes = await fetchWithAuth(`/shop/${shopId}/orders`);
-            if (orderRes.ok) {
-                const orderData = await orderRes.json();
-                setOrders(orderData.orders || orderData.items || []); // robust check
-            }
-
-        } catch (err: any) {
-            // console.error(err);
-            if (err.message === 'Unauthorized') {
-                router.push('/login');
-                return;
-            }
-            if (err.message === 'Failed to fetch shop') {
-                router.push('/login');
-                return;
-            }
-            setError(err.message);
+            await Promise.allSettled([
+                fetchShop(),
+                fetchProducts(),
+                fetchQRCodes(),
+                fetchOrders()
+            ]);
         } finally {
-            setLoading(false);
             if (refresh) setIsRefreshing(false);
-            // router.push('/login')
         }
     };
 
@@ -436,7 +467,6 @@ export default function ShopPage() {
         }
     };
 
-    if (loading) return <div className="p-8">{t('loading')}</div>;
     if (error) return <div className="p-8 text-red-500">Error: {error}</div>;
 
     return (
@@ -445,7 +475,9 @@ export default function ShopPage() {
             <div className="bg-white shadow">
                 <div className="max-w-7xl mx-auto px-4 py-6 flex justify-between items-center flex flex-col space-y-4 md:flex-row md:items-center md:justify-between md:space-y-0">
                     <div>
-                        <h1 className="text-2xl font-bold text-gray-900">{shop?.name || t('title')}</h1>
+                        <h1 className="text-2xl font-bold text-gray-900">
+                            {shopLoading ? <RefreshCw className="h-5 w-5 animate-spin text-gray-400 inline-block" /> : (shop?.name || t('title'))}
+                        </h1>
                         <p className="text-sm text-gray-500">{t('shopId', { id: String(shopId || '') })}</p>
                     </div>
                     <Button variant="outline" className="text-xs md:text-sm" onClick={handleShops}>{t('movetoshops')}</Button>
@@ -624,7 +656,9 @@ export default function ShopPage() {
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {orders
+                                {ordersLoading ? (
+                                    <TableRow><TableCell colSpan={4} className="text-center py-4"><RefreshCw className="animate-spin h-5 w-5 mx-auto text-gray-400" /></TableCell></TableRow>
+                                ) : orders
                                     .filter(o => ['USED'].includes(o.status))
                                     .filter(o => !searchUuid || (o.id || o.qr_id).includes(searchUuid))
                                     .length === 0 ? (
@@ -833,7 +867,9 @@ export default function ShopPage() {
                     </CardHeader>
                     <div style={{ flex: '1 1 auto', overflowY: 'auto', minHeight: 0 }} className="p-4 w-full">
                         <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                            {products.map((product) => (
+                            {productsLoading ? (
+                                <div className="col-span-full py-8 flex justify-center"><RefreshCw className="animate-spin h-6 w-6 text-gray-400" /></div>
+                            ) : products.map((product) => (
                                 <Card key={product.product_id} className="overflow-hidden">
                                     <div className="w-full relative aspect-[16/9]">
                                         {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -989,7 +1025,9 @@ export default function ShopPage() {
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {orders
+                                {ordersLoading ? (
+                                    <TableRow><TableCell colSpan={4} className="text-center py-4"><RefreshCw className="animate-spin h-5 w-5 mx-auto text-gray-400" /></TableCell></TableRow>
+                                ) : orders
                                     .filter(o => ['LINKED', 'ACTIVE', 'SHIPPED', 'COMPLETED', 'EXPIRED', 'BANNED'].includes(o.status))
                                     .filter(o => !searchUuid || (o.id || o.qr_id).includes(searchUuid))
                                     .length === 0 ? (
