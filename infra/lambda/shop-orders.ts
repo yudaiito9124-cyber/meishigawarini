@@ -245,10 +245,10 @@ function processBatchResponses(batchRes: any, relevantItems: any[]) {
     };
 }
 
-//内部で権限確認なし注意
+//内部で権限確認なし注意 -> 修正: 権限確認を追加
 async function handleUpdateOrder(event: any) {
-    const uuid = event.pathParameters?.uuid;
-    if (!uuid) return { statusCode: 400, headers: corsHeaders, body: 'Missing UUID' };
+    const qrId = event.pathParameters?.qrId; // uuid から qrId に変更
+    if (!qrId) return { statusCode: 400, headers: corsHeaders, body: 'Missing qrId' };
     const shopId = event.pathParameters?.shopId;
     if (!shopId) return { statusCode: 400, headers: corsHeaders, body: 'Missing shopID' };
 
@@ -256,11 +256,17 @@ async function handleUpdateOrder(event: any) {
     const { delivery_company, tracking_number, memo_for_users, memo_for_shop } = body;
     const metaRes = await ddb.send(new GetCommand({
         TableName: TABLE_NAME,
-        Key: { PK: `QR#${uuid}`, SK: 'METADATA' }
+        Key: { PK: `QR#${qrId}`, SK: 'METADATA' }
     }));
     if (!metaRes.Item) {
         return { statusCode: 404, headers: corsHeaders, body: 'Order not found' };
     }
+
+    // セキュリティチェック: このQRコードが指定されたショップのものであるか確認
+    if (metaRes.Item.shop_id !== shopId) {
+        return { statusCode: 403, headers: corsHeaders, body: 'QR does not belong to this shop' };
+    }
+
     if (metaRes.Item.status !== 'USED') {
         return { statusCode: 400, headers: corsHeaders, body: 'Order must be in USED status to ship' };
     }
@@ -282,7 +288,7 @@ async function handleUpdateOrder(event: any) {
     }
     await ddb.send(new UpdateCommand({
         TableName: TABLE_NAME,
-        Key: { PK: `QR#${uuid}`, SK: 'METADATA' },
+        Key: { PK: `QR#${qrId}`, SK: 'METADATA' },
         UpdateExpression: updateExpParts.join(', '),
         ExpressionAttributeValues: expAttrValues,
         ExpressionAttributeNames: { '#status': 'status' }, // 予約語回避
@@ -292,7 +298,7 @@ async function handleUpdateOrder(event: any) {
     if (tracking_number || delivery_company) {
         await ddb.send(new UpdateCommand({
             TableName: TABLE_NAME,
-            Key: { PK: `QR#${uuid}`, SK: 'ORDER' },
+            Key: { PK: `QR#${qrId}`, SK: 'ORDER' },
             UpdateExpression: 'SET delivery_company = :d, tracking_number = :t, ts_shipped_at = :now, ts_updated_at = :now',
             ExpressionAttributeValues: {
                 ':d': delivery_company,
@@ -305,14 +311,14 @@ async function handleUpdateOrder(event: any) {
     // Send Shipping Notification Email
     const orderRes = await ddb.send(new GetCommand({
         TableName: TABLE_NAME,
-        Key: { PK: `QR#${uuid}`, SK: 'ORDER' }
+        Key: { PK: `QR#${qrId}`, SK: 'ORDER' }
     }));
     const email = orderRes.Item?.email;
     const pin = metaRes.Item?.pin;
     if (email && pin) {
         try {
             const lang = 'ja';
-            const { subject, bodyText } = createShippingNotificationEmail({ uuid, pin, lang });
+            const { subject, bodyText } = createShippingNotificationEmail({ uuid: qrId, pin, lang });
             await sendEmail({ to: [email], subject: subject, text: bodyText });
         } catch (e) {
             console.error('Failed to send shipping notification email', e);

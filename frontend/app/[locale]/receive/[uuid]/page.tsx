@@ -9,11 +9,13 @@ import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card";
 import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
-import { MessageCircleQuestion } from "lucide-react";
+import { MessageCircleQuestion, Paperclip, X, FileText, File as FileIcon, Loader2, SendHorizontal } from "lucide-react";
 import SandboxedHtml from "@/components/SandboxedHtml";
+import { cn } from "@/lib/utils";
 
 
 const NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || "";
@@ -81,14 +83,67 @@ const fetchChatMessages = async (uuid: string, pin: string) => {
 };
 
 // Post Chat Message
-const postChatMessage = async (uuid: string, pin: string, username: string, message: string) => {
+const postChatMessage = async (uuid: string, pin: string, username: string, message: string, fileData?: any) => {
     const res = await fetch(`${NEXT_PUBLIC_API_URL}/recipient/qrcodes/${uuid}/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ pin, username, message }),
+        body: JSON.stringify({
+            pin,
+            username,
+            message,
+            ...(fileData || {})
+        }),
     });
     if (!res.ok) throw new Error("Failed to post message");
     return res.json();
+};
+
+// Get Upload URL
+const getChatUploadUrl = async (uuid: string, pin: string, filename: string, contentType: string, fileSize: number) => {
+    const res = await fetch(`${NEXT_PUBLIC_API_URL}/recipient/qrcodes/${uuid}/upload-url?pin=${pin}&filename=${encodeURIComponent(filename)}&contentType=${encodeURIComponent(contentType)}&fileSize=${fileSize}`);
+    if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.message || "Failed to get upload URL");
+    }
+    return res.json();
+};
+
+// Image Resizer Utility
+const resizeImage = (file: File, maxWidth: number = 1280): Promise<Blob> => {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = (event) => {
+            const img = new Image();
+            img.src = event.target?.result as string;
+            img.onload = () => {
+                const canvas = document.createElement("canvas");
+                let width = img.width;
+                let height = img.height;
+
+                if (width > maxWidth) {
+                    height = (height * maxWidth) / width;
+                    width = maxWidth;
+                }
+                if (height > maxWidth) {
+                    width = (width * maxWidth) / height;
+                    height = maxWidth;
+                }
+
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext("2d");
+                ctx?.drawImage(img, 0, 0, width, height);
+
+                canvas.toBlob((blob) => {
+                    if (blob) resolve(blob);
+                    else reject(new Error("Canvas to Blob failed"));
+                }, file.type, 0.8);
+            };
+            img.onerror = reject;
+        };
+        reader.onerror = reject;
+    });
 };
 
 export default function ReceivePage() {
@@ -119,6 +174,9 @@ export default function ReceivePage() {
     const [chatName, setChatName] = useState("");
     const [chatMessage, setChatMessage] = useState("");
     const [chatLoading, setChatLoading] = useState(false);
+    const [selectedFile, setSelectedFile] = useState<File | null>(null);
+    const [uploading, setUploading] = useState(false);
+    const [totalSizeInfo, setTotalSizeInfo] = useState<number | null>(null);
 
     // Subscription
     const [notificationEmail, setNotificationEmail] = useState("");
@@ -236,6 +294,7 @@ export default function ReceivePage() {
         try {
             const data = await fetchChatMessages(uuid, pin);
             setMessages(data.messages || []);
+            setTotalSizeInfo(data.total_size_bytes || 0);
         } catch (e) {
             console.error(e);
         }
@@ -254,16 +313,57 @@ export default function ReceivePage() {
 
     const handleChatSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!chatName || !chatMessage) return;
+        if ((!chatMessage && !selectedFile) || !chatName) return;
+
         setChatLoading(true);
         try {
-            await postChatMessage(uuid, pin, chatName, chatMessage);
-            setChatMessage(""); // Keep name
+            let fileData = null;
+            if (selectedFile) {
+                setUploading(true);
+                let uploadFile: File | Blob = selectedFile;
+
+                // Resize if image
+                if (selectedFile.type.startsWith("image/")) {
+                    try {
+                        uploadFile = await resizeImage(selectedFile);
+                    } catch (err) {
+                        console.error("Resize failed, using original", err);
+                    }
+                }
+
+                const { uploadUrl, publicUrl } = await getChatUploadUrl(
+                    uuid,
+                    pin,
+                    selectedFile.name,
+                    uploadFile.type,
+                    uploadFile.size
+                );
+
+                const uploadRes = await fetch(uploadUrl, {
+                    method: "PUT",
+                    headers: { "Content-Type": uploadFile.type },
+                    body: uploadFile
+                });
+
+                if (!uploadRes.ok) throw new Error("S3 Upload failed");
+
+                fileData = {
+                    file_url: publicUrl,
+                    file_name: selectedFile.name,
+                    file_type: selectedFile.type,
+                    file_size: uploadFile.size
+                };
+            }
+
+            await postChatMessage(uuid, pin, chatName, chatMessage, fileData);
+            setChatMessage("");
+            setSelectedFile(null);
             await loadMessages();
-        } catch (e) {
-            alert("Failed to send message: " + e);
+        } catch (e: any) {
+            alert("Failed to send message: " + e.message);
         } finally {
             setChatLoading(false);
+            setUploading(false);
         }
     };
 
@@ -667,70 +767,196 @@ export default function ReceivePage() {
             {/* Chat Section */}
             {
                 step !== "PIN" && (
-                    <Card className="w-full max-w-xl mt-6">
+                    <Card className="w-full max-w-xl mt-20 flex flex-col max-h-[calc(100vh-12rem)] overflow-hidden">
                         <CardHeader>
                             <CardTitle className="text-lg">{t('chat.title')}</CardTitle>
                             {/* Privacy Notice */}
-                            <p className="text-xs text-gray-500">{t('chat.privacy')}</p>
                         </CardHeader>
-                        <CardContent>
-                            <div className="space-y-4">
-                                <div className="max-h-60 overflow-y-auto space-y-3 p-2 border rounded bg-gray-50">
-                                    {messages.length === 0 ? (
-                                        <p className="text-sm text-gray-500 text-center py-4">{t('chat.noMessages')}</p>
-                                    ) : (
-                                        messages.slice().reverse().map((msg) => {
-                                            const isSystem = msg.username === 'System';
-                                            const displayUsername = isSystem ? t('chat.system') : msg.username;
-                                            const displayMessage = (isSystem && msg.message === 'DeliveryCompleted')
-                                                ? t('chat.systemMessage.deliveryCompleted')
-                                                : msg.message;
+                        <CardContent className="min-h-0 flex">
+                            <div className="flex-1 min-h-0 flex flex-col pt-0 pb-0 overflow-y-auto space-y-2 bg-gray-100 border shadow-sm rounded-xl" >
+                                {messages.length === 0 ? (
+                                    <p className="text-sm text-gray-500 text-center py-4">{t('chat.noMessages')}</p>
+                                ) : (
+                                    messages.slice().map((msg) => {
+                                        const isSystem = msg.username === 'System';
+                                        const displayUsername = isSystem ? t('chat.system') : msg.username;
+                                        const displayMessage = (isSystem && msg.message === 'DeliveryCompleted')
+                                            ? t('chat.systemMessage.deliveryCompleted')
+                                            : msg.message;
 
-                                            return (
-                                                <div key={msg.id} className={`${isSystem ? 'bg-blue-50 border-blue-100' : 'bg-white'} p-2 rounded shadow-sm text-sm border`}>
-                                                    <p className={`font-bold text-xs mb-1 ${isSystem ? 'text-blue-700' : 'text-gray-600'}`}>
-                                                        {displayUsername}
-                                                        <span className="text-gray-400 font-normal ml-2">• {new Date(msg.ts_created_at).toLocaleString()}</span>
+                                        return (
+                                            <div key={msg.id} className={`${isSystem ? 'bg-blue-50 border-blue-100' : 'bg-gray-100'} p-2 rounded-xl text-sm bg-gray-100 ${msg.username === chatName ? 'ml-10' : 'mr-10'}`}>
+                                                <p className={`font-bold text-xs ml-1 mb-1 flex items-center gap-1.5 ${isSystem ? 'text-blue-700' : 'text-gray-600'}`}>
+                                                    <span className={`w-2 h-2 rounded-full shrink-0 ${isSystem ? 'bg-blue-500' : 'bg-gray-400'}`} />
+                                                    {displayUsername}
+                                                    <span className="text-gray-400 font-normal ml-2">• {new Date(msg.ts_created_at).toLocaleString()}</span>
+                                                </p>
+                                                <div className="bg-white p-2 rounded-xl shadow-sm border">
+                                                    <p className={`whitespace-pre-wrap ml-2 ${isSystem ? 'text-blue-900' : ''}`}>
+                                                        {displayMessage}
                                                     </p>
-                                                    <p className={`whitespace-pre-wrap ${isSystem ? 'text-blue-900' : ''}`}>{displayMessage}</p>
+                                                    {msg.file_url && (
+                                                        <div className={`rounded p-4 ${displayMessage ? '' : ''}`}>
+                                                            {msg.file_type?.startsWith("image/") ? (
+                                                                <a href={msg.file_url} target="_blank" rel="noopener noreferrer" >
+                                                                    <img src={msg.file_url} alt={msg.file_name} className="max-w-full max-h-64 object-contain mx-auto rounded-xl shadow-sm" />
+                                                                </a>
+                                                            ) : msg.file_type?.startsWith("video/") ? (
+                                                                // <div className="rounded-xl overflow-hidden shadow-sm bg-black/90 aspect-video max-h-64 flex items-center justify-center mx-auto">
+                                                                <video
+                                                                    src={msg.file_url}
+                                                                    controls
+                                                                    className="max-h-64 max-w-full rounded-xl overflow-hidden shadow-sm bg-black/90 aspect-video flex items-center justify-center mx-auto"
+                                                                    playsInline
+                                                                >
+                                                                    {t('chat.videoUnsupported')}
+                                                                </video>
+                                                                // </div>
+                                                            ) : (
+                                                                <a
+                                                                    href={msg.file_url}
+                                                                    target="_blank"
+                                                                    rel="noopener noreferrer"
+                                                                    className="flex items-center p-2 gap-3 hover:bg-gray-100 transition-colors"
+                                                                >
+                                                                    <FileText className="w-8 h-8 text-gray-500" />
+                                                                    <div className="flex-1 min-w-0">
+                                                                        <p className="text-sm font-medium truncate text-blue-600 underline">{msg.file_name}</p>
+                                                                        <p className="text-xs text-gray-400">
+                                                                            {msg.file_size ? `${(msg.file_size / 1024 / 1024).toFixed(2)} MB` : ''}
+                                                                        </p>
+                                                                    </div>
+                                                                </a>
+                                                            )}
+                                                        </div>
+                                                    )}
                                                 </div>
-                                            );
-                                        })
-                                    )}
-                                </div>
-
-                                <form onSubmit={handleChatSubmit} className="space-y-3 border-t pt-4">
-                                    <div>
-                                        <Label htmlFor="chatName" className="text-xs">{t('chat.name')}</Label>
-                                        <Input
-                                            id="chatName"
-                                            placeholder={t('chat.namePlaceholder')}
-                                            value={chatName}
-                                            onChange={(e) => setChatName(e.target.value)}
-                                            required
-                                            className="h-8"
-                                        />
-                                    </div>
-                                    <div>
-                                        <Label htmlFor="chatMessage" className="text-xs">{t('chat.message')}</Label>
-                                        <Input
-                                            id="chatMessage"
-                                            placeholder={t('chat.placeholder')}
-                                            value={chatMessage}
-                                            onChange={(e) => setChatMessage(e.target.value)}
-                                            required
-                                        />
-                                    </div>
-                                    <Button type="submit" size="sm" className="w-full" disabled={chatLoading}>
-                                        {chatLoading ? t('chat.submitting') : t('chat.submit')}
-                                    </Button>
-                                </form>
+                                            </div>
+                                        );
+                                    })
+                                )}
+                                <div className="mb-10" />
                             </div>
                         </CardContent>
-                        <CardFooter className="flex flex-col gap-4 pt-0 items-start border-t  bg-gray-50/50">
+                        <CardFooter className="flex flex-col pt-0 bg-white">
+                            <form onSubmit={handleChatSubmit} className="w-full space-y-2 p-4 rounded-xl border-1 shadow-sm transition-all bg-gray-50">
+                                <div className="flex items-center gap-2">
+                                    <Label htmlFor="chatName" className="text-xs font-bold shrink-0 whitespace-nowrap">
+                                        {t('chat.name')}
+                                    </Label>
+                                    <Input
+                                        id="chatName"
+                                        placeholder={t('chat.namePlaceholder')}
+                                        value={chatName}
+                                        onChange={(e) => setChatName(e.target.value)}
+                                        required
+                                        className="h-8 flex-1 bg-white"
+                                    />
+                                </div>
+                                <div className="flex flex-col gap-1">
+                                    <div className="flex items-start gap-2">
+                                        <div className="flex-1">
+                                            <Label htmlFor="chatMessage" className="text-xs sr-only">{t('chat.message')}</Label>
+                                            <Textarea
+                                                id="chatMessage"
+                                                placeholder={t('chat.placeholder')}
+                                                value={chatMessage}
+                                                onChange={(e) => setChatMessage(e.target.value)}
+                                                className="min-h-[100px] bg-white"
+                                            />
+                                        </div>
+                                        <div className="flex flex-col gap-2 shrink-0">
+                                            <div className="relative">
+                                                <input
+                                                    type="file"
+                                                    id="chatFile"
+                                                    className="hidden"
+                                                    onChange={(e) => {
+                                                        const file = e.target.files?.[0];
+                                                        if (file) setSelectedFile(file);
+                                                        e.target.value = ""; // Reset
+                                                    }}
+                                                />
+                                                <Button
+                                                    type="button"
+                                                    variant="outline"
+                                                    size="icon"
+                                                    className={cn("h-[46px] w-10 shrink-0", selectedFile && "bg-blue-50 border-blue-200 text-blue-600 ")}
+                                                    onClick={() => document.getElementById('chatFile')?.click()}
+                                                    disabled={chatLoading}
+                                                >
+                                                    <Paperclip className="h-4 w-4" />
+                                                </Button>
+                                            </div>
+                                            <Button
+                                                type="submit"
+                                                size="icon"
+                                                className="h-[46px] w-10 shrink-0"
+                                                disabled={chatLoading || (totalSizeInfo !== null && totalSizeInfo > 100 * 1024 * 1024)}
+                                            >
+                                                {chatLoading ? (
+                                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                                ) : (
+                                                    <SendHorizontal className="h-4 w-4" />
+                                                )}
+                                            </Button>
+                                        </div>
+                                    </div>
+
+                                    {selectedFile && (
+                                        <div className="flex items-center gap-2 p-2 bg-blue-50 rounded-md border border-blue-100 animate-in fade-in slide-in-from-top-1">
+                                            <div className="flex-1 min-w-0 flex items-center gap-2">
+                                                {selectedFile.type.startsWith("image/") ? (
+                                                    <div className="w-8 h-8 rounded bg-white border overflow-hidden shrink-0">
+                                                        <img
+                                                            src={URL.createObjectURL(selectedFile)}
+                                                            alt="Preview"
+                                                            className="w-full h-full object-cover"
+                                                            onLoad={(e) => URL.revokeObjectURL((e.target as any).src)}
+                                                        />
+                                                    </div>
+                                                ) : (
+                                                    <FileIcon className="w-8 h-8 text-blue-500 shrink-0" />
+                                                )}
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="text-xs font-medium truncate">{selectedFile.name}</p>
+                                                    <p className="text-[10px] text-gray-500">{(selectedFile.size / 1024 / 1024).toFixed(2)} MB</p>
+                                                </div>
+                                            </div>
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="icon"
+                                                className="h-6 w-6 rounded-full"
+                                                onClick={() => setSelectedFile(null)}
+                                            >
+                                                <X className="h-3 h-3" />
+                                            </Button>
+                                        </div>
+                                    )}
+
+                                    {totalSizeInfo !== null && (
+                                        <div className="px-1 flex justify-end items-center text-[10px]">
+                                            <span className={cn(
+                                                "font-medium ",
+                                                totalSizeInfo > 75 * 1024 * 1024 ? "text-red-500" : "text-gray-400"
+                                            )}>
+                                                {t('chat.usage')}: {(totalSizeInfo / 1024 / 1024).toFixed(1)} / 100 MB
+                                            </span>
+                                            {totalSizeInfo > 400 * 1024 * 1024 && (
+                                                <span className="text-amber-500 flex items-center gap-1">
+                                                    <Loader2 className="w-2 h-2 animate-spin" />
+                                                    {t('chat.limitNear')}
+                                                </span>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                                <p className="text-xs text-gray-500">{t('chat.privacy')}</p>
+                            </form>
 
                             {/* Email Subscription */}
-                            <div className="w-full space-y-2 pt-2 ">
+                            <div className="w-full space-y-2 pt-3 mt-2">
                                 <Label className="text-xs text-gray-700 font-semibold">{t('chat.emailTitle')}</Label>
                                 <p className="text-xs text-gray-500">{t('chat.emailDesc')}</p>
                                 <div className="flex w-full gap-2 pt-1">

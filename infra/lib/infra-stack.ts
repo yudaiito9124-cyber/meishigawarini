@@ -179,6 +179,21 @@ export class InfraStack extends cdk.Stack {
     });
     table.grantReadWriteData(shopOrdersFn);
 
+    // Lambda: Recipient Upload URL (NEW)
+    const recipientUploadUrlFn = new nodejs.NodejsFunction(this, 'RecipientUploadUrlFn', {
+      entry: path.join(__dirname, '../lambda/recipient-upload-url.ts'),
+      ...commonProps,
+      environment: {
+        ...commonProps.environment,
+        BUCKET_NAME: bucket.bucketName,
+      },
+      bundling: {
+        externalModules: ['@aws-sdk/client-dynamodb', '@aws-sdk/lib-dynamodb', '@aws-sdk/client-s3', '@aws-sdk/s3-request-presigner'],
+      }
+    });
+    table.grantReadData(recipientUploadUrlFn);
+    bucket.grantPut(recipientUploadUrlFn);
+
 
 
     // API Gateway
@@ -472,9 +487,14 @@ export class InfraStack extends cdk.Stack {
     });
     table.grantReadWriteData(recipientChatFn);
 
-    const chatResource = qrResourceRecip.addResource('{uuid}').addResource('chat');
+    const qrIdResourceRecip = qrResourceRecip.addResource('{uuid}');
+
+    const chatResource = qrIdResourceRecip.addResource('chat');
     chatResource.addMethod('GET', new apigateway.LambdaIntegration(recipientChatFn));
     chatResource.addMethod('POST', new apigateway.LambdaIntegration(recipientChatFn));
+
+    const uploadUrlResourceChat = qrIdResourceRecip.addResource('upload-url');
+    uploadUrlResourceChat.addMethod('GET', new apigateway.LambdaIntegration(recipientUploadUrlFn));
 
 
 

@@ -26,7 +26,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 
         if (event.httpMethod === 'POST') {
             const body = JSON.parse(event.body || '{}');
-            const { pin, username, message, type, email, locale } = body;
+            const { pin, username, message, type, email, locale, file_url, file_name, file_type, file_size } = body;
 
             // 1. Verify PIN (Required for both Subscribe and Message)
             if (!pin) {
@@ -115,7 +115,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             }
 
             // === HANDLE MESSAGE ===
-            if (!username || !message) {
+            if (!username || (!message && !file_url)) {
                 return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Missing required fields' }) };
             }
 
@@ -123,20 +123,28 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Invalid username' }) };
             }
 
-            const newMessage = {
+            const newMessage: any = {
                 id: crypto.randomUUID(),
                 username,
                 message,
                 ts_created_at: new Date().toISOString()
             };
 
+            if (file_url) {
+                newMessage.file_url = file_url;
+                newMessage.file_name = file_name;
+                newMessage.file_type = file_type;
+                newMessage.file_size = file_size;
+            }
+
             await ddb.send(new UpdateCommand({
                 TableName: TABLE_NAME,
                 Key: { PK: `QR#${uuid}`, SK: 'CHAT' },
-                UpdateExpression: 'SET messages = list_append(if_not_exists(messages, :empty_list), :new_msg)',
+                UpdateExpression: 'SET messages = list_append(if_not_exists(messages, :empty_list), :new_msg) ADD total_size_bytes :size',
                 ExpressionAttributeValues: {
                     ':empty_list': [],
-                    ':new_msg': [newMessage]
+                    ':new_msg': [newMessage],
+                    ':size': file_size || 0
                 }
             }));
 
@@ -255,7 +263,10 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             return {
                 statusCode: 200,
                 headers: corsHeaders,
-                body: JSON.stringify({ messages: getChat.Item?.messages || [] })
+                body: JSON.stringify({
+                    messages: getChat.Item?.messages || [],
+                    total_size_bytes: getChat.Item?.total_size_bytes || 0
+                })
             };
         }
 
