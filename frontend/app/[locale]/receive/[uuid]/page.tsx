@@ -13,7 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card";
 import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { MessageCircleQuestion, Paperclip, X, FileText, File as FileIcon, Loader2, SendHorizontal, Pencil, UserPlus, Globe, Gift, User, MessagesSquare, Heart, Sparkles, Calendar, Clock } from "lucide-react";
+import { MessageCircleQuestion, Paperclip, X, FileText, File as FileIcon, Loader2, SendHorizontal, Pencil, UserPlus, Globe, Gift, User, MessagesSquare, Heart, Sparkles, Calendar, Clock, ShoppingBasket } from "lucide-react";
 import { SiFacebook, SiInstagram, SiThreads, SiX, SiYoutube, SiLine, SiTiktok, SiLinktree, SiEight } from "@icons-pack/react-simple-icons";
 import SandboxedHtml from "@/components/SandboxedHtml";
 import { cn } from "@/lib/utils";
@@ -192,6 +192,21 @@ const ShakingGiftBox = ({ isShaking }: { isShaking?: boolean }) => (
         </div>
     </div>
 );
+
+const EmptySenderInfo = (senderinfo: any) => {
+    return !senderinfo || Object.keys(senderinfo).every(key => {
+        if (key.startsWith("ts_")) return true;
+        return senderinfo[key] === "";
+    });
+};
+
+const EmptySenderInfoWithLinks = (senderinfo: any) => {
+    return !senderinfo || Object.keys(senderinfo).every(key => {
+        if (key.startsWith("ts_")) return true;
+        if (!key.startsWith("Service_") && !key.startsWith("SNS_")) return true;
+        return senderinfo[key] === "";
+    });
+};
 
 export default function ReceivePage() {
     const t = useTranslations('ReceivePage');
@@ -609,7 +624,8 @@ export default function ReceivePage() {
     };
 
     return (
-        <div className={cn("min-h-screen bg-gray-50 flex flex-col items-center justify-center py-8 px-4 transition-all duration-1000", step === "COMPLETED" && "bg-olive-300 sepia-[.2] shadow-[inset_0_0_500px_rgba(0,0,0,0.8)]")}>
+        <div className={cn("min-h-screen w-full bg-gray-50 flex flex-col items-center justify-center py-8 px-4 transition-all duration-1000", step === "COMPLETED" && "bg-olive-300 sepia-[.2] shadow-[inset_0_0_500px_rgba(0,0,0,0.8)]")}>
+            {/* COMPLETEしているカードを読み込む際のフェード処理 */}
             {showWhiteFade && (
                 <div
                     className="fixed inset-0 z-[100] bg-olive-800 animate-fade-out-white pointer-events-none"
@@ -811,36 +827,9 @@ export default function ReceivePage() {
                                 </div>
                             )}
 
-                            {/* Remaining Days for Active Gift */}
-                            {step === "FORM" && gift.ts_expired_at && (
-                                <div className="mt-4">
-                                    <p className="text-sm font-semibold text-green-600 border border-green-200 bg-green-50 p-2 rounded text-center">
-                                        {t('daysRemaining', getRemainingTime(gift.ts_expired_at)!)}
-                                    </p>
-                                    <p className="text-center text-sm text-gray-500 mt-1">
-                                        {t('limitdatetime', { datetime: new Date(gift.ts_expired_at).toLocaleString() })}
-                                    </p>
-                                </div>
-                            )}
-
-
-                            {/* Expired Message */}
-                            {step === "EXPIRED" && (
-                                <div className="mt-6 p-4 bg-red-50 border border-red-200 rounded text-center">
-                                    <p className="text-red-600 font-bold">{t('expiredStep.message')}</p>
-                                    <p className="text-red-500 text-sm mt-1">{t('expiredStep.subMessage', { date: new Date(gift.ts_expired_at).toLocaleDateString() })}</p>
-                                </div>
-                            )}
-
-                            <Label className="text-xl text-center flex flex-col text-gray-500">
-                                {step === "FORM" ? t('titles.form') :
-                                    step === "SUCCESS" ? t('titles.success') :
-                                        step === "SHIPPED" ? t('titles.shipped') :
-                                            step === "EXPIRED" ? t('titles.expired') :
-                                                step === "COMPLETED" ? t('titles.completed') : ""}
-                            </Label>
                         </div>
                     )}
+
                     {step === "PIN" && !gift?.product && (
                         <form onSubmit={handleVerifyPin} className={cn("space-y-6 transition-opacity", loading && "opacity-50 pointer-events-none")}>
                             <div className="space-y-2 p-4 bg-gray-50 rounded-lg">
@@ -863,124 +852,171 @@ export default function ReceivePage() {
                             </Button>
                         </form>
                     )}
+                </CardContent>
+            </Card>
 
-                    {step === "RESTRICTED" && !gift?.product && (
-                        <div className={cn("space-y-6 border-t mt-4 transition-opacity", loading && "opacity-50 pointer-events-none")}>
-                            <div className="text-center space-y-2 mt-4">
-                                <p className="text-yellow-600 font-medium">{t('restrictedStep.title')}</p>
-                                <p className="text-sm text-gray-500">{t('restrictedStep.message')}</p>
-                            </div>
-                            <form onSubmit={handleUnlock} className="space-y-4">
-                                <div className="space-y-2">
-                                    <Label htmlFor="unlockPassword">{t('restrictedStep.passwordLabel')}</Label>
-                                    <Input
-                                        id="unlockPassword"
-                                        type="password"
-                                        value={unlockPassword}
-                                        disabled={loading}
-                                        onChange={(e) => setUnlockPassword(e.target.value)}
-                                        required
-                                    />
-                                </div>
-                                <Button type="submit" className="w-full" disabled={loading}>
-                                    {loading ? t('restrictedStep.verifying') : t('restrictedStep.unlock')}
-                                </Button>
-                            </form>
-                        </div>
-                    )}
+            {/* --- Form / notification Section --- */}
+            {(["FORM", "SUCCESS", "SHIPPED", "EXPIRED", "RESTRICTED"].includes(step)) && (
+                <Card className="w-full max-w-xl mt-20">
+                    <CardHeader>
+                        <CardTitle className="text-xl text-center">
+                            {/* <Label className="text-xl text-center flex flex-col text-gray-500"> */}
+                            {
+                                step === "FORM" ? t('titles.form') :
+                                    step === "SUCCESS" ? t('titles.success') :
+                                        step === "SHIPPED" ? t('titles.shipped') :
+                                            step === "EXPIRED" ? t('titles.expired') :
+                                                step === "COMPLETED" ? t('titles.completed') :
+                                                    ""}
+                            {/* </Label>
+                            {step === "PIN" ? t('titles.pin') :
+                                step === "RESTRICTED" ? tst(gift.status.toLowerCase()) : ""} */}
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent>
 
-                    {step === "FORM" && (
-                        <form onSubmit={handleAddressSubmit} className="space-y-6">
-                            <div className="space-y-4 pt-8 mt-16 border-t">
-                                <Label className="font-semibold">{t('formStep.title')}</Label>
-                                <div className="space-y-2">
-                                    <Label htmlFor="name">{t('formStep.name')}</Label>
-                                    <Input
-                                        id="name"
-                                        required
-                                        value={name}
-                                        onChange={(e) => setName(e.target.value)}
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="zipCode">{t('formStep.zipCode')}</Label>
-                                    <Input
-                                        id="zipCode"
-                                        required
-                                        value={zipCode}
-                                        onChange={(e) => setZipCode(e.target.value)}
-                                        placeholder="123-4567"
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="address">{t('formStep.address')}</Label>
-                                    <Input
-                                        id="address"
-                                        required
-                                        value={address}
-                                        onChange={(e) => setAddress(e.target.value)}
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="phone">{t('formStep.phone')}</Label>
-                                    <Input
-                                        id="phone"
-                                        type="tel"
-                                        value={phone}
-                                        onChange={(e) => setPhone(e.target.value)}
-                                        placeholder="090-1234-5678"
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="email">{t('formStep.email')}</Label>
-                                    <p className="text-xs text-gray-500">{t('formStep.emailDescription')}</p>
-                                    <Input
-                                        id="email"
-                                        type="email"
-                                        value={email}
-                                        onChange={(e) => setEmail(e.target.value)}
-                                        placeholder="you@example.com"
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="preferredDate">{t('formStep.preferredDate')}</Label>
-                                    <div className="flex gap-2 items-center">
-                                        <Input
-                                            id="preferredDate"
-                                            type="date"
-                                            value={preferredDate}
-                                            onChange={(e) => setPreferredDate(e.target.value)}
-                                            className="flex-1"
-                                        />
-                                        <Button
-                                            type="button"
-                                            variant="outline"
-                                            onClick={() => setPreferredDate("")}
-                                            className="whitespace-nowrap"
-                                        >
-                                            {t('formStep.noPreference')}
-                                        </Button>
+                        {/* 有効期限 */}
+                        {!loading && step !== "PIN" && gift && gift.product && (
+                            <div className="pr-8 pl-8">
+                                {/* Remaining Days for Active Gift */}
+                                {step === "FORM" && gift.ts_expired_at && (
+                                    <div className="border border-gray-200 bg-gray-50 p-3 rounded text-center rounded-xl">
+                                        <p className="text-sm font-semibold text-green-600 ">
+                                            {t('daysRemaining', getRemainingTime(gift.ts_expired_at)!)}
+                                        </p>
+                                        <p className="text-sm text-center text-gray-500 mt-1">
+                                            {t('limitdatetime', { datetime: new Date(gift.ts_expired_at).toLocaleString() })}
+                                        </p>
                                     </div>
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="preferredTime">{t('formStep.preferredTime')}</Label>
-                                    <select
-                                        id="preferredTime"
-                                        value={preferredTime}
-                                        onChange={(e) => setPreferredTime(e.target.value)}
-                                        className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-                                    >
-                                        <option value="">{t('formStep.noPreference')}</option>
-                                        <option value="午前中">{t('formStep.timeMorning')}</option>
-                                        <option value="14-16時">{t('formStep.time1416')}</option>
-                                        <option value="16-18時">{t('formStep.time1618')}</option>
-                                        <option value="18-20時">{t('formStep.time1820')}</option>
-                                        <option value="19-21時">{t('formStep.time1921')}</option>
-                                    </select>
-                                </div>
+                                )}
 
-                                {/* Password Setting Section */}
-                                {/* <div className="space-y-4 pt-8 mt-16 border-t">
+                                {/* Expired Message */}
+                                {step === "EXPIRED" && (
+                                    <div className="mt-6 p-4 bg-red-50 border border-red-200 rounded-xl text-center">
+                                        <p className="text-red-600 font-bold">{t('expiredStep.message')}</p>
+                                        <p className="text-red-500 text-sm mt-1">{t('expiredStep.subMessage', { date: new Date(gift.ts_expired_at).toLocaleDateString() })}</p>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {step === "RESTRICTED" && !gift?.product && (
+                            <div className={cn("space-y-6 border-t mt-4 transition-opacity", loading && "opacity-50 pointer-events-none")}>
+                                <div className="text-center space-y-2 mt-4">
+                                    <p className="text-yellow-600 font-medium">{t('restrictedStep.title')}</p>
+                                    <p className="text-sm text-gray-500">{t('restrictedStep.message')}</p>
+                                </div>
+                                <form onSubmit={handleUnlock} className="space-y-4">
+                                    <div className="space-y-2">
+                                        <Label htmlFor="unlockPassword">{t('restrictedStep.passwordLabel')}</Label>
+                                        <Input
+                                            id="unlockPassword"
+                                            type="password"
+                                            value={unlockPassword}
+                                            disabled={loading}
+                                            onChange={(e) => setUnlockPassword(e.target.value)}
+                                            required
+                                        />
+                                    </div>
+                                    <Button type="submit" className="w-full" disabled={loading}>
+                                        {loading ? t('restrictedStep.verifying') : t('restrictedStep.unlock')}
+                                    </Button>
+                                </form>
+                            </div>
+                        )}
+
+                        {step === "FORM" && (
+                            <form onSubmit={handleAddressSubmit} className="space-y-6">
+                                <div className="space-y-4 p-8">
+                                    {/* <Label className="font-semibold">{t('formStep.title')}</Label> */}
+                                    <div className="space-y-2">
+                                        <Label htmlFor="name">{t('formStep.name')}</Label>
+                                        <Input
+                                            id="name"
+                                            required
+                                            value={name}
+                                            onChange={(e) => setName(e.target.value)}
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="zipCode">{t('formStep.zipCode')}</Label>
+                                        <Input
+                                            id="zipCode"
+                                            required
+                                            value={zipCode}
+                                            onChange={(e) => setZipCode(e.target.value)}
+                                            placeholder="123-4567"
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="address">{t('formStep.address')}</Label>
+                                        <Input
+                                            id="address"
+                                            required
+                                            value={address}
+                                            onChange={(e) => setAddress(e.target.value)}
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="phone">{t('formStep.phone')}</Label>
+                                        <Input
+                                            id="phone"
+                                            type="tel"
+                                            value={phone}
+                                            onChange={(e) => setPhone(e.target.value)}
+                                            placeholder="090-1234-5678"
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="email">{t('formStep.email')}</Label>
+                                        <p className="text-xs text-gray-500">{t('formStep.emailDescription')}</p>
+                                        <Input
+                                            id="email"
+                                            type="email"
+                                            value={email}
+                                            onChange={(e) => setEmail(e.target.value)}
+                                            placeholder="you@example.com"
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="preferredDate">{t('formStep.preferredDate')}</Label>
+                                        <div className="flex gap-2 items-center">
+                                            <Input
+                                                id="preferredDate"
+                                                type="date"
+                                                value={preferredDate}
+                                                onChange={(e) => setPreferredDate(e.target.value)}
+                                                className="flex-1"
+                                            />
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                onClick={() => setPreferredDate("")}
+                                                className="whitespace-nowrap"
+                                            >
+                                                {t('formStep.noPreference')}
+                                            </Button>
+                                        </div>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="preferredTime">{t('formStep.preferredTime')}</Label>
+                                        <select
+                                            id="preferredTime"
+                                            value={preferredTime}
+                                            onChange={(e) => setPreferredTime(e.target.value)}
+                                            className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                                        >
+                                            <option value="">{t('formStep.noPreference')}</option>
+                                            <option value="午前中">{t('formStep.timeMorning')}</option>
+                                            <option value="14-16時">{t('formStep.time1416')}</option>
+                                            <option value="16-18時">{t('formStep.time1618')}</option>
+                                            <option value="18-20時">{t('formStep.time1820')}</option>
+                                            <option value="19-21時">{t('formStep.time1921')}</option>
+                                        </select>
+                                    </div>
+
+                                    {/* Password Setting Section */}
+                                    {/* <div className="space-y-4 pt-8 mt-16 border-t">
                                     <Label className="font-semibold text-blue-800">{t('formStep.passwordTitle')}</Label>
                                     <p className="text-xs text-gray-500">
                                         {t('formStep.passwordDescription')}
@@ -1008,349 +1044,366 @@ export default function ReceivePage() {
                                 </div> */}
 
 
-                                {/* Password Setting Section (Commented out) */}
-                            </div>
+                                    {/* Password Setting Section (Commented out) */}
 
 
-                            <Button type="submit" className="w-full mt-8" disabled={loading}>
-                                {loading ? t('formStep.submitting') : t('formStep.submit')}
-                            </Button>
-                            <p className="text-xs text-gray-500 text-center">{t('formStep.privacyPolicy')}</p>
-                        </form>
-                    )}
-
-                    {step === "SUCCESS" && (
-                        <div className="text-center py-6 space-y-4">
-                            <p className="text-green-600 font-medium">{t('successStep.message')}</p>
-                            <p className="text-sm text-gray-500">{t('successStep.subMessage')}</p>
-                        </div>
-                    )}
-
-                    {step === "SHIPPED" && gift && (
-                        <div className="text-center py-6 space-y-4">
-                            <p className="text-green-600 font-medium">{t('shippedStep.message')}</p>
-                            {/* Assuming gift object has shipping details if fetched */
-                                console.log(gift)
-                            }
-
-                            {gift.delivery_company && (
-                                <p className="text-sm text-gray-500">{t('shippedStep.deliveryCompany', { company: gift.delivery_company })}</p>
-                            )}
-                            {gift.tracking_number && (
-                                <p className="text-sm text-gray-500">{t('shippedStep.tracking', { number: gift.tracking_number })}</p>
-                            )}
-                            <hr className="my-10 border-gray-200" />
-
-                            <p className="text-gray-600 text-sm">{t('shippedStep.receivedMessage')}</p>
-                            <Button type="submit" className="w-full" variant="outline" onClick={handleReceive} disabled={loading}>
-                                {loading ? t('formStep.submitting') : t('shippedStep.receivedButton')}
-                            </Button>
-
-                        </div>
-                    )}
-
-                    {step === "COMPLETED" && gift && (
-                        <div />
-                        // <div className="text-center py-6 space-y-4">
-                        //     <p className="text-green-600 font-medium">{t('shippedStep.compleatedMessage')}</p>
-                        // </div>
-                    )}
-                    {(step === "SUCCESS" || step === "SHIPPED") && (
-                        <div className=" text-right">
-                            <Dialog>
-                                <DialogTrigger asChild>
-                                    <Button variant="ghost" size="sm" className="text-gray-500 hover:text-gray-800 text-xs">
-                                        <MessageCircleQuestion className="w-4 h-4" />
-                                        {t('contactInfo.title')}
+                                    <Button type="submit" className="w-full flex flex-col flex-row items-center h-12 mt-14" disabled={loading}>
+                                        <SendHorizontal className="mr-2 h-4 w-4" />
+                                        {loading ? t('formStep.submitting') : t('formStep.submit')}
                                     </Button>
-                                </DialogTrigger>
-                                <DialogContent className="sm:max-w-md">
-                                    <DialogHeader>
-                                        <DialogTitle>{t('contactInfo.title')}</DialogTitle>
-                                        <DialogDescription className="text-xs text-gray-500">
-                                            {t('contactInfo.note')}
-                                        </DialogDescription>
-                                    </DialogHeader>
-                                    <div className="space-y-4 py-4">
-                                        <div className="space-y-2">
-                                            <Label className="text-xs text-gray-500">{t('contactInfo.orderId')}</Label>
-                                            <div className="p-3 bg-gray-50 rounded-md border border-gray-200 font-mono text-sm select-all text-center">
-                                                {uuid}
-                                            </div>
-                                        </div>
-                                        {gift?.shop_name && (
-                                            <div className="space-y-2">
-                                                <Label className="text-xs text-gray-500">{t('contactInfo.shopName')}</Label>
-                                                <div className="p-3 bg-gray-50 rounded-md border border-gray-200 text-sm break-all text-center font-medium">
-                                                    {gift.shop_name}
-                                                </div>
-                                            </div>
-                                        )}
-                                        {gift?.shop_email && (
-                                            <div className="space-y-2">
-                                                <Label className="text-xs text-gray-500">{t('contactInfo.shopEmail')}</Label>
-                                                <div className="p-3 bg-blue-50 rounded-md border border-blue-100 text-center">
-                                                    <a href={`mailto:${gift.shop_email}`} className="text-blue-600 font-medium hover:underline text-sm break-all">
-                                                        {gift.shop_email}
-                                                    </a>
-                                                </div>
-                                            </div>
-                                        )}
-                                    </div>
-                                </DialogContent>
-                            </Dialog>
-                        </div>
-                    )}
-                </CardContent>
-            </Card>
+                                    <p className="text-xs text-gray-500 text-center">{t('formStep.privacyPolicy')}</p>
+                                </div>
+                            </form>
+                        )}
 
+                        {step === "SUCCESS" && (
+                            <div className="text-center py-6 space-y-4">
+                                <p className="text-green-600 font-medium">{t('successStep.message')}</p>
+                                <p className="text-sm text-gray-500">{t('successStep.subMessage')}</p>
+                            </div>
+                        )}
+
+                        {step === "SHIPPED" && gift && (
+                            <div className="text-center py-6 space-y-4">
+                                <p className="text-green-600 font-medium">{t('shippedStep.message')}</p>
+                                {/* Assuming gift object has shipping details if fetched */
+                                    console.log(gift)
+                                }
+
+                                {gift.delivery_company && (
+                                    <p className="text-sm text-gray-500">{t('shippedStep.deliveryCompany', { company: gift.delivery_company })}</p>
+                                )}
+                                {gift.tracking_number && (
+                                    <p className="text-sm text-gray-500">{t('shippedStep.tracking', { number: gift.tracking_number })}</p>
+                                )}
+                                <hr className="my-10 border-gray-200" />
+
+                                <p className="text-gray-600 text-sm">{t('shippedStep.receivedMessage')}</p>
+                                <Button type="submit" className="w-full" variant="outline" onClick={handleReceive} disabled={loading}>
+                                    {loading ? t('formStep.submitting') : t('shippedStep.receivedButton')}
+                                </Button>
+
+                            </div>
+                        )}
+
+                        {step === "COMPLETED" && gift && (
+                            <div />
+                            // <div className="text-center py-6 space-y-4">
+                            //     <p className="text-green-600 font-medium">{t('shippedStep.compleatedMessage')}</p>
+                            // </div>
+                        )}
+                        {(step === "SUCCESS" || step === "SHIPPED") && (
+                            <div className=" text-right">
+                                <Dialog>
+                                    <DialogTrigger asChild>
+                                        <Button variant="ghost" size="sm" className="text-gray-500 hover:text-gray-800 text-xs">
+                                            <MessageCircleQuestion className="w-4 h-4" />
+                                            {t('contactInfo.title')}
+                                        </Button>
+                                    </DialogTrigger>
+                                    <DialogContent className="sm:max-w-md">
+                                        <DialogHeader>
+                                            <DialogTitle>{t('contactInfo.title')}</DialogTitle>
+                                            <DialogDescription className="text-xs text-gray-500">
+                                                {t('contactInfo.note')}
+                                            </DialogDescription>
+                                        </DialogHeader>
+                                        <div className="space-y-4 py-4">
+                                            <div className="space-y-2">
+                                                <Label className="text-xs text-gray-500">{t('contactInfo.orderId')}</Label>
+                                                <div className="p-3 bg-gray-50 rounded-md border border-gray-200 font-mono text-sm select-all text-center">
+                                                    {uuid}
+                                                </div>
+                                            </div>
+                                            {gift?.shop_name && (
+                                                <div className="space-y-2">
+                                                    <Label className="text-xs text-gray-500">{t('contactInfo.shopName')}</Label>
+                                                    <div className="p-3 bg-gray-50 rounded-md border border-gray-200 text-sm break-all text-center font-medium">
+                                                        {gift.shop_name}
+                                                    </div>
+                                                </div>
+                                            )}
+                                            {gift?.shop_email && (
+                                                <div className="space-y-2">
+                                                    <Label className="text-xs text-gray-500">{t('contactInfo.shopEmail')}</Label>
+                                                    <div className="p-3 bg-blue-50 rounded-md border border-blue-100 text-center">
+                                                        <a href={`mailto:${gift.shop_email}`} className="text-blue-600 font-medium hover:underline text-sm break-all">
+                                                            {gift.shop_email}
+                                                        </a>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </DialogContent>
+                                </Dialog>
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
+            )
+            }
 
 
             {/* Sender Info Section */}
-            {(step === "FORM" && !isEditingSender && !senderInfo) && (
-                <div>
-                    <Card className="w-full max-w-xl mt-20 flex flex-col items-center justify-center cursor-pointer p-6 border-3 border-dashed border-black-100 rounded-xl bg-gray-50/50 hover:bg-blue-200/50  hover:border-blue-200 transition-colors"
-                        onClick={() => setIsEditingSender(!isEditingSender)}
-                    >
-                        {/* <CardHeader className="w-full flex flex-col items-center justify-center cursor-pointer p-6 border border-dash rounded-xl bg-gray-50/50 hover:bg-white transition-colors"> */}
-                        <CardTitle className="text-xl text-center flex items-center justify-center gap-2">
-                            <UserPlus className="w-5 h-5 text-gray-600" />
-                            {t('senderInfo.title-empty')}
-                        </CardTitle>
-                        {/* </CardHeader> */}
-                    </Card>
-                </div>
-            )}
-            {(senderInfo || isEditingSender) ? (
-                < Card className="w-full max-w-xl mt-20 flex flex-col">
-                    <CardContent className="min-h-0 flex flex-col">
-                        {/* --- Sender Info Section --- */}
-                        <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2">
-                            <div className="flex justify-between gap-2">
-                                <Label className="font-bold text-gray-800 flex items-center text-lg">
-                                    {/* <div className="w-1.5 h-6 bg-blue-600 rounded-full" /> */}
-                                    <User className="w-5 h-5 text-gray-600" />
-                                    {t('senderInfo.title')}
-                                </Label>
-                                <div className="flex flex-row items-center">
-                                    {(senderInfo && senderInfo.ts_updated_at) && (
-                                        <span className="text-[10px] text-gray-400 flex items-center">
-                                            {new Date(senderInfo.ts_updated_at).toLocaleString()} {t('senderInfo.updated')}
-                                        </span>
-                                    )}
-                                    {(senderInfo && step === "FORM") ? (
-                                        <div className="flex items-center flex items-center">
-                                            <Button
-                                                variant="ghost"
-                                                size="icon"
-                                                className="h-10 w-10 text-gray-400 hover:text-gray-600"
-                                                onClick={() => setIsEditingSender(!isEditingSender)}
+            {
+                // sender information addition button
+                (step === "FORM" && !isEditingSender && EmptySenderInfo(senderInfo)) && (
+                    <div>
+                        <Card className="w-full max-w-xl mt-20 flex flex-col items-center justify-center cursor-pointer p-6 border-3 border-dashed border-black-100 rounded-xl bg-gray-50/50 hover:bg-blue-200/50  hover:border-blue-200 transition-colors"
+                            onClick={() => setIsEditingSender(!isEditingSender)}
+                        >
+                            {/* <CardHeader className="w-full flex flex-col items-center justify-center cursor-pointer p-6 border border-dash rounded-xl bg-gray-50/50 hover:bg-white transition-colors"> */}
+                            <CardTitle className="text-xl text-center flex items-center justify-center gap-2">
+                                <UserPlus className="w-5 h-5 text-gray-600" />
+                                {t('senderInfo.title-empty')}
+                            </CardTitle>
+                            {/* </CardHeader> */}
+                        </Card>
+                    </div>
+                )
+            }
+            {
+                (isEditingSender || !EmptySenderInfo(senderInfo)) ? (
+                    < Card className="w-full max-w-xl mt-20 flex flex-col">
+                        <CardContent className="min-h-0 flex flex-col">
+                            {/* --- Sender Info Section --- */}
+                            <div className="animate-in fade-in slide-in-from-bottom-2">
+                                <div className="flex justify-between gap-2">
+                                    <Label className="font-bold text-gray-800 flex items-center text-lg">
+                                        {/* <div className="w-1.5 h-6 bg-blue-600 rounded-full" /> */}
+                                        <User className="w-5 h-5 text-gray-600" />
+                                        {t('senderInfo.title')}
+                                    </Label>
+                                    <div className="flex flex-row items-center">
+                                        {(senderInfo && senderInfo.ts_updated_at) && (
+                                            <span className="text-[10px] text-gray-400 flex items-center">
+                                                {new Date(senderInfo.ts_updated_at).toLocaleString()} {t('senderInfo.updated')}
+                                            </span>
+                                        )}
+                                        {(senderInfo && step === "FORM") ? (
+                                            <div className="flex items-center flex items-center">
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="h-10 w-10 text-gray-400 hover:text-gray-600"
+                                                    onClick={() => setIsEditingSender(!isEditingSender)}
+                                                >
+                                                    {isEditingSender ? <X className="h-4 w-4" /> : <Pencil className="h-4 w-4" />}
+                                                </Button>
+                                            </div>
+                                        ) : ""}
+                                    </div>
+                                </div>
+
+                                <div className="relative group/card overflow-hidden">
+                                    {(step === "FORM" && isEditingSender) ? (
+                                        <div className="space-y-6">
+                                            <div
+                                                className="aspect-[1.6/1] w-full flex flex-col items-center justify-center gap-3 cursor-pointer p-6 border rounded-xl bg-gray-50/50 hover:bg-white transition-colors"
+                                                onClick={() => document.getElementById('senderCardUpload')?.click()}
                                             >
-                                                {isEditingSender ? <X className="h-4 w-4" /> : <Pencil className="h-4 w-4" />}
-                                            </Button>
+                                                {senderInfo.card_image_url && (
+                                                    <img
+                                                        src={senderInfo.card_image_url}
+                                                        alt="Business Card"
+                                                        className="w-full h-full object-contain rounded-lg shadow-md bg-white ring-1 ring-black/5"
+                                                    />
+                                                )}
+                                                <p className="text-xs text-gray-500">
+                                                    {t('senderInfo.description')}
+                                                </p>
+                                                <div className="w-16 h-16 rounded-full bg-blue-50 flex items-center justify-center group-hover/card:scale-110 transition-transform">
+                                                    <FileIcon className="w-8 h-8 text-blue-500" />
+                                                </div>
+                                                <div className="text-center">
+                                                    <p className="font-semibold text-gray-800">{t('senderInfo.uploadPlaceholder')}</p>
+                                                    <p className="text-xs text-gray-400 mt-1">{t('senderInfo.uploadHint')}</p>
+                                                </div>
+                                                <p className="text-[10px] text-gray-400 text-center italic">
+                                                    {t('senderInfo.notice')}
+                                                </p>
+                                            </div>
+
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t pt-6">
+                                                {Object.keys(senderForm).map((field) => (
+                                                    field !== 'card_image_url' && field !== 'card_image_name' && field !== 'ts_updated_at' && (
+                                                        <div key={field} className={cn("space-y-1.5", (field === 'memo' || field === 'address') && "md:col-span-2")}>
+                                                            <Label htmlFor={`sender-${field}`} className="text-xs font-bold text-gray-600 flex items-center gap-1">
+                                                                {field === "SNS_X" ? <SiX size={14} color="default" /> :
+                                                                    field === "SNS_Instagram" ? <SiInstagram size={14} color="default" /> :
+                                                                        field === "SNS_YouTube" ? <SiYoutube size={14} color="default" /> :
+                                                                            field === "SNS_Facebook" ? <SiFacebook size={14} color="default" /> :
+                                                                                field === "SNS_LINE" ? <SiLine size={14} color="default" /> :
+                                                                                    field === "SNS_TikTok" ? <SiTiktok size={14} color="default" /> :
+                                                                                        field === "SNS_Threads" ? <SiThreads size={14} color="default" /> :
+                                                                                            field === "Service_Linktree" ? <SiLinktree size={14} color="default" /> :
+                                                                                                field === "Service_Eight" ? <SiEight size={14} color="default" /> :
+                                                                                                    (field.startsWith("SNS_") || field.startsWith("Service_") || field === "HP" || field === "url") ? <Globe size={14} /> :
+                                                                                                        null
+                                                                }
+                                                                {t(`senderInfo.labels.${field}`)}
+                                                            </Label>
+                                                            {field === 'memo' || field === 'address' ? (
+                                                                <Textarea
+                                                                    id={`sender-${field}`}
+                                                                    value={(senderForm as any)[field]}
+                                                                    onChange={(e) => updateSenderForm(field, e.target.value)}
+                                                                    disabled={senderInfoLoading}
+                                                                    className="min-h-[80px] text-sm"
+                                                                    placeholder={t(`senderInfo.labels.${field}`)}
+                                                                />
+                                                            ) : (
+                                                                <Input
+                                                                    id={`sender-${field}`}
+                                                                    value={(senderForm as any)[field]}
+                                                                    onChange={(e) => updateSenderForm(field, e.target.value)}
+                                                                    disabled={senderInfoLoading}
+                                                                    className="h-9 text-sm"
+                                                                    placeholder={t(`senderInfo.labels.${field}`)}
+                                                                    type={field === 'email' ? 'email' : field === 'phone' ? 'tel' : 'text'}
+                                                                />
+                                                            )}
+                                                        </div>
+                                                    )
+                                                ))}
+                                                <div className="md:col-span-2 pt-2 flex flex-col gap-2">
+                                                    <Button
+                                                        onClick={() => handleSenderInfoUpdate()}
+                                                        disabled={senderInfoLoading}
+                                                        className="w-full"
+                                                    >
+                                                        {senderInfoLoading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <SendHorizontal className="w-4 h-4 mr-2" />}
+                                                        {senderInfoLoading ? t('senderInfo.saving') : t('senderInfo.save')}
+                                                    </Button>
+                                                    {isEditingSender && (
+                                                        <Button
+                                                            type="button"
+                                                            variant="ghost"
+                                                            onClick={() => setIsEditingSender(false)}
+                                                        >
+                                                            {t('senderInfo.cancel')}
+                                                        </Button>
+                                                    )}
+                                                </div>
+                                            </div>
+                                            <div className="mt-20 border-b" />
+                                            <Label className="w-full flex flex-col text-center text-xl border border-blue-100 bg-blue-200 rounded-xl">{t('senderInfo.preview')}</Label>
+                                        </div>
+                                    ) : ""}
+
+                                    {/* 実際に表示する箇所 */}
+                                    { }
+                                    {senderInfo ? (
+                                        <div>
+                                            {/* 名刺画像・顔写真 */}
+                                            {senderInfo.card_image_url && (
+                                                <div className="w-full p-4 mt-8">
+                                                    <img
+                                                        src={senderInfo.card_image_url}
+                                                        alt="Business Card"
+                                                        className="w-full h-full object-contain rounded-lg shadow-md bg-white ring-1 ring-black/5 mb-8 border"
+                                                    />
+                                                </div>
+                                            )}
+                                            {/* 名前 */}
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 ml-6 mr-6">
+                                                {Object.entries(senderForm).map(([field, value]) => value &&
+                                                    field == "name" && (
+                                                        <div key={field} className={cn("flex flex-col border-b border-gray-50 pb-2 sm:col-span-2")}>
+                                                            <span className="text-[10px] font-bold text-gray-400 uppercase">
+                                                                {t(`senderInfo.labels.${field}`)}
+                                                            </span>
+                                                            <span className={cn("text-gray-800 break-words whitespace-pre-wrap text-xl font-bold")}>
+                                                                {value}
+                                                            </span>
+                                                        </div>
+                                                    ))}
+                                            </div>
+                                            {/* 名前・LINK以外(メール・住所・電話番号・ホームページ等) */}
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 ml-6 mr-6">
+                                                {Object.entries(senderForm).map(([field, value]) => value &&
+                                                    field !== 'card_image_url' &&
+                                                    field !== 'card_image_name' &&
+                                                    field !== 'ts_updated_at' &&
+                                                    field !== 'name' &&
+                                                    !field.startsWith("SNS_") &&
+                                                    !field.startsWith("Service_") && (
+                                                        <div key={field} className={cn("flex flex-col border-b border-gray-50 pb-2", (field === 'memo' || field === 'address') && "sm:col-span-2")}>
+                                                            <span className="text-[10px] font-bold text-gray-400 uppercase">
+                                                                {t(`senderInfo.labels.${field}`)}
+                                                            </span>
+                                                            <span className={cn("text-gray-800 break-words", (field === 'memo' || field === 'address') && "whitespace-pre-wrap text-sm")}>
+                                                                {field === 'HP' || field === 'memo' ? renderTextWithLinks(value) : value}
+                                                            </span>
+                                                        </div>
+                                                    ))}
+                                            </div>
+                                            {/* LINK(SNS/Webサービスリンク) */}
+                                            {!EmptySenderInfoWithLinks(senderInfo) && (
+                                                <div className="gap-1 ml-6 mr-6">
+                                                    <span className="text-[10px] font-bold text-gray-400 uppercase">
+                                                        LINK
+                                                    </span>
+                                                    <div className="flex flex-wrap gap-1">
+                                                        {Object.entries(senderForm).map(([field, value]) => value && (field.startsWith("SNS_") || field.startsWith("Service_")) ? (
+                                                            <Button
+                                                                key={field}
+                                                                variant="outline"
+                                                                size="sm"
+                                                                className="h-8 gap-2 bg-white hover:bg-gray-50 border-gray-200 text-gray-700 relative group"
+                                                                onClick={() => {
+                                                                    const url = value.startsWith('http') ? value : `https://${value}`;
+                                                                    window.open(url, '_blank', 'noopener,noreferrer');
+                                                                }}
+                                                            >
+                                                                {field === "SNS_X" ? <SiX size={14} color="default" /> :
+                                                                    field === "SNS_Instagram" ? <SiInstagram size={14} color="default" /> :
+                                                                        field === "SNS_YouTube" ? <SiYoutube size={14} color="default" /> :
+                                                                            field === "SNS_Facebook" ? <SiFacebook size={14} color="default" /> :
+                                                                                field === "SNS_LINE" ? <SiLine size={14} color="default" /> :
+                                                                                    field === "SNS_TikTok" ? <SiTiktok size={14} color="default" /> :
+                                                                                        field === "SNS_Threads" ? <SiThreads size={14} color="default" /> :
+                                                                                            field === "Service_Eight" ? <SiEight size={14} color="default" /> :
+                                                                                                field === "Service_Linktree" ? <SiLinktree size={14} color="default" /> :
+                                                                                                    <Globe size={14} />
+                                                                }
+                                                                <span className="absolute -top-8 left-1/2 -translate-x-1/2 px-2 py-1 bg-gray-800 text-white text-[10px] rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none shadow-sm z-50">
+                                                                    {t(`senderInfo.labels.${field}`)}
+                                                                    <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-gray-800 rotate-45" />
+                                                                </span>
+                                                            </Button>
+                                                        ) : "")}
+                                                    </div>
+                                                </div>
+                                            )}
+                                            <input
+                                                type="file"
+                                                id="senderCardUpload"
+                                                className="hidden"
+                                                accept="image/*"
+                                                onChange={(e) => {
+                                                    const file = e.target.files?.[0];
+                                                    if (file) handleSenderInfoUpload(file);
+                                                    e.target.value = "";
+                                                }}
+                                            />
+                                            {senderInfoLoading && (
+                                                <div className="absolute inset-0 bg-white/60 backdrop-blur-[1px] flex items-center justify-center z-10 transition-all">
+                                                    <div className="flex flex-col items-center gap-2">
+                                                        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+                                                        <p className="text-xs font-bold text-blue-800">{t('senderInfo.uploading') || "アップロード中..."}</p>
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
                                     ) : ""}
                                 </div>
                             </div>
-
-                            <div className="relative group/card overflow-hidden">
-                                {(step === "FORM" || isEditingSender) ? (
-                                    <div className="space-y-6">
-                                        <div
-                                            className="aspect-[1.6/1] w-full flex flex-col items-center justify-center gap-3 cursor-pointer p-6 border rounded-xl bg-gray-50/50 hover:bg-white transition-colors"
-                                            onClick={() => document.getElementById('senderCardUpload')?.click()}
-                                        >
-                                            <img
-                                                src={senderInfo.card_image_url}
-                                                alt="Business Card"
-                                                className="w-full h-full object-contain rounded-lg shadow-md bg-white ring-1 ring-black/5"
-                                            />
-                                            <p className="text-xs text-gray-500">
-                                                {t('senderInfo.description')}
-                                            </p>
-                                            <div className="w-16 h-16 rounded-full bg-blue-50 flex items-center justify-center group-hover/card:scale-110 transition-transform">
-                                                <FileIcon className="w-8 h-8 text-blue-500" />
-                                            </div>
-                                            <div className="text-center">
-                                                <p className="font-semibold text-gray-800">{t('senderInfo.uploadPlaceholder')}</p>
-                                                <p className="text-xs text-gray-400 mt-1">{t('senderInfo.uploadHint')}</p>
-                                            </div>
-                                            <p className="text-[10px] text-gray-400 text-center italic">
-                                                {t('senderInfo.notice')}
-                                            </p>
-                                        </div>
-
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t pt-6">
-                                            {Object.keys(senderForm).map((field) => (
-                                                field !== 'card_image_url' && field !== 'card_image_name' && field !== 'ts_updated_at' && (
-                                                    <div key={field} className={cn("space-y-1.5", (field === 'memo' || field === 'address') && "md:col-span-2")}>
-                                                        <Label htmlFor={`sender-${field}`} className="text-xs font-bold text-gray-600 flex items-center gap-1">
-                                                            {field === "SNS_X" ? <SiX size={14} color="default" /> :
-                                                                field === "SNS_Instagram" ? <SiInstagram size={14} color="default" /> :
-                                                                    field === "SNS_YouTube" ? <SiYoutube size={14} color="default" /> :
-                                                                        field === "SNS_Facebook" ? <SiFacebook size={14} color="default" /> :
-                                                                            field === "SNS_LINE" ? <SiLine size={14} color="default" /> :
-                                                                                field === "SNS_TikTok" ? <SiTiktok size={14} color="default" /> :
-                                                                                    field === "SNS_Threads" ? <SiThreads size={14} color="default" /> :
-                                                                                        field === "Service_Linktree" ? <SiLinktree size={14} color="default" /> :
-                                                                                            field === "Service_Eight" ? <SiEight size={14} color="default" /> :
-                                                                                                (field.startsWith("SNS_") || field.startsWith("Service_") || field === "HP" || field === "url") ? <Globe size={14} /> :
-                                                                                                    null
-                                                            }
-                                                            {t(`senderInfo.labels.${field}`)}
-                                                        </Label>
-                                                        {field === 'memo' || field === 'address' ? (
-                                                            <Textarea
-                                                                id={`sender-${field}`}
-                                                                value={(senderForm as any)[field]}
-                                                                onChange={(e) => updateSenderForm(field, e.target.value)}
-                                                                disabled={senderInfoLoading}
-                                                                className="min-h-[80px] text-sm"
-                                                                placeholder={t(`senderInfo.labels.${field}`)}
-                                                            />
-                                                        ) : (
-                                                            <Input
-                                                                id={`sender-${field}`}
-                                                                value={(senderForm as any)[field]}
-                                                                onChange={(e) => updateSenderForm(field, e.target.value)}
-                                                                disabled={senderInfoLoading}
-                                                                className="h-9 text-sm"
-                                                                placeholder={t(`senderInfo.labels.${field}`)}
-                                                                type={field === 'email' ? 'email' : field === 'phone' ? 'tel' : 'text'}
-                                                            />
-                                                        )}
-                                                    </div>
-                                                )
-                                            ))}
-                                            <div className="md:col-span-2 pt-2 flex flex-col gap-2">
-                                                <Button
-                                                    onClick={() => handleSenderInfoUpdate()}
-                                                    disabled={senderInfoLoading}
-                                                    className="w-full bg-blue-600 hover:bg-blue-700"
-                                                >
-                                                    {senderInfoLoading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <SendHorizontal className="w-4 h-4 mr-2" />}
-                                                    {senderInfoLoading ? t('senderInfo.saving') : t('senderInfo.save')}
-                                                </Button>
-                                                {isEditingSender && (
-                                                    <Button
-                                                        type="button"
-                                                        variant="outline"
-                                                        onClick={() => setIsEditingSender(false)}
-                                                        className="w-full"
-                                                    >
-                                                        {t('senderInfo.cancel')}
-                                                    </Button>
-                                                )}
-                                            </div>
-                                        </div>
-                                        <div className="mb-10 border-b" />
-                                        <Label className="w-full flex flex-col text-center text-xl ">{t('senderInfo.preview')}</Label>
-                                    </div>
-                                ) : ""}
-
-                                {/* 実際に表示する箇所 */}
-                                {senderInfo ? (
-                                    <div>
-                                        <div className="w-full p-4">
-                                            <img
-                                                src={senderInfo.card_image_url}
-                                                alt="Business Card"
-                                                className="w-full h-full object-contain rounded-lg shadow-md bg-white ring-1 ring-black/5 mb-8 border"
-                                            />
-                                        </div>
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 ml-6 mr-6 mb-8">
-                                            {Object.entries(senderForm).map(([field, value]) => value &&
-                                                field == "name" && (
-                                                    <div key={field} className={cn("flex flex-col border-b border-gray-50 pb-2 sm:col-span-2")}>
-                                                        <span className="text-[10px] font-bold text-gray-400 uppercase">
-                                                            {t(`senderInfo.labels.${field}`)}
-                                                        </span>
-                                                        <span className={cn("text-gray-800 break-words whitespace-pre-wrap text-xl font-bold")}>
-                                                            {value}
-                                                        </span>
-                                                    </div>
-                                                ))}
-                                        </div>
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 ml-6 mr-6">
-                                            {Object.entries(senderForm).map(([field, value]) => value &&
-                                                field !== 'card_image_url' &&
-                                                field !== 'card_image_name' &&
-                                                field !== 'ts_updated_at' &&
-                                                field !== 'name' &&
-                                                !field.startsWith("SNS_") &&
-                                                !field.startsWith("Service_") && (
-                                                    <div key={field} className={cn("flex flex-col border-b border-gray-50 pb-2", (field === 'memo' || field === 'address') && "sm:col-span-2")}>
-                                                        <span className="text-[10px] font-bold text-gray-400 uppercase">
-                                                            {t(`senderInfo.labels.${field}`)}
-                                                        </span>
-                                                        <span className={cn("text-gray-800 break-words", (field === 'memo' || field === 'address') && "whitespace-pre-wrap text-sm")}>
-                                                            {field === 'HP' || field === 'memo' ? renderTextWithLinks(value) : value}
-                                                        </span>
-                                                    </div>
-                                                ))}
-                                        </div>
-                                        <div className="gap-1 ml-6 mr-6">
-                                            <span className="text-[10px] font-bold text-gray-400 uppercase">
-                                                LINK
-                                            </span>
-                                            <div className="flex flex-wrap gap-1">
-                                                {Object.entries(senderForm).map(([field, value]) => value && (field.startsWith("SNS_") || field.startsWith("Service_")) ? (
-                                                    <Button
-                                                        key={field}
-                                                        variant="outline"
-                                                        size="sm"
-                                                        className="h-8 gap-2 bg-white hover:bg-gray-50 border-gray-200 text-gray-700 relative group"
-                                                        onClick={() => {
-                                                            const url = value.startsWith('http') ? value : `https://${value}`;
-                                                            window.open(url, '_blank', 'noopener,noreferrer');
-                                                        }}
-                                                    >
-                                                        {field === "SNS_X" ? <SiX size={14} color="default" /> :
-                                                            field === "SNS_Instagram" ? <SiInstagram size={14} color="default" /> :
-                                                                field === "SNS_YouTube" ? <SiYoutube size={14} color="default" /> :
-                                                                    field === "SNS_Facebook" ? <SiFacebook size={14} color="default" /> :
-                                                                        field === "SNS_LINE" ? <SiLine size={14} color="default" /> :
-                                                                            field === "SNS_TikTok" ? <SiTiktok size={14} color="default" /> :
-                                                                                field === "SNS_Threads" ? <SiThreads size={14} color="default" /> :
-                                                                                    field === "Service_Eight" ? <SiEight size={14} color="default" /> :
-                                                                                        field === "Service_Linktree" ? <SiLinktree size={14} color="default" /> :
-                                                                                            <Globe size={14} />
-                                                        }
-                                                        <span className="absolute -top-8 left-1/2 -translate-x-1/2 px-2 py-1 bg-gray-800 text-white text-[10px] rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none shadow-sm z-50">
-                                                            {t(`senderInfo.labels.${field}`)}
-                                                            <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-gray-800 rotate-45" />
-                                                        </span>
-                                                    </Button>
-                                                ) : "")}
-                                            </div>
-                                        </div>
-                                        <input
-                                            type="file"
-                                            id="senderCardUpload"
-                                            className="hidden"
-                                            accept="image/*"
-                                            onChange={(e) => {
-                                                const file = e.target.files?.[0];
-                                                if (file) handleSenderInfoUpload(file);
-                                                e.target.value = "";
-                                            }}
-                                        />
-                                        {senderInfoLoading && (
-                                            <div className="absolute inset-0 bg-white/60 backdrop-blur-[1px] flex items-center justify-center z-10 transition-all">
-                                                <div className="flex flex-col items-center gap-2">
-                                                    <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
-                                                    <p className="text-xs font-bold text-blue-800">{t('senderInfo.uploading') || "アップロード中..."}</p>
-                                                </div>
-                                            </div>
-                                        )}
-                                    </div>
-                                ) : ""}
-                            </div>
-                        </div>
-                        {/* --------------------------- */}
-                    </CardContent>
-                </Card>
-            ) : ""}
+                            {/* --------------------------- */}
+                        </CardContent>
+                    </Card>
+                ) : ""
+            }
 
 
             {/* Chat Section */}
@@ -1365,7 +1418,7 @@ export default function ReceivePage() {
                             </CardTitle>
                         </CardHeader>
 
-                        <CardContent className="min-h-0 flex">
+                        <CardContent className="min-h-0 flex flex-1">
                             <div className={cn("flex-1 min-h-0 flex flex-col pt-0 pb-0 overflow-y-auto space-y-2 rounded-xl", step !== "COMPLETED" && "bg-gray-100 border shadow-sm")} >
                                 {messages.length === 0 ? (
                                     <p className="text-sm text-gray-500 text-center py-4">{t('chat.noMessages')}</p>
@@ -1573,16 +1626,30 @@ export default function ReceivePage() {
             }
 
 
-
-
-
-            <div className="mb-100" />
-
-
             {/* ========== Full-width Product Content Section ========== */}
-            {step !== "PIN" && gift && gift.product && gift.product.detail_html && (
-                <>
-                    <Card className="w-full max-w-xl mb-10">
+            {
+                step !== "PIN" && gift && gift.product && gift.product.detail_html && (
+                    <>
+                        {/* <Card className="w-full mt-20 flex flex-col items-center max-w-none bg-white "> */}
+                        <Card className="w-full mt-20 flex flex-col items-center max-w-xl bg-white ">
+                            {/* <CardHeader className="w-full flex flex-col items-center justify-center cursor-pointer p-6 border border-dash rounded-xl bg-gray-50/50 hover:bg-white transition-colors"> */}
+                            <CardTitle className="w-full flex flex-col items-center justify-center gap-2">
+                                <div className="w-full flex items-center justify-center text-xl text-center gap-2">
+                                    <ShoppingBasket className="w-5 h-5 text-gray-600" />
+                                    {t('shopinfo')}
+                                </div>
+                                <div className="w-full flex items-center justify-center text-xs text-center text-gray-500">
+                                    {t('shopinfo_description')}
+                                </div>
+                            </CardTitle>
+                            {/* </CardHeader> */}
+                            <CardContent className="min-h-0 flex flex-1 p-0">
+                                {gift.product.detail_html && (
+                                    <SandboxedHtml html={gift.product.detail_html} />
+                                )}
+                            </CardContent>
+                        </Card>
+                        {/* <Card className="w-full max-w-xl mb-10">
                         <CardHeader>
                             <CardTitle className="text-xl text-center">
                                 {step === "FORM" ? t('titles.form') :
@@ -1598,15 +1665,13 @@ export default function ReceivePage() {
                             <h1 className="text-2xl font-bold mb-1">{gift.product.name}</h1>
                             <p className="text-gray-500 mb-6">{gift.product.description}</p>
                         </CardContent>
-                    </Card>
-                    <div className="w-full max-w-3xl mb-8 animate-in fade-in duration-500">
+                    </Card> */}
+                        {/* <div className="w-full max-w-3xl mb-8 animate-in fade-in duration-500"> */}
                         {/* Rich Text HTML Content — rendered in an isolated iframe so CSS cannot leak out */}
-                        {gift.product.detail_html && (
-                            <SandboxedHtml html={gift.product.detail_html} />
-                        )}
-                    </div>
-                </>
-            )}
+                        {/* </div> */}
+                    </>
+                )
+            }
 
 
 

@@ -215,12 +215,12 @@
     },
     "ReceivePage": {
         "titles": {
-            "pin": "PINコードを入力してギフトを受け取る",
-            "form": "ギフトが届いています！",
-            "success": "受け取りの準備ができました",
-            "shipped": "ギフトが発送されました！",
+            "pin": "ギフトを受け取るにはPINコードを入力してください",
+            "form": "ギフトを配送してほしい住所をお知らせください",
+            "success": "配送先情報が送信されました",
+            "shipped": "ギフトが発送されました",
             "expired": "有効期限が切れています",
-            "completed": "ギフトをお楽しみください！"
+            "completed": "ギフトをお楽しみください"
         },
         "pinStep": {
             "label": "カード裏の数字 (5回間違えると一定時間ロックされます)",
@@ -235,8 +235,8 @@
             "unlock": "ロック解除",
             "verifying": "確認中..."
         },
-        "daysRemaining": "有効期限まで あと {days}日 と {hours}時間{minutes}分{seconds}秒です",
-        "limitdatetime": "有効期限: {datetime} (延長は一切できません)",
+        "daysRemaining": "有効期限まで あと {days}日 と約 {hours}時間{minutes}分 です",
+        "limitdatetime": "有効期限: {datetime} (延長はできませんのでご注意ください)",
         "formStep": {
             "title": "配送先情報",
             "name": "お名前",
@@ -253,8 +253,8 @@
             "time1618": "16-18時",
             "time1820": "18-20時",
             "time1921": "19-21時",
-            "submit": "ギフトを受け取る",
-            "submitting": "送信中...",
+            "submit": "この住所に配送する",
+            "submitting": "住所を送信中...",
             "passwordTitle": "パスワード設定 (任意)",
             "passwordDescription": "PINコードだけでは、プレゼントをくれた方でも配送時の追跡番号などを閲覧できてしまします。パスワードを設定することで、チャット以外の詳細情報を保護することができます。再設定はできませんので忘れないようご注意ください。",
             "passwordLabel": "パスワード",
@@ -324,12 +324,12 @@
             "title": "送り主",
             "title-empty": "送り主情報を追加",
             "updated": "更新",
-            "description": "名刺画像をアップロードして、あなたの情報を登録できます。",
+            "description": "名刺画像・顔画像等をアップロードできます。",
             "update": "名刺を更新する",
-            "uploadPlaceholder": "名刺画像をアップロード",
-            "uploadHint": "タップしてファイルを選択",
+            "uploadPlaceholder": "名刺画像・顔画像等をアップロード",
+            "uploadHint": "タップして画像ファイルを選択",
             "uploading": "アップロード中...",
-            "notice": "※アップロードされた情報は安全に保管され、このギフトのやり取りにのみ使用されます。",
+            "notice": "※アップロードされた画像は安全に保管され、このギフトのやり取りにのみ使用されます。",
             "save": "情報を保存",
             "saving": "保存中...",
             "cancel": "キャンセル",
@@ -360,6 +360,8 @@
                 "others": "その他 (例: 誕生日、血液型)"
             }
         },
+        "shopinfo": "ショップのご紹介",
+        "shopinfo_description": "このギフトを販売しているショップのご紹介",
         "memorySection": {
             "title": "思い出の記録",
             "daysPassed": "あれから {days} 日",
