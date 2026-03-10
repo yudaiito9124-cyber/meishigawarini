@@ -359,6 +359,13 @@
                 "exchange_date": "名刺交換日",
                 "others": "その他 (例: 誕生日、血液型)"
             }
+        },
+        "memorySection": {
+            "title": "思い出の記録",
+            "daysPassed": "あれから {days} 日",
+            "message": "このギフトが、あなたにとって素敵な思い出のひとつになりますように。",
+            "submittedAt": "受注日: {date}",
+            "receivedAt": "受け取り日: {date}"
         }
     },
     "AdminPage": {

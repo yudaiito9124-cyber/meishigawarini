@@ -225,6 +225,12 @@
             "shopName": "Shop Name",
             "shopEmail": "Shop Contact",
             "note": "Please include your Order ID when contacting the shop. Address changes after shipment may not be possible."
+        },
+        "memorySection": {
+            "title": "Memory Record",
+            "daysPassed": "{days} days since our encounter",
+            "message": "May this gift become a wonderful memory for you.",
+            "receivedAt": "Received on: {date}"
         }
     },
     "AdminPage": {

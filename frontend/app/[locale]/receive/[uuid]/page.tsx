@@ -13,7 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card";
 import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { MessageCircleQuestion, Paperclip, X, FileText, File as FileIcon, Loader2, SendHorizontal, Pencil, UserPlus, Globe, Gift, User, MessagesSquare } from "lucide-react";
+import { MessageCircleQuestion, Paperclip, X, FileText, File as FileIcon, Loader2, SendHorizontal, Pencil, UserPlus, Globe, Gift, User, MessagesSquare, Heart, Sparkles, Calendar, Clock } from "lucide-react";
 import { SiFacebook, SiInstagram, SiThreads, SiX, SiYoutube, SiLine, SiTiktok, SiLinktree, SiEight } from "@icons-pack/react-simple-icons";
 import SandboxedHtml from "@/components/SandboxedHtml";
 import { cn } from "@/lib/utils";
@@ -601,6 +601,84 @@ export default function ReceivePage() {
 
     return (
         <div className={cn("min-h-screen bg-gray-50 flex flex-col items-center justify-center py-8 px-4 transition-all duration-1000", step === "COMPLETED" && "bg-olive-300 sepia-[.1] shadow-[inset_0_0_500px_rgba(0,0,0,0.8)]")}>
+
+
+
+            {/* Memory Section */}
+            {step === "COMPLETED" && gift && (
+                <div className="w-full max-w-xl mt-60 mb-60 overflow-hidden relative">
+                    <Card className="border-none shadow-none bg-transparent">
+                        <CardContent className="flex flex-col items-center text-center space-y-6 py-8">
+                            <div className="relative">
+                                <div className="relative bg-white/80 p-4 rounded-full shadow-sm border border-gray-100">
+                                    <Heart className="w-8 h-8 text-gray-400 fill-gray-50" />
+                                </div>
+                                <Sparkles className="absolute -top-2 -right-2 w-5 h-5 text-gray-300 animate-pulse" />
+                            </div>
+
+                            <div className="space-y-2">
+                                <h2 className="text-2xl font-bold text-gray-700">
+                                    {t('memorySection.title')}
+                                </h2>
+                                <p className="text-gray-500 text-sm max-w-[280px] mx-auto leading-relaxed">
+                                    {t('memorySection.message')}
+                                </p>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4 w-full pt-4">
+                                <div className="bg-white/40 backdrop-blur-sm p-4 rounded-2xl border border-gray-200/50 shadow-sm flex flex-col items-center gap-2">
+                                    <div className="p-2 bg-gray-50 rounded-lg">
+                                        <Calendar className="w-4 h-4 text-gray-400" />
+                                    </div>
+                                    <div className="flex flex-col">
+                                        <span className="text-[10px] uppercase tracking-wider text-gray-400 font-bold">
+                                            Moment
+                                        </span>
+                                        <span className="text-sm font-semibold text-gray-600">
+                                            {gift.ts_submitted_at ? t('memorySection.daysPassed', {
+                                                days: Math.floor((Date.now() - new Date(gift.ts_submitted_at).getTime()) / (1000 * 60 * 60 * 24))
+                                            }) : "-"}
+                                        </span>
+                                    </div>
+                                    <div className="pt-2 text-[10px] text-gray-400 flex items-center gap-1.5 font-medium">
+                                        <div className="w-1 h-1 bg-gray-300 rounded-full" />
+                                        {t('memorySection.submittedAt', { date: new Date(gift.ts_submitted_at).toLocaleDateString() })}
+                                    </div>
+                                </div>
+
+                                <div className="bg-white/40 backdrop-blur-sm p-4 rounded-2xl border border-gray-200/50 shadow-sm flex flex-col items-center gap-2">
+                                    <div className="p-2 bg-gray-50 rounded-lg">
+                                        <Clock className="w-4 h-4 text-gray-400" />
+                                    </div>
+                                    <div className="flex flex-col">
+                                        <span className="text-[10px] uppercase tracking-wider text-gray-400 font-bold">
+                                            Status
+                                        </span>
+                                        <span className="text-sm font-semibold text-gray-600">
+                                            {tst(`${gift.status.toLowerCase()}`)}
+                                        </span>
+                                    </div>
+                                    <div className="pt-2 text-[10px] text-gray-400 flex items-center gap-1.5 font-medium">
+                                        <div className="w-1 h-1 bg-gray-300 rounded-full" />
+                                        {t('memorySection.receivedAt', { date: new Date(gift.ts_completed_at).toLocaleDateString() })}
+                                    </div>
+                                </div>
+                            </div>
+
+                        </CardContent>
+                    </Card>
+                </div>
+            )}
+
+
+
+
+
+
+
+
+
+
 
 
             {/* ========== Interactive Card Section ========== */}
@@ -1255,7 +1333,7 @@ export default function ReceivePage() {
                         </CardHeader>
 
                         <CardContent className="min-h-0 flex">
-                            <div className="flex-1 min-h-0 flex flex-col pt-0 pb-0 overflow-y-auto space-y-2 bg-gray-100 border shadow-sm rounded-xl" >
+                            <div className={cn("flex-1 min-h-0 flex flex-col pt-0 pb-0 overflow-y-auto space-y-2 rounded-xl", step !== "COMPLETED" && "bg-gray-100 border shadow-sm")} >
                                 {messages.length === 0 ? (
                                     <p className="text-sm text-gray-500 text-center py-4">{t('chat.noMessages')}</p>
                                 ) : (
@@ -1267,7 +1345,7 @@ export default function ReceivePage() {
                                             : msg.message;
 
                                         return (
-                                            <div key={msg.id} className={`${isSystem ? 'bg-blue-50 border-blue-100' : 'bg-gray-100'} p-2 rounded-xl text-sm bg-gray-100 ${msg.username === chatName ? 'ml-10' : 'mr-10'}`}>
+                                            <div key={msg.id} className={`${isSystem ? 'bg-blue-50 border-blue-100' : ''} p-2 rounded-xl text-sm ${msg.username === chatName ? 'ml-10' : 'mr-10'}`}>
                                                 <p className={`font-bold text-xs ml-1 mb-1 flex items-center gap-1.5 ${isSystem ? 'text-blue-700' : 'text-gray-600'}`}>
                                                     <span className={`w-2 h-2 rounded-full shrink-0 ${isSystem ? 'bg-blue-500' : 'bg-gray-400'}`} />
                                                     {displayUsername}
@@ -1463,6 +1541,11 @@ export default function ReceivePage() {
 
 
 
+
+
+            <div className="mb-100" />
+
+
             {/* ========== Full-width Product Content Section ========== */}
             {step !== "PIN" && gift && gift.product && gift.product.detail_html && (
                 <>
@@ -1491,6 +1574,8 @@ export default function ReceivePage() {
                     </div>
                 </>
             )}
+
+
 
         </div >
     );

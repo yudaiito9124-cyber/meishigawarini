@@ -209,6 +209,8 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 shop_name: shop_name,
                 memo_for_users: isAuthorizedByPassword ? item.memo_for_users : undefined,
                 ts_expired_at: item.ts_expired_at,
+                ts_completed_at: item.ts_completed_at ? item.ts_completed_at : undefined,
+                ts_submitted_at: item.ts_submitted_at ? item.ts_submitted_at : undefined,
                 is_password_protected: isPasswordProtected,
                 is_authorized: isAuthorizedByPassword
             })
