@@ -609,7 +609,7 @@ export default function ReceivePage() {
     };
 
     return (
-        <div className={cn("min-h-screen bg-gray-50 flex flex-col items-center justify-center py-8 px-4 transition-all duration-1000", step === "COMPLETED" && "bg-olive-300 sepia-[.1] shadow-[inset_0_0_500px_rgba(0,0,0,0.8)]")}>
+        <div className={cn("min-h-screen bg-gray-50 flex flex-col items-center justify-center py-8 px-4 transition-all duration-1000", step === "COMPLETED" && "bg-olive-300 sepia-[.2] shadow-[inset_0_0_500px_rgba(0,0,0,0.8)]")}>
             {showWhiteFade && (
                 <div
                     className="fixed inset-0 z-[100] bg-olive-800 animate-fade-out-white pointer-events-none"
@@ -765,7 +765,7 @@ export default function ReceivePage() {
                     )}
 
                     {!loading && step !== "PIN" && gift && gift.product && (
-                        <div className="animate-reveal space-y-4 pt-4">
+                        <div className="animate-reveal space-y-4">
                             {/* Hero Image */}
                             <div className="relative mb-6 overflow-hidden rounded-xl shadow-2xl group border-4 border-white/50">
                                 <img
@@ -795,10 +795,10 @@ export default function ReceivePage() {
                                 </div>
                             </div>
                             {/* <h1 className="relative z-20 text-4xl font-extrabold mb-1 text-center bg-clip-text text-transparent bg-gradient-to-r from-red-500 via-red-500 to-red-500 drop-shadow-sm drop-shadow-white animate-float"> */}
-                            <h1 className="relative z-20 text-4xl font-extrabold mb-1 text-center text-black drop-shadow-sm mt-10">
+                            <h1 className="relative z-20 text-4xl font-extrabold mb-1 text-center text-black drop-shadow-sm mt-18">
                                 {gift.product.name}
                             </h1>
-                            <p className="text-gray-600 mb-6 italic leading-relaxed text-center mb-10">{gift.product.description}</p>
+                            <p className="text-gray-600 italic leading-relaxed text-center mb-15">{gift.product.description}</p>
 
                             {/* Shop memo */}
                             {gift.memo_for_users && (
