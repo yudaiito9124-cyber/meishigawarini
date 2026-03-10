@@ -623,7 +623,7 @@ export default function ReceivePage() {
 
             {/* Memory Section */}
             {step === "COMPLETED" && gift && (
-                <div className="w-full max-w-xl mt-60 mb-60 overflow-hidden relative bg-mauve-100/40 rounded-xl shadow-sm">
+                <div className="w-full max-w-xl mt-20 mb-30 overflow-hidden relative bg-mauve-100/40 rounded-xl shadow-sm">
                     <Card className="border-none shadow-none bg-transparent">
                         <CardContent className="flex flex-col items-center text-center space-y-6 py-8">
                             <div className="relative">
