@@ -21,7 +21,7 @@ import confetti from "canvas-confetti";
 
 
 const NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || "";
-const GIFT_REVEAL_DELAY_MS = 500;
+const GIFT_REVEAL_DELAY_MS = 750;
 
 // Verify PIN and Fetch Gift Details
 const verifyGiftPin = async (uuid: string, pin: string, password?: string) => {
@@ -188,7 +188,7 @@ const fireConfetti = () => {
 const ShakingGiftBox = ({ isShaking }: { isShaking?: boolean }) => (
     <div className={cn("flex flex-col items-center justify-center py-10 transition-transform", isShaking && "animate-shake")}>
         <div className="relative w-24 h-24 mb-4 flex items-center justify-center">
-            <Gift size={64} className="text-black stroke-[1.2] stroke-black" />
+            <Gift size={64} className={cn("text-black stroke-[1.2] stroke-black animate-bounce")} />
         </div>
     </div>
 );
@@ -228,6 +228,7 @@ export default function ReceivePage() {
     // Subscription
     const [notificationEmail, setNotificationEmail] = useState("");
     const [subscribing, setSubscribing] = useState(false);
+    const [showWhiteFade, setShowWhiteFade] = useState(false);
 
     // Sender Info State
     const [senderInfo, setSenderInfo] = useState<any>(null);
@@ -278,7 +279,11 @@ export default function ReceivePage() {
                 new Promise(resolve => setTimeout(resolve, GIFT_REVEAL_DELAY_MS)) // Artificial delay for shake
             ]);
             setGift(data);
-            fireConfetti();
+            if (data.status === 'COMPLETED') {
+                setShowWhiteFade(true);
+            } else {
+                fireConfetti();
+            }
 
             if (data.is_password_protected && !data.is_authorized) {
                 setStep("RESTRICTED");
@@ -319,7 +324,11 @@ export default function ReceivePage() {
             ]);
             if (data.is_authorized) {
                 setGift(data);
-                fireConfetti();
+                if (data.status === 'COMPLETED') {
+                    setShowWhiteFade(true);
+                } else {
+                    fireConfetti();
+                }
                 setIsRestricted(false);
                 // Determine step again
                 if (data.status === 'USED') {
@@ -601,19 +610,27 @@ export default function ReceivePage() {
 
     return (
         <div className={cn("min-h-screen bg-gray-50 flex flex-col items-center justify-center py-8 px-4 transition-all duration-1000", step === "COMPLETED" && "bg-olive-300 sepia-[.1] shadow-[inset_0_0_500px_rgba(0,0,0,0.8)]")}>
+            {showWhiteFade && (
+                <div
+                    className="fixed inset-0 z-[100] bg-olive-800 animate-fade-out-white pointer-events-none"
+                    onAnimationEnd={() => setShowWhiteFade(false)}
+                />
+            )}
+
+
 
 
 
             {/* Memory Section */}
             {step === "COMPLETED" && gift && (
-                <div className="w-full max-w-xl mt-60 mb-60 overflow-hidden relative">
+                <div className="w-full max-w-xl mt-60 mb-60 overflow-hidden relative bg-mauve-100/40 rounded-xl shadow-sm">
                     <Card className="border-none shadow-none bg-transparent">
                         <CardContent className="flex flex-col items-center text-center space-y-6 py-8">
                             <div className="relative">
                                 <div className="relative bg-white/80 p-4 rounded-full shadow-sm border border-gray-100">
-                                    <Heart className="w-8 h-8 text-gray-400 fill-gray-50" />
+                                    <Heart className="w-8 h-8 text-pink-400 fill-gray-50" />
                                 </div>
-                                <Sparkles className="absolute -top-2 -right-2 w-5 h-5 text-gray-300 animate-pulse" />
+                                <Sparkles className="absolute -top-3 -right-3 w-8 h-8 text-amber-300 animate-pulse" />
                             </div>
 
                             <div className="space-y-2">
@@ -698,7 +715,7 @@ export default function ReceivePage() {
                             20% { transform: translate(-3px, 0px) rotate(1deg); }
                             30% { transform: translate(3px, 2px) rotate(0deg); }
                             40% { transform: translate(1px, -1px) rotate(1deg); }
-                            50% { transform: translate(-1px, 2px) rotate(-1deg); }
+                            50% { transform: translate(-1px, 5px) rotate(-1deg); }
                             60% { transform: translate(-3px, 1px) rotate(0deg); }
                             70% { transform: translate(3px, 1px) rotate(-1deg); }
                             80% { transform: translate(-1px, -1px) rotate(1deg); }
@@ -733,6 +750,13 @@ export default function ReceivePage() {
                         }
                         .animate-float {
                             animation: float 3s ease-in-out infinite;
+                        }
+                        @keyframes fade-out-white {
+                            0% { opacity: 1; }
+                            100% { opacity: 0; }
+                        }
+                        .animate-fade-out-white {
+                            animation: fade-out-white 3s ease-in-out forwards;
                         }
                     `}} />
 
@@ -1099,12 +1123,6 @@ export default function ReceivePage() {
             )}
             {(senderInfo || isEditingSender) ? (
                 < Card className="w-full max-w-xl mt-20 flex flex-col">
-                    {/* <CardHeader>
-                        <CardTitle className="text-xl text-center flex items-center justify-center gap-2">
-                            <User className="w-5 h-5 text-blue-600" /> */}
-                    {/* {t('senderInfo.title')} */}
-                    {/* </CardTitle>
-                    </CardHeader> */}
                     <CardContent className="min-h-0 flex flex-col">
                         {/* --- Sender Info Section --- */}
                         <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2">
@@ -1230,27 +1248,42 @@ export default function ReceivePage() {
                                     </div>
                                 ) : ""}
 
+                                {/* 実際に表示する箇所 */}
                                 {senderInfo ? (
                                     <div>
                                         <div className="w-full p-4">
                                             <img
                                                 src={senderInfo.card_image_url}
                                                 alt="Business Card"
-                                                className="w-full h-full object-contain rounded-lg shadow-md bg-white ring-1 ring-black/5 mb-10"
+                                                className="w-full h-full object-contain rounded-lg shadow-md bg-white ring-1 ring-black/5 mb-8 border"
                                             />
+                                        </div>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 ml-6 mr-6 mb-8">
+                                            {Object.entries(senderForm).map(([field, value]) => value &&
+                                                field == "name" && (
+                                                    <div key={field} className={cn("flex flex-col border-b border-gray-50 pb-2 sm:col-span-2")}>
+                                                        <span className="text-[10px] font-bold text-gray-400 uppercase">
+                                                            {t(`senderInfo.labels.${field}`)}
+                                                        </span>
+                                                        <span className={cn("text-gray-800 break-words whitespace-pre-wrap text-xl font-bold")}>
+                                                            {value}
+                                                        </span>
+                                                    </div>
+                                                ))}
                                         </div>
                                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 ml-6 mr-6">
                                             {Object.entries(senderForm).map(([field, value]) => value &&
                                                 field !== 'card_image_url' &&
                                                 field !== 'card_image_name' &&
                                                 field !== 'ts_updated_at' &&
+                                                field !== 'name' &&
                                                 !field.startsWith("SNS_") &&
                                                 !field.startsWith("Service_") && (
                                                     <div key={field} className={cn("flex flex-col border-b border-gray-50 pb-2", (field === 'memo' || field === 'address') && "sm:col-span-2")}>
                                                         <span className="text-[10px] font-bold text-gray-400 uppercase">
                                                             {t(`senderInfo.labels.${field}`)}
                                                         </span>
-                                                        <span className={cn("text-gray-800 break-words", (field === 'memo' || field === 'address') && "whitespace-pre-wrap", (field === 'name') ? "text-xl font-bold" : "text-sm")}>
+                                                        <span className={cn("text-gray-800 break-words", (field === 'memo' || field === 'address') && "whitespace-pre-wrap text-sm")}>
                                                             {field === 'HP' || field === 'memo' ? renderTextWithLinks(value) : value}
                                                         </span>
                                                     </div>
