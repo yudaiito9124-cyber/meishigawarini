@@ -49,12 +49,12 @@
 | `image_url` | String | 商品画像のURL （署名付き等でアップロードされたS3への完全URLパス等） |
 | `price` | Number | 価格 （0以上の正の数値） |
 | `valid_days` | Number | QRコードの有効日数設定 （整数値、例: `90`, `180` など） |
-| `status` | String | 商品の販売状態 (`ACTIVE` または `STOPPED`) ※詳細は2.6章 |
+| `status` | String | 商品の販売状態 (`ACTIVE`, `STOPPED`, または `DELETED`) ※詳細は2.6章 |
 | `ts_created_at` | String | 作成日時 （ISO 8601形式のUTC日時文字列） |
 | `GSI1_PK` | String | `PRODUCT#{status}` （アクティブな商品一覧取得用、例: `PRODUCT#ACTIVE`） |
 | `GSI1_SK` | String | 作成日時等のソートキー （ISO 8601形式のUTC日時文字列） |
 | `GSI2_PK` | String | `PRODUCT#{productId}` （UUIDからの逆引き用） |
-| `GSI2_SK` | String | 作成日時等のソートキー （ISO 8601形式のUTC日時文字列） |
+| `GSI2_SK` | String | `SHOP#{productId}` (旧データ：作成日時等のソートキー （ISO 8601形式のUTC日時文字列）) |
 
 ### 2.3 QR Metadata (QRコード及び注文ステータス)
 QRコードのライフサイクルや注文ステータス、商品との紐付けを管理します。

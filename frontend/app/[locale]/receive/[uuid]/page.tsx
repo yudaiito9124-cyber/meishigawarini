@@ -1055,7 +1055,7 @@ export default function ReceivePage() {
                         //     <p className="text-green-600 font-medium">{t('shippedStep.compleatedMessage')}</p>
                         // </div>
                     )}
-                    {(step === "SUCCESS" || step === "SHIPPED" || step === "COMPLETED") && (
+                    {(step === "SUCCESS" || step === "SHIPPED") && (
                         <div className=" text-right">
                             <Dialog>
                                 <DialogTrigger asChild>

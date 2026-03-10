@@ -494,10 +494,20 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 };
             }
 
-            await ddb.send(new DeleteCommand({
+            const deletedItem = { ...prodRes.Item };
+            deletedItem.GSI1_PK = 'PRODUCT#DELETED';
+            deletedItem.status = 'DELETED';
+
+            await ddb.send(new PutCommand({
                 TableName: TABLE_NAME,
-                Key: { PK: `SHOP#${shopId}`, SK: `PRODUCT#${pid}` }
+                Item: deletedItem
             }));
+
+            // 削除しちゃうと見返したときに受け取った商品がよくわからなくなる
+            // await ddb.send(new DeleteCommand({
+            //     TableName: TABLE_NAME,
+            //     Key: { PK: `SHOP#${shopId}`, SK: `PRODUCT#${pid}` }
+            // }));
 
             return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ message: 'Product deleted' }) };
         }
