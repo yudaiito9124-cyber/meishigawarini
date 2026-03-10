@@ -12,8 +12,9 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card";
-import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
-import { MessageCircleQuestion, Paperclip, X, FileText, File as FileIcon, Loader2, SendHorizontal } from "lucide-react";
+import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { MessageCircleQuestion, Paperclip, X, FileText, File as FileIcon, Loader2, SendHorizontal, Pencil, UserPlus, Globe } from "lucide-react";
+import { SiFacebook, SiInstagram, SiThreads, SiX, SiYoutube, SiLine, SiTiktok, SiLinktree, SiEight } from "@icons-pack/react-simple-icons";
 import SandboxedHtml from "@/components/SandboxedHtml";
 import { cn } from "@/lib/utils";
 
@@ -146,6 +147,28 @@ const resizeImage = (file: File, maxWidth: number = 1280): Promise<Blob> => {
     });
 };
 
+// Linkify Helper
+const renderTextWithLinks = (text: string) => {
+    if (!text) return text;
+    const urlRegex = /(https?:\/\/[^\s]+)/g;
+    return text.split(urlRegex).map((part, i) => {
+        if (part.match(urlRegex)) {
+            return (
+                <a
+                    key={i}
+                    href={part}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-600 hover:underline break-all"
+                >
+                    {part}
+                </a>
+            );
+        }
+        return part;
+    });
+};
+
 export default function ReceivePage() {
     const t = useTranslations('ReceivePage');
     const tst = useTranslations('Status');
@@ -181,6 +204,37 @@ export default function ReceivePage() {
     // Subscription
     const [notificationEmail, setNotificationEmail] = useState("");
     const [subscribing, setSubscribing] = useState(false);
+
+    // Sender Info State
+    const [senderInfo, setSenderInfo] = useState<any>(null);
+    const [senderInfoLoading, setSenderInfoLoading] = useState(false);
+    const [isEditingSender, setIsEditingSender] = useState(false);
+    const [senderForm, setSenderForm] = useState({
+        name: "",
+        job_title: "",
+        company: "",
+        department: "",
+        email: "",
+        phone: "",
+        phone_direct: "",
+        address: "",
+        HP: "",
+        memo: "",
+        SNS_Facebook: "",
+        SNS_Instagram: "",
+        SNS_Threads: "",
+        SNS_X: "",
+        SNS_YouTube: "",
+        SNS_LINE: "",
+        SNS_TikTok: "",
+        Service_Eight: "",
+        Service_Linktree: "",
+    });
+
+    const updateSenderForm = (field: string, value: string) => {
+        setSenderForm(prev => ({ ...prev, [field]: value }));
+    };
+    const [chatcontent, setChatcontent] = useState("");
 
     // Steps: PIN -> FORM (or SHIPPED/SUCCESS) -> RESTRICTED (if blocked)
     const [step, setStep] = useState<"PIN" | "FORM" | "SUCCESS" | "SHIPPED" | "EXPIRED" | "COMPLETED" | "RESTRICTED">("PIN");
@@ -289,12 +343,19 @@ export default function ReceivePage() {
         }
     };
 
-    // Load messages when step is not PIN (i.e. logged in)
+    // Load messages and sender info when step is not PIN (i.e. logged in)
     const loadMessages = useCallback(async () => {
         try {
             const data = await fetchChatMessages(uuid, pin);
             setMessages(data.messages || []);
             setTotalSizeInfo(data.total_size_bytes || 0);
+            setSenderInfo(data.sender_info || null);
+            if (data.sender_info) {
+                setSenderForm(prev => ({
+                    ...prev,
+                    ...data.sender_info
+                }));
+            }
         } catch (e) {
             console.error(e);
         }
@@ -367,6 +428,87 @@ export default function ReceivePage() {
         }
     };
 
+    const handleSenderInfoUpdate = async (fields?: any) => {
+        setSenderInfoLoading(true);
+        try {
+            const updatedSenderInfo = {
+                ...senderInfo,
+                ...(fields || senderForm),
+                ts_updated_at: new Date().toISOString()
+            };
+
+            await fetch(`${NEXT_PUBLIC_API_URL}/recipient/qrcodes/${uuid}/chat`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    pin,
+                    type: 'update_sender_info',
+                    sender_info: updatedSenderInfo
+                }),
+            });
+
+            await loadMessages();
+            setIsEditingSender(false);
+        } catch (e: any) {
+            alert("Failed to update sender info: " + e.message);
+        } finally {
+            setSenderInfoLoading(false);
+        }
+    };
+
+    const handleSenderInfoUpload = async (file: File) => {
+        setSenderInfoLoading(true);
+        try {
+            let uploadFile: File | Blob = file;
+            if (file.type.startsWith("image/")) {
+                try {
+                    uploadFile = await resizeImage(file);
+                } catch (err) {
+                    console.error("Resize failed", err);
+                }
+            }
+
+            const { uploadUrl, publicUrl } = await getChatUploadUrl(
+                uuid,
+                pin,
+                file.name,
+                uploadFile.type,
+                uploadFile.size
+            );
+
+            const uploadRes = await fetch(uploadUrl, {
+                method: "PUT",
+                headers: { "Content-Type": uploadFile.type },
+                body: uploadFile
+            });
+
+            if (!uploadRes.ok) throw new Error("S3 Upload failed");
+
+            const newSenderInfo = {
+                ...senderForm,
+                card_image_url: publicUrl,
+                card_image_name: file.name,
+                ts_updated_at: new Date().toISOString()
+            };
+
+            await fetch(`${NEXT_PUBLIC_API_URL}/recipient/qrcodes/${uuid}/chat`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    pin,
+                    type: 'update_sender_info',
+                    sender_info: newSenderInfo
+                }),
+            });
+
+            await loadMessages();
+        } catch (e: any) {
+            alert("Failed to upload business card: " + e.message);
+        } finally {
+            setSenderInfoLoading(false);
+        }
+    };
+
     const getRemainingTime = (expiresAt: string) => {
         if (!expiresAt) return null;
         const diff = new Date(expiresAt).getTime() - new Date().getTime();
@@ -428,34 +570,6 @@ export default function ReceivePage() {
     return (
         <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center py-8 px-4">
 
-            {/* ========== Full-width Product Content Section ========== */}
-            {step !== "PIN" && gift && gift.product && gift.product.detail_html && (
-                <>
-                    <Card className="w-full max-w-xl mb-10">
-                        <CardHeader>
-                            <CardTitle className="text-xl text-center">
-                                {step === "FORM" ? t('titles.form') :
-                                    step === "SUCCESS" ? t('titles.success') :
-                                        step === "SHIPPED" ? t('titles.shipped') :
-                                            step === "EXPIRED" ? t('titles.expired') :
-                                                step === "COMPLETED" ? t('titles.completed') :
-                                                    step === "RESTRICTED" ? tst(gift.status.toLowerCase()) : ""}
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <img src={gift.product.image_url} alt="Gift" className="w-full max-h-72 object-cover rounded-xl mb-6 shadow" />
-                            <h1 className="text-2xl font-bold mb-1">{gift.product.name}</h1>
-                            <p className="text-gray-500 mb-6">{gift.product.description}</p>
-                        </CardContent>
-                    </Card>
-                    <div className="w-full max-w-3xl mb-8 animate-in fade-in duration-500">
-                        {/* Rich Text HTML Content — rendered in an isolated iframe so CSS cannot leak out */}
-                        {gift.product.detail_html && (
-                            <SandboxedHtml html={gift.product.detail_html} />
-                        )}
-                    </div>
-                </>
-            )}
 
             {/* ========== Interactive Card Section ========== */}
             <Card className="w-full max-w-xl">
@@ -670,6 +784,9 @@ export default function ReceivePage() {
                                         />
                                     </div>
                                 </div> */}
+
+
+                                {/* Password Setting Section (Commented out) */}
                             </div>
 
 
@@ -764,14 +881,251 @@ export default function ReceivePage() {
                 </CardContent>
             </Card>
 
+
+
+            {/* Sender Info Section */}
+            {(step === "FORM" && !isEditingSender && !senderInfo) && (
+                <div>
+                    <Card className="w-full w-xl mt-20 flex-col items-center justify-center cursor-pointer p-6 border-3 border-dashed border-black-100 rounded-xl bg-gray-50/50 hover:bg-blue-200/50  hover:border-blue-200 transition-colors"
+                        onClick={() => setIsEditingSender(!isEditingSender)}
+                    >
+                        {/* <CardHeader className="w-full flex flex-col items-center justify-center cursor-pointer p-6 border border-dash rounded-xl bg-gray-50/50 hover:bg-white transition-colors"> */}
+                        <CardTitle className="text-xl text-center transition-colors flex items-center justify-center gap-2">
+                            <UserPlus className="w-5 h-5" />
+                            {t('senderInfo.title-empty')}
+                        </CardTitle>
+                        {/* </CardHeader> */}
+                    </Card>
+                </div>
+            )}
+            {(senderInfo || isEditingSender) ? (
+                < Card className="w-full w-xl mt-20 flex flex-col">
+                    <CardHeader>
+                        <CardTitle className="text-xl text-center">{t('senderInfo.title')}</CardTitle>
+                    </CardHeader>
+                    <CardContent className="min-h-0 flex flex-col">
+                        {/* --- Sender Info Section --- */}
+                        <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2">
+                            <div className="flex justify-between gap-2">
+                                <Label className="font-bold text-gray-800 flex items-center text-lg">
+                                    <div className="w-1.5 h-6 bg-blue-600 rounded-full" />
+                                    {t('senderInfo.title')}
+                                </Label>
+                                <div className="flex flex-row items-center">
+                                    {(senderInfo && senderInfo.ts_updated_at) && (
+                                        <span className="text-[10px] text-gray-400 flex items-center">
+                                            {new Date(senderInfo.ts_updated_at).toLocaleString()} {t('senderInfo.updated')}
+                                        </span>
+                                    )}
+                                    {(senderInfo && step === "FORM") ? (
+                                        <div className="flex items-center flex items-center">
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                className="h-10 w-10 text-gray-400 hover:text-gray-600"
+                                                onClick={() => setIsEditingSender(!isEditingSender)}
+                                            >
+                                                {isEditingSender ? <X className="h-4 w-4" /> : <Pencil className="h-4 w-4" />}
+                                            </Button>
+                                        </div>
+                                    ) : ""}
+                                </div>
+                            </div>
+
+                            <div className="relative group/card overflow-hidden">
+                                {(step === "FORM" || isEditingSender) ? (
+                                    <div className="space-y-6">
+                                        <div
+                                            className="aspect-[1.6/1] w-full flex flex-col items-center justify-center gap-3 cursor-pointer p-6 border rounded-xl bg-gray-50/50 hover:bg-white transition-colors"
+                                            onClick={() => document.getElementById('senderCardUpload')?.click()}
+                                        >
+                                            <img
+                                                src={senderInfo.card_image_url}
+                                                alt="Business Card"
+                                                className="w-full h-full object-contain rounded-lg shadow-md bg-white ring-1 ring-black/5"
+                                            />
+                                            <p className="text-xs text-gray-500">
+                                                {t('senderInfo.description')}
+                                            </p>
+                                            <div className="w-16 h-16 rounded-full bg-blue-50 flex items-center justify-center group-hover/card:scale-110 transition-transform">
+                                                <FileIcon className="w-8 h-8 text-blue-500" />
+                                            </div>
+                                            <div className="text-center">
+                                                <p className="font-semibold text-gray-800">{t('senderInfo.uploadPlaceholder')}</p>
+                                                <p className="text-xs text-gray-400 mt-1">{t('senderInfo.uploadHint')}</p>
+                                            </div>
+                                            <p className="text-[10px] text-gray-400 text-center italic">
+                                                {t('senderInfo.notice')}
+                                            </p>
+                                        </div>
+
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t pt-6">
+                                            {Object.keys(senderForm).map((field) => (
+                                                field !== 'card_image_url' && field !== 'card_image_name' && field !== 'ts_updated_at' && (
+                                                    <div key={field} className={cn("space-y-1.5", (field === 'memo' || field === 'address') && "md:col-span-2")}>
+                                                        <Label htmlFor={`sender-${field}`} className="text-xs font-bold text-gray-600 flex items-center gap-1">
+                                                            {field === "SNS_X" ? <SiX size={14} color="default" /> :
+                                                                field === "SNS_Instagram" ? <SiInstagram size={14} color="default" /> :
+                                                                    field === "SNS_YouTube" ? <SiYoutube size={14} color="default" /> :
+                                                                        field === "SNS_Facebook" ? <SiFacebook size={14} color="default" /> :
+                                                                            field === "SNS_LINE" ? <SiLine size={14} color="default" /> :
+                                                                                field === "SNS_TikTok" ? <SiTiktok size={14} color="default" /> :
+                                                                                    field === "SNS_Threads" ? <SiThreads size={14} color="default" /> :
+                                                                                        field === "Service_Linktree" ? <SiLinktree size={14} color="default" /> :
+                                                                                            field === "Service_Eight" ? <SiEight size={14} color="default" /> :
+                                                                                                (field.startsWith("SNS_") || field.startsWith("Service_") || field === "HP" || field === "url") ? <Globe size={14} /> :
+                                                                                                    null
+                                                            }
+                                                            {t(`senderInfo.labels.${field}`)}
+                                                        </Label>
+                                                        {field === 'memo' || field === 'address' ? (
+                                                            <Textarea
+                                                                id={`sender-${field}`}
+                                                                value={(senderForm as any)[field]}
+                                                                onChange={(e) => updateSenderForm(field, e.target.value)}
+                                                                disabled={senderInfoLoading}
+                                                                className="min-h-[80px] text-sm"
+                                                                placeholder={t(`senderInfo.labels.${field}`)}
+                                                            />
+                                                        ) : (
+                                                            <Input
+                                                                id={`sender-${field}`}
+                                                                value={(senderForm as any)[field]}
+                                                                onChange={(e) => updateSenderForm(field, e.target.value)}
+                                                                disabled={senderInfoLoading}
+                                                                className="h-9 text-sm"
+                                                                placeholder={t(`senderInfo.labels.${field}`)}
+                                                                type={field === 'email' ? 'email' : field === 'phone' ? 'tel' : 'text'}
+                                                            />
+                                                        )}
+                                                    </div>
+                                                )
+                                            ))}
+                                            <div className="md:col-span-2 pt-2 flex flex-col gap-2">
+                                                <Button
+                                                    onClick={() => handleSenderInfoUpdate()}
+                                                    disabled={senderInfoLoading}
+                                                    className="w-full bg-blue-600 hover:bg-blue-700"
+                                                >
+                                                    {senderInfoLoading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <SendHorizontal className="w-4 h-4 mr-2" />}
+                                                    {senderInfoLoading ? t('senderInfo.saving') : t('senderInfo.save')}
+                                                </Button>
+                                                {isEditingSender && (
+                                                    <Button
+                                                        type="button"
+                                                        variant="outline"
+                                                        onClick={() => setIsEditingSender(false)}
+                                                        className="w-full"
+                                                    >
+                                                        {t('senderInfo.cancel')}
+                                                    </Button>
+                                                )}
+                                            </div>
+                                        </div>
+                                        <div className="mb-10 border-b" />
+                                        <Label className="w-full flex flex-col text-center text-xl ">{t('senderInfo.preview')}</Label>
+                                    </div>
+                                ) : ""}
+
+                                {senderInfo ? (
+                                    <div>
+                                        <div className="w-full p-4">
+                                            <img
+                                                src={senderInfo.card_image_url}
+                                                alt="Business Card"
+                                                className="w-full h-full object-contain rounded-lg shadow-md bg-white ring-1 ring-black/5"
+                                            />
+                                        </div>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-1">
+                                            {Object.entries(senderForm).map(([field, value]) => value &&
+                                                field !== 'card_image_url' &&
+                                                field !== 'card_image_name' &&
+                                                field !== 'ts_updated_at' &&
+                                                !field.startsWith("SNS_") &&
+                                                !field.startsWith("Service_") && (
+                                                    <div key={field} className={cn("flex flex-col border-b border-gray-50 pb-2", (field === 'memo' || field === 'address') && "sm:col-span-2")}>
+                                                        <span className="text-[10px] font-bold text-gray-400 uppercase">
+                                                            {t(`senderInfo.labels.${field}`)}
+                                                        </span>
+                                                        <span className={cn("text-gray-800 break-words", (field === 'memo' || field === 'address') && "whitespace-pre-wrap", (field === 'name') ? "text-xl font-bold" : "text-sm")}>
+                                                            {field === 'HP' || field === 'memo' ? renderTextWithLinks(value) : value}
+                                                        </span>
+                                                    </div>
+                                                ))}
+                                        </div>
+                                        <div>
+                                            <span className="text-[10px] font-bold text-gray-400 uppercase">
+                                                LINK
+                                            </span>
+                                            <div className="flex flex-wrap gap-1 ml-4 mr-4">
+                                                {Object.entries(senderForm).map(([field, value]) => value && (field.startsWith("SNS_") || field.startsWith("Service_")) ? (
+                                                    <Button
+                                                        key={field}
+                                                        variant="outline"
+                                                        size="sm"
+                                                        className="h-8 gap-2 bg-white hover:bg-gray-50 border-gray-200 text-gray-700 relative group"
+                                                        onClick={() => {
+                                                            const url = value.startsWith('http') ? value : `https://${value}`;
+                                                            window.open(url, '_blank', 'noopener,noreferrer');
+                                                        }}
+                                                    >
+                                                        {field === "SNS_X" ? <SiX size={14} color="default" /> :
+                                                            field === "SNS_Instagram" ? <SiInstagram size={14} color="default" /> :
+                                                                field === "SNS_YouTube" ? <SiYoutube size={14} color="default" /> :
+                                                                    field === "SNS_Facebook" ? <SiFacebook size={14} color="default" /> :
+                                                                        field === "SNS_LINE" ? <SiLine size={14} color="default" /> :
+                                                                            field === "SNS_TikTok" ? <SiTiktok size={14} color="default" /> :
+                                                                                field === "SNS_Threads" ? <SiThreads size={14} color="default" /> :
+                                                                                    field === "Service_Eight" ? <SiEight size={14} color="default" /> :
+                                                                                        field === "Service_Linktree" ? <SiLinktree size={14} color="default" /> :
+                                                                                            <Globe size={14} />
+                                                        }
+                                                        <span className="absolute -top-8 left-1/2 -translate-x-1/2 px-2 py-1 bg-gray-800 text-white text-[10px] rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none shadow-sm z-50">
+                                                            {t(`senderInfo.labels.${field}`)}
+                                                            <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-gray-800 rotate-45" />
+                                                        </span>
+                                                    </Button>
+                                                ) : "")}
+                                            </div>
+                                        </div>
+                                        <input
+                                            type="file"
+                                            id="senderCardUpload"
+                                            className="hidden"
+                                            accept="image/*"
+                                            onChange={(e) => {
+                                                const file = e.target.files?.[0];
+                                                if (file) handleSenderInfoUpload(file);
+                                                e.target.value = "";
+                                            }}
+                                        />
+                                        {senderInfoLoading && (
+                                            <div className="absolute inset-0 bg-white/60 backdrop-blur-[1px] flex items-center justify-center z-10 transition-all">
+                                                <div className="flex flex-col items-center gap-2">
+                                                    <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+                                                    <p className="text-xs font-bold text-blue-800">{t('senderInfo.uploading') || "アップロード中..."}</p>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                ) : ""}
+                            </div>
+                        </div>
+                        {/* --------------------------- */}
+                    </CardContent>
+                </Card>
+            ) : ""}
+
+
             {/* Chat Section */}
             {
                 step !== "PIN" && (
-                    <Card className="w-full max-w-xl mt-20 flex flex-col min-h-[1500px] max-h-[calc(100vh-12rem)] overflow-hidden">
-                        <CardHeader>
-                            <CardTitle className="text-lg">{t('chat.title')}</CardTitle>
-                            {/* Privacy Notice */}
-                        </CardHeader>
+                    <Card className={cn("w-full max-w-xl mt-20 flex flex-col", step !== "COMPLETED" && "max-h-[calc(100vh-12rem)] min-h-[800px] overflow-hidden")}>
+                        {step !== "COMPLETED" && (
+                            <CardHeader>
+                                <CardTitle className="text-xl text-center">{t('chat.title')}</CardTitle>
+                            </CardHeader>
+                        )}
                         <CardContent className="min-h-0 flex">
                             <div className="flex-1 min-h-0 flex flex-col pt-0 pb-0 overflow-y-auto space-y-2 bg-gray-100 border shadow-sm rounded-xl" >
                                 {messages.length === 0 ? (
@@ -838,144 +1192,177 @@ export default function ReceivePage() {
                                 <div className="mb-10" />
                             </div>
                         </CardContent>
-                        <CardFooter className="flex flex-col pt-0 bg-white">
-                            <form onSubmit={handleChatSubmit} className="w-full space-y-2 p-4 rounded-xl border-1 shadow-sm transition-all bg-gray-50">
-                                <div className="flex items-center gap-2">
-                                    <Label htmlFor="chatName" className="text-xs font-bold shrink-0 whitespace-nowrap">
-                                        {t('chat.name')}
-                                    </Label>
-                                    <Input
-                                        id="chatName"
-                                        placeholder={t('chat.namePlaceholder')}
-                                        value={chatName}
-                                        onChange={(e) => setChatName(e.target.value)}
-                                        required
-                                        className="h-8 flex-1 bg-white"
-                                    />
-                                </div>
-                                <div className="flex flex-col gap-1">
-                                    <div className="flex items-start gap-2">
-                                        <div className="flex-1">
-                                            <Label htmlFor="chatMessage" className="text-xs sr-only">{t('chat.message')}</Label>
-                                            <Textarea
-                                                id="chatMessage"
-                                                placeholder={t('chat.placeholder')}
-                                                value={chatMessage}
-                                                onChange={(e) => setChatMessage(e.target.value)}
-                                                className="min-h-[100px] bg-white"
-                                            />
-                                        </div>
-                                        <div className="flex flex-col gap-2 shrink-0">
-                                            <div className="relative">
-                                                <input
-                                                    type="file"
-                                                    id="chatFile"
-                                                    className="hidden"
-                                                    onChange={(e) => {
-                                                        const file = e.target.files?.[0];
-                                                        if (file) setSelectedFile(file);
-                                                        e.target.value = ""; // Reset
-                                                    }}
+                        {step !== "COMPLETED" && (
+                            <CardFooter className="flex flex-col pt-0 bg-white">
+                                <form onSubmit={handleChatSubmit} className="w-full space-y-2 p-4 rounded-xl border-1 shadow-sm transition-all bg-gray-50">
+                                    <div className="flex items-center gap-2">
+                                        <Label htmlFor="chatName" className="text-xs font-bold shrink-0 whitespace-nowrap">
+                                            {t('chat.name')}
+                                        </Label>
+                                        <Input
+                                            id="chatName"
+                                            placeholder={t('chat.namePlaceholder')}
+                                            value={chatName}
+                                            onChange={(e) => setChatName(e.target.value)}
+                                            required
+                                            className="h-8 flex-1 bg-white"
+                                        />
+                                    </div>
+                                    <div className="flex flex-col gap-1">
+                                        <div className="flex items-start gap-2">
+                                            <div className="flex-1">
+                                                <Label htmlFor="chatMessage" className="text-xs sr-only">{t('chat.message')}</Label>
+                                                <Textarea
+                                                    id="chatMessage"
+                                                    placeholder={t('chat.placeholder')}
+                                                    value={chatMessage}
+                                                    onChange={(e) => setChatMessage(e.target.value)}
+                                                    className="min-h-[100px] bg-white"
                                                 />
+                                            </div>
+                                            <div className="flex flex-col gap-2 shrink-0">
+                                                <div className="relative">
+                                                    <input
+                                                        type="file"
+                                                        id="chatFile"
+                                                        className="hidden"
+                                                        onChange={(e) => {
+                                                            const file = e.target.files?.[0];
+                                                            if (file) setSelectedFile(file);
+                                                            e.target.value = ""; // Reset
+                                                        }}
+                                                    />
+                                                    <Button
+                                                        type="button"
+                                                        variant="outline"
+                                                        size="icon"
+                                                        className={cn("h-[46px] w-10 shrink-0", selectedFile && "bg-blue-50 border-blue-200 text-blue-600 ")}
+                                                        onClick={() => document.getElementById('chatFile')?.click()}
+                                                        disabled={chatLoading}
+                                                    >
+                                                        <Paperclip className="h-4 w-4" />
+                                                    </Button>
+                                                </div>
                                                 <Button
-                                                    type="button"
-                                                    variant="outline"
+                                                    type="submit"
                                                     size="icon"
-                                                    className={cn("h-[46px] w-10 shrink-0", selectedFile && "bg-blue-50 border-blue-200 text-blue-600 ")}
-                                                    onClick={() => document.getElementById('chatFile')?.click()}
-                                                    disabled={chatLoading}
+                                                    className="h-[46px] w-10 shrink-0"
+                                                    disabled={chatLoading || (totalSizeInfo !== null && totalSizeInfo > 100 * 1024 * 1024)}
                                                 >
-                                                    <Paperclip className="h-4 w-4" />
+                                                    {chatLoading ? (
+                                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                                    ) : (
+                                                        <SendHorizontal className="h-4 w-4" />
+                                                    )}
                                                 </Button>
                                             </div>
-                                            <Button
-                                                type="submit"
-                                                size="icon"
-                                                className="h-[46px] w-10 shrink-0"
-                                                disabled={chatLoading || (totalSizeInfo !== null && totalSizeInfo > 100 * 1024 * 1024)}
-                                            >
-                                                {chatLoading ? (
-                                                    <Loader2 className="h-4 w-4 animate-spin" />
-                                                ) : (
-                                                    <SendHorizontal className="h-4 w-4" />
-                                                )}
-                                            </Button>
                                         </div>
-                                    </div>
 
-                                    {selectedFile && (
-                                        <div className="flex items-center gap-2 p-2 bg-blue-50 rounded-md border border-blue-100 animate-in fade-in slide-in-from-top-1">
-                                            <div className="flex-1 min-w-0 flex items-center gap-2">
-                                                {selectedFile.type.startsWith("image/") ? (
-                                                    <div className="w-8 h-8 rounded bg-white border overflow-hidden shrink-0">
-                                                        <img
-                                                            src={URL.createObjectURL(selectedFile)}
-                                                            alt="Preview"
-                                                            className="w-full h-full object-cover"
-                                                            onLoad={(e) => URL.revokeObjectURL((e.target as any).src)}
-                                                        />
+                                        {selectedFile && (
+                                            <div className="flex items-center gap-2 p-2 bg-blue-50 rounded-md border border-blue-100 animate-in fade-in slide-in-from-top-1">
+                                                <div className="flex-1 min-w-0 flex items-center gap-2">
+                                                    {selectedFile.type.startsWith("image/") ? (
+                                                        <div className="w-8 h-8 rounded bg-white border overflow-hidden shrink-0">
+                                                            <img
+                                                                src={URL.createObjectURL(selectedFile)}
+                                                                alt="Preview"
+                                                                className="w-full h-full object-cover"
+                                                                onLoad={(e) => URL.revokeObjectURL((e.target as any).src)}
+                                                            />
+                                                        </div>
+                                                    ) : (
+                                                        <FileIcon className="w-8 h-8 text-blue-500 shrink-0" />
+                                                    )}
+                                                    <div className="flex-1 min-w-0">
+                                                        <p className="text-xs font-medium truncate">{selectedFile.name}</p>
+                                                        <p className="text-[10px] text-gray-500">{(selectedFile.size / 1024 / 1024).toFixed(2)} MB</p>
                                                     </div>
-                                                ) : (
-                                                    <FileIcon className="w-8 h-8 text-blue-500 shrink-0" />
-                                                )}
-                                                <div className="flex-1 min-w-0">
-                                                    <p className="text-xs font-medium truncate">{selectedFile.name}</p>
-                                                    <p className="text-[10px] text-gray-500">{(selectedFile.size / 1024 / 1024).toFixed(2)} MB</p>
                                                 </div>
+                                                <Button
+                                                    type="button"
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="h-6 w-6 rounded-full"
+                                                    onClick={() => setSelectedFile(null)}
+                                                >
+                                                    <X className="h-3 h-3" />
+                                                </Button>
                                             </div>
-                                            <Button
-                                                type="button"
-                                                variant="ghost"
-                                                size="icon"
-                                                className="h-6 w-6 rounded-full"
-                                                onClick={() => setSelectedFile(null)}
-                                            >
-                                                <X className="h-3 h-3" />
-                                            </Button>
-                                        </div>
-                                    )}
+                                        )}
 
-                                    {totalSizeInfo !== null && (
-                                        <div className="px-1 flex justify-end items-center text-[10px]">
-                                            <span className={cn(
-                                                "font-medium ",
-                                                totalSizeInfo > 60 * 1024 * 1024 ? "text-red-500" : "text-gray-400"
-                                            )}>
-                                                {t('chat.usage')}: {(totalSizeInfo / 1024 / 1024).toFixed(1)} / 100 MB
-                                            </span>
-                                            {totalSizeInfo > 80 * 1024 * 1024 && (
-                                                <span className="text-amber-500 flex items-center gap-1">
-                                                    <Loader2 className="w-2 h-2 animate-spin" />
-                                                    {t('chat.limitNear')}
+                                        {totalSizeInfo !== null && (
+                                            <div className="px-1 flex justify-end items-center text-[10px]">
+                                                <span className={cn(
+                                                    "font-medium ",
+                                                    totalSizeInfo > 60 * 1024 * 1024 ? "text-red-500" : "text-gray-400"
+                                                )}>
+                                                    {t('chat.usage')}: {(totalSizeInfo / 1024 / 1024).toFixed(1)} / 100 MB
                                                 </span>
-                                            )}
-                                        </div>
-                                    )}
-                                </div>
-                                <p className="text-xs text-gray-500">{t('chat.privacy')}</p>
-                            </form>
+                                                {totalSizeInfo > 80 * 1024 * 1024 && (
+                                                    <span className="text-amber-500 flex items-center gap-1">
+                                                        <Loader2 className="w-2 h-2 animate-spin" />
+                                                        {t('chat.limitNear')}
+                                                    </span>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+                                    <p className="text-xs text-gray-500">{t('chat.privacy')}</p>
+                                </form>
 
-                            {/* Email Subscription */}
-                            <div className="w-full space-y-2 pt-3 mt-2">
-                                <Label className="text-xs text-gray-700 font-semibold">{t('chat.emailTitle')}</Label>
-                                <p className="text-xs text-gray-500">{t('chat.emailDesc')}</p>
-                                <div className="flex w-full gap-2 pt-1">
-                                    <Input
-                                        placeholder="you@example.com"
-                                        type="email"
-                                        className="h-8 text-xs bg-white"
-                                        value={notificationEmail}
-                                        onChange={(e) => setNotificationEmail(e.target.value)}
-                                    />
-                                    <Button size="sm" variant="outline" className="h-8 text-xs whitespace-nowrap bg-white" onClick={handleSubscribe} disabled={subscribing}>
-                                        {subscribing ? "..." : t('chat.subscribe')}
-                                    </Button>
+                                {/* Email Subscription */}
+                                <div className="w-full space-y-2 pt-3 mt-2">
+                                    <Label className="text-xs text-gray-700 font-semibold">{t('chat.emailTitle')}</Label>
+                                    <p className="text-xs text-gray-500">{t('chat.emailDesc')}</p>
+                                    <div className="flex w-full gap-2 pt-1">
+                                        <Input
+                                            placeholder="you@example.com"
+                                            type="email"
+                                            className="h-8 text-xs bg-white"
+                                            value={notificationEmail}
+                                            onChange={(e) => setNotificationEmail(e.target.value)}
+                                        />
+                                        <Button size="sm" variant="outline" className="h-8 text-xs whitespace-nowrap bg-white" onClick={handleSubscribe} disabled={subscribing}>
+                                            {subscribing ? "..." : t('chat.subscribe')}
+                                        </Button>
+                                    </div>
                                 </div>
-                            </div>
-                        </CardFooter>
+                            </CardFooter>
+                        )}
                     </Card>
                 )
             }
+
+
+
+            {/* ========== Full-width Product Content Section ========== */}
+            {step !== "PIN" && gift && gift.product && gift.product.detail_html && (
+                <>
+                    <Card className="w-full max-w-xl mb-10">
+                        <CardHeader>
+                            <CardTitle className="text-xl text-center">
+                                {step === "FORM" ? t('titles.form') :
+                                    step === "SUCCESS" ? t('titles.success') :
+                                        step === "SHIPPED" ? t('titles.shipped') :
+                                            step === "EXPIRED" ? t('titles.expired') :
+                                                step === "COMPLETED" ? t('titles.completed') :
+                                                    step === "RESTRICTED" ? tst(gift.status.toLowerCase()) : ""}
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <img src={gift.product.image_url} alt="Gift" className="w-full max-h-72 object-cover rounded-xl mb-6 shadow" />
+                            <h1 className="text-2xl font-bold mb-1">{gift.product.name}</h1>
+                            <p className="text-gray-500 mb-6">{gift.product.description}</p>
+                        </CardContent>
+                    </Card>
+                    <div className="w-full max-w-3xl mb-8 animate-in fade-in duration-500">
+                        {/* Rich Text HTML Content — rendered in an isolated iframe so CSS cannot leak out */}
+                        {gift.product.detail_html && (
+                            <SandboxedHtml html={gift.product.detail_html} />
+                        )}
+                    </div>
+                </>
+            )}
 
         </div >
     );

@@ -114,6 +114,29 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 };
             }
 
+            // === HANDLE SENDER INFO UPDATE ===
+            if (type === 'update_sender_info') {
+                const { sender_info } = body;
+                if (!sender_info) {
+                    return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Missing sender_info' }) };
+                }
+
+                await ddb.send(new UpdateCommand({
+                    TableName: TABLE_NAME,
+                    Key: { PK: `QR#${uuid}`, SK: 'CHAT' },
+                    UpdateExpression: 'SET sender_info = :info',
+                    ExpressionAttributeValues: {
+                        ':info': sender_info
+                    }
+                }));
+
+                return {
+                    statusCode: 200,
+                    headers: corsHeaders,
+                    body: JSON.stringify({ message: 'Sender info updated', data: sender_info })
+                };
+            }
+
             // === HANDLE MESSAGE ===
             if (!username || (!message && !file_url)) {
                 return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Missing required fields' }) };
@@ -265,7 +288,8 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 headers: corsHeaders,
                 body: JSON.stringify({
                     messages: getChat.Item?.messages || [],
-                    total_size_bytes: getChat.Item?.total_size_bytes || 0
+                    total_size_bytes: getChat.Item?.total_size_bytes || 0,
+                    sender_info: getChat.Item?.sender_info || null
                 })
             };
         }
