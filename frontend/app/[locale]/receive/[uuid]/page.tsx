@@ -13,13 +13,15 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card";
 import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { MessageCircleQuestion, Paperclip, X, FileText, File as FileIcon, Loader2, SendHorizontal, Pencil, UserPlus, Globe } from "lucide-react";
+import { MessageCircleQuestion, Paperclip, X, FileText, File as FileIcon, Loader2, SendHorizontal, Pencil, UserPlus, Globe, Gift, User, MessagesSquare } from "lucide-react";
 import { SiFacebook, SiInstagram, SiThreads, SiX, SiYoutube, SiLine, SiTiktok, SiLinktree, SiEight } from "@icons-pack/react-simple-icons";
 import SandboxedHtml from "@/components/SandboxedHtml";
 import { cn } from "@/lib/utils";
+import confetti from "canvas-confetti";
 
 
 const NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || "";
+const GIFT_REVEAL_DELAY_MS = 500;
 
 // Verify PIN and Fetch Gift Details
 const verifyGiftPin = async (uuid: string, pin: string, password?: string) => {
@@ -169,6 +171,28 @@ const renderTextWithLinks = (text: string) => {
     });
 };
 
+const fireConfetti = () => {
+    const duration = 3 * 1000;
+    const animationEnd = Date.now() + duration;
+    const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 0 };
+    const randomInRange = (min: number, max: number) => Math.random() * (max - min) + min;
+    const interval: any = setInterval(function () {
+        const timeLeft = animationEnd - Date.now();
+        if (timeLeft <= 0) return clearInterval(interval);
+        const particleCount = 50 * (timeLeft / duration);
+        confetti({ ...defaults, particleCount, origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 } });
+        confetti({ ...defaults, particleCount, origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 } });
+    }, 250);
+};
+
+const ShakingGiftBox = ({ isShaking }: { isShaking?: boolean }) => (
+    <div className={cn("flex flex-col items-center justify-center py-10 transition-transform", isShaking && "animate-shake")}>
+        <div className="relative w-24 h-24 mb-4 flex items-center justify-center">
+            <Gift size={64} className="text-black stroke-[1.2] stroke-black" />
+        </div>
+    </div>
+);
+
 export default function ReceivePage() {
     const t = useTranslations('ReceivePage');
     const tst = useTranslations('Status');
@@ -249,8 +273,12 @@ export default function ReceivePage() {
         setError(null);
 
         try {
-            const data = await verifyGiftPin(uuid, pin);
+            const [data] = await Promise.all([
+                verifyGiftPin(uuid, pin),
+                new Promise(resolve => setTimeout(resolve, GIFT_REVEAL_DELAY_MS)) // Artificial delay for shake
+            ]);
             setGift(data);
+            fireConfetti();
 
             if (data.is_password_protected && !data.is_authorized) {
                 setStep("RESTRICTED");
@@ -285,9 +313,13 @@ export default function ReceivePage() {
         e.preventDefault();
         setLoading(true);
         try {
-            const data = await verifyGiftPin(uuid, pin, unlockPassword);
+            const [data] = await Promise.all([
+                verifyGiftPin(uuid, pin, unlockPassword),
+                new Promise(resolve => setTimeout(resolve, GIFT_REVEAL_DELAY_MS)) // Artificial delay for shake
+            ]);
             if (data.is_authorized) {
                 setGift(data);
+                fireConfetti();
                 setIsRestricted(false);
                 // Determine step again
                 if (data.status === 'USED') {
@@ -568,7 +600,7 @@ export default function ReceivePage() {
     };
 
     return (
-        <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center py-8 px-4">
+        <div className={cn("min-h-screen bg-gray-50 flex flex-col items-center justify-center py-8 px-4 transition-all duration-1000", step === "COMPLETED" && "bg-olive-300 sepia-[.1] shadow-[inset_0_0_500px_rgba(0,0,0,0.8)]")}>
 
 
             {/* ========== Interactive Card Section ========== */}
@@ -576,27 +608,104 @@ export default function ReceivePage() {
                 <CardHeader>
                     <CardTitle className="text-xl text-center">
                         {step === "PIN" ? t('titles.pin') :
-                            step === "FORM" ? t('titles.form') :
-                                step === "SUCCESS" ? t('titles.success') :
-                                    step === "SHIPPED" ? t('titles.shipped') :
-                                        step === "EXPIRED" ? t('titles.expired') :
-                                            step === "COMPLETED" ? t('titles.completed') :
-                                                step === "RESTRICTED" ? tst(gift.status.toLowerCase()) : ""}
+                            step === "RESTRICTED" ? tst(gift.status.toLowerCase()) : ""}
                     </CardTitle>
                 </CardHeader>
-                <CardContent>
-                    {step !== "PIN" && gift && gift.product && (
-                        <div>
+                <CardContent className={cn("relative min-h-[300px] flex flex-col justify-center transition-colors duration-1000", step !== "PIN" && "bg-gradient-to-b from-white to-amber-50/20")}>
+                    <style dangerouslySetInnerHTML={{
+                        __html: `
+                        @keyframes shake {
+                            0% { transform: translate(1px, 1px) rotate(0deg); }
+                            10% { transform: translate(-1px, -2px) rotate(-1deg); }
+                            20% { transform: translate(-3px, 0px) rotate(1deg); }
+                            30% { transform: translate(3px, 2px) rotate(0deg); }
+                            40% { transform: translate(1px, -1px) rotate(1deg); }
+                            50% { transform: translate(-1px, 2px) rotate(-1deg); }
+                            60% { transform: translate(-3px, 1px) rotate(0deg); }
+                            70% { transform: translate(3px, 1px) rotate(-1deg); }
+                            80% { transform: translate(-1px, -1px) rotate(1deg); }
+                            90% { transform: translate(1px, 2px) rotate(0deg); }
+                            100% { transform: translate(1px, -2px) rotate(-1deg); }
+                        }
+                        .animate-shake {
+                            animation: shake 0.5s infinite;
+                        }
+                        @keyframes reveal-gift {
+                            0% { transform: scale(0.8) translateY(20px); opacity: 0; filter: blur(10px); }
+                            100% { transform: scale(1) translateY(0); opacity: 1; filter: blur(0); }
+                        }
+                        .animate-reveal {
+                            animation: reveal-gift 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+                        }
+                        .reveal-delay-200 {
+                            animation-delay: 0.2s;
+                            opacity: 0;
+                        }
+                        @keyframes shine {
+                            0% { transform: translateX(-100%); opacity: 0; }
+                            50% { opacity: 0.5; }
+                            100% { transform: translateX(100%); opacity: 0; }
+                        }
+                        .animate-shine {
+                            animation: shine 3s infinite;
+                        }
+                        @keyframes float {
+                            0%, 100% { transform: translateY(0); }
+                            50% { transform: translateY(-5px); }
+                        }
+                        .animate-float {
+                            animation: float 3s ease-in-out infinite;
+                        }
+                    `}} />
+
+                    {(loading || step === "PIN" || step === "RESTRICTED") && !gift?.product && (
+                        <ShakingGiftBox isShaking={loading} />
+                    )}
+
+                    {!loading && step !== "PIN" && gift && gift.product && (
+                        <div className="animate-reveal space-y-4 pt-4">
                             {/* Hero Image */}
-                            <img src={gift.product.image_url} alt="Gift" className="w-full max-h-72 object-cover rounded-xl mb-6 shadow" />
-                            <h1 className="text-2xl font-bold mb-1">{gift.product.name}</h1>
-                            <p className="text-gray-500 mb-6">{gift.product.description}</p>
+                            <div className="relative mb-6 overflow-hidden rounded-xl shadow-2xl group border-4 border-white/50">
+                                <img
+                                    src={gift.product.image_url}
+                                    alt="Gift"
+                                    className="w-full max-h-72 object-cover transform transition-transform duration-700 group-hover:scale-105"
+                                />
+                                {/* Diagonal Corner Ribbon (Top Right) */}
+                                <div className="absolute top-0 right-0 w-24 h-24 overflow-hidden pointer-events-none z-10 animate-reveal reveal-delay-200">
+                                    <div className={cn("absolute top-[18px] right-[-32px] w-[120px] text-white text-[10px] font-bold py-1 shadow-lg rotate-45 text-center uppercase tracking-wider border-y border-white/30 backdrop-blur-sm", gift.status !== "COMPLETED" ? "bg-red-500" : "bg-red-900")}>
+                                        Gift for you!
+                                    </div>
+                                </div>
+
+                                {/* Diagonal Corner Ribbon (Bottom Left) */}
+                                <div className="absolute bottom-0 left-0 w-24 h-24 overflow-hidden pointer-events-none z-10 animate-reveal reveal-delay-200">
+                                    <div className={cn("absolute bottom-[18px] left-[-32px] w-[120px] text-white text-[10px] font-bold py-1 shadow-lg rotate-45 text-center uppercase tracking-wider border-y border-white/30 backdrop-blur-sm", gift.status !== "COMPLETED" ? "bg-red-500" : "bg-red-900")}>
+                                        Have a nice time!
+                                    </div>
+                                </div>
+
+                                {/* Elegant Shimmer Overlay */}
+                                <div className="absolute inset-0 bg-gradient-to-tr from-white/10 via-transparent to-black/5 pointer-events-none" />
+                                <div className="absolute inset-0 bg-gradient-to-t from-black/10 via-transparent to-transparent pointer-events-none" />
+                                <div className="absolute inset-0 overflow-hidden pointer-events-none">
+                                    <div className="absolute inset-0 w-1/2 h-full bg-gradient-to-r from-transparent via-white/20 to-transparent -skew-x-12 animate-shine" />
+                                </div>
+                            </div>
+                            {/* <h1 className="relative z-20 text-4xl font-extrabold mb-1 text-center bg-clip-text text-transparent bg-gradient-to-r from-red-500 via-red-500 to-red-500 drop-shadow-sm drop-shadow-white animate-float"> */}
+                            <h1 className="relative z-20 text-4xl font-extrabold mb-1 text-center text-black drop-shadow-sm mt-10">
+                                {gift.product.name}
+                            </h1>
+                            <p className="text-gray-600 mb-6 italic leading-relaxed text-center mb-10">{gift.product.description}</p>
 
                             {/* Shop memo */}
                             {gift.memo_for_users && (
-                                <div className="mt-6 p-3 bg-blue-50 rounded-md border border-blue-100">
-                                    <h3 className="font-semibold text-sm text-blue-800 mb-1">{t('shopMessage')}</h3>
-                                    <p className="text-sm text-blue-900 whitespace-pre-wrap">{gift.memo_for_users}</p>
+                                <div className="mt-6 p-4 bg-amber-50/50 rounded-xl border border-amber-200/50 shadow-sm backdrop-blur-sm">
+                                    <h3 className="font-bold text-xs uppercase tracking-wider text-amber-800 mb-2 flex items-center gap-2">
+                                        <div className="w-1 h-3 bg-amber-400 rounded-full" />
+                                        {t('shopMessage')}
+                                    </h3>
+                                    <p className="text-sm text-amber-900/80 whitespace-pre-wrap leading-relaxed">{gift.memo_for_users}</p>
                                 </div>
                             )}
 
@@ -612,6 +721,7 @@ export default function ReceivePage() {
                                 </div>
                             )}
 
+
                             {/* Expired Message */}
                             {step === "EXPIRED" && (
                                 <div className="mt-6 p-4 bg-red-50 border border-red-200 rounded text-center">
@@ -619,17 +729,26 @@ export default function ReceivePage() {
                                     <p className="text-red-500 text-sm mt-1">{t('expiredStep.subMessage', { date: new Date(gift.ts_expired_at).toLocaleDateString() })}</p>
                                 </div>
                             )}
+
+                            <Label className="text-xl text-center flex flex-col text-gray-500">
+                                {step === "FORM" ? t('titles.form') :
+                                    step === "SUCCESS" ? t('titles.success') :
+                                        step === "SHIPPED" ? t('titles.shipped') :
+                                            step === "EXPIRED" ? t('titles.expired') :
+                                                step === "COMPLETED" ? t('titles.completed') : ""}
+                            </Label>
                         </div>
                     )}
-                    {step === "PIN" && (
-                        <form onSubmit={handleVerifyPin} className="space-y-6">
+                    {step === "PIN" && !gift?.product && (
+                        <form onSubmit={handleVerifyPin} className={cn("space-y-6 transition-opacity", loading && "opacity-50 pointer-events-none")}>
                             <div className="space-y-2 p-4 bg-gray-50 rounded-lg">
                                 <Label htmlFor="pin" className="font-semibold">{t('pinStep.label')}</Label>
                                 <Input
                                     id="pin"
-                                    type="text" // or password if preferred, but usually printed on card so text is fine
+                                    type="text"
                                     placeholder={t('pinStep.placeholder')}
                                     value={pin}
+                                    disabled={loading}
                                     onChange={(e) => {
                                         setPin(e.target.value);
                                         setPinError("");
@@ -643,8 +762,8 @@ export default function ReceivePage() {
                         </form>
                     )}
 
-                    {step === "RESTRICTED" && (
-                        <div className="space-y-6 border-t mt-4">
+                    {step === "RESTRICTED" && !gift?.product && (
+                        <div className={cn("space-y-6 border-t mt-4 transition-opacity", loading && "opacity-50 pointer-events-none")}>
                             <div className="text-center space-y-2 mt-4">
                                 <p className="text-yellow-600 font-medium">{t('restrictedStep.title')}</p>
                                 <p className="text-sm text-gray-500">{t('restrictedStep.message')}</p>
@@ -656,6 +775,7 @@ export default function ReceivePage() {
                                         id="unlockPassword"
                                         type="password"
                                         value={unlockPassword}
+                                        disabled={loading}
                                         onChange={(e) => setUnlockPassword(e.target.value)}
                                         required
                                     />
@@ -828,9 +948,10 @@ export default function ReceivePage() {
                     )}
 
                     {step === "COMPLETED" && gift && (
-                        <div className="text-center py-6 space-y-4">
-                            <p className="text-green-600 font-medium">{t('shippedStep.compleatedMessage')}</p>
-                        </div>
+                        <div />
+                        // <div className="text-center py-6 space-y-4">
+                        //     <p className="text-green-600 font-medium">{t('shippedStep.compleatedMessage')}</p>
+                        // </div>
                     )}
                     {(step === "SUCCESS" || step === "SHIPPED" || step === "COMPLETED") && (
                         <div className=" text-right">
@@ -886,12 +1007,12 @@ export default function ReceivePage() {
             {/* Sender Info Section */}
             {(step === "FORM" && !isEditingSender && !senderInfo) && (
                 <div>
-                    <Card className="w-full w-xl mt-20 flex-col items-center justify-center cursor-pointer p-6 border-3 border-dashed border-black-100 rounded-xl bg-gray-50/50 hover:bg-blue-200/50  hover:border-blue-200 transition-colors"
+                    <Card className="w-full max-w-xl mt-20 flex flex-col items-center justify-center cursor-pointer p-6 border-3 border-dashed border-black-100 rounded-xl bg-gray-50/50 hover:bg-blue-200/50  hover:border-blue-200 transition-colors"
                         onClick={() => setIsEditingSender(!isEditingSender)}
                     >
                         {/* <CardHeader className="w-full flex flex-col items-center justify-center cursor-pointer p-6 border border-dash rounded-xl bg-gray-50/50 hover:bg-white transition-colors"> */}
-                        <CardTitle className="text-xl text-center transition-colors flex items-center justify-center gap-2">
-                            <UserPlus className="w-5 h-5" />
+                        <CardTitle className="text-xl text-center flex items-center justify-center gap-2">
+                            <UserPlus className="w-5 h-5 text-gray-600" />
                             {t('senderInfo.title-empty')}
                         </CardTitle>
                         {/* </CardHeader> */}
@@ -899,16 +1020,20 @@ export default function ReceivePage() {
                 </div>
             )}
             {(senderInfo || isEditingSender) ? (
-                < Card className="w-full w-xl mt-20 flex flex-col">
-                    <CardHeader>
-                        <CardTitle className="text-xl text-center">{t('senderInfo.title')}</CardTitle>
-                    </CardHeader>
+                < Card className="w-full max-w-xl mt-20 flex flex-col">
+                    {/* <CardHeader>
+                        <CardTitle className="text-xl text-center flex items-center justify-center gap-2">
+                            <User className="w-5 h-5 text-blue-600" /> */}
+                    {/* {t('senderInfo.title')} */}
+                    {/* </CardTitle>
+                    </CardHeader> */}
                     <CardContent className="min-h-0 flex flex-col">
                         {/* --- Sender Info Section --- */}
                         <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2">
                             <div className="flex justify-between gap-2">
                                 <Label className="font-bold text-gray-800 flex items-center text-lg">
-                                    <div className="w-1.5 h-6 bg-blue-600 rounded-full" />
+                                    {/* <div className="w-1.5 h-6 bg-blue-600 rounded-full" /> */}
+                                    <User className="w-5 h-5 text-gray-600" />
                                     {t('senderInfo.title')}
                                 </Label>
                                 <div className="flex flex-row items-center">
@@ -1033,10 +1158,10 @@ export default function ReceivePage() {
                                             <img
                                                 src={senderInfo.card_image_url}
                                                 alt="Business Card"
-                                                className="w-full h-full object-contain rounded-lg shadow-md bg-white ring-1 ring-black/5"
+                                                className="w-full h-full object-contain rounded-lg shadow-md bg-white ring-1 ring-black/5 mb-10"
                                             />
                                         </div>
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-1">
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 ml-6 mr-6">
                                             {Object.entries(senderForm).map(([field, value]) => value &&
                                                 field !== 'card_image_url' &&
                                                 field !== 'card_image_name' &&
@@ -1053,11 +1178,11 @@ export default function ReceivePage() {
                                                     </div>
                                                 ))}
                                         </div>
-                                        <div>
+                                        <div className="gap-1 ml-6 mr-6">
                                             <span className="text-[10px] font-bold text-gray-400 uppercase">
                                                 LINK
                                             </span>
-                                            <div className="flex flex-wrap gap-1 ml-4 mr-4">
+                                            <div className="flex flex-wrap gap-1">
                                                 {Object.entries(senderForm).map(([field, value]) => value && (field.startsWith("SNS_") || field.startsWith("Service_")) ? (
                                                     <Button
                                                         key={field}
@@ -1121,11 +1246,14 @@ export default function ReceivePage() {
             {
                 step !== "PIN" && (
                     <Card className={cn("w-full max-w-xl mt-20 flex flex-col", step !== "COMPLETED" && "max-h-[calc(100vh-12rem)] min-h-[800px] overflow-hidden")}>
-                        {step !== "COMPLETED" && (
-                            <CardHeader>
-                                <CardTitle className="text-xl text-center">{t('chat.title')}</CardTitle>
-                            </CardHeader>
-                        )}
+
+                        <CardHeader>
+                            <CardTitle className="text-xl text-center flex items-center justify-left gap-2">
+                                <MessagesSquare className="w-5 h-5 text-gray-600" />
+                                {t('chat.title')}
+                            </CardTitle>
+                        </CardHeader>
+
                         <CardContent className="min-h-0 flex">
                             <div className="flex-1 min-h-0 flex flex-col pt-0 pb-0 overflow-y-auto space-y-2 bg-gray-100 border shadow-sm rounded-xl" >
                                 {messages.length === 0 ? (
