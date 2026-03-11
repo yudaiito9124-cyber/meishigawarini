@@ -5,7 +5,7 @@ import { DynamoDBDocumentClient, GetCommand, UpdateCommand } from '@aws-sdk/lib-
 import { createMessageNotificationEmail } from './templates/email';
 import { sendEmail } from './utils/email-client';
 import { isLocked, getRateLimitUpdate, getResetRateLimitUpdate } from './utils/rate-limit';
-import { signUrlIfS3, stripSignature, signUrlsInHtml, deleteFileByUrl } from './utils/s3';
+import { signUrlIfS3, stripSignature, signUrlsInHtml, deleteFileByUrl, copyS3Object } from './utils/s3';
 
 import * as crypto from 'crypto';
 
@@ -174,6 +174,77 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                     statusCode: 200,
                     headers: corsHeaders,
                     body: JSON.stringify({ message: 'Sender info updated', data: sender_info })
+                };
+            }
+
+            // === HANDLE SAVE AS NEW USER ===
+            if (type === 'save_as_new_user') {
+                const { sender_info } = body;
+                if (!sender_info) {
+                    return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Missing sender_info' }) };
+                }
+
+                const now = new Date();
+                const timestamp = now.toISOString().replace(/[:T]/g, '-').split('.')[0].replace(/-/g, '').slice(0, 8) + '-' + now.toISOString().split('T')[1].split('.')[0].replace(/:/g, '');
+                const randomUuid = crypto.randomUUID();
+                const userid = `${timestamp}-${randomUuid}`;
+
+                const copyFile = async (url: string) => {
+                    if (!url || !url.includes(BUCKET_NAME)) return url;
+                    try {
+                        const urlObj = new URL(url);
+                        let sourceKey = decodeURIComponent(urlObj.pathname.substring(1));
+                        if (sourceKey.startsWith(`${BUCKET_NAME}/`)) {
+                            sourceKey = sourceKey.substring(BUCKET_NAME.length + 1);
+                        }
+                        const filename = sourceKey.split('/').pop();
+                        const destKey = `user/${userid}/usercontent/${filename}`;
+                        await copyS3Object(BUCKET_NAME, sourceKey, destKey);
+                        
+                        const region = process.env.AWS_REGION || 'ap-northeast-1';
+                        return `https://${BUCKET_NAME}.s3.${region}.amazonaws.com/${destKey}`;
+                    } catch (e) {
+                        console.error("Failed to copy S3 object:", url, e);
+                        return url;
+                    }
+                };
+
+                let senderInfoStr = JSON.stringify(sender_info);
+                const urlRegex = /https?:\/\/[^"'\s\\]+/g;
+                const matches = senderInfoStr.match(urlRegex) || [];
+                const uniqueUrls = [...new Set(matches)].filter((url) => url.includes(BUCKET_NAME));
+
+                const urlMap = new Map<string, string>();
+                for (const url of uniqueUrls) {
+                    const newUrl = await copyFile(url);
+                    urlMap.set(url, newUrl);
+                }
+
+                for (const [oldUrl, newUrl] of urlMap.entries()) {
+                    senderInfoStr = senderInfoStr.split(oldUrl).join(newUrl);
+                }
+
+                const newSenderInfo = JSON.parse(senderInfoStr);
+
+                const keys = Object.keys(newSenderInfo);
+                await ddb.send(new UpdateCommand({
+                    TableName: TABLE_NAME,
+                    Key: { PK: `USER#${userid}`, SK: 'SENDING' },
+                    UpdateExpression: 'SET ' + ['#ts = :ts', ...keys.map((_, i) => `#field${i} = :val${i}`)].join(', '),
+                    ExpressionAttributeNames: {
+                        '#ts': 'ts_created_at',
+                        ...keys.reduce((acc, k, i) => ({ ...acc, [`#field${i}`]: k }), {})
+                    },
+                    ExpressionAttributeValues: {
+                        ':ts': new Date().toISOString(),
+                        ...keys.reduce((acc, k, i) => ({ ...acc, [`:val${i}`]: newSenderInfo[k] }), {})
+                    }
+                }));
+
+                return {
+                    statusCode: 200,
+                    headers: corsHeaders,
+                    body: JSON.stringify({ message: 'User created successfully', userid })
                 };
             }
 

@@ -13,7 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card";
 import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { MessageCircleQuestion, Paperclip, X, FileText, File as FileIcon, Loader2, SendHorizontal, Pencil, UserPlus, Globe, Gift, User, MessagesSquare, Heart, Sparkles, Calendar, Clock, ShoppingBasket, Plus, Copy, Trash2, ChevronDown, ImageIcon } from "lucide-react";
+import { MessageCircleQuestion, Paperclip, X, FileText, File as FileIcon, Loader2, Save, SendHorizontal, Pencil, UserPlus, Globe, Gift, User, MessagesSquare, Heart, Sparkles, Calendar, Clock, ShoppingBasket, Plus, Copy, Trash2, ChevronDown, ImageIcon } from "lucide-react";
 import { SiFacebook, SiInstagram, SiThreads, SiX, SiYoutube, SiLine, SiTiktok, SiLinktree, SiEight } from "@icons-pack/react-simple-icons";
 import SandboxedHtml from "@/components/SandboxedHtml";
 import { cn } from "@/lib/utils";
@@ -366,7 +366,7 @@ export default function ReceivePage() {
             } else {
                 alert(t('errors.invalidPassword'));
             }
-        } catch (e) {
+        } catch (e: any) {
             alert(t('errors.unlockFailed'));
         } finally {
             setLoading(false);
@@ -424,7 +424,7 @@ export default function ReceivePage() {
                     ...sanitizedInfo
                 }));
             }
-        } catch (e) {
+        } catch (e: any) {
             console.error(e);
         }
     }, [uuid, pin]);
@@ -524,6 +524,24 @@ export default function ReceivePage() {
         }
     };
 
+    const handleSaveAsNewUser = async () => {
+        setSenderInfoLoading(true);
+        try {
+            const res = await fetch(`${NEXT_PUBLIC_API_URL}/recipient/qrcodes/${uuid}/chat`, {
+                method: 'POST',
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ type: 'save_as_new_user', pin, sender_info: senderForm })
+            });
+            if (!res.ok) throw new Error("Failed to save data");
+            const data = await res.json();
+            alert(`Export as ${data.userid}`);
+        } catch (e: any) {
+            alert(t('senderInfo.updateFailed') + e.message);
+        } finally {
+            setSenderInfoLoading(false);
+        }
+    };
+
     const handleHtmlImageUpload = async (file: File) => {
         if (!uuid || !pin) return;
         setSenderInfoLoading(true);
@@ -558,7 +576,7 @@ export default function ReceivePage() {
             // Update local senderInfo with clean URLs for next save, but UI uses htmlImageUrls for display
             setSenderInfo(newSenderInfo);
             setSenderForm(newSenderInfo);
-        } catch (e) {
+        } catch (e: any) {
             console.error(e);
             alert(t('errors.uploadFailed'));
         } finally {
@@ -700,7 +718,7 @@ export default function ReceivePage() {
             });
             alert(t('chat.subscribeSuccess'));
             setNotificationEmail("");
-        } catch (e) {
+        } catch (e: any) {
             alert(t('chat.subscribeFailed'));
         } finally {
             setSubscribing(false);
@@ -1452,9 +1470,9 @@ export default function ReceivePage() {
                                                                                     fetch(`${NEXT_PUBLIC_API_URL}/recipient/qrcodes/${uuid}/chat`, {
                                                                                         method: 'POST',
                                                                                         headers: { "Content-Type": "application/json" },
-                                                                                        body: JSON.stringify({ 
-                                                                                            type: 'update_sender_info', 
-                                                                                            pin, 
+                                                                                        body: JSON.stringify({
+                                                                                            type: 'update_sender_info',
+                                                                                            pin,
                                                                                             sender_info: newSenderInfo,
                                                                                             deleted_html_image_urls: [deletedUrl]
                                                                                         })
@@ -1489,6 +1507,15 @@ export default function ReceivePage() {
                                                         e.target.value = "";
                                                     }}
                                                 />
+                                                <Button
+                                                    onClick={() => handleSaveAsNewUser()}
+                                                    disabled={senderInfoLoading}
+                                                    variant="ghost"
+                                                    className="border-blue-200 text-gray-600 justify-end"
+                                                >
+                                                    {senderInfoLoading ? <Loader2 className="w-2 h-2 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}
+                                                    {/* {senderInfoLoading ? t('senderInfo.saving') : t('senderInfo.saveData')} */}
+                                                </Button>
                                             </div>
                                         )}
 
