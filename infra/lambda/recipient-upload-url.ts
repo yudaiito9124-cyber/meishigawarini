@@ -5,6 +5,7 @@ import { DynamoDBDocumentClient, GetCommand } from '@aws-sdk/lib-dynamodb';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import * as crypto from 'crypto';
+import { signUrlIfS3 } from './utils/s3';
 
 const client = new DynamoDBClient({});
 const ddb = DynamoDBDocumentClient.from(client);
@@ -93,11 +94,14 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         const uploadUrl = await getSignedUrl(s3, command, { expiresIn: 300 });
         const region = process.env.AWS_REGION || 'ap-northeast-1';
         const publicUrl = `https://${BUCKET_NAME}.s3.${region}.amazonaws.com/${key}`;
+        
+        // Sign the publicUrl for immediate preview in frontend
+        const signedPublicUrl = await signUrlIfS3(publicUrl, BUCKET_NAME);
 
         return {
             statusCode: 200,
             headers: corsHeaders,
-            body: JSON.stringify({ uploadUrl, publicUrl, key })
+            body: JSON.stringify({ uploadUrl, publicUrl: signedPublicUrl, key })
         };
 
     } catch (error: any) {

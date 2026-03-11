@@ -4,6 +4,7 @@ import { DynamoDBDocumentClient, PutCommand, QueryCommand, GetCommand, UpdateCom
 import { S3Client, PutObjectCommand, CopyObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import * as crypto from 'crypto';
+import { signUrlIfS3, stripSignature } from './utils/s3';
 
 const client = new DynamoDBClient({});
 const ddb = DynamoDBDocumentClient.from(client);
@@ -129,7 +130,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                     name,
                     description,
                     detail_html: detail_html || '', // Store the HTML code
-                    image_url,
+                    image_url: stripSignature(image_url),
                     price,
                     valid_days: validityPeriod,
                     status: 'ACTIVE', // Default status
@@ -259,7 +260,10 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             const region = process.env.AWS_REGION || 'ap-northeast-1';
             const publicUrl = `https://${BUCKET_NAME}.s3.${region}.amazonaws.com/${key}`;
 
-            return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ uploadUrl, publicUrl }) };
+            // Also sign the publicUrl for immediate preview in frontend
+            const signedPublicUrl = await signUrlIfS3(publicUrl, BUCKET_NAME);
+
+            return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ uploadUrl, publicUrl: signedPublicUrl }) };
         }
 
         // 4. List Products (GET /shop/{shopId}/products)
@@ -276,7 +280,15 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             const items = (res.Items || []).map(item => ({
                 ...item,
                 product_id: item.SK.replace('PRODUCT#', '')
-            }));
+            })) as any[];
+
+            // Sign image URLs
+            for (const item of items) {
+                if (item.image_url) {
+                    item.image_url = await signUrlIfS3(item.image_url, BUCKET_NAME);
+                }
+            }
+
             return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ items }) };
         }
 

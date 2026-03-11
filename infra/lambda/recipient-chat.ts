@@ -5,10 +5,12 @@ import { DynamoDBDocumentClient, GetCommand, UpdateCommand } from '@aws-sdk/lib-
 import { createMessageNotificationEmail } from './templates/email';
 import { sendEmail } from './utils/email-client';
 import { isLocked, getRateLimitUpdate, getResetRateLimitUpdate } from './utils/rate-limit';
+import { signUrlIfS3, stripSignature } from './utils/s3';
 
 const client = new DynamoDBClient({});
 const ddb = DynamoDBDocumentClient.from(client);
 const TABLE_NAME = process.env.TABLE_NAME || '';
+const BUCKET_NAME = process.env.BUCKET_NAME || '';
 
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
@@ -126,7 +128,10 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                     Key: { PK: `QR#${uuid}`, SK: 'CHAT' },
                     UpdateExpression: 'SET sender_info = :info',
                     ExpressionAttributeValues: {
-                        ':info': sender_info
+                        ':info': {
+                            ...sender_info,
+                            card_image_url: stripSignature(sender_info.card_image_url)
+                        }
                     }
                 }));
 
@@ -154,7 +159,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             };
 
             if (file_url) {
-                newMessage.file_url = file_url;
+                newMessage.file_url = stripSignature(file_url);
                 newMessage.file_name = file_name;
                 newMessage.file_type = file_type;
                 newMessage.file_size = file_size;
@@ -283,13 +288,28 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 Key: { PK: `QR#${uuid}`, SK: 'CHAT' }
             }));
 
+            const messages = getChat.Item?.messages || [];
+            const sender_info = getChat.Item?.sender_info || null;
+
+            // Sign URLs for messages
+            for (const msg of messages) {
+                if (msg.file_url) {
+                    msg.file_url = await signUrlIfS3(msg.file_url, BUCKET_NAME);
+                }
+            }
+
+            // Sign URL for sender info
+            if (sender_info && sender_info.card_image_url) {
+                sender_info.card_image_url = await signUrlIfS3(sender_info.card_image_url, BUCKET_NAME);
+            }
+
             return {
                 statusCode: 200,
                 headers: corsHeaders,
                 body: JSON.stringify({
-                    messages: getChat.Item?.messages || [],
+                    messages,
                     total_size_bytes: getChat.Item?.total_size_bytes || 0,
-                    sender_info: getChat.Item?.sender_info || null
+                    sender_info
                 })
             };
         }

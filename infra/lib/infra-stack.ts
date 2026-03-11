@@ -40,13 +40,8 @@ export class InfraStack extends cdk.Stack {
           allowedHeaders: ['*'],
         },
       ],
-      publicReadAccess: true, // For prototype simplicity. Alternatively use CloudFront or Presigned Get Urls.
-      blockPublicAccess: {
-        blockPublicAcls: false,
-        blockPublicPolicy: false,
-        ignorePublicAcls: false,
-        restrictPublicBuckets: false,
-      } as any // Forced public access for prototype
+      publicReadAccess: false,
+      blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
     });
 
     // Cognito User Pool
@@ -124,7 +119,8 @@ export class InfraStack extends cdk.Stack {
       ...commonProps,
       environment: {
         ...commonProps.environment,
-        USER_POOL_ID: userPool.userPoolId
+        USER_POOL_ID: userPool.userPoolId,
+        BUCKET_NAME: bucket.bucketName,
       }
     });
     table.grantReadData(adminListFn);
@@ -132,6 +128,7 @@ export class InfraStack extends cdk.Stack {
       actions: ['cognito-idp:AdminGetUser'],
       resources: [userPool.userPoolArn]
     }));
+    bucket.grantRead(adminListFn);
 
     // Lambda: Shop & Product Mgmt
     const shopMgmtFn = new nodejs.NodejsFunction(this, 'ShopMgmtFn', {
@@ -193,6 +190,7 @@ export class InfraStack extends cdk.Stack {
     });
     table.grantReadData(recipientUploadUrlFn);
     bucket.grantPut(recipientUploadUrlFn);
+    bucket.grantRead(recipientUploadUrlFn);
 
 
 
@@ -458,10 +456,12 @@ export class InfraStack extends cdk.Stack {
       ...commonProps,
       environment: {
         ...commonProps.environment,
-        USER_POOL_ID: userPool.userPoolId
+        USER_POOL_ID: userPool.userPoolId,
+        BUCKET_NAME: bucket.bucketName,
       }
     });
     table.grantReadWriteData(recipientVerifyPinFn);
+    bucket.grantRead(recipientVerifyPinFn);
     // Allow Lambda to fetch user attributes (email) from Cognito
     recipientVerifyPinFn.addToRolePolicy(new iam.PolicyStatement({
       actions: ['cognito-idp:AdminGetUser'],
@@ -482,10 +482,12 @@ export class InfraStack extends cdk.Stack {
       entry: path.join(__dirname, '../lambda/recipient-chat.ts'),
       ...commonProps,
       environment: {
-        ...commonProps.environment
+        ...commonProps.environment,
+        BUCKET_NAME: bucket.bucketName,
       }
     });
     table.grantReadWriteData(recipientChatFn);
+    bucket.grantRead(recipientChatFn);
 
     const qrIdResourceRecip = qrResourceRecip.addResource('{uuid}');
 

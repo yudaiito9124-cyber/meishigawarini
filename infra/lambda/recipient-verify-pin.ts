@@ -4,12 +4,14 @@ import { DynamoDBDocumentClient, GetCommand, UpdateCommand } from '@aws-sdk/lib-
 import { CognitoIdentityProviderClient, AdminGetUserCommand } from '@aws-sdk/client-cognito-identity-provider';
 import * as bcrypt from 'bcryptjs';
 import { isLocked, getRateLimitUpdate, getResetRateLimitUpdate } from './utils/rate-limit';
+import { signUrlIfS3 } from './utils/s3';
 
 const client = new DynamoDBClient({});
 const ddb = DynamoDBDocumentClient.from(client);
 const cognito = new CognitoIdentityProviderClient({});
 const TABLE_NAME = process.env.TABLE_NAME || '';
 const USER_POOL_ID = process.env.USER_POOL_ID || '';
+const BUCKET_NAME = process.env.BUCKET_NAME || '';
 
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
@@ -139,6 +141,9 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 }
             }));
             product = prodRes.Item;
+            if (product && product.image_url) {
+                product.image_url = await signUrlIfS3(product.image_url, BUCKET_NAME);
+            }
         }
 
         // Fetch Shop Metadata for Email
