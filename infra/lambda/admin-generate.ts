@@ -35,7 +35,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 
 
         // Limit max count for safety
-        if (count > 10) { // DynamoDB BatchWrite limit is 25 items
+        if (count > 100) { // DynamoDB BatchWrite limit is 25 items
             return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Max 25 items per batch' }) };
         }
 

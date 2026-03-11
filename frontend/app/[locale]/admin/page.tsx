@@ -530,7 +530,7 @@ function QRCodeListSection({ apiUrl, onGeneratePDF }: { apiUrl: string, onGenera
                     </div>
                 </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-4 ">
                 <div className="flex flex-wrap fpex gap-2 justify-start items-center ">
                     {["UNASSIGNED", "LINKED", "ACTIVE", "USED", "SHIPPED", "COMPLETED", "EXPIRED", "BANNED"].map((s) => (
                         <Button
@@ -579,9 +579,8 @@ function QRCodeListSection({ apiUrl, onGeneratePDF }: { apiUrl: string, onGenera
                     <p className="text-sm text-gray-500 mb-2">
                         {t('list.info', { status: t(`list.status.${status.toLowerCase()}`), count: codes.length })}
                     </p>
-                    <div className="overflow-auto max-h-96">
-                        <Table>
-                            <TableHeader>
+                        <Table wrapperClassName="max-h-[70vh] overflow-auto">
+                            <TableHeader className="sticky top-0 bg-white z-10 shadow-sm">
                                 <TableRow>
                                     <TableHead>{t('list.table.uuid')}</TableHead>
                                     <TableHead>{t('list.table.pin')}</TableHead>
@@ -767,7 +766,6 @@ function QRCodeListSection({ apiUrl, onGeneratePDF }: { apiUrl: string, onGenera
                                 )}
                             </TableBody>
                         </Table>
-                    </div>
                 </div>
             </CardContent>
         </Card>
