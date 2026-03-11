@@ -81,7 +81,6 @@ export default function AdminPage() {
         return null;
     }
 
-
     const handleGenerate = async () => {
         try {
             const session = await fetchAuthSession();
@@ -393,15 +392,15 @@ export default function AdminPage() {
                             {generatedBatches.length === 0 ? <p className="text-gray-500">{t('batches.noBatches')}</p> : (
                                 generatedBatches.map(batch => (
                                     <div key={batch.id} className="bg-white border p-4 rounded-md">
-                                        <div className="flex justify-between items-center mb-2">
-                                            <div>
-                                                <p className="font-medium">{t('batches.batchId', { id: batch.id })}</p>
-                                                <p className="text-sm text-gray-500">{t('batches.info', { count: batch.count, date: batch.date })}</p>
+                                        <div className="flex flex-wrap items-center mb-2">
+                                            <div className="flex gap-2 flex-wrap flex-rows items-center">
+                                                <div>
+                                                    <p className="font-medium">{t('batches.batchId', { id: batch.id })}</p>
+                                                    <p className="text-sm text-gray-500">{t('batches.info', { count: batch.count, date: batch.date })}</p>
+                                                </div>
+                                                <p className="flex justify-center items-center text-sm bg-green-100 text-green-800 px-3 py-1 rounded-xl">{batch.status}</p>
                                             </div>
-                                            <span className="text-sm bg-green-100 text-green-800 px-2 py-1 rounded">
-                                                {batch.status}
-                                            </span>
-                                            <Button variant="outline" size="sm" onClick={() => generatePDF(batch)}>{t('batches.downloadPdf')}</Button>
+                                            <Button className="ml-auto" variant="outline" size="sm" onClick={() => generatePDF(batch)}>{t('batches.downloadPdf')}</Button>
                                         </div>
                                         {/* Display Codes */}
                                         <div className="mt-2 bg-gray-100 p-2 rounded text-xs font-mono overflow-auto max-h-40">
@@ -447,6 +446,79 @@ function QRCodeListSection({ apiUrl, onGeneratePDF }: { apiUrl: string, onGenera
     const [codes, setCodes] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
 
+
+
+    const handleExportCSV = () => {
+        if (codes.length === 0) return;
+
+        // Header for CSV
+        const headers = [
+            t('list.table.uuid'),
+            t('list.table.pin'),
+            t('list.table.status'),
+            t('list.table.createdAt'),
+            t('shopInfo.name'),
+            t('shopInfo.id'),
+            t('shopInfo.contact'),
+            tShop('orders.productName'),
+            tShop('orders.recipient'),
+            tShop('orders.contact'),
+            tShop('orders.address'),
+            tShop('orders.preferredDateTime'),
+            tShop('orders.shipDialog.deliveryCompany'),
+            tShop('orders.shipDialog.label'),
+            tShop('orders.userMessage'),
+            tShop('orders.shopMemo'),
+        ];
+
+        // Map data to rows
+        const rows = codes.map(item => {
+            const uuid = item.PK.replace('QR#', '');
+            const statusLabel = st(item.status ? item.status.toLowerCase() : 'active');
+            const updatedAt = item.ts_updated_at ? new Date(item.ts_updated_at).toLocaleString() : '-';
+            const email = item.shipping_info?.email || '-';
+            const phone = item.shipping_info?.phone || '-';
+            const contact = `${email}${phone !== '-' ? ' / ' + phone : ''}`;
+            const preferredDateTime = `${item.preferred_date || '-'} / ${item.preferred_time || '-'}`;
+
+            return [
+                uuid,
+                item.pin || '-',
+                statusLabel,
+                updatedAt,
+                item.shop_name || '-',
+                item.shop_id || '-',
+                item.shop_email || '-',
+                item.product_name || item.product_id || '-',
+                item.recipient_name || '-',
+                contact,
+                item.address || '-',
+                preferredDateTime,
+                item.delivery_company || '-',
+                item.tracking_number || '-',
+                item.memo_for_users || '-',
+                item.memo_for_shop || '-',
+            ];
+        });
+
+        // Combine into CSV string
+        const csvContent = [
+            headers.join(','),
+            ...rows.map(row => row.map(val => `"${String(val).replace(/"/g, '""')}"`).join(','))
+        ].join('\n');
+
+        // Create blob and download
+        const blob = new Blob(["\uFEFF" + csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+        link.href = url;
+        link.setAttribute('download', `qrcodes-export-${status.toLowerCase()}-${timestamp}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
     const fetchCodes = async (targetStatus?: string) => {
         setLoading(true);
         try {
@@ -477,11 +549,6 @@ function QRCodeListSection({ apiUrl, onGeneratePDF }: { apiUrl: string, onGenera
             setLoading(false);
         }
     };
-
-
-    // Initial fetch when invalidating or status changes? 
-    // Let's make it manual for now or useEffect
-    // useEffect(() => { fetchCodes(); }, [status]); 
 
     const handleDeleteAllBanned = async () => {
         if (status !== 'BANNED') return;
@@ -524,6 +591,9 @@ function QRCodeListSection({ apiUrl, onGeneratePDF }: { apiUrl: string, onGenera
                                 {t('list.deleteAllBanned')}
                             </Button>
                         )}
+                        <Button variant="outline" size="sm" onClick={handleExportCSV} disabled={loading || codes.length === 0}>
+                            {t('list.exportCsv')}
+                        </Button>
                         <Button variant="outline" size="sm" onClick={() => fetchCodes()} disabled={loading}>
                             {loading ? t('list.loading') : t('list.refresh')}
                         </Button>
@@ -579,193 +649,193 @@ function QRCodeListSection({ apiUrl, onGeneratePDF }: { apiUrl: string, onGenera
                     <p className="text-sm text-gray-500 mb-2">
                         {t('list.info', { status: t(`list.status.${status.toLowerCase()}`), count: codes.length })}
                     </p>
-                        <Table wrapperClassName="max-h-[70vh] overflow-auto">
-                            <TableHeader className="sticky top-0 bg-white z-10 shadow-sm">
+                    <Table wrapperClassName="max-h-[70vh] overflow-auto">
+                        <TableHeader className="sticky top-0 bg-white z-10 shadow-sm">
+                            <TableRow>
+                                <TableHead>{t('list.table.uuid')}</TableHead>
+                                <TableHead>{t('list.table.pin')}</TableHead>
+                                <TableHead>{t('list.table.status')}</TableHead>
+                                <TableHead>{t('list.table.createdAt')}</TableHead>
+                                <TableHead>{t('list.table.actions')}</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {codes.length === 0 ? (  // there is nocodes 
                                 <TableRow>
-                                    <TableHead>{t('list.table.uuid')}</TableHead>
-                                    <TableHead>{t('list.table.pin')}</TableHead>
-                                    <TableHead>{t('list.table.status')}</TableHead>
-                                    <TableHead>{t('list.table.createdAt')}</TableHead>
-                                    <TableHead>{t('list.table.actions')}</TableHead>
+                                    <TableCell colSpan={4} className="text-center text-gray-500">
+                                        {t('list.table.noCodes')}
+                                    </TableCell>
                                 </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {codes.length === 0 ? (  // there is nocodes 
-                                    <TableRow>
-                                        <TableCell colSpan={4} className="text-center text-gray-500">
-                                            {t('list.table.noCodes')}
-                                        </TableCell>
-                                    </TableRow>
-                                ) : ( // there is some codes
-                                    codes.map((item: any) => {
-                                        const uuid = item.PK.replace('QR#', '');
-                                        return (
-                                            <Dialog key={item.PK}>
-                                                <DialogTrigger asChild>
-                                                    <TableRow className="cursor-pointer hover:bg-gray-100">
-                                                        <TableCell className="font-mono text-xs select-all">
-                                                            {uuid}
-                                                        </TableCell>
-                                                        <TableCell className="font-mono text-xs select-all">
-                                                            {item.pin}
-                                                        </TableCell>
-                                                        <TableCell>
-                                                            <span className={`px-2 py-1 rounded text-xs ${item.status === 'UNASSIGNED' ? 'bg-gray-100' :
-                                                                item.status === 'LINKED' ? 'bg-emerald-100 text-emerald-800' :
-                                                                    item.status === 'ACTIVE' ? 'bg-yellow-100 text-yellow-800' :
-                                                                        item.status === 'USED' ? 'bg-orange-100 text-orange-800' :
-                                                                            item.status === 'SHIPPED' ? 'bg-indigo-100 text-indigo-800' :
-                                                                                item.status === 'COMPLETED' ? 'bg-purple-100 text-purple-800' :
-                                                                                    item.status === 'EXPIRED' ? 'bg-gray-100 text-gray-800' :
-                                                                                        item.status === 'BANNED' ? 'bg-red-100 text-red-800' :
-                                                                                            'bg-green-100 text-green-800'
-                                                                }`}>
-                                                                {st(item.status ? item.status.toLowerCase() : 'active')}
-                                                            </span>
-                                                        </TableCell>
-                                                        <TableCell className="text-xs text-gray-500">
-                                                            {item.ts_updated_at ? new Date(item.ts_updated_at).toLocaleString() : '-'}
-                                                        </TableCell>
-                                                        <TableCell onClick={(e) => e.stopPropagation()}>
-                                                            <Button
-                                                                variant="outline"
-                                                                size="sm"
-                                                                className="mr-2 h-6 text-xs"
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation(); // Stop dialog trigger
-                                                                    const uuid = item.PK.replace('QR#', '');
-                                                                    onGeneratePDF({
-                                                                        id: uuid,
-                                                                        codes: [{ uuid, pin: item.pin }]
-                                                                    });
-                                                                }}
-                                                            >
-                                                                {t('list.ban.pdf')}
-                                                            </Button>
-                                                            {item.status !== 'BANNED' && (
-                                                                <BanButton uuid={item.PK.replace('QR#', '')} apiUrl={apiUrl} onSuccess={fetchCodes} />
-                                                            )}
-                                                        </TableCell>
-                                                    </TableRow>
-                                                </DialogTrigger>
-                                                <DialogContent className="max-w-md">
-                                                    <DialogHeader>
-                                                        <DialogTitle>{tShop('orders.details')}</DialogTitle>
-                                                        <DialogDescription className="font-mono text-xs text-gray-500">
-                                                            ID: {uuid}
-                                                        </DialogDescription>
-                                                    </DialogHeader>
+                            ) : ( // there is some codes
+                                codes.map((item: any) => {
+                                    const uuid = item.PK.replace('QR#', '');
+                                    return (
+                                        <Dialog key={item.PK}>
+                                            <DialogTrigger asChild>
+                                                <TableRow className="cursor-pointer hover:bg-gray-100">
+                                                    <TableCell className="font-mono text-xs select-all">
+                                                        {uuid}
+                                                    </TableCell>
+                                                    <TableCell className="font-mono text-xs select-all">
+                                                        {item.pin}
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <span className={`px-2 py-1 rounded text-xs ${item.status === 'UNASSIGNED' ? 'bg-gray-100' :
+                                                            item.status === 'LINKED' ? 'bg-emerald-100 text-emerald-800' :
+                                                                item.status === 'ACTIVE' ? 'bg-yellow-100 text-yellow-800' :
+                                                                    item.status === 'USED' ? 'bg-orange-100 text-orange-800' :
+                                                                        item.status === 'SHIPPED' ? 'bg-indigo-100 text-indigo-800' :
+                                                                            item.status === 'COMPLETED' ? 'bg-purple-100 text-purple-800' :
+                                                                                item.status === 'EXPIRED' ? 'bg-gray-100 text-gray-800' :
+                                                                                    item.status === 'BANNED' ? 'bg-red-100 text-red-800' :
+                                                                                        'bg-green-100 text-green-800'
+                                                            }`}>
+                                                            {st(item.status ? item.status.toLowerCase() : 'active')}
+                                                        </span>
+                                                    </TableCell>
+                                                    <TableCell className="text-xs text-gray-500">
+                                                        {item.ts_updated_at ? new Date(item.ts_updated_at).toLocaleString() : '-'}
+                                                    </TableCell>
+                                                    <TableCell onClick={(e) => e.stopPropagation()}>
+                                                        <Button
+                                                            variant="outline"
+                                                            size="sm"
+                                                            className="mr-2 h-6 text-xs"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation(); // Stop dialog trigger
+                                                                const uuid = item.PK.replace('QR#', '');
+                                                                onGeneratePDF({
+                                                                    id: uuid,
+                                                                    codes: [{ uuid, pin: item.pin }]
+                                                                });
+                                                            }}
+                                                        >
+                                                            {t('list.ban.pdf')}
+                                                        </Button>
+                                                        {item.status !== 'BANNED' && (
+                                                            <BanButton uuid={item.PK.replace('QR#', '')} apiUrl={apiUrl} onSuccess={fetchCodes} />
+                                                        )}
+                                                    </TableCell>
+                                                </TableRow>
+                                            </DialogTrigger>
+                                            <DialogContent className="max-w-md">
+                                                <DialogHeader>
+                                                    <DialogTitle>{tShop('orders.details')}</DialogTitle>
+                                                    <DialogDescription className="font-mono text-xs text-gray-500">
+                                                        ID: {uuid}
+                                                    </DialogDescription>
+                                                </DialogHeader>
 
-                                                    <div className="space-y-4 py-4 max-h-[70vh] overflow-y-auto">
-                                                        {/* Product Info */}
-                                                        <div>
-                                                            <h4 className="text-sm font-semibold text-gray-500">{tShop('orders.productName')}</h4>
-                                                            <p className="font-medium">{item.product_name || item.product_id || '-'}</p>
-                                                        </div>
+                                                <div className="space-y-4 py-4 max-h-[70vh] overflow-y-auto">
+                                                    {/* Product Info */}
+                                                    <div>
+                                                        <h4 className="text-sm font-semibold text-gray-500">{tShop('orders.productName')}</h4>
+                                                        <p className="font-medium">{item.product_name || item.product_id || '-'}</p>
+                                                    </div>
 
 
-                                                        {/* Shop Info */}
-                                                        <div>
-                                                            <h4 className="text-sm font-semibold text-gray-500">{t('shopInfo.title')}</h4>
-                                                            <div className="text-sm mt-1 grid grid-cols-[80px_1fr] gap-x-2 gap-y-1">
-                                                                <span className="text-gray-400 text-xs">{t('shopInfo.name')}</span>
-                                                                <span className="font-medium">{item.shop_name || '-'}</span>
+                                                    {/* Shop Info */}
+                                                    <div>
+                                                        <h4 className="text-sm font-semibold text-gray-500">{t('shopInfo.title')}</h4>
+                                                        <div className="text-sm mt-1 grid grid-cols-[80px_1fr] gap-x-2 gap-y-1">
+                                                            <span className="text-gray-400 text-xs">{t('shopInfo.name')}</span>
+                                                            <span className="font-medium">{item.shop_name || '-'}</span>
 
-                                                                <span className="text-gray-400 text-xs">{t('shopInfo.id')}</span>
-                                                                <span className="font-mono text-xs text-gray-600">{item.shop_id || '-'}</span>
+                                                            <span className="text-gray-400 text-xs">{t('shopInfo.id')}</span>
+                                                            <span className="font-mono text-xs text-gray-600">{item.shop_id || '-'}</span>
 
-                                                                <span className="text-gray-400 text-xs">{t('shopInfo.contact')}</span>
-                                                                <span className="text-gray-600 break-all">{item.shop_email || '-'}</span>
-                                                            </div>
-                                                        </div>
-
-
-                                                        {/* Status */}
-                                                        <div>
-                                                            <h4 className="text-sm font-semibold text-gray-500">{tShop('orders.status')}</h4>
-
-                                                            <span className={`px-2 py-1 rounded text-xs ${item.status === 'UNASSIGNED' ? 'bg-gray-100' :
-                                                                item.status === 'LINKED' ? 'bg-emerald-100 text-emerald-800' :
-                                                                    item.status === 'ACTIVE' ? 'bg-yellow-100 text-yellow-800' :
-                                                                        item.status === 'USED' ? 'bg-orange-100 text-orange-800' :
-                                                                            item.status === 'SHIPPED' ? 'bg-indigo-100 text-indigo-800' :
-                                                                                item.status === 'COMPLETED' ? 'bg-purple-100 text-purple-800' :
-                                                                                    item.status === 'EXPIRED' ? 'bg-gray-100 text-gray-800' :
-                                                                                        item.status === 'BANNED' ? 'bg-red-100 text-red-800' :
-                                                                                            'bg-green-100 text-green-800'
-                                                                }`}>{st(item.status ? item.status.toLowerCase() : 'active')}</span>
-                                                        </div>
-
-                                                        {/* Recipient Info */}
-                                                        <div className="grid grid-cols-2 gap-4">
-                                                            <div>
-                                                                <h4 className="text-sm font-semibold text-gray-500">{tShop('orders.recipient')}</h4>
-                                                                <p>{item.recipient_name || '-'}</p>
-                                                            </div>
-                                                            <div>
-                                                                <h4 className="text-sm font-semibold text-gray-500">{tShop('orders.contact')}</h4>
-                                                                <p className="break-all">{item.shipping_info?.email || '-'}</p>
-                                                                <p className="text-sm mt-1">{item.shipping_info?.phone || '-'}</p>
-                                                            </div>
-                                                        </div>
-
-                                                        <div>
-                                                            <h4 className="text-sm font-semibold text-gray-500">{tShop('orders.address')}</h4>
-                                                            {item.postal_code && <p className="text-sm">〒{item.postal_code}</p>}
-                                                            <p className="whitespace-pre-wrap text-sm">{item.address || '-'}</p>
-                                                        </div>
-
-
-                                                        <div>
-                                                            <h4 className="text-sm font-semibold text-gray-500">{tShop('orders.preferredDateTime')}</h4>
-                                                            <p className="text-sm">{item.preferred_date}  /  {item.preferred_time}</p>
-                                                        </div>
-
-                                                        {/* Order Info */}
-                                                        <div className="pt-2 space-y-4">
-                                                            {item.memo_for_users && (
-                                                                <div>
-                                                                    <h4 className="text-sm font-semibold text-gray-500">{tShop('orders.userMessage')}</h4>
-                                                                    <p className="text-sm bg-gray-50 p-2 rounded">{item.memo_for_users}</p>
-                                                                </div>
-                                                            )}
-                                                            {item.memo_for_shop && (
-                                                                <div>
-                                                                    <h4 className="text-sm font-semibold text-gray-500">{tShop('orders.shopMemo')}</h4>
-                                                                    <p className="text-sm bg-orange-50 p-2 rounded">{item.memo_for_shop}</p>
-                                                                </div>
-                                                            )}
-                                                            <div>
-                                                                <h4 className="text-sm font-semibold text-gray-500">{tShop('orders.shipDialog.deliveryCompany')}</h4>
-                                                                <p className="font-mono">{item.delivery_company || '-'}</p>
-                                                            </div>
-                                                            <div>
-                                                                <h4 className="text-sm font-semibold text-gray-500">{tShop('orders.shipDialog.label')}</h4>
-                                                                <p className="font-mono">{item.tracking_number || '-'}</p>
-                                                            </div>
-                                                        </div>
-
-                                                        <div className="grid grid-cols-2 gap-4">
-                                                            <div>
-                                                                <h4 className="text-sm font-semibold text-gray-500">{tShop('orders.timestamps')}</h4>
-                                                                <p className="text-sm">{ts('ts_updated_at') + ": " + (item.ts_updated_at ? new Date(item.ts_updated_at).toLocaleString() : "-")}</p>
-                                                                <p className="text-sm">{ts('ts_linked_at') + ": " + (item.ts_linked_at ? new Date(item.ts_linked_at).toLocaleString() : "-")}</p>
-                                                                <p className="text-sm">{ts('ts_activated_at') + ": " + (item.ts_activated_at ? new Date(item.ts_activated_at).toLocaleString() : "-")}</p>
-                                                                <p className="text-sm">{ts('ts_submitted_at') + ": " + (item.ts_submitted_at ? new Date(item.ts_submitted_at).toLocaleString() : "-")}</p>
-                                                                <p className="text-sm">{ts('ts_shipped_at') + ": " + (item.ts_shipped_at ? new Date(item.ts_shipped_at).toLocaleString() : "-")}</p>
-                                                                <p className="text-sm">{ts('ts_completed_at') + ": " + (item.ts_completed_at ? new Date(item.ts_completed_at).toLocaleString() : "-")}</p>
-                                                                <p className="text-sm">{ts('ts_expired_at') + ": " + (item.ts_expired_at ? new Date(item.ts_expired_at).toLocaleString() : "-")}</p>
-                                                                <p className="text-sm">{ts('ts_banned_at') + ": " + (item.ts_banned_at ? new Date(item.ts_banned_at).toLocaleString() : "-")}</p>
-                                                            </div>
+                                                            <span className="text-gray-400 text-xs">{t('shopInfo.contact')}</span>
+                                                            <span className="text-gray-600 break-all">{item.shop_email || '-'}</span>
                                                         </div>
                                                     </div>
-                                                </DialogContent>
-                                            </Dialog>
-                                        );
-                                    })
-                                )}
-                            </TableBody>
-                        </Table>
+
+
+                                                    {/* Status */}
+                                                    <div>
+                                                        <h4 className="text-sm font-semibold text-gray-500">{tShop('orders.status')}</h4>
+
+                                                        <span className={`px-2 py-1 rounded text-xs ${item.status === 'UNASSIGNED' ? 'bg-gray-100' :
+                                                            item.status === 'LINKED' ? 'bg-emerald-100 text-emerald-800' :
+                                                                item.status === 'ACTIVE' ? 'bg-yellow-100 text-yellow-800' :
+                                                                    item.status === 'USED' ? 'bg-orange-100 text-orange-800' :
+                                                                        item.status === 'SHIPPED' ? 'bg-indigo-100 text-indigo-800' :
+                                                                            item.status === 'COMPLETED' ? 'bg-purple-100 text-purple-800' :
+                                                                                item.status === 'EXPIRED' ? 'bg-gray-100 text-gray-800' :
+                                                                                    item.status === 'BANNED' ? 'bg-red-100 text-red-800' :
+                                                                                        'bg-green-100 text-green-800'
+                                                            }`}>{st(item.status ? item.status.toLowerCase() : 'active')}</span>
+                                                    </div>
+
+                                                    {/* Recipient Info */}
+                                                    <div className="grid grid-cols-2 gap-4">
+                                                        <div>
+                                                            <h4 className="text-sm font-semibold text-gray-500">{tShop('orders.recipient')}</h4>
+                                                            <p>{item.recipient_name || '-'}</p>
+                                                        </div>
+                                                        <div>
+                                                            <h4 className="text-sm font-semibold text-gray-500">{tShop('orders.contact')}</h4>
+                                                            <p className="break-all">{item.shipping_info?.email || '-'}</p>
+                                                            <p className="text-sm mt-1">{item.shipping_info?.phone || '-'}</p>
+                                                        </div>
+                                                    </div>
+
+                                                    <div>
+                                                        <h4 className="text-sm font-semibold text-gray-500">{tShop('orders.address')}</h4>
+                                                        {item.postal_code && <p className="text-sm">〒{item.postal_code}</p>}
+                                                        <p className="whitespace-pre-wrap text-sm">{item.address || '-'}</p>
+                                                    </div>
+
+
+                                                    <div>
+                                                        <h4 className="text-sm font-semibold text-gray-500">{tShop('orders.preferredDateTime')}</h4>
+                                                        <p className="text-sm">{item.preferred_date}  /  {item.preferred_time}</p>
+                                                    </div>
+
+                                                    {/* Order Info */}
+                                                    <div className="pt-2 space-y-4">
+                                                        {item.memo_for_users && (
+                                                            <div>
+                                                                <h4 className="text-sm font-semibold text-gray-500">{tShop('orders.userMessage')}</h4>
+                                                                <p className="text-sm bg-gray-50 p-2 rounded">{item.memo_for_users}</p>
+                                                            </div>
+                                                        )}
+                                                        {item.memo_for_shop && (
+                                                            <div>
+                                                                <h4 className="text-sm font-semibold text-gray-500">{tShop('orders.shopMemo')}</h4>
+                                                                <p className="text-sm bg-orange-50 p-2 rounded">{item.memo_for_shop}</p>
+                                                            </div>
+                                                        )}
+                                                        <div>
+                                                            <h4 className="text-sm font-semibold text-gray-500">{tShop('orders.shipDialog.deliveryCompany')}</h4>
+                                                            <p className="font-mono">{item.delivery_company || '-'}</p>
+                                                        </div>
+                                                        <div>
+                                                            <h4 className="text-sm font-semibold text-gray-500">{tShop('orders.shipDialog.label')}</h4>
+                                                            <p className="font-mono">{item.tracking_number || '-'}</p>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="grid grid-cols-2 gap-4">
+                                                        <div>
+                                                            <h4 className="text-sm font-semibold text-gray-500">{tShop('orders.timestamps')}</h4>
+                                                            <p className="text-sm">{ts('ts_updated_at') + ": " + (item.ts_updated_at ? new Date(item.ts_updated_at).toLocaleString() : "-")}</p>
+                                                            <p className="text-sm">{ts('ts_linked_at') + ": " + (item.ts_linked_at ? new Date(item.ts_linked_at).toLocaleString() : "-")}</p>
+                                                            <p className="text-sm">{ts('ts_activated_at') + ": " + (item.ts_activated_at ? new Date(item.ts_activated_at).toLocaleString() : "-")}</p>
+                                                            <p className="text-sm">{ts('ts_submitted_at') + ": " + (item.ts_submitted_at ? new Date(item.ts_submitted_at).toLocaleString() : "-")}</p>
+                                                            <p className="text-sm">{ts('ts_shipped_at') + ": " + (item.ts_shipped_at ? new Date(item.ts_shipped_at).toLocaleString() : "-")}</p>
+                                                            <p className="text-sm">{ts('ts_completed_at') + ": " + (item.ts_completed_at ? new Date(item.ts_completed_at).toLocaleString() : "-")}</p>
+                                                            <p className="text-sm">{ts('ts_expired_at') + ": " + (item.ts_expired_at ? new Date(item.ts_expired_at).toLocaleString() : "-")}</p>
+                                                            <p className="text-sm">{ts('ts_banned_at') + ": " + (item.ts_banned_at ? new Date(item.ts_banned_at).toLocaleString() : "-")}</p>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </DialogContent>
+                                        </Dialog>
+                                    );
+                                })
+                            )}
+                        </TableBody>
+                    </Table>
                 </div>
             </CardContent>
         </Card>

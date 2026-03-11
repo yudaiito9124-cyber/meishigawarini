@@ -1,4 +1,25 @@
 {
+    "Status": {
+        "unassigned": "UNASSIGNED",
+        "linked": "LINKED",
+        "active": "ACTIVE",
+        "used": "WAITING FOR SHIPMENT",
+        "shipped": "SHIPPED",
+        "completed": "COMPLETED",
+        "expired": "EXPIRED",
+        "banned": "BANNED"
+    },
+    "Timestamp": {
+        "ts_created_at": "Created At",
+        "ts_linked_at": "Linked At",
+        "ts_activated_at": "Activated At",
+        "ts_submitted_at": "Submitted At",
+        "ts_shipped_at": "Shipped At",
+        "ts_completed_at": "Completed At",
+        "ts_expired_at": "Expired At",
+        "ts_banned_at": "Banned At",
+        "ts_updated_at": "Updated At"
+    },
     "HomePage": {
         "title": "Welcome to meishigawarini",
         "shopAdmin": "Shop Admin",
@@ -149,6 +170,28 @@
             "product": "Product",
             "status": "Status",
             "activatedAt": "Last Updated Date Time"
+        },
+        "shopSettings": {
+            "title": "Shop Settings",
+            "description": "Configure your shop's name and HTML description.",
+            "name": "Shop Name",
+            "detailHtml": "Shop Description (HTML)",
+            "detailHtmlPlaceholder": "Enter description in HTML format...",
+            "submit": "Save Shop Settings",
+            "success": "Shop settings updated successfully.",
+            "failed": "Failed to update shop settings.",
+            "error": "An error occurred."
+        },
+        "productDetails": {
+            "title": "Product Details",
+            "name": "Product Name",
+            "description": "Description",
+            "price": "Price",
+            "validDays": "Validity Period",
+            "validDaysSuffix": "days",
+            "detailHtml": "Introduction HTML (Preview)",
+            "rawDetailHtml": "Introduction HTML (Source)",
+            "close": "Close"
         }
     },
     "ReceivePage": {
@@ -265,6 +308,7 @@
             "refresh": "Refresh",
             "loading": "Loading...",
             "deleteAllBanned": "Delete All BANNED",
+            "exportCsv": "Export CSV",
             "status": {
                 "unassigned": "UNASSIGNED",
                 "linked": "LINKED",
@@ -301,13 +345,13 @@
             "keyword": {
                 "placeholder": "Enter keyword to search by UUID (at least 8 characters)",
                 "tooShort": "Keyword must be at least 8 characters long."
-            },
-            "shopInfo": {
-                "title": "Shop Information",
-                "id": "Shop ID",
-                "name": "Shop Name",
-                "contact": "Contact"
             }
+        },
+        "shopInfo": {
+            "title": "Shop Information",
+            "id": "Shop ID",
+            "name": "Shop Name",
+            "contact": "Contact"
         }
     },
     "VerifyPage": {

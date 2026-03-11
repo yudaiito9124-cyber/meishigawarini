@@ -149,6 +149,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         // Fetch Shop Metadata for Email
         let shop_email = undefined;
         let shop_name = undefined;
+        let shop_detail_html = undefined;
         let owner_id = undefined;
         if (shop_id && isAuthorizedByPassword) {
             const shopRes = await ddb.send(new GetCommand({
@@ -158,6 +159,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             if (shopRes.Item) {
                 shop_email = shopRes.Item.email;
                 shop_name = shopRes.Item.name;
+                shop_detail_html = shopRes.Item.detail_html;
                 owner_id = shopRes.Item.owner_id;
             }
 
@@ -212,6 +214,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 product: product,
                 shop_email: shop_email,
                 shop_name: shop_name,
+                shop_detail_html: shop_detail_html,
                 memo_for_users: isAuthorizedByPassword ? item.memo_for_users : undefined,
                 ts_expired_at: item.ts_expired_at,
                 ts_completed_at: item.ts_completed_at ? item.ts_completed_at : undefined,

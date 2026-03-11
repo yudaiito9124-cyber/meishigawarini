@@ -28,6 +28,7 @@
 | `PK` | String | `SHOP#{shopId}` （`shopId` はUUID形式、例: `SHOP#123e4567-...`） |
 | `SK` | String | 常に固定値 `METADATA` |
 | `name` | String | ショップ名 （任意の文字列、例: `山田青果店`） |
+| `detail_html` | String | ショップ説明 （任意のHTML文字列） |
 | `email` | String | ショップの連絡先メールアドレス （例: `info@example.com`） |
 | `owner_id` | String | オーナーのCognitoユーザーID （UUID形式の `sub` 属性） |
 | `ts_created_at` | String | 作成日時 （ISO 8601形式のUTC日時文字列、例: `2024-03-01T12:00:00.000Z`） |
@@ -46,6 +47,7 @@
 | `product_id` | String | 商品自身のUUID （逆引きや参照用） |
 | `name` | String | 商品名 （任意の文字列、例: `高級メロン`） |
 | `description` | String | 商品説明 （任意のシングルライン文字列） |
+| `detail_html` | String | 商品説明 （任意のHTML文字列） |
 | `image_url` | String | 商品画像のURL （署名付き等でアップロードされたS3への完全URLパス等） |
 | `price` | Number | 価格 （0以上の正の数値） |
 | `valid_days` | Number | QRコードの有効日数設定 （整数値、例: `90`, `180` など） |

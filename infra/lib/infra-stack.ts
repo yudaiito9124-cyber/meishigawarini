@@ -355,6 +355,11 @@ export class InfraStack extends cdk.Stack {
       authorizer,
       authorizationType: apigateway.AuthorizationType.COGNITO
     });
+    // shop/{shopId} PATCH #UpdateShop
+    shopIdResource.addMethod('PATCH', new apigateway.LambdaIntegration(shopMgmtFn), {
+      authorizer,
+      authorizationType: apigateway.AuthorizationType.COGNITO
+    });
 
     const productsResource = shopIdResource.addResource('products'); // shop/{shopId}/products
     // shop/{shopId}/products POST #CreateProducts

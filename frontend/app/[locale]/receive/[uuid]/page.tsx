@@ -1628,7 +1628,7 @@ export default function ReceivePage() {
 
             {/* ========== Full-width Product Content Section ========== */}
             {
-                step !== "PIN" && gift && gift.product && gift.product.detail_html && (
+                step !== "PIN" && gift && (gift.shop_detail_html || (gift.product && gift.product.detail_html)) && (
                     <>
                         {/* <Card className="w-full mt-20 flex flex-col items-center max-w-none bg-white "> */}
                         <Card className="w-full mt-20 flex flex-col items-center max-w-xl bg-white ">
@@ -1644,9 +1644,7 @@ export default function ReceivePage() {
                             </CardTitle>
                             {/* </CardHeader> */}
                             <CardContent className="min-h-0 flex flex-1 p-0">
-                                {gift.product.detail_html && (
-                                    <SandboxedHtml html={gift.product.detail_html} />
-                                )}
+                                <SandboxedHtml html={gift.shop_detail_html || gift.product.detail_html} />
                             </CardContent>
                         </Card>
                         {/* <Card className="w-full max-w-xl mb-10">

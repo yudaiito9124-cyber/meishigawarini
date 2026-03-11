@@ -109,6 +109,40 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             return { statusCode: 200, headers: corsHeaders, body: JSON.stringify(shopMetadata) };
         }
 
+        // 2.5 Update Shop Details (PATCH /shop/{shopId})
+        if (method === 'PATCH' && (path.endsWith(`/shop/${shopId}`) || path.endsWith(`/shop/${shopId}/`))) {
+            const body = JSON.parse(event.body || '{}');
+            const { name, detail_html } = body;
+
+            const updateExprParts = [];
+            const attrNames: any = {};
+            const attrValues: any = {};
+
+            if (name !== undefined) {
+                updateExprParts.push('#name = :name');
+                attrNames['#name'] = 'name';
+                attrValues[':name'] = name;
+            }
+            if (detail_html !== undefined) {
+                updateExprParts.push('detail_html = :html');
+                attrValues[':html'] = detail_html;
+            }
+
+            if (updateExprParts.length === 0) {
+                return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ message: 'No changes provided' }) };
+            }
+
+            await ddb.send(new UpdateCommand({
+                TableName: TABLE_NAME,
+                Key: { PK: `SHOP#${shopId}`, SK: 'METADATA' },
+                UpdateExpression: `SET ${updateExprParts.join(', ')}`,
+                ExpressionAttributeNames: Object.keys(attrNames).length > 0 ? attrNames : undefined,
+                ExpressionAttributeValues: attrValues
+            }));
+
+            return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ message: 'Shop updated' }) };
+        }
+
         // 3. Create Product (POST /shop/{shopId}/products)
         if (method === 'POST' && path.endsWith('/products')) {
 

@@ -211,6 +211,31 @@
                 "expired": "有効期限が切れ、ギフトが無効になった状態です。",
                 "banned": "不正利用などにより、システム管理者が利用停止させた状態です。"
             }
+        },
+        "shopSettings": {
+            "title": "ショップ設定",
+            "description": "ショップの名前や紹介文を設定します。",
+            "updatePreview": "プレビュー更新",
+            "name": "ショップ名",
+            "detailHtml": "ショップ紹介(HTML)",
+            "detailHtmlPlaceholder": "HTML(CSS)形式で入力してください。",
+            "submit": "ショップ設定を保存",
+            "success": "ショップ設定を更新しました。",
+            "failed": "更新に失敗しました。",
+            "sourcecode": "ソースコード",
+            "preview": "プレビュー",
+            "error": "エラーが発生しました。"
+        },
+        "productDetails": {
+            "title": "商品詳細",
+            "name": "商品名",
+            "description": "説明",
+            "price": "価格",
+            "validDays": "有効期間",
+            "validDaysSuffix": "日",
+            "detailHtml": "紹介用HTML (プレビュー)",
+            "rawDetailHtml": "紹介用HTML (ソースコード)",
+            "close": "閉じる"
         }
     },
     "ReceivePage": {
@@ -404,6 +429,7 @@
             "refresh": "更新",
             "loading": "読み込み中...",
             "deleteAllBanned": "BAN済みを全て削除",
+            "exportCsv": "CSV出力",
             "status": {
                 "unassigned": "未割り当て",
                 "linked": "連携済み",

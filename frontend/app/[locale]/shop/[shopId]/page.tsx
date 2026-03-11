@@ -4,8 +4,8 @@
  */
 'use client';
 
-import { useState, useEffect } from 'react';
-import { RefreshCw, ArrowRight, HelpCircle, Camera } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { RefreshCw, ArrowRight, HelpCircle, Camera, Settings, ShoppingBasket, Eye } from 'lucide-react';
 import { notFound, useParams } from 'next/navigation';
 import { useRouter } from '@/i18n/routing';
 import { useTranslations } from 'next-intl';
@@ -18,6 +18,7 @@ import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import QRScanner from '@/components/ui/qr-scanner';
+import SandboxedHtml from '@/components/SandboxedHtml';
 import { APP_CONFIG } from '@/lib/config';
 
 const NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || "";
@@ -25,6 +26,7 @@ const NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 // --- Effects ---
 export default function ShopPage() {
     const t = useTranslations('ShopPage');
+    const tr = useTranslations('ReceivePage');
     const ts = useTranslations('Timestamp');
     const st = useTranslations('Status');
     const tb = useTranslations('BackendError');
@@ -41,6 +43,8 @@ export default function ShopPage() {
     const [ordersLoading, setOrdersLoading] = useState(true);
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [error, setError] = useState('');
+    const [debouncedPreviewHtml, setDebouncedPreviewHtml] = useState<string>('');
+    const shopDetailRef = useRef<HTMLTextAreaElement>(null);
     const [isLinking, setIsLinking] = useState(false);
 
     const [searchUuid, setSearchUuid] = useState('');
@@ -54,6 +58,8 @@ export default function ShopPage() {
     const [importShops, setImportShops] = useState<any[]>([]);
     const [selectedImportShopId, setSelectedImportShopId] = useState('');
     const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
+    const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+
 
     // Protect Route
     useEffect(() => {
@@ -89,6 +95,9 @@ export default function ShopPage() {
                 if (!res.ok) throw new Error('Failed to fetch shop');
                 const data = await res.json();
                 setShop(data);
+                if (data.detail_html) {
+                    setDebouncedPreviewHtml(data.detail_html);
+                }
             } catch (err: any) {
                 if (err.statusCode === 401) {
                     router.push('/login');
@@ -274,7 +283,7 @@ export default function ShopPage() {
                 body: JSON.stringify({
                     name: formData.get('name'),
                     description: formData.get('description'),
-                    detail_html: formData.get('detail_html'),
+                    // detail_html: formData.get('detail_html'),
                     price: Number(formData.get('price')),
                     valid_days: formData.get('valid_days'),
                     image_url: imageUrl,
@@ -435,6 +444,38 @@ export default function ShopPage() {
         }
     };
 
+    const handleUpdateShop = async (e: React.FormEvent) => {
+        e.preventDefault();
+        const form = e.target as HTMLFormElement;
+        const formData = new FormData(form);
+
+        try {
+            const res = await fetchWithAuth(`/shop/${shopId}`, {
+                method: 'PATCH',
+                body: JSON.stringify({
+                    name: formData.get('shop_name'),
+                    detail_html: formData.get('shop_detail_html')
+                })
+            });
+            if (res.ok) {
+                alert(t('shopSettings.success', { defaultValue: 'ショップ設定を更新しました。' }));
+                fetchShopData();
+                setIsSettingsOpen(false);
+            } else {
+                alert(t('shopSettings.failed', { defaultValue: '更新に失敗しました。' }));
+            }
+        } catch (err) {
+            console.error(err);
+            alert(t('shopSettings.error', { defaultValue: 'エラーが発生しました。' }));
+        }
+    };
+
+    const handleUpdatePreview = () => {
+        if (shopDetailRef.current) {
+            setDebouncedPreviewHtml(shopDetailRef.current.value);
+        }
+    };
+
     const [isScanning, setIsScanning] = useState(false);
     const [scannedUuid, setScannedUuid] = useState('');
     const [qrStatusDetails, setQrStatusDetails] = useState<any>(null);
@@ -484,7 +525,87 @@ export default function ShopPage() {
                         </h1>
                         <p className="text-sm text-gray-500">{t('shopId', { id: String(shopId || '') })}</p>
                     </div>
-                    <Button variant="outline" className="text-xs md:text-sm" onClick={handleShops}>{t('movetoshops')}</Button>
+                    <div className="flex items-center space-x-2">
+                        <Dialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
+                            <DialogTrigger asChild>
+                                <Button variant="ghost" size="icon" className="text-gray-500 hover:text-gray-900">
+                                    <Settings className="h-5 w-5" />
+                                    <span className="sr-only">{t('shopSettings.title')}</span>
+                                </Button>
+                            </DialogTrigger>
+                            <DialogContent className="max-w-[95vw] sm:max-w-[95vw] w-full max-h-[95vh] h-[95vh] overflow-y-auto">
+                                <DialogHeader>
+                                    <DialogTitle>{t('shopSettings.title', { defaultValue: 'ショップ設定' })}</DialogTitle>
+                                    <DialogDescription>{t('shopSettings.description', { defaultValue: 'ショップの名前や紹介文を設定します。' })}</DialogDescription>
+                                </DialogHeader>
+                                <form onSubmit={handleUpdateShop} className="space-y-4 py-4">
+                                    <div className="space-y-2">
+                                        <Label htmlFor="shop_name">{t('shopSettings.name')}</Label>
+                                        <Input id="shop_name" name="shop_name" defaultValue={shop?.name} required />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="shop_detail_html">{t('shopSettings.detailHtml')}</Label>
+                                        <div className="border rounded-md overflow-hidden bg-gray-50/30 min-h-[400px] h-[calc(95vh-300px)] flex flex-col lg:flex-row">
+                                            <div className="flex-1 flex flex-col min-h-0 border-b lg:border-b-0 lg:border-r bg-white">
+                                                <div className="px-3 py-2 bg-gray-50 border-b flex justify-between items-center shrink-0">
+                                                    <Label htmlFor="shop_detail_html" className="text-xs font-bold text-gray-600 uppercase tracking-wider">{t('shopSettings.sourcecode')}</Label>
+                                                </div>
+                                                <textarea
+                                                    ref={shopDetailRef}
+                                                    id="shop_detail_html"
+                                                    name="shop_detail_html"
+                                                    defaultValue={shop?.detail_html}
+                                                    className="flex-1 w-full p-4 text-sm font-mono focus-visible:outline-none resize-none overflow-y-auto min-h-0"
+                                                    placeholder={t('shopSettings.detailHtmlPlaceholder')}
+                                                />
+                                            </div>
+                                            <div className="flex-1 flex flex-col min-h-0 bg-gray-50/50">
+                                                <div className="px-3 py-2 bg-gray-50 border-b flex justify-between items-center shrink-0">
+                                                    <Label className="text-xs font-bold text-gray-600 uppercase tracking-wider">{t('shopSettings.preview')}</Label>
+                                                    <Button
+                                                        type="button"
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={handleUpdatePreview}
+                                                        className="h-7 px-2 text-[10px] gap-1 bg-white border-blue-200 text-blue-600 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300"
+                                                    >
+                                                        <Eye className="w-3 h-3" />
+                                                        {t('shopSettings.updatePreview')}
+                                                    </Button>
+                                                </div>
+                                                <div className="flex-1 overflow-y-auto w-full min-h-0 p-4 flex flex-col items-center">
+                                                    <Card className="w-full mt-20 flex flex-col items-center max-w-xl bg-white ">
+                                                        <CardTitle className="w-full flex flex-col items-center justify-center gap-2">
+                                                            <div className="w-full flex items-center justify-center text-xl text-center gap-2">
+                                                                <ShoppingBasket className="w-5 h-5 text-gray-600" />
+                                                                {tr('shopinfo')}
+                                                            </div>
+                                                            <div className="w-full flex items-center justify-center text-xs text-center text-gray-500">
+                                                                {tr('shopinfo_description')}
+                                                            </div>
+                                                        </CardTitle>
+                                                        {/* </CardHeader> */}
+                                                        <CardContent className="min-h-0 flex flex-1 p-0">
+                                                            <SandboxedHtml html={debouncedPreviewHtml} />
+                                                        </CardContent>
+                                                    </Card>
+                                                    {/* <div className="max-w-xl mx-auto lg:mx-0 bg-white shadow-sm border rounded-lg p-6 min-h-full">
+                                                        <SandboxedHtml html={previewDetailHtml} />
+                                                    </div> */}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <DialogFooter>
+                                        <Button type="submit" className="w-full">
+                                            {t('shopSettings.submit', { defaultValue: 'ショップ設定を保存' })}
+                                        </Button>
+                                    </DialogFooter>
+                                </form>
+                            </DialogContent>
+                        </Dialog>
+                        <Button variant="outline" className="text-xs md:text-sm" onClick={handleShops}>{t('movetoshops')}</Button>
+                    </div>
                 </div>
 
             </div>
@@ -492,6 +613,7 @@ export default function ShopPage() {
 
 
             <div className="max-w-7xl mx-auto px-8 py-10 space-y-10">
+
 
                 {/* Link QR */}
                 <div className="grid grid-cols-1 lg:grid-cols-1 gap-6">
@@ -874,41 +996,104 @@ export default function ShopPage() {
                             {productsLoading ? (
                                 <div className="col-span-full py-8 flex justify-center"><RefreshCw className="animate-spin h-6 w-6 text-gray-400" /></div>
                             ) : products.map((product) => (
-                                <Card key={product.product_id} className="overflow-hidden">
-                                    <div className="w-full relative aspect-[16/9]">
-                                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                                        <img src={product.image_url} alt={product.name} className="w-full h-full object-cover" />
-                                        <div className="absolute top-2 right-2 flex gap-2">
-                                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${product.status === 'ACTIVE' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                                                }`}>
-                                                {product.status}
-                                            </span>
-                                        </div>
-                                    </div>
-                                    <CardHeader className="px-3 pt-2 pb-1">
-                                        <CardTitle className="text-base truncate" title={product.name}>{product.name}</CardTitle>
-                                        <CardDescription className="line-clamp-1 text-xs">{product.description}</CardDescription>
-                                        <p className="text-xs text-gray-500 mt-0.5">
-                                            {t('addProduct.validDays')}: {product.valid_days ? product.valid_days : APP_CONFIG.DEFAULT_VALID_DAYS}日
-                                        </p>
-                                        <p className="text-[10px] text-gray-400 font-mono mt-1 truncate" title={product.product_id}>
-                                            ID: {product.product_id}
-                                        </p>
-                                    </CardHeader>
-                                    <CardContent className="px-3 pb-2 pt-0 flex justify-between items-center">
-                                        <span className="font-bold text-sm">¥{product.price ? Number(product.price).toLocaleString("ja-JP") : "0"}</span>
-                                        <div className="flex gap-2">
-                                            <Button variant="outline" size="sm" className="h-7 text-xs px-2" onClick={() => handleToggleStatus(product.product_id, product.status)} disabled={togglingProductId === product.product_id}>
-                                                {togglingProductId === product.product_id ? t('linkQr.processing') : (product.status === 'ACTIVE' ? t('product.stop') : t('product.activate'))}
-                                            </Button>
-                                            {product.status !== 'ACTIVE' && (
-                                                <Button variant="destructive" size="sm" className="h-7 text-xs px-2" onClick={() => handleDeleteProduct(product.product_id, product.name)} disabled={deletingProductId === product.product_id}>
-                                                    {deletingProductId === product.product_id ? t('linkQr.processing') : t('product.delete')}
-                                                </Button>
+                                <Dialog key={product.product_id}>
+                                    <DialogTrigger asChild>
+                                        <Card className="overflow-hidden cursor-pointer hover:ring-2 hover:ring-primary/50 transition-all">
+                                            <div className="w-full relative aspect-[16/9]">
+                                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                                <img src={product.image_url} alt={product.name} className="w-full h-full object-cover" />
+                                                <div className="absolute top-2 right-2 flex gap-2">
+                                                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${product.status === 'ACTIVE' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                                                        }`}>
+                                                        {product.status}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                            <CardHeader className="px-3 pt-2 pb-1">
+                                                <CardTitle className="text-base truncate" title={product.name}>{product.name}</CardTitle>
+                                                <CardDescription className="line-clamp-1 text-xs">{product.description}</CardDescription>
+                                                <p className="text-xs text-gray-500 mt-0.5">
+                                                    {t('addProduct.validDays')}: {product.valid_days ? product.valid_days : APP_CONFIG.DEFAULT_VALID_DAYS}日
+                                                </p>
+                                                <p className="text-[10px] text-gray-400 font-mono mt-1 truncate" title={product.product_id}>
+                                                    ID: {product.product_id}
+                                                </p>
+                                            </CardHeader>
+                                            <CardContent className="px-3 pb-2 pt-0 flex justify-between items-center">
+                                                <span className="font-bold text-sm">¥{product.price ? Number(product.price).toLocaleString("ja-JP") : "0"}</span>
+                                                <div className="flex gap-2">
+                                                    <Button variant="outline" size="sm" className="h-7 text-xs px-2" onClick={(e) => { e.stopPropagation(); handleToggleStatus(product.product_id, product.status); }} disabled={togglingProductId === product.product_id}>
+                                                        {togglingProductId === product.product_id ? t('linkQr.processing') : (product.status === 'ACTIVE' ? t('product.stop') : t('product.activate'))}
+                                                    </Button>
+                                                    {product.status !== 'ACTIVE' && (
+                                                        <Button variant="destructive" size="sm" className="h-7 text-xs px-2" onClick={(e) => { e.stopPropagation(); handleDeleteProduct(product.product_id, product.name); }} disabled={deletingProductId === product.product_id}>
+                                                            {deletingProductId === product.product_id ? t('linkQr.processing') : t('product.delete')}
+                                                        </Button>
+                                                    )}
+                                                </div>
+                                            </CardContent>
+                                        </Card>
+                                    </DialogTrigger>
+                                    <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                                        <DialogHeader>
+                                            <DialogTitle>{t('productDetails.title')}</DialogTitle>
+                                        </DialogHeader>
+                                        <div className="space-y-6 py-4">
+                                            <div className="aspect-[16/9] w-full relative rounded-lg overflow-hidden border">
+                                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                                <img src={product.image_url} alt={product.name} className="w-full h-full object-cover" />
+                                            </div>
+
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                <div className="space-y-1">
+                                                    <p className="text-xs text-gray-500 font-medium">{t('productDetails.name')}</p>
+                                                    <p className="font-bold text-lg">{product.name}</p>
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <p className="text-xs text-gray-500 font-medium">{t('productDetails.price')}</p>
+                                                    <p className="font-bold text-lg text-emerald-600">¥{Number(product.price || 0).toLocaleString()}</p>
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <p className="text-xs text-gray-500 font-medium">{t('productDetails.validDays')}</p>
+                                                    <p className="font-medium">{product.valid_days || APP_CONFIG.DEFAULT_VALID_DAYS} {t('productDetails.validDaysSuffix')}</p>
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <p className="text-xs text-gray-500 font-medium">ID</p>
+                                                    <p className="font-mono text-xs text-gray-400 break-all">{product.product_id}</p>
+                                                </div>
+                                            </div>
+
+                                            <div className="space-y-1">
+                                                <p className="text-xs text-gray-500 font-medium">{t('productDetails.description')}</p>
+                                                <p className="text-sm text-gray-700 whitespace-pre-wrap">{product.description || '-'}</p>
+                                            </div>
+
+                                            {product.detail_html && (
+                                                <div className="space-y-4 pt-4 border-t">
+                                                    <div className="space-y-2">
+                                                        <p className="text-xs text-gray-500 font-medium">{t('productDetails.detailHtml')}</p>
+                                                        <div className="border rounded-md p-4 bg-white shadow-sm overflow-hidden">
+                                                            <SandboxedHtml html={product.detail_html} />
+                                                        </div>
+                                                    </div>
+                                                    <div className="space-y-2">
+                                                        <p className="text-xs text-gray-500 font-medium">{t('productDetails.rawDetailHtml')}</p>
+                                                        <textarea
+                                                            readOnly
+                                                            value={product.detail_html}
+                                                            className="w-full h-32 p-3 text-xs font-mono bg-gray-50 border rounded-md focus:outline-none focus:ring-1 focus:ring-primary/20"
+                                                        />
+                                                    </div>
+                                                </div>
                                             )}
                                         </div>
-                                    </CardContent>
-                                </Card>
+                                        <DialogFooter>
+                                            <DialogTrigger asChild>
+                                                <Button variant="outline">{t('productDetails.close')}</Button>
+                                            </DialogTrigger>
+                                        </DialogFooter>
+                                    </DialogContent>
+                                </Dialog>
                             ))}
                             {/* フォーム部分の幅を制限し、中央寄せにするために max-w-md と mx-auto を追加 */}
                             <Card className="col-span-2 sm:col-span-2 md:col-span-3 lg:col-span-4 max-w-lg mx-auto mt-8 mb-8 w-full">
@@ -963,15 +1148,17 @@ export default function ShopPage() {
                                             <Label htmlFor="description">{t('addProduct.description')}</Label>
                                             <Input id="description" name="description" required />
                                         </div>
-                                        <div className="space-y-2">
-                                            <Label htmlFor="detail_html">{t('addProduct.detailHtml')}</Label>
-                                            <textarea
-                                                id="detail_html"
-                                                name="detail_html"
-                                                className="flex min-h-[120px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                                                placeholder={t('addProduct.detailHtmlPlaceholder')}
-                                            />
-                                        </div>
+                                        {/* 
+                                         <div className="space-y-2">
+                                             <Label htmlFor="detail_html">{t('addProduct.detailHtml')}</Label>
+                                             <textarea
+                                                 id="detail_html"
+                                                 name="detail_html"
+                                                 className="flex min-h-[120px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                                 placeholder={t('addProduct.detailHtmlPlaceholder')}
+                                             />
+                                         </div>
+                                         */}
                                         <div className="grid grid-cols-2 gap-4">
                                             <div className="space-y-2">
                                                 <Label htmlFor="price">{t('addProduct.price')}</Label>
