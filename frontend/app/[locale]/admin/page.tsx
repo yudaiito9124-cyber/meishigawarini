@@ -531,7 +531,7 @@ function QRCodeListSection({ apiUrl, onGeneratePDF }: { apiUrl: string, onGenera
                 </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-                <div className="flex gap-2">
+                <div className="flex flex-wrap fpex gap-2 justify-start items-center ">
                     {["UNASSIGNED", "LINKED", "ACTIVE", "USED", "SHIPPED", "COMPLETED", "EXPIRED", "BANNED"].map((s) => (
                         <Button
                             key={s}
