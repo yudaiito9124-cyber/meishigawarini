@@ -5,6 +5,7 @@ import { DynamoDBDocumentClient, GetCommand } from '@aws-sdk/lib-dynamodb';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import * as crypto from 'crypto';
+import { generateId } from './utils/id';
 import { signUrlIfS3 } from './utils/s3';
 
 const client = new DynamoDBClient({});
@@ -80,15 +81,13 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         }
 
         // 3. Generate Naming Convention
-        const now = new Date();
-        const dateStr = now.toISOString().replace(/[:T]/g, '-').split('.')[0].replace(/-/g, '').slice(0, 8) + '-' + now.toISOString().split('T')[1].split('.')[0].replace(/:/g, '');
-        const hash = crypto.randomBytes(4).toString('hex');
+        const id = generateId();
         const ext = filename.split('.').pop() || 'bin';
         
         // Use folder if provided (e.g., sendercontent), otherwise default to UUID folder
         const key = folder 
-            ? `qrcode/${uuid}/${folder}/${dateStr}_${hash}.${ext}`
-            : `qrcode/${uuid}/${dateStr}_${hash}.${ext}`;
+            ? `qrcode/${uuid}/${folder}/${id}.${ext}`
+            : `qrcode/${uuid}/${id}.${ext}`;
 
         const command = new PutObjectCommand({
             Bucket: BUCKET_NAME,

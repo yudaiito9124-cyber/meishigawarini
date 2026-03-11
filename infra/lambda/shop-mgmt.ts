@@ -4,6 +4,7 @@ import { DynamoDBDocumentClient, PutCommand, QueryCommand, GetCommand, UpdateCom
 import { S3Client, PutObjectCommand, CopyObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import * as crypto from 'crypto';
+import { generateId } from './utils/id';
 import { signUrlIfS3, stripSignature, signUrlsInHtml, deleteFileByUrl } from './utils/s3';
 
 const client = new DynamoDBClient({});
@@ -59,7 +60,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 
             const email = claims.email; // Get email from Cognito claims
 
-            const newShopId = crypto.randomUUID();
+            const newShopId = generateId();
             const now = new Date().toISOString();
             await ddb.send(new PutCommand({
                 TableName: TABLE_NAME,
@@ -184,7 +185,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             const { name, description, image_url, price, valid_days, detail_html } = body;
             if (!name) return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Missing product name' }) };
 
-            const productId = crypto.randomUUID();
+            const productId = generateId();
             // Default valid_days to 1 if not provided
             const validityPeriod = valid_days ? parseInt(valid_days) : DEFAULT_VALID_DAYS;
             const now = new Date().toISOString();
@@ -265,7 +266,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                         const sourceKey = decodeURIComponent(urlObj.pathname.substring(1));
 
                         const ext = sourceKey.split('.').pop() || 'jpg';
-                        const newFilename = `${crypto.randomUUID()}.${ext}`;
+                        const newFilename = `${generateId()}.${ext}`;
                         const newKey = `shop/${shopId}/products/${newFilename}`;
 
                         await s3.send(new CopyObjectCommand({

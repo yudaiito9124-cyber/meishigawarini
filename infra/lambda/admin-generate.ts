@@ -3,6 +3,7 @@ import { DynamoDBClient, BatchWriteItemCommand } from '@aws-sdk/client-dynamodb'
 import { DynamoDBDocumentClient, GetCommand, QueryCommand } from '@aws-sdk/lib-dynamodb';
 import * as crypto from 'crypto';
 import { verifyAdmin } from './share/admin-auth-inlambda';
+import { generateId } from './utils/id';
 
 const client = new DynamoDBClient({});
 const ddbDocClient = DynamoDBDocumentClient.from(client);
@@ -103,7 +104,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         const ids = [];
 
         for (let i = 0; i < count; i++) {
-            const uuid = crypto.randomUUID();
+            const uuid = generateId();
             let pin = '';
             do {
                 // Cryptographically secure random number

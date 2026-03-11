@@ -8,6 +8,7 @@ import { isLocked, getRateLimitUpdate, getResetRateLimitUpdate } from './utils/r
 import { signUrlIfS3, stripSignature, signUrlsInHtml, deleteFileByUrl, copyS3Object } from './utils/s3';
 
 import * as crypto from 'crypto';
+import { generateId } from './utils/id';
 
 const client = new DynamoDBClient({});
 const ddb = DynamoDBDocumentClient.from(client, {
@@ -184,10 +185,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                     return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Missing sender_info' }) };
                 }
 
-                const now = new Date();
-                const timestamp = now.toISOString().replace(/[:T]/g, '-').split('.')[0].replace(/-/g, '').slice(0, 8) + '-' + now.toISOString().split('T')[1].split('.')[0].replace(/:/g, '');
-                const randomUuid = crypto.randomUUID();
-                const userid = `${timestamp}-${randomUuid}`;
+                const userid = generateId();
 
                 const copyFile = async (url: string) => {
                     if (!url || !url.includes(BUCKET_NAME)) return url;
@@ -258,7 +256,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             }
 
             const newMessage: any = {
-                id: crypto.randomUUID(),
+                id: generateId(),
                 username,
                 message,
                 ts_created_at: new Date().toISOString()

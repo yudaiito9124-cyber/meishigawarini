@@ -20,6 +20,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import QRScanner from '@/components/ui/qr-scanner';
 import SandboxedHtml from '@/components/SandboxedHtml';
 import { APP_CONFIG } from '@/lib/config';
+import { generateId } from '@/lib/id';
 
 const NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
@@ -217,7 +218,7 @@ export default function ShopPage() {
             const res = await fetchWithAuth(`/shop/${shopId}/products/upload-url`, {
                 method: 'POST',
                 body: JSON.stringify({
-                    filename: `${crypto.randomUUID()}.${file.name.split('.').pop()}`,
+                    filename: `${generateId()}.${file.name.split('.').pop()}`,
                     contentType: file.type,
                     folder: 'shopcontent'
                 })
@@ -311,7 +312,7 @@ export default function ShopPage() {
 
                 // 2. Rename (use random UUID for image)
                 const ext = file.name.split('.').pop();
-                const randomName = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(7);
+                const randomName = generateId();
                 const filename = `${randomName}.${ext}`;
 
                 // Cast Blob back to File-like object if necessary, or just use blob body

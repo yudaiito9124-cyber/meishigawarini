@@ -3,6 +3,7 @@ import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, GetCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
 import { sendEmail } from './email-client';
 import { createMessageNotificationEmail } from '../templates/email';
+import { generateId } from './id';
 
 const client = new DynamoDBClient({});
 const ddb = DynamoDBDocumentClient.from(client);
@@ -43,7 +44,7 @@ export async function sendSystemNotification(qr_id: string, message: string, pin
 
         // 2. Add System Message to Chat
         const newMessage = {
-            id: crypto.randomUUID(),
+            id: generateId(),
             username: SYSTEM_USERNAME,
             message,
             ts_created_at: new Date().toISOString()

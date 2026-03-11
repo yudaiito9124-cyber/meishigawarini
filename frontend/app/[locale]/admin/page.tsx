@@ -13,6 +13,7 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { APP_CONFIG } from "@/lib/config";
 import jsPDF from 'jspdf';
+import { generateId } from '@/lib/id';
 import { useTranslations } from 'next-intl';
 const NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 const NEXT_PUBLIC_APP_URL = process.env.NEXT_PUBLIC_APP_URL || "";
@@ -97,11 +98,8 @@ export default function AdminPage() {
 
             if (res.ok) {
                 const data = await res.json();
+                const batchid = `batch-${generateId()}`;
                 const now = new Date();
-                const pad = (n: number) => n.toString().padStart(2, '0');
-                const timeStr = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
-                const ms = now.getMilliseconds().toString().padStart(3, '0');
-                const batchid = `batch-${timeStr}${ms}`;
 
                 const newBatch = {
                     id: batchid,
@@ -511,7 +509,7 @@ function QRCodeListSection({ apiUrl, onGeneratePDF }: { apiUrl: string, onGenera
         const blob = new Blob(["\uFEFF" + csvContent], { type: 'text/csv;charset=utf-8;' });
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
-        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+        const timestamp = generateId();
         link.href = url;
         link.setAttribute('download', `qrcodes-export-${status.toLowerCase()}-${timestamp}.csv`);
         document.body.appendChild(link);
