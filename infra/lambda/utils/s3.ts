@@ -1,4 +1,4 @@
-import { S3Client, GetObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, GetObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
 const s3Client = new S3Client({});
@@ -49,4 +49,14 @@ export function stripSignature(url: string | undefined): string | undefined {
     } catch (e) {
         return url;
     }
+}
+/**
+ * Deletes an object from S3.
+ */
+export async function deleteFileFromS3(bucket: string, key: string): Promise<void> {
+    const command = new DeleteObjectCommand({
+        Bucket: bucket,
+        Key: key,
+    });
+    await s3Client.send(command);
 }

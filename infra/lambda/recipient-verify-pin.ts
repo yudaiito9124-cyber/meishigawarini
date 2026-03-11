@@ -7,7 +7,12 @@ import { isLocked, getRateLimitUpdate, getResetRateLimitUpdate } from './utils/r
 import { signUrlIfS3 } from './utils/s3';
 
 const client = new DynamoDBClient({});
-const ddb = DynamoDBDocumentClient.from(client);
+const ddb = DynamoDBDocumentClient.from(client, {
+    marshallOptions: {
+        removeUndefinedValues: true,
+        convertEmptyValues: true
+    }
+});
 const cognito = new CognitoIdentityProviderClient({});
 const TABLE_NAME = process.env.TABLE_NAME || '';
 const USER_POOL_ID = process.env.USER_POOL_ID || '';

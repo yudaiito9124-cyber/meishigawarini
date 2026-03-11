@@ -493,6 +493,7 @@ export class InfraStack extends cdk.Stack {
     });
     table.grantReadWriteData(recipientChatFn);
     bucket.grantRead(recipientChatFn);
+    bucket.grantDelete(recipientChatFn);
 
     const qrIdResourceRecip = qrResourceRecip.addResource('{uuid}');
 

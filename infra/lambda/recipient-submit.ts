@@ -8,7 +8,12 @@ import { isLocked, getRateLimitUpdate } from './utils/rate-limit';
 
 const client = new DynamoDBClient({});
 const cognito = new CognitoIdentityProviderClient({});
-const ddb = DynamoDBDocumentClient.from(client);
+const ddb = DynamoDBDocumentClient.from(client, {
+    marshallOptions: {
+        removeUndefinedValues: true,
+        convertEmptyValues: true
+    }
+});
 const TABLE_NAME = process.env.TABLE_NAME || '';
 
 const corsHeaders = {

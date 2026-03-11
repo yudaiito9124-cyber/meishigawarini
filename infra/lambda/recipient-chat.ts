@@ -5,10 +5,17 @@ import { DynamoDBDocumentClient, GetCommand, UpdateCommand } from '@aws-sdk/lib-
 import { createMessageNotificationEmail } from './templates/email';
 import { sendEmail } from './utils/email-client';
 import { isLocked, getRateLimitUpdate, getResetRateLimitUpdate } from './utils/rate-limit';
-import { signUrlIfS3, stripSignature } from './utils/s3';
+import { signUrlIfS3, stripSignature, deleteFileFromS3 } from './utils/s3';
+
+import * as crypto from 'crypto';
 
 const client = new DynamoDBClient({});
-const ddb = DynamoDBDocumentClient.from(client);
+const ddb = DynamoDBDocumentClient.from(client, {
+    marshallOptions: {
+        removeUndefinedValues: true,
+        convertEmptyValues: true
+    }
+});
 const TABLE_NAME = process.env.TABLE_NAME || '';
 const BUCKET_NAME = process.env.BUCKET_NAME || '';
 
@@ -123,7 +130,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                     return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Missing sender_info' }) };
                 }
 
-                await ddb.send(new UpdateCommand({
+                const res = await ddb.send(new UpdateCommand({
                     TableName: TABLE_NAME,
                     Key: { PK: `QR#${uuid}`, SK: 'CHAT' },
                     UpdateExpression: 'SET sender_info = :info',
@@ -132,8 +139,25 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                             ...sender_info,
                             card_image_url: stripSignature(sender_info.card_image_url)
                         }
-                    }
+                    },
+                    ReturnValues: 'ALL_OLD'
                 }));
+
+                // Delete old image from S3 if it exists and has changed
+                const oldSenderInfo = res.Attributes?.sender_info;
+                const oldImageUrl = oldSenderInfo?.card_image_url;
+                const newImageUrl = stripSignature(sender_info.card_image_url);
+
+                if (oldImageUrl && oldImageUrl !== newImageUrl && oldImageUrl.includes(BUCKET_NAME)) {
+                    try {
+                        const urlObj = new URL(oldImageUrl);
+                        const oldKey = decodeURIComponent(urlObj.pathname.substring(1));
+                        await deleteFileFromS3(BUCKET_NAME, oldKey);
+                        console.log("Deleted old sender image from S3:", oldKey);
+                    } catch (e) {
+                        console.error("Failed to delete old image from S3:", e);
+                    }
+                }
 
                 return {
                     statusCode: 200,

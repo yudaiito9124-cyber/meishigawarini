@@ -407,9 +407,14 @@ export default function ReceivePage() {
             setTotalSizeInfo(data.total_size_bytes || 0);
             setSenderInfo(data.sender_info || null);
             if (data.sender_info) {
+                // Sanitize: Convert null values to empty strings to avoid React warning
+                const sanitizedInfo = { ...data.sender_info };
+                Object.keys(sanitizedInfo).forEach(key => {
+                    if (sanitizedInfo[key] === null) sanitizedInfo[key] = "";
+                });
                 setSenderForm(prev => ({
                     ...prev,
-                    ...data.sender_info
+                    ...sanitizedInfo
                 }));
             }
         } catch (e) {
@@ -507,6 +512,36 @@ export default function ReceivePage() {
             setIsEditingSender(false);
         } catch (e: any) {
             alert("Failed to update sender info: " + e.message);
+        } finally {
+            setSenderInfoLoading(false);
+        }
+    };
+
+    const handleRemoveSenderImage = async () => {
+        if (!confirm(t('senderInfo.removeImage') + "?")) return;
+
+        setSenderInfoLoading(true);
+        try {
+            const updatedSenderInfo = {
+                ...senderInfo,
+                card_image_url: "",
+                card_image_name: "",
+                ts_updated_at: new Date().toISOString()
+            };
+
+            await fetch(`${NEXT_PUBLIC_API_URL}/recipient/qrcodes/${uuid}/chat`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    pin,
+                    type: 'update_sender_info',
+                    sender_info: updatedSenderInfo
+                }),
+            });
+
+            await loadMessages();
+        } catch (e: any) {
+            alert("Failed to remove image: " + e.message);
         } finally {
             setSenderInfoLoading(false);
         }
@@ -1146,7 +1181,7 @@ export default function ReceivePage() {
 
             {/* Sender Info Section */}
             {
-                // sender information addition button
+                // 送り主情報を追加するボタン
                 (step === "FORM" && !isEditingSender && EmptySenderInfo(senderInfo)) && (
                     <div>
                         <Card className="w-full max-w-xl mt-20 flex flex-col items-center justify-center cursor-pointer p-6 border-3 border-dashed border-black-100 rounded-xl bg-gray-50/50 hover:bg-blue-200/50  hover:border-blue-200 transition-colors"
@@ -1163,8 +1198,10 @@ export default function ReceivePage() {
                 )
             }
             {
+                // 送り主情報を閲覧・編集
                 (isEditingSender || !EmptySenderInfo(senderInfo)) ? (
                     < Card className="w-full max-w-xl mt-20 flex flex-col">
+
                         <CardContent className="min-h-0 flex flex-col">
                             {/* --- Sender Info Section --- */}
                             <div className="animate-in fade-in slide-in-from-bottom-2">
@@ -1194,7 +1231,7 @@ export default function ReceivePage() {
                                         ) : ""}
                                     </div>
                                 </div>
-
+                                {/* 編集箇所 */}
                                 <div className="relative group/card overflow-hidden">
                                     {(step === "FORM" && isEditingSender) ? (
                                         <div className="space-y-6">
@@ -1203,11 +1240,24 @@ export default function ReceivePage() {
                                                 onClick={() => document.getElementById('senderCardUpload')?.click()}
                                             >
                                                 {senderInfo.card_image_url && (
-                                                    <img
-                                                        src={senderInfo.card_image_url}
-                                                        alt="Business Card"
-                                                        className="w-full h-full object-contain rounded-lg shadow-md bg-white ring-1 ring-black/5"
-                                                    />
+                                                    <div className="relative w-full h-full">
+                                                        <img
+                                                            src={senderInfo.card_image_url}
+                                                            alt="Business Card"
+                                                            className="w-full h-full object-contain rounded-lg shadow-md bg-white ring-1 ring-black/5"
+                                                        />
+                                                        <Button
+                                                            variant="destructive"
+                                                            size="icon"
+                                                            className="absolute -top-2 -right-2 h-8 w-8 rounded-full shadow-lg z-10"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                handleRemoveSenderImage();
+                                                            }}
+                                                        >
+                                                            <X className="h-4 w-4" />
+                                                        </Button>
+                                                    </div>
                                                 )}
                                                 <p className="text-xs text-gray-500">
                                                     {t('senderInfo.description')}
@@ -1246,7 +1296,7 @@ export default function ReceivePage() {
                                                             {field === 'memo' || field === 'address' ? (
                                                                 <Textarea
                                                                     id={`sender-${field}`}
-                                                                    value={(senderForm as any)[field]}
+                                                                    value={(senderForm as any)[field] || ""}
                                                                     onChange={(e) => updateSenderForm(field, e.target.value)}
                                                                     disabled={senderInfoLoading}
                                                                     className="min-h-[80px] text-sm"
@@ -1255,7 +1305,7 @@ export default function ReceivePage() {
                                                             ) : (
                                                                 <Input
                                                                     id={`sender-${field}`}
-                                                                    value={(senderForm as any)[field]}
+                                                                    value={(senderForm as any)[field] || ""}
                                                                     onChange={(e) => updateSenderForm(field, e.target.value)}
                                                                     disabled={senderInfoLoading}
                                                                     className="h-9 text-sm"
@@ -1448,7 +1498,6 @@ export default function ReceivePage() {
                                                                     <img src={msg.file_url} alt={msg.file_name} className="max-w-full max-h-64 object-contain mx-auto rounded-xl shadow-sm" />
                                                                 </a>
                                                             ) : msg.file_type?.startsWith("video/") ? (
-                                                                // <div className="rounded-xl overflow-hidden shadow-sm bg-black/90 aspect-video max-h-64 flex items-center justify-center mx-auto">
                                                                 <video
                                                                     src={msg.file_url}
                                                                     controls
@@ -1457,7 +1506,6 @@ export default function ReceivePage() {
                                                                 >
                                                                     {t('chat.videoUnsupported')}
                                                                 </video>
-                                                                // </div>
                                                             ) : (
                                                                 <a
                                                                     href={msg.file_url}
@@ -1484,6 +1532,7 @@ export default function ReceivePage() {
                                 <div className="mb-10" />
                             </div>
                         </CardContent>
+                        {/*　チャットの送信セクション (カードの状態が受け渡し完了になる前まで入力可能) */}
                         {step !== "COMPLETED" && (
                             <CardFooter className="flex flex-col pt-0 bg-white">
                                 <form onSubmit={handleChatSubmit} className="w-full space-y-2 p-4 rounded-xl border-1 shadow-sm transition-all bg-gray-50">
@@ -1628,46 +1677,42 @@ export default function ReceivePage() {
 
             {/* ========== Full-width Product Content Section ========== */}
             {
-                step !== "PIN" && gift && (gift.shop_detail_html || (gift.product && gift.product.detail_html)) && (
-                    <>
-                        {/* <Card className="w-full mt-20 flex flex-col items-center max-w-none bg-white "> */}
-                        <Card className="w-full mt-20 flex flex-col items-center max-w-xl bg-white ">
-                            {/* <CardHeader className="w-full flex flex-col items-center justify-center cursor-pointer p-6 border border-dash rounded-xl bg-gray-50/50 hover:bg-white transition-colors"> */}
-                            <CardTitle className="w-full flex flex-col items-center justify-center gap-2">
-                                <div className="w-full flex items-center justify-center text-xl text-center gap-2">
-                                    <ShoppingBasket className="w-5 h-5 text-gray-600" />
-                                    {t('shopinfo')}
-                                </div>
-                                <div className="w-full flex items-center justify-center text-xs text-center text-gray-500">
-                                    {t('shopinfo_description')}
-                                </div>
-                            </CardTitle>
-                            {/* </CardHeader> */}
-                            <CardContent className="min-h-0 flex flex-1 p-0">
-                                <SandboxedHtml html={gift.shop_detail_html || gift.product.detail_html} />
-                            </CardContent>
-                        </Card>
-                        {/* <Card className="w-full max-w-xl mb-10">
-                        <CardHeader>
-                            <CardTitle className="text-xl text-center">
-                                {step === "FORM" ? t('titles.form') :
-                                    step === "SUCCESS" ? t('titles.success') :
-                                        step === "SHIPPED" ? t('titles.shipped') :
-                                            step === "EXPIRED" ? t('titles.expired') :
-                                                step === "COMPLETED" ? t('titles.completed') :
-                                                    step === "RESTRICTED" ? tst(gift.status.toLowerCase()) : ""}
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <img src={gift.product.image_url} alt="Gift" className="w-full max-h-72 object-cover rounded-xl mb-6 shadow" />
-                            <h1 className="text-2xl font-bold mb-1">{gift.product.name}</h1>
-                            <p className="text-gray-500 mb-6">{gift.product.description}</p>
+                step !== "PIN" && gift && (gift.product && gift.product.detail_html) && (
+                    <Card className="w-full mt-20 flex flex-col items-center max-w-xl bg-white ">
+                        <CardTitle className="w-full flex flex-col items-center justify-center gap-2">
+                            <div className="w-full flex items-center justify-center text-xl text-center gap-2">
+                                <ShoppingBasket className="w-5 h-5 text-gray-600" />
+                                {t('shopinfo')}
+                            </div>
+                            <div className="w-full flex items-center justify-center text-xs text-center text-gray-500">
+                                {t('shopinfo_description')}
+                            </div>
+                        </CardTitle>
+                        <CardContent className="min-h-0 flex flex-1 p-0">
+                            <SandboxedHtml html={gift.product.detail_html} />
                         </CardContent>
-                    </Card> */}
-                        {/* <div className="w-full max-w-3xl mb-8 animate-in fade-in duration-500"> */}
-                        {/* Rich Text HTML Content — rendered in an isolated iframe so CSS cannot leak out */}
-                        {/* </div> */}
-                    </>
+                    </Card>
+                )
+            }
+
+
+            {/* ========== Full-width Product Content Section ========== */}
+            {
+                step !== "PIN" && gift && (gift.shop_detail_html) && (
+                    <Card className="w-full mt-20 flex flex-col items-center max-w-xl bg-white ">
+                        <CardTitle className="w-full flex flex-col items-center justify-center gap-2">
+                            <div className="w-full flex items-center justify-center text-xl text-center gap-2">
+                                <ShoppingBasket className="w-5 h-5 text-gray-600" />
+                                {t('shopinfo')}
+                            </div>
+                            <div className="w-full flex items-center justify-center text-xs text-center text-gray-500">
+                                {t('shopinfo_description')}
+                            </div>
+                        </CardTitle>
+                        <CardContent className="min-h-0 flex flex-1 p-0">
+                            <SandboxedHtml html={gift.shop_detail_html} />
+                        </CardContent>
+                    </Card>
                 )
             }
 
