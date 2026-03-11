@@ -1,10 +1,10 @@
 import { APIGatewayProxyHandler } from 'aws-lambda';
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, PutCommand, QueryCommand, GetCommand, UpdateCommand, DeleteCommand } from '@aws-sdk/lib-dynamodb';
-import { S3Client, PutObjectCommand, CopyObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, PutObjectCommand, CopyObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import * as crypto from 'crypto';
-import { signUrlIfS3, stripSignature, signUrlsInHtml } from './utils/s3';
+import { signUrlIfS3, stripSignature, signUrlsInHtml, deleteFileByUrl } from './utils/s3';
 
 const client = new DynamoDBClient({});
 const ddb = DynamoDBDocumentClient.from(client);
@@ -110,6 +110,11 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             if (result.detail_html) {
                 result.detail_html = await signUrlsInHtml(result.detail_html, BUCKET_NAME);
             }
+            if (result.html_image_urls && Array.isArray(result.html_image_urls)) {
+                result.html_image_urls = await Promise.all(
+                    result.html_image_urls.map((url: string) => signUrlIfS3(url, BUCKET_NAME))
+                );
+            }
             return { statusCode: 200, headers: corsHeaders, body: JSON.stringify(result) };
         }
 
@@ -130,6 +135,31 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             if (detail_html !== undefined) {
                 updateExprParts.push('detail_html = :html');
                 attrValues[':html'] = detail_html;
+            }
+
+            // Handle html_image_urls specifically for S3 cleanup
+            if (body.html_image_urls !== undefined) {
+                const newUrls = Array.isArray(body.html_image_urls) ? body.html_image_urls.map((url: string) => stripSignature(url)) : [];
+                const oldUrls = shopMetadata.html_image_urls || [];
+
+                // Delete removed images from S3 (legacy check for items removed from oldUrls but maybe not caught, though explicit list handles it mostly)
+                const toDelete = oldUrls.filter((url: string) => !newUrls.includes(url));
+                for (const url of toDelete) {
+                    await deleteFileByUrl(url, BUCKET_NAME);
+                }
+
+                // Explicitly delete URLs tracked by frontend
+                if (body.deleted_html_image_urls && Array.isArray(body.deleted_html_image_urls)) {
+                    for (const url of body.deleted_html_image_urls) {
+                        const cleanUrl = stripSignature(url);
+                        if (cleanUrl && !toDelete.includes(cleanUrl)) {
+                            await deleteFileByUrl(cleanUrl, BUCKET_NAME);
+                        }
+                    }
+                }
+
+                updateExprParts.push('html_image_urls = :hiu');
+                attrValues[':hiu'] = newUrls;
             }
 
             if (updateExprParts.length === 0) {
@@ -273,7 +303,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         //    Get Upload URL for 3. Create product (POST /shop/{shopId}/products/upload-url)
         if (method === 'POST' && path.endsWith('/upload-url')) {
             const body = JSON.parse(event.body || '{}');
-            const { filename, contentType } = body;
+            const { filename, contentType, folder } = body;
             if (!filename || !contentType) return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Missing filename or contentType' }) };
 
             const ALLOWED_CONTENT_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
@@ -287,7 +317,10 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Invalid file extension. Only images are allowed.' }) };
             }
 
-            const key = `shop/${shopId}/products/${filename}`;
+            let key = `shop/${shopId}/products/${filename}`;
+            if (folder === 'shopcontent') {
+                key = `shop/${shopId}/shopcontent/${filename}`;
+            }
             const command = new PutObjectCommand({
                 Bucket: BUCKET_NAME,
                 Key: key,
@@ -315,10 +348,12 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                     ':sk': 'PRODUCT#'
                 }
             }));
-            const items = (res.Items || []).map(item => ({
-                ...item,
-                product_id: item.SK.replace('PRODUCT#', '')
-            })) as any[];
+            const items = (res.Items || [])
+                .filter(item => item.status !== 'DELETED')
+                .map(item => ({
+                    ...item,
+                    product_id: item.SK.replace('PRODUCT#', '')
+                })) as any[];
 
             // Sign image URLs and HTML
             for (const item of items) {

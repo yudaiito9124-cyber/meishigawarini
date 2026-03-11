@@ -62,6 +62,26 @@ export async function deleteFileFromS3(bucket: string, key: string): Promise<voi
 }
 
 /**
+ * Deletes an object from S3 using its URL.
+ */
+export async function deleteFileByUrl(url: string | undefined, bucketName: string): Promise<void> {
+    if (!url || !url.includes(bucketName)) return;
+    try {
+        const urlObj = new URL(url);
+        // Path might be /bucket/key or /key. 
+        // If it starts with /bucketName/, we strip that too.
+        let key = decodeURIComponent(urlObj.pathname.substring(1));
+        if (key.startsWith(`${bucketName}/`)) {
+            key = key.substring(bucketName.length + 1);
+        }
+        await deleteFileFromS3(bucketName, key);
+        console.log(`Deleted S3 object: ${key}`);
+    } catch (e) {
+        console.error(`Failed to delete S3 object by URL: ${url}`, e);
+    }
+}
+
+/**
  * Finds S3 URLs in HTML and replaces them with signed URLs.
  */
 export async function signUrlsInHtml(html: string | undefined, bucketName: string): Promise<string | undefined> {

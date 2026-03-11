@@ -489,7 +489,7 @@ export default function ReceivePage() {
             setSelectedFile(null);
             await loadMessages();
         } catch (e: any) {
-            alert("Failed to send message: " + e.message);
+            alert(t('chat.sendFailed') + e.message);
         } finally {
             setChatLoading(false);
             setUploading(false);
@@ -518,7 +518,7 @@ export default function ReceivePage() {
             await loadMessages();
             setIsEditingSender(false);
         } catch (e: any) {
-            alert("Failed to update sender info: " + e.message);
+            alert(t('senderInfo.updateFailed') + e.message);
         } finally {
             setSenderInfoLoading(false);
         }
@@ -560,7 +560,7 @@ export default function ReceivePage() {
             setSenderForm(newSenderInfo);
         } catch (e) {
             console.error(e);
-            alert("Upload failed");
+            alert(t('errors.uploadFailed'));
         } finally {
             setSenderInfoLoading(false);
         }
@@ -1416,7 +1416,7 @@ export default function ReceivePage() {
                                                     </div>
                                                     <div className="space-y-2">
                                                         {htmlImageUrls.length === 0 ? (
-                                                            <p className="text-[10px] text-gray-400 italic font-medium py-2">アップロードされた画像はありません。HTML内で使用する画像をここに追加できます。</p>
+                                                            <p className="text-[10px] text-gray-400 italic font-medium py-2">{t('senderInfo.labels.detail_html-noimages')}</p>
                                                         ) : (
                                                             <div className="grid grid-cols-1 gap-2">
                                                                 {htmlImageUrls.map((url, idx) => (
@@ -1434,7 +1434,7 @@ export default function ReceivePage() {
                                                                                 className="h-8 w-8 text-gray-400 hover:text-blue-600 hover:bg-blue-50"
                                                                                 onClick={() => {
                                                                                     navigator.clipboard.writeText(url);
-                                                                                    alert("URLをコピーしました");
+                                                                                    alert(t('senderInfo.urlCopied'));
                                                                                 }}
                                                                             >
                                                                                 <Copy className="w-3.5 h-3.5" />
@@ -1444,14 +1444,20 @@ export default function ReceivePage() {
                                                                                 size="icon"
                                                                                 className="h-8 w-8 text-gray-400 hover:text-red-600 hover:bg-red-50"
                                                                                 onClick={() => {
-                                                                                    if (!confirm("この画像を削除しますか？")) return;
+                                                                                    if (!confirm(t('senderInfo.confirmRemoveImage'))) return;
+                                                                                    const deletedUrl = htmlImageUrls[idx];
                                                                                     const next = htmlImageUrls.filter((_, i) => i !== idx);
                                                                                     setHtmlImageUrls(next);
                                                                                     const newSenderInfo = { ...senderForm, html_image_urls: next };
                                                                                     fetch(`${NEXT_PUBLIC_API_URL}/recipient/qrcodes/${uuid}/chat`, {
                                                                                         method: 'POST',
                                                                                         headers: { "Content-Type": "application/json" },
-                                                                                        body: JSON.stringify({ type: 'update_sender_info', pin, sender_info: newSenderInfo })
+                                                                                        body: JSON.stringify({ 
+                                                                                            type: 'update_sender_info', 
+                                                                                            pin, 
+                                                                                            sender_info: newSenderInfo,
+                                                                                            deleted_html_image_urls: [deletedUrl]
+                                                                                        })
                                                                                     });
                                                                                     setSenderInfo(newSenderInfo);
                                                                                     setSenderForm(newSenderInfo);
@@ -1467,8 +1473,8 @@ export default function ReceivePage() {
                                                     </div>
                                                     <div className="bg-blue-50/50 p-2.5 rounded-lg border border-blue-100/50">
                                                         <p className="text-[9px] text-blue-700 leading-relaxed font-medium">
-                                                            <span className="inline-block px-1 bg-blue-100 rounded mr-1 text-blue-800">使い方</span>
-                                                            コピーしたURLを詳細HTML内の <code>&lt;img src="..."&gt;</code> に貼り付けてください。実行時に自動的に署名付きURLへ置換され、画像が表示されます。
+                                                            <span className="inline-block px-1 bg-blue-100 rounded mr-1 text-blue-800">{t('senderInfo.usage')}</span>
+                                                            {t('senderInfo.usageDesc1')} <code>&lt;img src="..."&gt;</code> {t('senderInfo.usageDesc2')}
                                                         </p>
                                                     </div>
                                                 </div>
@@ -1638,7 +1644,7 @@ export default function ReceivePage() {
                                         <div className="absolute inset-0 bg-white/60 backdrop-blur-[1px] flex items-center justify-center z-10 transition-all">
                                             <div className="flex flex-col items-center gap-2">
                                                 <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
-                                                <p className="text-xs font-bold text-blue-800">{t('senderInfo.uploading') || "アップロード中..."}</p>
+                                                <p className="text-xs font-bold text-blue-800">{t('senderInfo.uploading')}</p>
                                             </div>
                                         </div>
                                     )}

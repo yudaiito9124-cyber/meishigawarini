@@ -5,7 +5,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { RefreshCw, ArrowRight, HelpCircle, Camera, Settings, ShoppingBasket, Eye } from 'lucide-react';
+import { RefreshCw, ArrowRight, HelpCircle, Camera, Settings, ShoppingBasket, Eye, Plus, Trash2, Copy, ChevronDown, ImageIcon } from 'lucide-react';
 import { notFound, useParams } from 'next/navigation';
 import { useRouter } from '@/i18n/routing';
 import { useTranslations } from 'next-intl';
@@ -59,6 +59,10 @@ export default function ShopPage() {
     const [selectedImportShopId, setSelectedImportShopId] = useState('');
     const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+    const [htmlImageUrls, setHtmlImageUrls] = useState<string[]>([]);
+    const [htmlImageUrlsToDelete, setHtmlImageUrlsToDelete] = useState<string[]>([]);
+    const [isHtmlImageSectionOpen, setIsHtmlImageSectionOpen] = useState(false);
+    const [isUploadingHtmlImage, setIsUploadingHtmlImage] = useState(false);
 
 
     // Protect Route
@@ -97,6 +101,9 @@ export default function ShopPage() {
                 setShop(data);
                 if (data.detail_html) {
                     setDebouncedPreviewHtml(data.detail_html);
+                }
+                if (data.html_image_urls) {
+                    setHtmlImageUrls(data.html_image_urls);
                 }
             } catch (err: any) {
                 if (err.statusCode === 401) {
@@ -180,6 +187,63 @@ export default function ShopPage() {
             fetchImportShops();
         }
     }, [isImportDialogOpen, shopId]);
+
+    // Reset settings state when dialog opens or closes
+    useEffect(() => {
+        if (shop) {
+            if (shop.html_image_urls) {
+                setHtmlImageUrls(shop.html_image_urls);
+            } else {
+                setHtmlImageUrls([]);
+            }
+            if (shop.detail_html) {
+                setDebouncedPreviewHtml(shop.detail_html);
+            } else {
+                setDebouncedPreviewHtml('');
+            }
+        }
+        setIsHtmlImageSectionOpen(false);
+        setIsUploadingHtmlImage(false);
+        setHtmlImageUrlsToDelete([]);
+    }, [isSettingsOpen, shop]);
+
+    const handleHtmlImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        setIsUploadingHtmlImage(true);
+        try {
+            // 1. Get Presigned URL
+            const res = await fetchWithAuth(`/shop/${shopId}/products/upload-url`, {
+                method: 'POST',
+                body: JSON.stringify({
+                    filename: `${crypto.randomUUID()}.${file.name.split('.').pop()}`,
+                    contentType: file.type,
+                    folder: 'shopcontent'
+                })
+            });
+
+            if (!res.ok) throw new Error('Failed to get upload URL');
+            const { uploadUrl, publicUrl } = await res.json();
+
+            // 2. Upload to S3
+            const uploadRes = await fetch(uploadUrl, {
+                method: 'PUT',
+                body: file,
+                headers: { 'Content-Type': file.type }
+            });
+
+            if (!uploadRes.ok) throw new Error('Failed to upload image');
+
+            // 3. Update State
+            setHtmlImageUrls(prev => [...prev, publicUrl]);
+        } catch (err: any) {
+            console.error('HTML Image upload failed:', err);
+            alert('Upload failed: ' + err.message);
+        } finally {
+            setIsUploadingHtmlImage(false);
+        }
+    };
 
     const handleShops = async () => {
         try {
@@ -454,7 +518,9 @@ export default function ShopPage() {
                 method: 'PATCH',
                 body: JSON.stringify({
                     name: formData.get('shop_name'),
-                    detail_html: formData.get('shop_detail_html')
+                    detail_html: formData.get('shop_detail_html'),
+                    html_image_urls: htmlImageUrls,
+                    deleted_html_image_urls: htmlImageUrlsToDelete
                 })
             });
             if (res.ok) {
@@ -533,7 +599,7 @@ export default function ShopPage() {
                                     <span className="sr-only">{t('shopSettings.title')}</span>
                                 </Button>
                             </DialogTrigger>
-                            <DialogContent className="max-w-[95vw] sm:max-w-[95vw] w-full max-h-[95vh] h-[95vh] overflow-y-auto">
+                            <DialogContent key={isSettingsOpen ? 'open' : 'closed'} className="max-w-[95vw] sm:max-w-[95vw] w-full max-h-[95vh] h-[95vh] overflow-y-auto">
                                 <DialogHeader>
                                     <DialogTitle>{t('shopSettings.title', { defaultValue: 'ショップ設定' })}</DialogTitle>
                                     <DialogDescription>{t('shopSettings.description', { defaultValue: 'ショップの名前や紹介文を設定します。' })}</DialogDescription>
@@ -545,7 +611,7 @@ export default function ShopPage() {
                                     </div>
                                     <div className="space-y-2">
                                         <Label htmlFor="shop_detail_html">{t('shopSettings.detailHtml')}</Label>
-                                        <div className="border rounded-md overflow-hidden bg-gray-50/30 min-h-[400px] h-[calc(95vh-300px)] flex flex-col lg:flex-row">
+                                        <div className="border rounded-md overflow-hidden bg-gray-50/30 min-h-[400px] h-[calc(95vh-400px)] flex flex-col lg:flex-row">
                                             <div className="flex-1 flex flex-col min-h-0 border-b lg:border-b-0 lg:border-r bg-white">
                                                 <div className="px-3 py-2 bg-gray-50 border-b flex justify-between items-center shrink-0 min-h-[50px]">
                                                     <Label htmlFor="shop_detail_html" className="text-xs font-bold text-gray-600 uppercase tracking-wider">{t('shopSettings.sourcecode')}</Label>
@@ -601,6 +667,95 @@ export default function ShopPage() {
                                                     </div> */}
                                                 </div>
                                             </div>
+                                        </div>
+
+                                        {/* HTML Images Section */}
+                                        <div className="space-y-2 pt-2">
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={() => setIsHtmlImageSectionOpen(!isHtmlImageSectionOpen)}
+                                                className="w-full flex justify-between items-center text-gray-500 hover:text-gray-900 px-2"
+                                            >
+                                                <div className="flex items-center gap-2">
+                                                    <ImageIcon className="w-4 h-4" />
+                                                    <span className="font-semibold">{tr('senderInfo.labels.detail_html-images')}</span>
+                                                </div>
+                                                <ChevronDown className={`w-4 h-4 transition-transform ${isHtmlImageSectionOpen ? 'rotate-180' : ''}`} />
+                                            </Button>
+
+                                            {isHtmlImageSectionOpen && (
+                                                <div className="space-y-4 p-4 bg-gray-50/50 rounded-lg border border-dashed border-gray-200">
+                                                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                                                        {htmlImageUrls.map((url, index) => (
+                                                            <div key={index} className="group relative aspect-square bg-white rounded-md border overflow-hidden shadow-sm hover:ring-2 hover:ring-primary/30 transition-all">
+                                                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                                                <img
+                                                                    src={url}
+                                                                    alt={`HTML content ${index}`}
+                                                                    className="w-full h-full object-cover"
+                                                                    onError={(e) => {
+                                                                        (e.target as HTMLImageElement).src = 'https://placehold.co/200x200?text=Error';
+                                                                    }}
+                                                                />
+                                                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                                                                    <Button
+                                                                        type="button"
+                                                                        variant="secondary"
+                                                                        size="icon"
+                                                                        className="h-8 w-8 rounded-full bg-white/90 hover:bg-white"
+                                                                        onClick={() => {
+                                                                            navigator.clipboard.writeText(url);
+                                                                            alert(t('shopSettings.copySuccess'));
+                                                                        }}
+                                                                        title={t('shopSettings.copyUrl')}
+                                                                    >
+                                                                        <Copy className="h-4 w-4 text-gray-700" />
+                                                                    </Button>
+                                                                    <Button
+                                                                        type="button"
+                                                                        variant="destructive"
+                                                                        size="icon"
+                                                                        className="h-8 w-8 rounded-full"
+                                                                        onClick={() => {
+                                                                            setHtmlImageUrlsToDelete(prev => [...prev, url]);
+                                                                            setHtmlImageUrls(prev => prev.filter((_, i) => i !== index));
+                                                                        }}
+                                                                        title={t('product.delete')}
+                                                                    >
+                                                                        <Trash2 className="h-4 w-4" />
+                                                                    </Button>
+                                                                </div>
+                                                            </div>
+                                                        ))}
+
+                                                        <label className="flex flex-col items-center justify-center aspect-square bg-white rounded-md border border-dashed border-gray-300 hover:border-primary/50 hover:bg-primary/5 cursor-pointer transition-all group">
+                                                            <div className="flex flex-col items-center gap-1 text-gray-400 group-hover:text-primary transition-colors">
+                                                                {isUploadingHtmlImage ? (
+                                                                    <RefreshCw className="w-6 h-6 animate-spin" />
+                                                                ) : (
+                                                                    <>
+                                                                        <Plus className="w-6 h-6" />
+                                                                        <span className="text-[10px] font-medium">{tr('senderInfo.labels.detail_html-addimage')}</span>
+                                                                    </>
+                                                                )}
+                                                            </div>
+                                                            <input
+                                                                type="file"
+                                                                className="hidden"
+                                                                accept="image/*"
+                                                                onChange={handleHtmlImageUpload}
+                                                                disabled={isUploadingHtmlImage}
+                                                                onClick={(e) => (e.target as HTMLInputElement).value = ''}
+                                                            />
+                                                        </label>
+                                                    </div>
+                                                    <p className="text-[10px] text-gray-400 italic">
+                                                        {t('shopSettings.imageHint')}
+                                                    </p>
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
                                     <DialogFooter>

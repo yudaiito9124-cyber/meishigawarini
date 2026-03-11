@@ -1,511 +1,523 @@
 {
-    "Site": {
-        "name": "名刺代わりに。"
-    },
-    "Timestamp": {
-        "ts_created_at": "作成日時",
-        "ts_linked_at": "連携日時",
-        "ts_activated_at": "有効化日時",
-        "ts_submitted_at": "住所入力日時",
-        "ts_shipped_at": "発送日時",
-        "ts_completed_at": "完了日時",
-        "ts_expired_at": "期限切れ日時",
-        "ts_banned_at": "BAN日時",
-        "ts_updated_at": "更新日時"
-    },
-    "Status": {
-        "unassigned": "未連携",
-        "linked": "連携済み",
-        "active": "有効化済み",
-        "used": "発送待ち",
-        "shipped": "発送済み",
-        "completed": "受取り完了",
-        "expired": "期限切れ",
-        "banned": "BAN済み"
-    },
-    "HomePage": {
-        "title": "名刺代わりにへようこそ",
-        "shopAdmin": "ショップ管理者画面",
-        "heroTitle": "名刺代わりに、",
-        "heroSubtitle": "心を贈ろう。",
-        "description": "”名刺代わりに。” は出会いにちょっとした贈りものを添えるデジタルギフトサービス。 ギフトの送り先はQRコードから指定できます。"
-    },
-    "LoginPage": {
-        "title": "ログイン",
-        "email": "メールアドレス",
-        "password": "パスワード",
-        "signIn": "ログイン",
-        "signingIn": "ログイン中...",
-        "noAccount": "アカウントをお持ちでないですか？",
-        "signUpLink": "登録する",
-        "errors": {
-            "default": "ログインに失敗しました",
-            "notAuthorized": "メールアドレスまたはパスワードが間違っています。",
-            "notConfirmed": "ユーザーが確認されていません。メールを確認してください。"
-        }
-    },
-    "RegisterPage": {
-        "title": "アカウント作成",
-        "email": "メールアドレス",
-        "emailNote": "ご入力いただいたメールアドレスは、顧客向けの問い合わせ窓口として表示されます。",
-        "password": "パスワード",
-        "passwordHint": "大文字、小文字、数字を含む8文字以上で入力してください。",
-        "signUp": "登録",
-        "creatingAccount": "作成中...",
-        "hasAccount": "すでにアカウントをお持ちですか？",
-        "loginLink": "ログイン",
-        "successTitle": "登録完了！",
-        "successMessage": "アカウントが作成されました。",
-        "goToLogin": "ログイン画面へ",
-        "errors": {
-            "default": "登録に失敗しました",
-            "usernameExists": "ユーザーは既に存在します。ログインしてください。"
-        }
-    },
-    "Metadata": {
-        "title": "名刺代わりに。",
-        "description": "出会いにちょっとした贈りものを添えるデジタルギフトサービス。 ギフトの送り先はQRコードから指定できます。"
-    },
-    "ShopListPage": {
-        "loading": "ショップ一覧を読み込み中...",
-        "title": "マイショップ",
-        "subtitle": "管理するショップを選択するか、新しいショップを作成してください。",
-        "userId": "ユーザーID: {id}",
-        "logout": "ログアウト",
-        "createShop": "ショップ新規作成",
-        "createDialog": {
-            "title": "ショップ作成",
-            "description": "新しいショップの名前を入力してください。",
-            "label": "ショップ名",
-            "placeholder": "素敵なショップ",
-            "submit": "作成",
-            "submitting": "作成中..."
-        },
-        "noShops": "ショップが見つかりません。まずは作成しましょう！",
-        "manageShop": "管理画面へ",
-        "created": "作成日: {date}"
-    },
-    "ShopPage": {
-        "loading": "ショップの管理画面を読み込み中...",
-        "title": "-",
-        "movetoshops": "ショップ一覧へ戻る",
-        "shopId": "ショップID: {id}",
-        "refresh": "更新",
-        "incomingOrders": "受信した注文",
-        "ordersDesc": "注文と発送を管理します。",
-        "orders": {
-            "date": "更新日時",
-            "recipient": "受取人",
-            "contact": "連絡先",
-            "address": "住所",
-            "preferredDateTime": "希望日時",
-            "status": "ステータス",
-            "action": "発送処理",
-            "uuid": "ID",
-            "productName": "商品名",
-            "noOrders": "注文はまだありません",
-            "ship": "発送する",
-            "details": "詳細",
-            "userMessage": "購入者へのメッセージ(オプション)",
-            "shopMemo": "メモ(ショップのみ閲覧可能)",
-            "timestamps": "タイムスタンプ",
-            "shipDialog": {
-                "title": "発送処理",
-                "description": "{name} 様への発送情報を入力してください。",
-                "label": "追跡番号(なし等でも可)",
-                "deliveryCompany": "配送会社",
-                "submit": "発送済みにする"
-            }
-        },
-        "products": "商品一覧",
-        "product": {
-            "stop": "停止",
-            "activate": "有効化",
-            "delete": "削除",
-            "deleteConfirm": "\"{name}\" を削除してもよろしいですか？"
-        },
-        "search": {
-            "placeholder": "カードIDで絞り込み...",
-            "go": "検索",
-            "clear": "クリア"
-        },
-        "addProduct": {
-            "title": "商品追加",
-            "name": "商品名",
-            "description": "説明",
-            "detailHtml": "詳細(HTML)",
-            "detailHtmlPlaceholder": "詳細(HTML)",
-            "price": "価格 (円)",
-            "validDays": "有効期限 (日数)",
-            "image": "商品画像",
-            "imagePlaceholder": "対応形式: .jpg, .png, .gif, .webp",
-            "submit": "商品を登録",
-            "success": "商品を追加しました！",
-            "failed": "商品の追加に失敗しました",
-            "error": "商品の追加中にエラーが発生しました"
-        },
-        "importProduct": {
-            "button": "商品を一括インポート",
-            "dialogTitle": "別ショップから商品をインポート",
-            "dialogDesc": "コピー元のショップを選択してください。対象ショップのすべての商品がこのショップに追加されます。商品のIDは同一です。",
-            "selectShop": "インポート元のショップ",
-            "placeholder": "ショップを選択してください...",
-            "submit": "インポート",
-            "cancel": "キャンセル"
-        },
-        "linkQr": {
-            "title": "カード有効化",
-            "description": "会計後，カードと商品を紐付けし，使えるようにします。",
-            "uuidLabel": "QRコード",
-            "placeholder": "QRコード手動入力? 123e4567-...",
-            "productName": "商品名",
-            "scan": "QRコードをスキャン",
-            "manualinput": "手動入力？",
-            "selectProduct": "商品 (カードに商品名が記載されていない場合)",
-            "selectPlaceholder": "商品を選択してください...",
-            "option": "オプション(必要に応じて)",
-            "memoForUsersLabel": "(オプション) ショップメッセージ",
-            "memoForUsersPlaceholder": "購入者・受取者にメッセージ",
-            "memoForShopLabel": "(オプション) メモ",
-            "memoForShopPlaceholder": "メモ(ショップのみ閲覧可能)",
-            "submit": "連携して有効化",
-            "processing": "処理中...",
-            "foreignQrError": "このカードは使えません。",
-            "clear": "取り消し",
-            "scanDialog": {
-                "title": "QRコードスキャン",
-                "description": "枠内にQRコードを合わせてください。",
-                "apply": "適用",
-                "cancel": "キャンセル"
-            },
-            "success": "QRコードが連携され有効化されました！"
-        },
-        "linkedQr": {
-            "title": "連携済みQRコード",
-            "id": "QR ID",
-            "product": "商品",
-            "status": "ステータス",
-            "activatedAt": "有効化日時",
-            "noLinks": "連携済みのQRコードはありません"
-        },
-        "history": {
-            "title": "その他の注文履歴",
-            "noLinks": "履歴はありません",
-            "id": "ID",
-            "product": "商品",
-            "status": "ステータス",
-            "activatedAt": "更新日時"
-        },
-        "statusGuide": {
-            "title": "ステータスガイド",
-            "description": "注文の進捗状況とステータスの意味を確認できます。",
-            "flow": "注文の流れ",
-            "list": "ステータス詳細",
-            "statuses": {
-                "unassigned": "QRコードが生成されましたが、まだショップや商品と紐付けられていません。",
-                "linked": "ショップや商品と紐付けられましたが、まだ使用できるように有効化されていません。",
-                "active": "有効化されており、ギフトとして贈ることができる状態です。",
-                "used": "受取人が住所を入力し、発送待ちの状態です（ショップ側で発送作業が必要です）。",
-                "shipped": "ショップが商品を発送し、追跡番号が登録された状態です。",
-                "completed": "取引が正常に完了しました（受取人が受取完了報告を行った場合など）。",
-                "expired": "有効期限が切れ、ギフトが無効になった状態です。",
-                "banned": "不正利用などにより、システム管理者が利用停止させた状態です。"
-            }
-        },
-        "shopSettings": {
-            "title": "ショップ設定",
-            "description": "ショップの名前や紹介文を設定します。",
-            "updatePreview": "プレビュー更新",
-            "name": "ショップ名",
-            "detailHtml": "ショップ紹介(HTML)",
-            "detailHtmlPlaceholder": "HTML(CSS)形式で入力してください。",
-            "submit": "ショップ設定を保存",
-            "success": "ショップ設定を更新しました。",
-            "failed": "更新に失敗しました。",
-            "sourcecode": "ソースコード",
-            "preview": "プレビュー",
-            "error": "エラーが発生しました。"
-        },
-        "productDetails": {
-            "title": "商品詳細",
-            "name": "商品名",
-            "description": "説明",
-            "price": "価格",
-            "validDays": "有効期間",
-            "validDaysSuffix": "日",
-            "detailHtml": "紹介用HTML (プレビュー)",
-            "rawDetailHtml": "紹介用HTML (ソースコード)",
-            "close": "閉じる"
-        }
-    },
-    "ReceivePage": {
-        "titles": {
-            "pin": "ギフトを受け取るにはPINコードを入力してください",
-            "form": "ギフトを配送してほしい住所をお知らせください",
-            "success": "配送先情報が送信されました",
-            "shipped": "ギフトが発送されました",
-            "expired": "有効期限が切れています",
-            "completed": "ギフトをお楽しみください"
-        },
-        "pinStep": {
-            "label": "カード裏の数字 (5回間違えると一定時間ロックされます)",
-            "placeholder": "8桁の数字",
-            "submit": "ギフトを見る",
-            "verifying": "確認中..."
-        },
-        "restrictedStep": {
-            "title": "パスワード確認",
-            "message": "ギフトの詳細を表示するには、設定したパスワードを入力してください。",
-            "passwordLabel": "パスワード",
-            "unlock": "ロック解除",
-            "verifying": "確認中..."
-        },
-        "daysRemaining": "有効期限まで あと {days}日 と約 {hours}時間{minutes}分 です",
-        "limitdatetime": "有効期限: {datetime} (延長はできませんのでご注意ください)",
-        "formStep": {
-            "title": "配送先情報",
-            "name": "お名前",
-            "address": "配送先住所",
-            "zipCode": "郵便番号",
-            "phone": "電話番号 (任意)",
-            "email": "メールアドレス (任意)",
-            "emailDescription": "発送状況やチャットの内容に関する通知、ショップからの問い合わせも行います。",
-            "preferredDate": "配送希望日 (任意)",
-            "preferredTime": "配送希望時間 (任意)",
-            "noPreference": "指定なし",
-            "timeMorning": "午前中",
-            "time1416": "14-16時",
-            "time1618": "16-18時",
-            "time1820": "18-20時",
-            "time1921": "19-21時",
-            "submit": "この住所に配送する",
-            "submitting": "住所を送信中...",
-            "passwordTitle": "パスワード設定 (任意)",
-            "passwordDescription": "PINコードだけでは、プレゼントをくれた方でも配送時の追跡番号などを閲覧できてしまします。パスワードを設定することで、チャット以外の詳細情報を保護することができます。再設定はできませんので忘れないようご注意ください。",
-            "passwordLabel": "パスワード",
-            "passwordPlaceholder": "4文字以上",
-            "confirmPasswordLabel": "パスワード（確認）",
-            "confirmPasswordPlaceholder": "もう一度入力",
-            "privacyPolicy": "入力された個人情報は、商品の発送および発送に関する連絡のみに使用され、その他の目的には使用されません。"
-        },
-        "successStep": {
-            "message": "配送先情報が送信されました！",
-            "subMessage": "ショップの担当者が発送いたします。"
-        },
-        "shippedStep": {
-            "message": "ギフトは発送済みです！",
-            "tracking": "追跡番号: {number}",
-            "receivedMessage": "荷物の受け取りが完了しましたか？",
-            "receivedButton": "受け取り完了",
-            "compleatedMessage": "荷物の受け取りが完了しました！",
-            "deliveryCompany": "配送会社: {company}"
-        },
-        "expiredStep": {
-            "message": "このギフトの有効期限は切れています。",
-            "subMessage": "有効期限: {date}"
-        },
-        "errors": {
-            "invalidPin": "PINが無効か、ギフトが見つかりません",
-            "inactive": "このカードは有効ではありません。",
-            "submitFailed": "住所の送信に失敗しました。",
-            "passwordMismatch": "パスワードが一致しません",
-            "invalidPassword": "パスワードが間違っています",
-            "unlockFailed": "ロック解除に失敗しました",
-            "invalidEmailFormat": "メールアドレスの形式が正しくありません"
-        },
-        "chat": {
-            "title": "メッセージチャット",
-            "name": "お名前",
-            "message": "メッセージ",
-            "noMessages": "まだメッセージはありません",
-            "submit": "送信",
-            "submitting": "送信中...",
-            "uploading": "アップロード中...",
-            "usage": "使用容量",
-            "limitNear": "制限に近づいています",
-            "placeholder": "メッセージを入力...",
-            "namePlaceholder": "ニックネーム",
-            "videoUnsupported": "お使いのブラウザはビデオタグをサポートしていません。",
-            "privacy": "このメッセージは、プレゼントをくれた方(QRコードとPINコードを知っている人)にしか閲覧できません。ショップはこのメッセージを閲覧できません。様々な規格のファイルをアップロードできますが、機密性の高い情報・個人情報などのアップロードは避けてください。",
-            "emailTitle": "メール通知設定",
-            "emailDesc": "新しいメッセージが届いた際に通知を受け取ることができます。",
-            "subscribe": "登録",
-            "subscribeSuccess": "通知設定が完了しました",
-            "subscribeFailed": "登録に失敗しました",
-            "system": "システム",
-            "systemMessage": {
-                "deliveryCompleted": "ギフトの受け取りが完了しました。"
-            }
-        },
-        "shopMessage": "ショップからのメッセージ",
-        "contactInfo": {
-            "title": "お問い合わせ",
-            "orderId": "注文ID",
-            "shopName": "ショップ名",
-            "shopEmail": "担当ショップの連絡先",
-            "note": "※ショップへ問い合わせる際には，下記「注文ID」と「ショップ名」を明記してください。発送後の住所変更など対応ができない場合があるため、あらかじめご了承ください。"
-        },
-        "senderInfo": {
-            "title": "送り主",
-            "title-empty": "送り主情報を追加",
-            "updated": "更新",
-            "description": "名刺画像・顔画像等をアップロードできます。",
-            "update": "名刺を更新する",
-            "uploadPlaceholder": "名刺画像・顔画像等をアップロード",
-            "uploadHint": "タップして画像ファイルを選択",
-            "uploading": "アップロード中...",
-            "notice": "※アップロードされた画像は安全に保管され、このギフトのやり取りにのみ使用されます。",
-            "save": "情報を保存",
-            "removeImage": "画像を削除",
-            "saving": "保存中...",
-            "cancel": "キャンセル",
-            "preview": "プレビュー",
-            "labels": {
-                "name": "名前",
-                "job_title": "役職",
-                "company": "会社名",
-                "department": "部署",
-                "email": "メールアドレス",
-                "phone": "電話番号",
-                "phone_direct": "電話番号(直通・携帯)",
-                "address": "住所",
-                "tags": "タグ",
-                "memo": "メモ",
-                "url": "URL",
-                "HP": "ホームページ",
-                "SNS_Facebook": "Facebook",
-                "SNS_Instagram": "Instagram",
-                "SNS_Threads": "Threads",
-                "SNS_X": "X",
-                "SNS_YouTube": "YouTube",
-                "SNS_LINE": "LINE",
-                "SNS_TikTok": "TikTok",
-                "Service_Linktree": "Linktree",
-                "Service_Eight": "Eight",
-                "exchange_date": "名刺交換日",
-                "others": "その他 (例: 誕生日、血液型)",
-                "addhtmlmessage": "HTML形式のメッセージを追加",
-                "detail_html": "HTMLソースコード",
-                "detail_html-images": "HTML用画像",
-                "detail_html-addimage": "画像を追加"
-            }
-        },
-        "shopinfo": "ショップのご紹介",
-        "shopinfo_description": "このギフトを販売しているショップのご紹介",
-        "memorySection": {
-            "title": "思い出の記録",
-            "daysPassed": "あれから {days} 日",
-            "message": "このギフトが、あなたにとって素敵な思い出のひとつになりますように。",
-            "submittedAt": "受注日: {date}",
-            "receivedAt": "受け取り日: {date}"
-        }
-    },
-    "AdminPage": {
-        "title": "管理ダッシュボード",
-        "generate": {
-            "title": "QRコード生成",
-            "quantity": "生成数",
-            "shopId": "ショップID (任意)",
-            "productId": "プロダクトID (任意)",
-            "button": "生成"
-        },
-        "batches": {
-            "title": "現在生成されているQRコード",
-            "noBatches": "まだバッチが生成されていません。",
-            "batchId": "バッチ: {id}",
-            "info": "{count} 件 • {date}",
-            "status": {
-                "ready": "準備完了",
-                "processing": "処理中"
-            },
-            "downloadPdf": "PDFダウンロード",
-            "table": {
-                "uuid": "UUID",
-                "pin": "PIN"
-            },
-            "alerts": {
-                "success": "QRコードの生成に成功しました",
-                "failed": "QRコードの生成に失敗しました",
-                "error": "エラーが発生しました"
-            }
-        },
-        "list": {
-            "title": "全QRコード",
-            "refresh": "更新",
-            "loading": "読み込み中...",
-            "deleteAllBanned": "BAN済みを全て削除",
-            "exportCsv": "CSV出力",
-            "status": {
-                "unassigned": "未割り当て",
-                "linked": "連携済み",
-                "active": "有効",
-                "used": "使用済み",
-                "shipped": "発送済み",
-                "completed": "完了済み",
-                "banned": "BAN済み",
-                "expired": "期限切れ",
-                "search": "UUIDで検索",
-                "undefined": "不明な状態"
-            },
-            "info": "ステータス: {status} • 件数: {count}",
-            "table": {
-                "uuid": "UUID",
-                "pin": "PIN",
-                "status": "ステータス",
-                "createdAt": "更新日時",
-                "actions": "操作",
-                "noCodes": "コードが見つかりません。更新ボタンを押してください。"
-            },
-            "ban": {
-                "button": "BAN",
-                "confirm": "本当にこのQRコードをBANしますか？この操作で即座に無効化されます。一度BANされたQRコードは元に戻せません。",
-                "success": "BANしました",
-                "failed": "BANに失敗しました",
-                "error": "エラーが発生しました",
-                "pdf": "PDF"
-            },
-            "deleteBanned": {
-                "confirm": "本当に全てのBAN済みコードを削除しますか？この操作は元に戻せません。",
-                "success": "BAN済みコードを {count} 件削除しました。",
-                "failed": "削除に失敗しました",
-                "error": "削除中にエラーが発生しました"
-            },
-            "keyword": {
-                "placeholder": "UUIDで検索 (8文字以上)",
-                "tooShort": "キーワードは8文字以上で入力してください。"
-            }
-        },
-        "shopInfo": {
-            "title": "ショップ情報",
-            "id": "ショップID",
-            "name": "ショップ名",
-            "contact": "連絡先"
-        }
-    },
-    "VerifyPage": {
-        "title": "アカウント確認",
-        "description": "メールに送信されたコードを入力してください。",
-        "email": "メールアドレス",
-        "emailPlaceholder": "you@example.com",
-        "code": "確認コード",
-        "codePlaceholder": "123456",
-        "button": "確認",
-        "verifying": "確認中...",
-        "loading": "読み込み中...",
-        "errors": {
-            "failed": "確認に失敗しました",
-            "incomplete": "確認が完了していません。次のステップ: {step}"
-        }
-    },
-    "UI": {
-        "Error starting scanner": "QRコードスキャナーを起動できませんでした。",
-        "Camera permission denied or error starting scanner": "カメラを起動できませんでした。カメラの使用を許可してください。または、ほかのアプリケーション(Web会議等)でカメラを使用している場合は、そのアプリケーションを閉じるか、カメラの使用を中断し、もう一度スキャンボタンを押してください。"
-    },
-    "BackendError": {
-        "QR not found": "QRコードが見つかりません。",
-        "QR does not belong to this shop": "QRコードはこのショップのものではありません。",
-        "QR is not in a valid state": "QRコードは利用できない状態です。すでに有効化されている、使用済みか、無効化されている可能性があります。",
-        "Product not found": "このカードに紐づけられていた商品が見つかりません。削除されている可能性があります。このカードは使えないため廃棄してください。",
-        "Product is stopped": "このカードに紐づけられていた商品が停止されています。もしこのカードを使用したい場合はSTOPPED状態の商品を有効化してください。"
+  "Site": {
+    "name": "名刺代わりに。"
+  },
+  "Timestamp": {
+    "ts_created_at": "作成日時",
+    "ts_linked_at": "連携日時",
+    "ts_activated_at": "有効化日時",
+    "ts_submitted_at": "住所入力日時",
+    "ts_shipped_at": "発送日時",
+    "ts_completed_at": "完了日時",
+    "ts_expired_at": "期限切れ日時",
+    "ts_banned_at": "BAN日時",
+    "ts_updated_at": "更新日時"
+  },
+  "Status": {
+    "unassigned": "未連携",
+    "linked": "連携済み",
+    "active": "有効化済み",
+    "used": "発送待ち",
+    "shipped": "発送済み",
+    "completed": "受取り完了",
+    "expired": "期限切れ",
+    "banned": "BAN済み"
+  },
+  "HomePage": {
+    "title": "名刺代わりにへようこそ",
+    "shopAdmin": "ショップ管理者画面",
+    "heroTitle": "名刺代わりに、",
+    "heroSubtitle": "心を贈ろう。",
+    "description": "”名刺代わりに。” は出会いにちょっとした贈りものを添えるデジタルギフトサービス。 ギフトの送り先はQRコードから指定できます。"
+  },
+  "LoginPage": {
+    "title": "ログイン",
+    "email": "メールアドレス",
+    "password": "パスワード",
+    "signIn": "ログイン",
+    "signingIn": "ログイン中...",
+    "noAccount": "アカウントをお持ちでないですか？",
+    "signUpLink": "登録する",
+    "errors": {
+      "default": "ログインに失敗しました",
+      "notAuthorized": "メールアドレスまたはパスワードが間違っています。",
+      "notConfirmed": "ユーザーが確認されていません。メールを確認してください。"
     }
+  },
+  "RegisterPage": {
+    "title": "アカウント作成",
+    "email": "メールアドレス",
+    "emailNote": "ご入力いただいたメールアドレスは、顧客向けの問い合わせ窓口として表示されます。",
+    "password": "パスワード",
+    "passwordHint": "大文字、小文字、数字を含む8文字以上で入力してください。",
+    "signUp": "登録",
+    "creatingAccount": "作成中...",
+    "hasAccount": "すでにアカウントをお持ちですか？",
+    "loginLink": "ログイン",
+    "successTitle": "登録完了！",
+    "successMessage": "アカウントが作成されました。",
+    "goToLogin": "ログイン画面へ",
+    "errors": {
+      "default": "登録に失敗しました",
+      "usernameExists": "ユーザーは既に存在します。ログインしてください。"
+    }
+  },
+  "Metadata": {
+    "title": "名刺代わりに。",
+    "description": "出会いにちょっとした贈りものを添えるデジタルギフトサービス。 ギフトの送り先はQRコードから指定できます。"
+  },
+  "ShopListPage": {
+    "loading": "ショップ一覧を読み込み中...",
+    "title": "マイショップ",
+    "subtitle": "管理するショップを選択するか、新しいショップを作成してください。",
+    "userId": "ユーザーID: {id}",
+    "logout": "ログアウト",
+    "createShop": "ショップ新規作成",
+    "createDialog": {
+      "title": "ショップ作成",
+      "description": "新しいショップの名前を入力してください。",
+      "label": "ショップ名",
+      "placeholder": "素敵なショップ",
+      "submit": "作成",
+      "submitting": "作成中..."
+    },
+    "noShops": "ショップが見つかりません。まずは作成しましょう！",
+    "manageShop": "管理画面へ",
+    "created": "作成日: {date}"
+  },
+  "ShopPage": {
+    "loading": "ショップの管理画面を読み込み中...",
+    "title": "-",
+    "movetoshops": "ショップ一覧へ戻る",
+    "shopId": "ショップID: {id}",
+    "refresh": "更新",
+    "incomingOrders": "受信した注文",
+    "ordersDesc": "注文と発送を管理します。",
+    "orders": {
+      "date": "更新日時",
+      "recipient": "受取人",
+      "contact": "連絡先",
+      "address": "住所",
+      "preferredDateTime": "希望日時",
+      "status": "ステータス",
+      "action": "発送処理",
+      "uuid": "ID",
+      "productName": "商品名",
+      "noOrders": "注文はまだありません",
+      "ship": "発送する",
+      "details": "詳細",
+      "userMessage": "購入者へのメッセージ(オプション)",
+      "shopMemo": "メモ(ショップのみ閲覧可能)",
+      "timestamps": "タイムスタンプ",
+      "shipDialog": {
+        "title": "発送処理",
+        "description": "{name} 様への発送情報を入力してください。",
+        "label": "追跡番号(なし等でも可)",
+        "deliveryCompany": "配送会社",
+        "submit": "発送済みにする"
+      }
+    },
+    "products": "商品一覧",
+    "product": {
+      "stop": "停止",
+      "activate": "有効化",
+      "delete": "削除",
+      "deleteConfirm": "\"{name}\" を削除してもよろしいですか？"
+    },
+    "search": {
+      "placeholder": "カードIDで絞り込み...",
+      "go": "検索",
+      "clear": "クリア"
+    },
+    "addProduct": {
+      "title": "商品追加",
+      "name": "商品名",
+      "description": "説明",
+      "detailHtml": "詳細(HTML)",
+      "detailHtmlPlaceholder": "詳細(HTML)",
+      "price": "価格 (円)",
+      "validDays": "有効期限 (日数)",
+      "image": "商品画像",
+      "imagePlaceholder": "対応形式: .jpg, .png, .gif, .webp",
+      "submit": "商品を登録",
+      "success": "商品を追加しました！",
+      "failed": "商品の追加に失敗しました",
+      "error": "商品の追加中にエラーが発生しました"
+    },
+    "importProduct": {
+      "button": "商品を一括インポート",
+      "dialogTitle": "別ショップから商品をインポート",
+      "dialogDesc": "コピー元のショップを選択してください。対象ショップのすべての商品がこのショップに追加されます。商品のIDは同一です。",
+      "selectShop": "インポート元のショップ",
+      "placeholder": "ショップを選択してください...",
+      "submit": "インポート",
+      "cancel": "キャンセル"
+    },
+    "linkQr": {
+      "title": "カード有効化",
+      "description": "会計後，カードと商品を紐付けし，使えるようにします。",
+      "uuidLabel": "QRコード",
+      "placeholder": "QRコード手動入力? 123e4567-...",
+      "productName": "商品名",
+      "scan": "QRコードをスキャン",
+      "manualinput": "手動入力？",
+      "selectProduct": "商品 (カードに商品名が記載されていない場合)",
+      "selectPlaceholder": "商品を選択してください...",
+      "option": "オプション(必要に応じて)",
+      "memoForUsersLabel": "(オプション) ショップメッセージ",
+      "memoForUsersPlaceholder": "購入者・受取者にメッセージ",
+      "memoForShopLabel": "(オプション) メモ",
+      "memoForShopPlaceholder": "メモ(ショップのみ閲覧可能)",
+      "submit": "連携して有効化",
+      "processing": "処理中...",
+      "foreignQrError": "このカードは使えません。",
+      "clear": "取り消し",
+      "scanDialog": {
+        "title": "QRコードスキャン",
+        "description": "枠内にQRコードを合わせてください。",
+        "apply": "適用",
+        "cancel": "キャンセル"
+      },
+      "success": "QRコードが連携され有効化されました！"
+    },
+    "linkedQr": {
+      "title": "連携済みQRコード",
+      "id": "QR ID",
+      "product": "商品",
+      "status": "ステータス",
+      "activatedAt": "有効化日時",
+      "noLinks": "連携済みのQRコードはありません"
+    },
+    "history": {
+      "title": "その他の注文履歴",
+      "noLinks": "履歴はありません",
+      "id": "ID",
+      "product": "商品",
+      "status": "ステータス",
+      "activatedAt": "更新日時"
+    },
+    "statusGuide": {
+      "title": "ステータスガイド",
+      "description": "注文の進捗状況とステータスの意味を確認できます。",
+      "flow": "注文の流れ",
+      "list": "ステータス詳細",
+      "statuses": {
+        "unassigned": "QRコードが生成されましたが、まだショップや商品と紐付けられていません。",
+        "linked": "ショップや商品と紐付けられましたが、まだ使用できるように有効化されていません。",
+        "active": "有効化されており、ギフトとして贈ることができる状態です。",
+        "used": "受取人が住所を入力し、発送待ちの状態です（ショップ側で発送作業が必要です）。",
+        "shipped": "ショップが商品を発送し、追跡番号が登録された状態です。",
+        "completed": "取引が正常に完了しました（受取人が受取完了報告を行った場合など）。",
+        "expired": "有効期限が切れ、ギフトが無効になった状態です。",
+        "banned": "不正利用などにより、システム管理者が利用停止させた状態です。"
+      }
+    },
+    "shopSettings": {
+      "title": "ショップ設定",
+      "description": "ショップの名前や紹介文を設定します。",
+      "updatePreview": "プレビュー更新",
+      "name": "ショップ名",
+      "detailHtml": "ショップ紹介(HTML)",
+      "detailHtmlPlaceholder": "HTML(CSS)形式で入力してください。",
+      "submit": "ショップ設定を保存",
+      "success": "ショップ設定を更新しました。",
+      "failed": "更新に失敗しました。",
+      "sourcecode": "ソースコード",
+      "preview": "プレビュー",
+      "copySuccess": "クリップボードにコピーしました",
+      "imageHint": "※画像をアップロードするとURLが生成されます。コピーボタンでURLを取得し、HTMLコードの '<'img src=\"...\"'>' に貼り付けてください。",
+      "copyUrl": "URLをコピー",
+      "error": "エラーが発生しました。"
+    },
+    "productDetails": {
+      "title": "商品詳細",
+      "name": "商品名",
+      "description": "説明",
+      "price": "価格",
+      "validDays": "有効期間",
+      "validDaysSuffix": "日",
+      "detailHtml": "紹介用HTML (プレビュー)",
+      "rawDetailHtml": "紹介用HTML (ソースコード)",
+      "close": "閉じる"
+    }
+  },
+  "ReceivePage": {
+    "titles": {
+      "pin": "ギフトを受け取るにはPINコードを入力してください",
+      "form": "ギフトを配送してほしい住所をお知らせください",
+      "success": "配送先情報が送信されました",
+      "shipped": "ギフトが発送されました",
+      "expired": "有効期限が切れています",
+      "completed": "ギフトをお楽しみください"
+    },
+    "pinStep": {
+      "label": "カード裏の数字 (5回間違えると一定時間ロックされます)",
+      "placeholder": "8桁の数字",
+      "submit": "ギフトを見る",
+      "verifying": "確認中..."
+    },
+    "restrictedStep": {
+      "title": "パスワード確認",
+      "message": "ギフトの詳細を表示するには、設定したパスワードを入力してください。",
+      "passwordLabel": "パスワード",
+      "unlock": "ロック解除",
+      "verifying": "確認中..."
+    },
+    "daysRemaining": "有効期限まで あと {days}日 と約 {hours}時間{minutes}分 です",
+    "limitdatetime": "有効期限: {datetime} (延長はできませんのでご注意ください)",
+    "formStep": {
+      "title": "配送先情報",
+      "name": "お名前",
+      "address": "配送先住所",
+      "zipCode": "郵便番号",
+      "phone": "電話番号 (任意)",
+      "email": "メールアドレス (任意)",
+      "emailDescription": "発送状況やチャットの内容に関する通知、ショップからの問い合わせも行います。",
+      "preferredDate": "配送希望日 (任意)",
+      "preferredTime": "配送希望時間 (任意)",
+      "noPreference": "指定なし",
+      "timeMorning": "午前中",
+      "time1416": "14-16時",
+      "time1618": "16-18時",
+      "time1820": "18-20時",
+      "time1921": "19-21時",
+      "submit": "この住所に配送する",
+      "submitting": "住所を送信中...",
+      "passwordTitle": "パスワード設定 (任意)",
+      "passwordDescription": "PINコードだけでは、プレゼントをくれた方でも配送時の追跡番号などを閲覧できてしまします。パスワードを設定することで、チャット以外の詳細情報を保護することができます。再設定はできませんので忘れないようご注意ください。",
+      "passwordLabel": "パスワード",
+      "passwordPlaceholder": "4文字以上",
+      "confirmPasswordLabel": "パスワード（確認）",
+      "confirmPasswordPlaceholder": "もう一度入力",
+      "privacyPolicy": "入力された個人情報は、商品の発送および発送に関する連絡のみに使用され、その他の目的には使用されません。"
+    },
+    "successStep": {
+      "message": "配送先情報が送信されました！",
+      "subMessage": "ショップの担当者が発送いたします。"
+    },
+    "shippedStep": {
+      "message": "ギフトは発送済みです！",
+      "tracking": "追跡番号: {number}",
+      "receivedMessage": "荷物の受け取りが完了しましたか？",
+      "receivedButton": "受け取り完了",
+      "compleatedMessage": "荷物の受け取りが完了しました！",
+      "deliveryCompany": "配送会社: {company}"
+    },
+    "expiredStep": {
+      "message": "このギフトの有効期限は切れています。",
+      "subMessage": "有効期限: {date}"
+    },
+    "errors": {
+      "invalidPin": "PINが無効か、ギフトが見つかりません",
+      "inactive": "このカードは有効ではありません。",
+      "submitFailed": "住所の送信に失敗しました。",
+      "passwordMismatch": "パスワードが一致しません",
+      "invalidPassword": "パスワードが間違っています",
+      "unlockFailed": "ロック解除に失敗しました",
+      "invalidEmailFormat": "メールアドレスの形式が正しくありません",
+      "uploadFailed": "アップロードに失敗しました"
+    },
+    "chat": {
+      "title": "メッセージチャット",
+      "name": "お名前",
+      "message": "メッセージ",
+      "noMessages": "まだメッセージはありません",
+      "submit": "送信",
+      "submitting": "送信中...",
+      "uploading": "アップロード中...",
+      "usage": "使用容量",
+      "limitNear": "制限に近づいています",
+      "placeholder": "メッセージを入力...",
+      "namePlaceholder": "ニックネーム",
+      "videoUnsupported": "お使いのブラウザはビデオタグをサポートしていません。",
+      "privacy": "このメッセージは、プレゼントをくれた方(QRコードとPINコードを知っている人)にしか閲覧できません。ショップはこのメッセージを閲覧できません。様々な規格のファイルをアップロードできますが、機密性の高い情報・個人情報などのアップロードは避けてください。",
+      "emailTitle": "メール通知設定",
+      "emailDesc": "新しいメッセージが届いた際に通知を受け取ることができます。",
+      "subscribe": "登録",
+      "subscribeSuccess": "通知設定が完了しました",
+      "subscribeFailed": "登録に失敗しました",
+      "system": "システム",
+      "systemMessage": {
+        "deliveryCompleted": "ギフトの受け取りが完了しました。"
+      },
+      "sendFailed": "メッセージの送信に失敗しました: "
+    },
+    "shopMessage": "ショップからのメッセージ",
+    "contactInfo": {
+      "title": "お問い合わせ",
+      "orderId": "注文ID",
+      "shopName": "ショップ名",
+      "shopEmail": "担当ショップの連絡先",
+      "note": "※ショップへ問い合わせる際には，下記「注文ID」と「ショップ名」を明記してください。発送後の住所変更など対応ができない場合があるため、あらかじめご了承ください。"
+    },
+    "senderInfo": {
+      "title": "送り主",
+      "title-empty": "送り主情報を追加",
+      "updated": "更新",
+      "description": "名刺画像・顔画像等をアップロードできます。",
+      "update": "名刺を更新する",
+      "uploadPlaceholder": "名刺画像・顔画像等をアップロード",
+      "uploadHint": "タップして画像ファイルを選択",
+      "uploading": "アップロード中...",
+      "notice": "※アップロードされた画像は安全に保管され、このギフトのやり取りにのみ使用されます。",
+      "save": "情報を保存",
+      "removeImage": "画像を削除",
+      "saving": "保存中...",
+      "cancel": "キャンセル",
+      "preview": "プレビュー",
+      "labels": {
+        "name": "名前",
+        "job_title": "役職",
+        "company": "会社名",
+        "department": "部署",
+        "email": "メールアドレス",
+        "phone": "電話番号",
+        "phone_direct": "電話番号(直通・携帯)",
+        "address": "住所",
+        "tags": "タグ",
+        "memo": "メモ",
+        "url": "URL",
+        "HP": "ホームページ",
+        "SNS_Facebook": "Facebook",
+        "SNS_Instagram": "Instagram",
+        "SNS_Threads": "Threads",
+        "SNS_X": "X",
+        "SNS_YouTube": "YouTube",
+        "SNS_LINE": "LINE",
+        "SNS_TikTok": "TikTok",
+        "Service_Linktree": "Linktree",
+        "Service_Eight": "Eight",
+        "exchange_date": "名刺交換日",
+        "others": "その他 (例: 誕生日、血液型)",
+        "addhtmlmessage": "HTML形式のメッセージを追加",
+        "detail_html": "HTMLソースコード",
+        "detail_html-images": "HTML用画像",
+        "detail_html-addimage": "画像を追加",
+        "detail_html-noimages": "アップロードされた画像はありません。HTML内で使用する画像をここに追加できます。"
+      },
+      "updateFailed": "送り主情報の更新に失敗しました: ",
+      "confirmRemoveImage": "この画像を削除しますか？",
+      "urlCopied": "URLをコピーしました",
+      "usage": "使い方",
+      "usageDesc1": "コピーしたURLを詳細HTML内の ",
+      "usageDesc2": " に貼り付けてください。実行時に自動的に署名付きURLへ置換され、画像が表示されます。"
+    },
+    "shopinfo": "ショップのご紹介",
+    "shopinfo_description": "このギフトを販売しているショップのご紹介",
+    "memorySection": {
+      "title": "思い出の記録",
+      "daysPassed": "あれから {days} 日",
+      "message": "このギフトが、あなたにとって素敵な思い出のひとつになりますように。",
+      "submittedAt": "受注日: {date}",
+      "receivedAt": "受け取り日: {date}"
+    }
+  },
+  "AdminPage": {
+    "title": "管理ダッシュボード",
+    "generate": {
+      "title": "QRコード生成",
+      "quantity": "生成数",
+      "shopId": "ショップID (任意)",
+      "productId": "プロダクトID (任意)",
+      "button": "生成"
+    },
+    "batches": {
+      "title": "現在生成されているQRコード",
+      "noBatches": "まだバッチが生成されていません。",
+      "batchId": "バッチ: {id}",
+      "info": "{count} 件 • {date}",
+      "status": {
+        "ready": "準備完了",
+        "processing": "処理中"
+      },
+      "downloadPdf": "PDFダウンロード",
+      "table": {
+        "uuid": "UUID",
+        "pin": "PIN"
+      },
+      "alerts": {
+        "success": "QRコードの生成に成功しました",
+        "failed": "QRコードの生成に失敗しました",
+        "error": "エラーが発生しました"
+      }
+    },
+    "list": {
+      "title": "全QRコード",
+      "refresh": "更新",
+      "loading": "読み込み中...",
+      "deleteAllBanned": "BAN済みを全て削除",
+      "exportCsv": "CSV出力",
+      "status": {
+        "unassigned": "未割り当て",
+        "linked": "連携済み",
+        "active": "有効",
+        "used": "使用済み",
+        "shipped": "発送済み",
+        "completed": "完了済み",
+        "banned": "BAN済み",
+        "expired": "期限切れ",
+        "search": "UUIDで検索",
+        "undefined": "不明な状態"
+      },
+      "info": "ステータス: {status} • 件数: {count}",
+      "table": {
+        "uuid": "UUID",
+        "pin": "PIN",
+        "status": "ステータス",
+        "createdAt": "更新日時",
+        "actions": "操作",
+        "noCodes": "コードが見つかりません。更新ボタンを押してください。"
+      },
+      "ban": {
+        "button": "BAN",
+        "confirm": "本当にこのQRコードをBANしますか？この操作で即座に無効化されます。一度BANされたQRコードは元に戻せません。",
+        "success": "BANしました",
+        "failed": "BANに失敗しました",
+        "error": "エラーが発生しました",
+        "pdf": "PDF"
+      },
+      "deleteBanned": {
+        "confirm": "本当に全てのBAN済みコードを削除しますか？この操作は元に戻せません。",
+        "success": "BAN済みコードを {count} 件削除しました。",
+        "failed": "削除に失敗しました",
+        "error": "削除中にエラーが発生しました"
+      },
+      "keyword": {
+        "placeholder": "UUIDで検索 (8文字以上)",
+        "tooShort": "キーワードは8文字以上で入力してください。"
+      }
+    },
+    "shopInfo": {
+      "title": "ショップ情報",
+      "id": "ショップID",
+      "name": "ショップ名",
+      "contact": "連絡先"
+    }
+  },
+  "VerifyPage": {
+    "title": "アカウント確認",
+    "description": "メールに送信されたコードを入力してください。",
+    "email": "メールアドレス",
+    "emailPlaceholder": "you@example.com",
+    "code": "確認コード",
+    "codePlaceholder": "123456",
+    "button": "確認",
+    "verifying": "確認中...",
+    "loading": "読み込み中...",
+    "errors": {
+      "failed": "確認に失敗しました",
+      "incomplete": "確認が完了していません。次のステップ: {step}"
+    }
+  },
+  "UI": {
+    "Error starting scanner": "QRコードスキャナーを起動できませんでした。",
+    "Camera permission denied or error starting scanner": "カメラを起動できませんでした。カメラの使用を許可してください。または、ほかのアプリケーション(Web会議等)でカメラを使用している場合は、そのアプリケーションを閉じるか、カメラの使用を中断し、もう一度スキャンボタンを押してください。"
+  },
+  "BackendError": {
+    "QR not found": "QRコードが見つかりません。",
+    "QR does not belong to this shop": "QRコードはこのショップのものではありません。",
+    "QR is not in a valid state": "QRコードは利用できない状態です。すでに有効化されている、使用済みか、無効化されている可能性があります。",
+    "Product not found": "このカードに紐づけられていた商品が見つかりません。削除されている可能性があります。このカードは使えないため廃棄してください。",
+    "Product is stopped": "このカードに紐づけられていた商品が停止されています。もしこのカードを使用したい場合はSTOPPED状態の商品を有効化してください。"
+  }
 }

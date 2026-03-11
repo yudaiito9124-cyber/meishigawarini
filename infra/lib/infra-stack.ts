@@ -145,6 +145,7 @@ export class InfraStack extends cdk.Stack {
     table.grantReadWriteData(shopMgmtFn);
     bucket.grantPut(shopMgmtFn);
     bucket.grantRead(shopMgmtFn);
+    bucket.grantDelete(shopMgmtFn);
 
     // Lambda: Recipient Submit
     const recipientSubmitFn = new nodejs.NodejsFunction(this, 'RecipientSubmitFn', {

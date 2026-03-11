@@ -1,414 +1,430 @@
 {
-    "Status": {
+  "Status": {
+    "unassigned": "UNASSIGNED",
+    "linked": "LINKED",
+    "active": "ACTIVE",
+    "used": "WAITING FOR SHIPMENT",
+    "shipped": "SHIPPED",
+    "completed": "COMPLETED",
+    "expired": "EXPIRED",
+    "banned": "BANNED"
+  },
+  "Timestamp": {
+    "ts_created_at": "Created At",
+    "ts_linked_at": "Linked At",
+    "ts_activated_at": "Activated At",
+    "ts_submitted_at": "Submitted At",
+    "ts_shipped_at": "Shipped At",
+    "ts_completed_at": "Completed At",
+    "ts_expired_at": "Expired At",
+    "ts_banned_at": "Banned At",
+    "ts_updated_at": "Updated At"
+  },
+  "HomePage": {
+    "title": "Welcome to meishigawarini",
+    "shopAdmin": "Shop Admin",
+    "heroTitle": "Instead of a business card,",
+    "heroSubtitle": "give a heart.",
+    "description": "\"Meishigawarini\" is a digital gift service that adds a small gift to your encounter. You can specify the recipient of the gift from the QR code."
+  },
+  "LoginPage": {
+    "title": "Sign In",
+    "email": "Email",
+    "password": "Password",
+    "signIn": "Sign In",
+    "signingIn": "Signing in...",
+    "noAccount": "Don't have an account?",
+    "signUpLink": "Sign up",
+    "errors": {
+      "default": "Failed to login",
+      "notAuthorized": "Incorrect username or password.",
+      "notConfirmed": "User is not confirmed. Please verify your email."
+    }
+  },
+  "RegisterPage": {
+    "title": "Create Account",
+    "email": "Email",
+    "emailNote": "The email address you enter will be displayed to customers as your contact point.",
+    "password": "Password",
+    "passwordHint": "Must be at least 8 characters, with uppercase, lowercase, and numbers.",
+    "signUp": "Sign Up",
+    "creatingAccount": "Creating Account...",
+    "hasAccount": "Already have an account?",
+    "loginLink": "Log in",
+    "successTitle": "Registration Successful!",
+    "successMessage": "Your account has been created.",
+    "goToLogin": "Go to Login",
+    "errors": {
+      "default": "Failed to register",
+      "usernameExists": "User already exists. Please log in instead."
+    }
+  },
+  "Metadata": {
+    "title": "Meishigawarini",
+    "description": "Digital gift service adding a small gift to encounters."
+  },
+  "ShopListPage": {
+    "title": "My Shops",
+    "subtitle": "Select a shop to manage or create a new one.",
+    "userId": "User ID: {id}",
+    "logout": "Logout",
+    "createShop": "Create New Shop",
+    "createDialog": {
+      "title": "Create Shop",
+      "description": "Enter the name of your new shop.",
+      "label": "Shop Name",
+      "placeholder": "My Awesome Shop",
+      "submit": "Create",
+      "submitting": "Creating..."
+    },
+    "noShops": "No shops found. Create one to get started!",
+    "manageShop": "Manage Shop",
+    "created": "Created: {date}"
+  },
+  "ShopPage": {
+    "loading": "Loading Dashboard...",
+    "title": "Shop Dashboard",
+    "shopId": "Shop ID: {id}",
+    "movetoshops": "Back to shop list",
+    "incomingOrders": "Incoming Orders",
+    "ordersDesc": "Manage your orders and shipments.",
+    "orders": {
+      "date": "Last Updated Date Time",
+      "recipient": "Recipient",
+      "contact": "Contact",
+      "address": "Address",
+      "status": "Status",
+      "action": "Action",
+      "uuid": "ID",
+      "productName": "Product Name",
+      "noOrders": "No active orders",
+      "ship": "Ship",
+      "details": "Details",
+      "userMessage": "User Message",
+      "shopMemo": "Shop Memo",
+      "shipDialog": {
+        "title": "Mark as Shipped",
+        "description": "Enter tracking number for {name}",
+        "label": "Tracking Number",
+        "submit": "Confirm Shipment"
+      }
+    },
+    "products": "Products",
+    "product": {
+      "stop": "Stop",
+      "activate": "Activate",
+      "delete": "Delete",
+      "deleteConfirm": "Are you sure you want to delete \"{name}\"?"
+    },
+    "search": {
+      "placeholder": "Search by UUID...",
+      "go": "Search",
+      "clear": "Clear"
+    },
+    "addProduct": {
+      "title": "Add New Product",
+      "name": "Product Name",
+      "description": "Description",
+      "price": "Price (¥)",
+      "validDays": "Valid Days",
+      "image": "Product Image",
+      "imagePlaceholder": "Supported formats: .jpg, .png, .gif, .webp",
+      "submit": "Create Product",
+      "success": "Product created!",
+      "failed": "Failed to create product",
+      "error": "Error creating product"
+    },
+    "linkQr": {
+      "title": "Link QR Code",
+      "description": "Connect a physical QR card to a product.",
+      "uuidLabel": "QR UUID (Scan or Type)",
+      "placeholder": "e.g. 123e4567-...",
+      "scan": "Scan QR Code",
+      "selectProduct": "Select Product",
+      "selectPlaceholder": "Select a product...",
+      "memoForUsersLabel": "Message from shop (visible to purchasers and recipients)",
+      "memoForUsersPlaceholder": "You can enter a message...",
+      "memoForShopLabel": "Memo (visible only to shop)",
+      "memoForShopPlaceholder": "You can enter a memo...",
+      "submit": "Link & Activate",
+      "processing": "Processing...",
+      "scanDialog": {
+        "title": "Scan QR Code",
+        "description": "Position the QR code within the frame.",
+        "cancel": "Cancel"
+      },
+      "success": "QR Code Linked and Activated!"
+    },
+    "linkedQr": {
+      "title": "Linked QR Codes",
+      "id": "QR ID",
+      "product": "Product",
+      "status": "Status",
+      "activatedAt": "Activated At",
+      "noLinks": "No linked QR codes"
+    },
+    "history": {
+      "title": "Order History",
+      "noLinks": "No history.",
+      "id": "ID",
+      "product": "Product",
+      "status": "Status",
+      "activatedAt": "Last Updated Date Time"
+    },
+    "shopSettings": {
+      "title": "Shop Settings",
+      "description": "Configure your shop's name and HTML description.",
+      "name": "Shop Name",
+      "detailHtml": "Shop Description (HTML)",
+      "detailHtmlPlaceholder": "Enter description in HTML format...",
+      "submit": "Save Shop Settings",
+      "success": "Shop settings updated successfully.",
+      "failed": "Failed to update shop settings.",
+      "sourcecode": "Source Code",
+      "preview": "Preview",
+      "copySuccess": "URL copied to clipboard",
+      "imageHint": "* Once an image is uploaded, a URL will be generated. Click the copy button to get the URL and paste it into the '<'img src=\"...\"'>' tag in your HTML code.",
+      "copyUrl": "Copy URL",
+      "error": "An error occurred."
+    },
+    "productDetails": {
+      "title": "Product Details",
+      "name": "Product Name",
+      "description": "Description",
+      "price": "Price",
+      "validDays": "Validity Period",
+      "validDaysSuffix": "days",
+      "detailHtml": "Introduction HTML (Preview)",
+      "rawDetailHtml": "Introduction HTML (Source)",
+      "close": "Close"
+    }
+  },
+  "ReceivePage": {
+    "titles": {
+      "pin": "Enter PIN to View Gift",
+      "form": "You received a gift!",
+      "success": "Thank You!",
+      "shipped": "Your gift is on the way!"
+    },
+    "pinStep": {
+      "label": "Enter PIN Code",
+      "placeholder": "8-digit PIN",
+      "submit": "View Gift",
+      "verifying": "Verifying..."
+    },
+    "formStep": {
+      "title": "Delivery Details",
+      "name": "Full Name",
+      "address": "Delivery Address",
+      "preferredDate": "Preferred Delivery Date (Optional)",
+      "preferredTime": "Preferred Delivery Time (Optional)",
+      "noPreference": "No preference",
+      "timeMorning": "Morning",
+      "time1416": "14:00 - 16:00",
+      "time1618": "16:00 - 18:00",
+      "time1820": "18:00 - 20:00",
+      "time1921": "19:00 - 21:00",
+      "privacyPolicy": "The personal information you enter will be used only for shipping and shipping-related communications and will not be used for any other purpose.",
+      "submit": "Receive Gift",
+      "submitting": "Submitting..."
+    },
+    "successStep": {
+      "message": "Your shipping information has been sent!",
+      "subMessage": "The shop will ship your gift soon."
+    },
+    "shippedStep": {
+      "message": "Your gift has been shipped!",
+      "tracking": "Tracking: {number}"
+    },
+    "errors": {
+      "invalidPin": "Invalid PIN or Gift not found",
+      "inactive": "This card is not active.",
+      "submitFailed": "Failed to submit address.",
+      "invalidEmailFormat": "Invalid email format",
+      "uploadFailed": "Failed to upload"
+    },
+    "chat": {
+      "title": "Chat",
+      "name": "Name",
+      "message": "Message",
+      "noMessages": "No messages yet.",
+      "submit": "Submit",
+      "submitting": "Submitting...",
+      "uploading": "Uploading...",
+      "usage": "Capacity Usage",
+      "limitNear": "Limit near",
+      "placeholder": "Enter message...",
+      "namePlaceholder": "Nickname",
+      "videoUnsupported": "Your browser does not support the video tag.",
+      "privacy": "This message is only visible to the sender (who knows the QR code and PIN). The shop cannot view this message.",
+      "emailTitle": "Email Notification Settings",
+      "emailDesc": "Receive email notifications when a new message arrives.",
+      "subscribe": "Subscribe",
+      "subscribeSuccess": "Subscription successful",
+      "subscribeFailed": "Subscription failed",
+      "system": "System",
+      "systemMessage": {
+        "deliveryCompleted": "Item received. Thank you."
+      },
+      "sendFailed": "Failed to send message: "
+    },
+    "shopMessage": "Shop Message",
+    "contactInfo": {
+      "title": "Contact / Order Info",
+      "orderId": "Order ID",
+      "shopName": "Shop Name",
+      "shopEmail": "Shop Contact",
+      "note": "Please include your Order ID when contacting the shop. Address changes after shipment may not be possible."
+    },
+    "memorySection": {
+      "title": "Memory Record",
+      "daysPassed": "{days} days since our encounter",
+      "message": "May this gift become a wonderful memory for you.",
+      "receivedAt": "Received on: {date}"
+    },
+    "senderInfo": {
+      "title": "Sender Info",
+      "title-empty": "Add Sender Info",
+      "updated": "Updated",
+      "description": "You can upload a business card or face photo.",
+      "update": "Update Info",
+      "uploadPlaceholder": "Upload Business Card / Photo",
+      "uploadHint": "Tap to select an image",
+      "uploading": "Uploading...",
+      "removeImage": "Remove Image",
+      "notice": "* Uploaded images are stored securely and used only for this gift exchange.",
+      "save": "Save Info",
+      "saving": "Saving...",
+      "cancel": "Cancel",
+      "preview": "Preview",
+      "labels": {
+        "name": "Name",
+        "job_title": "Title",
+        "company": "Company",
+        "department": "Department",
+        "email": "Email",
+        "phone": "Phone",
+        "phone_direct": "Direct Phone",
+        "address": "Address",
+        "tags": "Tags",
+        "memo": "Memo",
+        "url": "URL",
+        "HP": "Home Page",
+        "SNS_Facebook": "Facebook",
+        "SNS_Instagram": "Instagram",
+        "SNS_Threads": "Threads",
+        "SNS_X": "X",
+        "SNS_YouTube": "YouTube",
+        "SNS_LINE": "LINE",
+        "SNS_TikTok": "TikTok",
+        "Service_Linktree": "Linktree",
+        "Service_Eight": "Eight",
+        "exchange_date": "Exchange Date",
+        "others": "Others (e.g., Birthday, Blood Type)",
+        "detail_html": "Details (HTML)",
+        "detail_html-images": "Images for HTML",
+        "detail_html-addimage": "Add Image",
+        "detail_html-noimages": "No images uploaded. You can add images here to use in the HTML."
+      },
+      "updateFailed": "Failed to update sender info: ",
+      "confirmRemoveImage": "Are you sure you want to remove this image?",
+      "urlCopied": "URL copied to clipboard",
+      "usage": "Usage",
+      "usageDesc1": "Copy the URL and paste it into an ",
+      "usageDesc2": " tag in your HTML. It will automatically be replaced with a signed URL when displayed."
+    }
+  },
+  "AdminPage": {
+    "title": "Admin Dashboard",
+    "generate": {
+      "title": "Generate QR Codes",
+      "quantity": "Quantity to Generate",
+      "button": "Generate"
+    },
+    "batches": {
+      "title": "Currently Generated QR Codes",
+      "noBatches": "No batches generated yet.",
+      "batchId": "Batch: {id}",
+      "info": "{count} codes • {date}",
+      "status": {
+        "ready": "Ready",
+        "processing": "Processing"
+      },
+      "downloadPdf": "Download PDF",
+      "table": {
+        "uuid": "UUID",
+        "pin": "PIN"
+      },
+      "alerts": {
+        "success": "Successfully generated codes",
+        "failed": "Failed to generate codes",
+        "error": "Error generating codes"
+      }
+    },
+    "list": {
+      "title": "All QR Codes",
+      "refresh": "Refresh",
+      "loading": "Loading...",
+      "deleteAllBanned": "Delete All BANNED",
+      "exportCsv": "Export CSV",
+      "status": {
         "unassigned": "UNASSIGNED",
         "linked": "LINKED",
         "active": "ACTIVE",
-        "used": "WAITING FOR SHIPMENT",
+        "used": "USED",
         "shipped": "SHIPPED",
-        "completed": "COMPLETED",
-        "expired": "EXPIRED",
-        "banned": "BANNED"
+        "banned": "BANNED",
+        "search": "Search by UUID",
+        "undefined": "undefined"
+      },
+      "info": "Showing status: {status} • Count: {count}",
+      "table": {
+        "uuid": "UUID",
+        "pin": "PIN",
+        "status": "Status",
+        "createdAt": "Created At",
+        "actions": "Actions",
+        "noCodes": "No codes found. Press Refresh to load."
+      },
+      "ban": {
+        "button": "Ban",
+        "confirm": "Are you sure you want to BAN this QR code? It will stop working immediately.",
+        "success": "Successfully banned",
+        "failed": "Failed to ban",
+        "error": "Error banning QR code",
+        "pdf": "PDF"
+      },
+      "deleteBanned": {
+        "confirm": "Are you sure you want to DELAETE ALL BANNED QR codes? This action cannot be undone.",
+        "success": "Successfully deleted {count} BANNED codes.",
+        "failed": "Failed to delete Banned codes",
+        "error": "Error deleting Banned codes"
+      },
+      "keyword": {
+        "placeholder": "Enter keyword to search by UUID (at least 8 characters)",
+        "tooShort": "Keyword must be at least 8 characters long."
+      }
     },
-    "Timestamp": {
-        "ts_created_at": "Created At",
-        "ts_linked_at": "Linked At",
-        "ts_activated_at": "Activated At",
-        "ts_submitted_at": "Submitted At",
-        "ts_shipped_at": "Shipped At",
-        "ts_completed_at": "Completed At",
-        "ts_expired_at": "Expired At",
-        "ts_banned_at": "Banned At",
-        "ts_updated_at": "Updated At"
-    },
-    "HomePage": {
-        "title": "Welcome to meishigawarini",
-        "shopAdmin": "Shop Admin",
-        "heroTitle": "Instead of a business card,",
-        "heroSubtitle": "give a heart.",
-        "description": "\"Meishigawarini\" is a digital gift service that adds a small gift to your encounter. You can specify the recipient of the gift from the QR code."
-    },
-    "LoginPage": {
-        "title": "Sign In",
-        "email": "Email",
-        "password": "Password",
-        "signIn": "Sign In",
-        "signingIn": "Signing in...",
-        "noAccount": "Don't have an account?",
-        "signUpLink": "Sign up",
-        "errors": {
-            "default": "Failed to login",
-            "notAuthorized": "Incorrect username or password.",
-            "notConfirmed": "User is not confirmed. Please verify your email."
-        }
-    },
-    "RegisterPage": {
-        "title": "Create Account",
-        "email": "Email",
-        "emailNote": "The email address you enter will be displayed to customers as your contact point.",
-        "password": "Password",
-        "passwordHint": "Must be at least 8 characters, with uppercase, lowercase, and numbers.",
-        "signUp": "Sign Up",
-        "creatingAccount": "Creating Account...",
-        "hasAccount": "Already have an account?",
-        "loginLink": "Log in",
-        "successTitle": "Registration Successful!",
-        "successMessage": "Your account has been created.",
-        "goToLogin": "Go to Login",
-        "errors": {
-            "default": "Failed to register",
-            "usernameExists": "User already exists. Please log in instead."
-        }
-    },
-    "Metadata": {
-        "title": "Meishigawarini",
-        "description": "Digital gift service adding a small gift to encounters."
-    },
-    "ShopListPage": {
-        "title": "My Shops",
-        "subtitle": "Select a shop to manage or create a new one.",
-        "userId": "User ID: {id}",
-        "logout": "Logout",
-        "createShop": "Create New Shop",
-        "createDialog": {
-            "title": "Create Shop",
-            "description": "Enter the name of your new shop.",
-            "label": "Shop Name",
-            "placeholder": "My Awesome Shop",
-            "submit": "Create",
-            "submitting": "Creating..."
-        },
-        "noShops": "No shops found. Create one to get started!",
-        "manageShop": "Manage Shop",
-        "created": "Created: {date}"
-    },
-    "ShopPage": {
-        "loading": "Loading Dashboard...",
-        "title": "Shop Dashboard",
-        "shopId": "Shop ID: {id}",
-        "movetoshops": "Back to shop list",
-        "incomingOrders": "Incoming Orders",
-        "ordersDesc": "Manage your orders and shipments.",
-        "orders": {
-            "date": "Last Updated Date Time",
-            "recipient": "Recipient",
-            "contact": "Contact",
-            "address": "Address",
-            "status": "Status",
-            "action": "Action",
-            "uuid": "ID",
-            "productName": "Product Name",
-            "noOrders": "No active orders",
-            "ship": "Ship",
-            "details": "Details",
-            "userMessage": "User Message",
-            "shopMemo": "Shop Memo",
-            "shipDialog": {
-                "title": "Mark as Shipped",
-                "description": "Enter tracking number for {name}",
-                "label": "Tracking Number",
-                "submit": "Confirm Shipment"
-            }
-        },
-        "products": "Products",
-        "product": {
-            "stop": "Stop",
-            "activate": "Activate",
-            "delete": "Delete",
-            "deleteConfirm": "Are you sure you want to delete \"{name}\"?"
-        },
-        "search": {
-            "placeholder": "Search by UUID...",
-            "go": "Search",
-            "clear": "Clear"
-        },
-        "addProduct": {
-            "title": "Add New Product",
-            "name": "Product Name",
-            "description": "Description",
-            "price": "Price (¥)",
-            "validDays": "Valid Days",
-            "image": "Product Image",
-            "imagePlaceholder": "Supported formats: .jpg, .png, .gif, .webp",
-            "submit": "Create Product",
-            "success": "Product created!",
-            "failed": "Failed to create product",
-            "error": "Error creating product"
-        },
-        "linkQr": {
-            "title": "Link QR Code",
-            "description": "Connect a physical QR card to a product.",
-            "uuidLabel": "QR UUID (Scan or Type)",
-            "placeholder": "e.g. 123e4567-...",
-            "scan": "Scan QR Code",
-            "selectProduct": "Select Product",
-            "selectPlaceholder": "Select a product...",
-            "memoForUsersLabel": "Message from shop (visible to purchasers and recipients)",
-            "memoForUsersPlaceholder": "You can enter a message...",
-            "memoForShopLabel": "Memo (visible only to shop)",
-            "memoForShopPlaceholder": "You can enter a memo...",
-            "submit": "Link & Activate",
-            "processing": "Processing...",
-            "scanDialog": {
-                "title": "Scan QR Code",
-                "description": "Position the QR code within the frame.",
-                "cancel": "Cancel"
-            },
-            "success": "QR Code Linked and Activated!"
-        },
-        "linkedQr": {
-            "title": "Linked QR Codes",
-            "id": "QR ID",
-            "product": "Product",
-            "status": "Status",
-            "activatedAt": "Activated At",
-            "noLinks": "No linked QR codes"
-        },
-        "history": {
-            "title": "Order History",
-            "noLinks": "No history.",
-            "id": "ID",
-            "product": "Product",
-            "status": "Status",
-            "activatedAt": "Last Updated Date Time"
-        },
-        "shopSettings": {
-            "title": "Shop Settings",
-            "description": "Configure your shop's name and HTML description.",
-            "name": "Shop Name",
-            "detailHtml": "Shop Description (HTML)",
-            "detailHtmlPlaceholder": "Enter description in HTML format...",
-            "submit": "Save Shop Settings",
-            "success": "Shop settings updated successfully.",
-            "failed": "Failed to update shop settings.",
-            "error": "An error occurred."
-        },
-        "productDetails": {
-            "title": "Product Details",
-            "name": "Product Name",
-            "description": "Description",
-            "price": "Price",
-            "validDays": "Validity Period",
-            "validDaysSuffix": "days",
-            "detailHtml": "Introduction HTML (Preview)",
-            "rawDetailHtml": "Introduction HTML (Source)",
-            "close": "Close"
-        }
-    },
-    "ReceivePage": {
-        "titles": {
-            "pin": "Enter PIN to View Gift",
-            "form": "You received a gift!",
-            "success": "Thank You!",
-            "shipped": "Your gift is on the way!"
-        },
-        "pinStep": {
-            "label": "Enter PIN Code",
-            "placeholder": "8-digit PIN",
-            "submit": "View Gift",
-            "verifying": "Verifying..."
-        },
-        "formStep": {
-            "title": "Delivery Details",
-            "name": "Full Name",
-            "address": "Delivery Address",
-            "preferredDate": "Preferred Delivery Date (Optional)",
-            "preferredTime": "Preferred Delivery Time (Optional)",
-            "noPreference": "No preference",
-            "timeMorning": "Morning",
-            "time1416": "14:00 - 16:00",
-            "time1618": "16:00 - 18:00",
-            "time1820": "18:00 - 20:00",
-            "time1921": "19:00 - 21:00",
-            "privacyPolicy": "The personal information you enter will be used only for shipping and shipping-related communications and will not be used for any other purpose.",
-            "submit": "Receive Gift",
-            "submitting": "Submitting..."
-        },
-        "successStep": {
-            "message": "Your shipping information has been sent!",
-            "subMessage": "The shop will ship your gift soon."
-        },
-        "shippedStep": {
-            "message": "Your gift has been shipped!",
-            "tracking": "Tracking: {number}"
-        },
-        "errors": {
-            "invalidPin": "Invalid PIN or Gift not found",
-            "inactive": "This card is not active.",
-            "submitFailed": "Failed to submit address.",
-            "invalidEmailFormat": "Invalid email format"
-        },
-        "chat": {
-            "title": "Chat",
-            "name": "Name",
-            "message": "Message",
-            "noMessages": "No messages yet.",
-            "submit": "Submit",
-            "submitting": "Submitting...",
-            "uploading": "Uploading...",
-            "usage": "Capacity Usage",
-            "limitNear": "Limit near",
-            "placeholder": "Enter message...",
-            "namePlaceholder": "Nickname",
-            "videoUnsupported": "Your browser does not support the video tag.",
-            "privacy": "This message is only visible to the sender (who knows the QR code and PIN). The shop cannot view this message.",
-            "emailTitle": "Email Notification Settings",
-            "emailDesc": "Receive email notifications when a new message arrives.",
-            "subscribe": "Subscribe",
-            "subscribeSuccess": "Subscription successful",
-            "subscribeFailed": "Subscription failed",
-            "system": "System",
-            "systemMessage": {
-                "deliveryCompleted": "Item received. Thank you."
-            }
-        },
-        "shopMessage": "Shop Message",
-        "contactInfo": {
-            "title": "Contact / Order Info",
-            "orderId": "Order ID",
-            "shopName": "Shop Name",
-            "shopEmail": "Shop Contact",
-            "note": "Please include your Order ID when contacting the shop. Address changes after shipment may not be possible."
-        },
-        "memorySection": {
-            "title": "Memory Record",
-            "daysPassed": "{days} days since our encounter",
-            "message": "May this gift become a wonderful memory for you.",
-            "receivedAt": "Received on: {date}"
-        },
-        "senderInfo": {
-            "title": "Sender Info",
-            "title-empty": "Add Sender Info",
-            "updated": "Updated",
-            "description": "You can upload a business card or face photo.",
-            "update": "Update Info",
-            "uploadPlaceholder": "Upload Business Card / Photo",
-            "uploadHint": "Tap to select an image",
-            "uploading": "Uploading...",
-            "removeImage": "Remove Image",
-            "notice": "* Uploaded images are stored securely and used only for this gift exchange.",
-            "save": "Save Info",
-            "saving": "Saving...",
-            "cancel": "Cancel",
-            "preview": "Preview",
-            "labels": {
-                "name": "Name",
-                "job_title": "Title",
-                "company": "Company",
-                "department": "Department",
-                "email": "Email",
-                "phone": "Phone",
-                "phone_direct": "Direct Phone",
-                "address": "Address",
-                "tags": "Tags",
-                "memo": "Memo",
-                "url": "URL",
-                "HP": "Home Page",
-                "SNS_Facebook": "Facebook",
-                "SNS_Instagram": "Instagram",
-                "SNS_Threads": "Threads",
-                "SNS_X": "X",
-                "SNS_YouTube": "YouTube",
-            "SNS_LINE": "LINE",
-                "SNS_TikTok": "TikTok",
-                "Service_Linktree": "Linktree",
-                "Service_Eight": "Eight",
-                "exchange_date": "Exchange Date",
-                "others": "Others (e.g., Birthday, Blood Type)",
-                "detail_html": "Details (HTML)"
-            }
-        }
-    },
-    "AdminPage": {
-        "title": "Admin Dashboard",
-        "generate": {
-            "title": "Generate QR Codes",
-            "quantity": "Quantity to Generate",
-            "button": "Generate"
-        },
-        "batches": {
-            "title": "Currently Generated QR Codes",
-            "noBatches": "No batches generated yet.",
-            "batchId": "Batch: {id}",
-            "info": "{count} codes • {date}",
-            "status": {
-                "ready": "Ready",
-                "processing": "Processing"
-            },
-            "downloadPdf": "Download PDF",
-            "table": {
-                "uuid": "UUID",
-                "pin": "PIN"
-            },
-            "alerts": {
-                "success": "Successfully generated codes",
-                "failed": "Failed to generate codes",
-                "error": "Error generating codes"
-            }
-        },
-        "list": {
-            "title": "All QR Codes",
-            "refresh": "Refresh",
-            "loading": "Loading...",
-            "deleteAllBanned": "Delete All BANNED",
-            "exportCsv": "Export CSV",
-            "status": {
-                "unassigned": "UNASSIGNED",
-                "linked": "LINKED",
-                "active": "ACTIVE",
-                "used": "USED",
-                "shipped": "SHIPPED",
-                "banned": "BANNED",
-                "search": "Search by UUID",
-                "undefined": "undefined"
-            },
-            "info": "Showing status: {status} • Count: {count}",
-            "table": {
-                "uuid": "UUID",
-                "pin": "PIN",
-                "status": "Status",
-                "createdAt": "Created At",
-                "actions": "Actions",
-                "noCodes": "No codes found. Press Refresh to load."
-            },
-            "ban": {
-                "button": "Ban",
-                "confirm": "Are you sure you want to BAN this QR code? It will stop working immediately.",
-                "success": "Successfully banned",
-                "failed": "Failed to ban",
-                "error": "Error banning QR code",
-                "pdf": "PDF"
-            },
-            "deleteBanned": {
-                "confirm": "Are you sure you want to DELAETE ALL BANNED QR codes? This action cannot be undone.",
-                "success": "Successfully deleted {count} BANNED codes.",
-                "failed": "Failed to delete Banned codes",
-                "error": "Error deleting Banned codes"
-            },
-            "keyword": {
-                "placeholder": "Enter keyword to search by UUID (at least 8 characters)",
-                "tooShort": "Keyword must be at least 8 characters long."
-            }
-        },
-        "shopInfo": {
-            "title": "Shop Information",
-            "id": "Shop ID",
-            "name": "Shop Name",
-            "contact": "Contact"
-        }
-    },
-    "VerifyPage": {
-        "title": "Verify Account",
-        "description": "Enter the code sent to your email.",
-        "email": "Email",
-        "emailPlaceholder": "you@example.com",
-        "code": "Confirmation Code",
-        "codePlaceholder": "123456",
-        "button": "Verify",
-        "verifying": "Verifying...",
-        "loading": "Loading...",
-        "errors": {
-            "failed": "Failed to verify",
-            "incomplete": "Verification incomplete. Next step: {step}"
-        }
+    "shopInfo": {
+      "title": "Shop Information",
+      "id": "Shop ID",
+      "name": "Shop Name",
+      "contact": "Contact"
     }
+  },
+  "VerifyPage": {
+    "title": "Verify Account",
+    "description": "Enter the code sent to your email.",
+    "email": "Email",
+    "emailPlaceholder": "you@example.com",
+    "code": "Confirmation Code",
+    "codePlaceholder": "123456",
+    "button": "Verify",
+    "verifying": "Verifying...",
+    "loading": "Loading...",
+    "errors": {
+      "failed": "Failed to verify",
+      "incomplete": "Verification incomplete. Next step: {step}"
+    }
+  }
 }
