@@ -650,16 +650,12 @@ export default function ShopPage() {
                                                                 {tr('shopinfo_description')}
                                                             </div>
                                                         </CardTitle>
-                                                        <CardContent className="min-h-0 flex flex-1 p-0 w-full"> {/* w-fullを追加 */}
-                                                            <div className="w-full mt-0 mr-0 ml-0 p-0 shadow relative"> {/* w-fullを追加 */}
-                                                                {/* Top fade effect */}
-                                                                <div className="absolute top-0 left-0 right-0 h-5 bg-gradient-to-b from-white to-transparent pointer-events-none z-10" />
-
+                                                        <CardContent className="min-h-0 flex flex-1 p-0 w-full p-4"> {/* w-fullを追加 */}
+                                                            <div className="w-full mt-0 mr-0 ml-0 p-0 relative rounded-2xl overflow-hidden border border-gray-100 shadow-sm bg-white">
                                                                 {/* コンテンツ */}
                                                                 <SandboxedHtml html={debouncedPreviewHtml} />
-
-                                                                {/* Bottom fade effect */}
-                                                                <div className="absolute bottom-0 left-0 right-0 h-5 bg-gradient-to-t from-white to-transparent pointer-events-none z-10" />
+                                                                {/* Overly to "gather" the corners */}
+                                                                <div className="absolute inset-0 pointer-events-none rounded-2xl ring-1 ring-black/5 ring-inset" />
                                                             </div>
                                                         </CardContent>
                                                     </Card>
@@ -1235,15 +1231,15 @@ export default function ShopPage() {
                                                             <p className="w-full text-xs text-gray-500 font-medium">{t('productDetails.detailHtml')}</p>
                                                             <div className="w-full border rounded-md p-4 bg-white shadow-sm overflow-hidden">
                                                                 <CardContent className="min-h-0 flex flex-1 p-0 w-full"> {/* w-fullを追加 */}
-                                                                    <div className="w-full mt-0 mr-0 ml-0 p-0 shadow relative"> {/* w-fullを追加 */}
+                                                                    <div className="w-full mt-0 mr-0 ml-0 p-0 relative"> {/* w-fullを追加 */}
                                                                         {/* Top fade effect */}
-                                                                        <div className="absolute top-0 left-0 right-0 h-5 bg-gradient-to-b from-white to-transparent pointer-events-none z-10" />
+                                                                        {/* <div className="absolute top-0 left-0 right-0 h-5 bg-gradient-to-b from-white to-transparent pointer-events-none z-10" /> */}
 
                                                                         {/* コンテンツ */}
                                                                         <SandboxedHtml html={debouncedPreviewHtml} />
 
                                                                         {/* Bottom fade effect */}
-                                                                        <div className="absolute bottom-0 left-0 right-0 h-5 bg-gradient-to-t from-white to-transparent pointer-events-none z-10" />
+                                                                        {/* <div className="absolute bottom-0 left-0 right-0 h-5 bg-gradient-to-t from-white to-transparent pointer-events-none z-10" /> */}
                                                                     </div>
                                                                 </CardContent>
                                                             </div>

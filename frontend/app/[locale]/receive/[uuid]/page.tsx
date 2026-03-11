@@ -185,8 +185,12 @@ const fireConfetti = () => {
     }, 250);
 };
 
-const ShakingGiftBox = ({ isShaking }: { isShaking?: boolean }) => (
-    <div className={cn("flex flex-col items-center justify-center py-10 transition-transform", isShaking && "animate-shake")}>
+const ShakingGiftBox = ({ isShaking, isExpanding }: { isShaking?: boolean, isExpanding?: boolean }) => (
+    <div className={cn(
+        "flex flex-col items-center justify-center py-10 transition-all duration-700",
+        isShaking && "animate-shake",
+        isExpanding && "animate-expand"
+    )}>
         <div className="relative w-24 h-24 mb-4 flex items-center justify-center">
             <Gift size={64} className={cn("text-black stroke-[1.2] stroke-black animate-bounce")} />
         </div>
@@ -244,6 +248,7 @@ export default function ReceivePage() {
     const [notificationEmail, setNotificationEmail] = useState("");
     const [subscribing, setSubscribing] = useState(false);
     const [showWhiteFade, setShowWhiteFade] = useState(false);
+    const [isExpanding, setIsExpanding] = useState(false);
 
     // Sender Info State
     const [senderInfo, setSenderInfo] = useState<any>(null);
@@ -295,10 +300,12 @@ export default function ReceivePage() {
         setError(null);
 
         try {
-            const [data] = await Promise.all([
-                verifyGiftPin(uuid, pin),
-                new Promise(resolve => setTimeout(resolve, GIFT_REVEAL_DELAY_MS)) // Artificial delay for shake
-            ]);
+            const data = await verifyGiftPin(uuid, pin);
+
+            // Start expansion animation after successful verification
+            setIsExpanding(true);
+            await new Promise(resolve => setTimeout(resolve, 800)); // Wait for expansion
+
             setGift(data);
             if (data.status === 'COMPLETED') {
                 setShowWhiteFade(true);
@@ -332,6 +339,7 @@ export default function ReceivePage() {
             setPinError(t('errors.invalidPin'));
         } finally {
             setLoading(false);
+            setIsExpanding(false);
         }
     };
 
@@ -339,11 +347,13 @@ export default function ReceivePage() {
         e.preventDefault();
         setLoading(true);
         try {
-            const [data] = await Promise.all([
-                verifyGiftPin(uuid, pin, unlockPassword),
-                new Promise(resolve => setTimeout(resolve, GIFT_REVEAL_DELAY_MS)) // Artificial delay for shake
-            ]);
+            const data = await verifyGiftPin(uuid, pin, unlockPassword);
+
             if (data.is_authorized) {
+                // Start expansion animation after successful verification
+                setIsExpanding(true);
+                await new Promise(resolve => setTimeout(resolve, 800)); // Wait for expansion
+
                 setGift(data);
                 if (data.status === 'COMPLETED') {
                     setShowWhiteFade(true);
@@ -370,6 +380,7 @@ export default function ReceivePage() {
             alert(t('errors.unlockFailed'));
         } finally {
             setLoading(false);
+            setIsExpanding(false);
         }
     };
 
@@ -844,8 +855,8 @@ export default function ReceivePage() {
                             animation: shake 0.5s infinite;
                         }
                         @keyframes reveal-gift {
-                            0% { transform: scale(0.8) translateY(20px); opacity: 0; filter: blur(10px); }
-                            100% { transform: scale(1) translateY(0); opacity: 1; filter: blur(0); }
+                            0% { transform: scale(0.8) translateY(20px); opacity: 0; }
+                            100% { transform: scale(1) translateY(0); opacity: 1; }
                         }
                         .animate-reveal {
                             animation: reveal-gift 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
@@ -876,10 +887,17 @@ export default function ReceivePage() {
                         .animate-fade-out-white {
                             animation: fade-out-white 3s ease-in-out forwards;
                         }
+                        @keyframes expand-gift {
+                            0% { transform: scale(1); opacity: 1; }
+                            100% { transform: scale(50); opacity: 0; } // 拡大アニメーションの拡大率
+                        }
+                        .animate-expand {
+                            animation: expand-gift 0.8s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+                        }
                     `}} />
 
-                    {(loading || step === "PIN" || step === "RESTRICTED") && !gift?.product && (
-                        <ShakingGiftBox isShaking={loading} />
+                    {(loading || isExpanding || step === "PIN" || step === "RESTRICTED") && !gift?.product && (
+                        <ShakingGiftBox isShaking={loading && !isExpanding} isExpanding={isExpanding} />
                     )}
 
                     {!loading && step !== "PIN" && gift && gift.product && (
@@ -1160,17 +1178,14 @@ export default function ReceivePage() {
 
                         {step === "SUCCESS" && (
                             <div className="text-center py-6 space-y-4">
-                                <p className="text-green-600 font-medium">{t('successStep.message')}</p>
+                                {/* <p className="text-green-600 font-medium">{t('successStep.message')}</p> */}
                                 <p className="text-sm text-gray-500">{t('successStep.subMessage')}</p>
                             </div>
                         )}
 
                         {step === "SHIPPED" && gift && (
                             <div className="text-center py-6 space-y-4">
-                                <p className="text-green-600 font-medium">{t('shippedStep.message')}</p>
-                                {/* Assuming gift object has shipping details if fetched */
-                                    console.log(gift)
-                                }
+                                {/* <p className="text-green-600 font-medium">{t('shippedStep.message')}</p> */}
 
                                 {gift.delivery_company && (
                                     <p className="text-sm text-gray-500">{t('shippedStep.deliveryCompany', { company: gift.delivery_company })}</p>
@@ -1181,7 +1196,7 @@ export default function ReceivePage() {
                                 <hr className="my-10 border-gray-200" />
 
                                 <p className="text-gray-600 text-sm">{t('shippedStep.receivedMessage')}</p>
-                                <Button type="submit" className="w-full" variant="outline" onClick={handleReceive} disabled={loading}>
+                                <Button type="submit" className="w-full h-12" variant="default" onClick={handleReceive} disabled={loading}>
                                     {loading ? t('formStep.submitting') : t('shippedStep.receivedButton')}
                                 </Button>
 
@@ -1302,7 +1317,7 @@ export default function ReceivePage() {
                                         className="aspect-[1.6/1] w-full flex flex-col items-center justify-center gap-3 cursor-pointer p-6 border rounded-xl bg-gray-50/50 hover:bg-white transition-colors"
                                         onClick={() => document.getElementById('senderCardUpload')?.click()}
                                     >
-                                        {senderInfo.card_image_url && (
+                                        {senderInfo?.card_image_url && (
                                             <div className="relative w-full h-full">
                                                 <img
                                                     src={senderInfo.card_image_url}
@@ -1551,14 +1566,14 @@ export default function ReceivePage() {
 
                                     {/* HTML Detail */}
                                     {senderInfo.detail_html && (
-                                        <div className="w-full mt-0 mr-0 ml-0 p-0 shadow relative mb-10">
-                                            {/* Top fade effect */}
-                                            <div className="absolute top-0 left-0 right-0 h-5 bg-gradient-to-b from-white to-transparent pointer-events-none z-10" />
-                                            {/* content */}
-                                            <SandboxedHtml html={senderInfo.detail_html} />
-                                            {/* Bottom fade effect */}
-                                            <div className="absolute bottom-0 left-0 right-0 h-5 bg-gradient-to-t from-white to-transparent pointer-events-none z-10" />
-                                        </div>
+                                        <CardContent className="min-h-0 flex flex-1 w-full mb-6"> {/* w-fullを追加 */}
+                                            <div className="w-full mt-0 relative rounded-2xl overflow-hidden border border-gray-100 shadow-sm bg-white">
+                                                {/* コンテンツ */}
+                                                <SandboxedHtml html={senderInfo.detail_html} />
+                                                {/* Overly to "gather" the corners */}
+                                                <div className="absolute inset-0 pointer-events-none rounded-2xl ring-1 ring-black/5 ring-inset" />
+                                            </div>
+                                        </CardContent>
                                     )}
 
                                     <div className="mr-8 ml-8">
@@ -1917,16 +1932,12 @@ export default function ReceivePage() {
                                 {t('shopinfo_description')}
                             </div>
                         </CardTitle>
-                        <CardContent className="min-h-0 flex flex-1 p-0 w-full"> {/* w-fullを追加 */}
-                            <div className="w-full mt-0 mr-0 ml-0 p-0 shadow relative"> {/* w-fullを追加 */}
-                                {/* Top fade effect */}
-                                <div className="absolute top-0 left-0 right-0 h-5 bg-gradient-to-b from-white to-transparent pointer-events-none z-10" />
-
+                        <CardContent className="min-h-0 flex flex-1 p-0 w-full p-4"> {/* w-fullを追加 */}
+                            <div className="w-full mt-0 mr-0 ml-0 p-0 relative rounded-2xl overflow-hidden border border-gray-100 shadow-sm bg-white">
                                 {/* コンテンツ */}
                                 <SandboxedHtml html={gift.shop_detail_html} />
-
-                                {/* Bottom fade effect */}
-                                <div className="absolute bottom-0 left-0 right-0 h-5 bg-gradient-to-t from-white to-transparent pointer-events-none z-10" />
+                                {/* Overly to "gather" the corners */}
+                                <div className="absolute inset-0 pointer-events-none rounded-2xl ring-1 ring-black/5 ring-inset" />
                             </div>
                         </CardContent>
                     </Card>

@@ -10,7 +10,7 @@ export default function ResponsiveSecureFrame({ html }: { html: string }) {
         const handleMessage = (event: MessageEvent) => {
             if (event.origin !== "null") return;
             if (event.data && event.data.type === "resize-iframe" && event.data.id === iframeId) {
-                const nextHeight = Math.ceil(event.data.height + 50);
+                const nextHeight = Math.ceil(event.data.height + 2);
 
                 setHeight((prev) => {
                     const currentHeight = parseInt(prev);
@@ -35,7 +35,7 @@ export default function ResponsiveSecureFrame({ html }: { html: string }) {
         const doc = parser.parseFromString(sanitizedRaw, "text/html");
 
         // 1. セキュリティ & Base設定
-        const trustedCDNs = ["https://fonts.googleapis.com", "https://fonts.gstatic.com", "https://cdnjs.cloudflare.com", "https://cdn.jsdelivr.net", "https://unpkg.com", "https://ka-f.fontawesome.com", "https://use.fontawesome.com"].join(" ");
+        const trustedCDNs = ["https://fonts.googleapis.com", "https://fonts.gstatic.com", "https://cdnjs.cloudflare.com", "https://cdn.jsdelivr.net", "https://unpkg.com", "https://ka-f.fontawesome.com", "https://use.fontawesome.com", "https://cdn.tailwindcss.com"].join(" ");
         const meta = doc.createElement("meta");
         meta.httpEquiv = "Content-Security-Policy";
         meta.content = `default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline' ${trustedCDNs}; font-src ${trustedCDNs} data:; img-src 'self' data: https:; connect-src 'none';`;
