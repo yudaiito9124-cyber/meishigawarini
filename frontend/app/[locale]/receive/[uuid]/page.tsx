@@ -1675,28 +1675,7 @@ export default function ReceivePage() {
             }
 
 
-            {/* ========== Full-width Product Content Section ========== */}
-            {
-                step !== "PIN" && gift && (gift.product && gift.product.detail_html) && (
-                    <Card className="w-full mt-20 flex flex-col items-center max-w-xl bg-white ">
-                        <CardTitle className="w-full flex flex-col items-center justify-center gap-2">
-                            <div className="w-full flex items-center justify-center text-xl text-center gap-2">
-                                <ShoppingBasket className="w-5 h-5 text-gray-600" />
-                                {t('shopinfo')}
-                            </div>
-                            <div className="w-full flex items-center justify-center text-xs text-center text-gray-500">
-                                {t('shopinfo_description')}
-                            </div>
-                        </CardTitle>
-                        <CardContent className="min-h-0 flex flex-1 p-0">
-                            <SandboxedHtml html={gift.product.detail_html} />
-                        </CardContent>
-                    </Card>
-                )
-            }
-
-
-            {/* ========== Full-width Product Content Section ========== */}
+            {/* ========== ショップの紹介セクション ========== */}
             {
                 step !== "PIN" && gift && (gift.shop_detail_html) && (
                     <Card className="w-full mt-20 flex flex-col items-center max-w-xl bg-white ">
