@@ -1,0 +1,16 @@
+# Temporary HTML samples
+sample*.html
+
+# IDE
+.vscode/
+
+# Node
+node_modules/
+.next/
+dist/
+.env*
+!.env.example
+
+# OS
+Thumbs.db
+.DS_Store

@@ -91,7 +91,7 @@
     "movetoshops": "ショップ一覧へ戻る",
     "shopId": "ショップID: {id}",
     "refresh": "更新",
-    "incomingOrders": "受信した注文",
+    "incomingOrders": "発送待ち",
     "ordersDesc": "注文と発送を管理します。",
     "orders": {
       "date": "更新日時",
@@ -189,7 +189,7 @@
       "noLinks": "連携済みのQRコードはありません"
     },
     "history": {
-      "title": "その他の注文履歴",
+      "title": "発注待ち以外のカード",
       "noLinks": "履歴はありません",
       "id": "ID",
       "product": "商品",
@@ -418,12 +418,12 @@
     "generate": {
       "title": "QRコード生成",
       "quantity": "生成数",
-      "shopId": "ショップID (任意)",
-      "productId": "プロダクトID (任意)",
+      "shopId": "ショップID (任意，そのショップに限定)",
+      "productId": "商品ID (任意，その商品に限定)",
       "button": "生成"
     },
     "batches": {
-      "title": "現在生成されているQRコード",
+      "title": "現在生成したQRコード",
       "noBatches": "まだバッチが生成されていません。",
       "batchId": "バッチ: {id}",
       "info": "{count} 件 • {date}",
