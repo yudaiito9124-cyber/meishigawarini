@@ -547,7 +547,7 @@ export default function ShopPage() {
                                         <Label htmlFor="shop_detail_html">{t('shopSettings.detailHtml')}</Label>
                                         <div className="border rounded-md overflow-hidden bg-gray-50/30 min-h-[400px] h-[calc(95vh-300px)] flex flex-col lg:flex-row">
                                             <div className="flex-1 flex flex-col min-h-0 border-b lg:border-b-0 lg:border-r bg-white">
-                                                <div className="px-3 py-2 bg-gray-50 border-b flex justify-between items-center shrink-0">
+                                                <div className="px-3 py-2 bg-gray-50 border-b flex justify-between items-center shrink-0 min-h-[50px]">
                                                     <Label htmlFor="shop_detail_html" className="text-xs font-bold text-gray-600 uppercase tracking-wider">{t('shopSettings.sourcecode')}</Label>
                                                 </div>
                                                 <textarea
@@ -560,7 +560,7 @@ export default function ShopPage() {
                                                 />
                                             </div>
                                             <div className="flex-1 flex flex-col min-h-0 bg-gray-50/50">
-                                                <div className="px-3 py-2 bg-gray-50 border-b flex justify-between items-center shrink-0">
+                                                <div className="px-3 py-2 bg-gray-50 border-b flex justify-between items-center shrink-0 min-h-[50px]">
                                                     <Label className="text-xs font-bold text-gray-600 uppercase tracking-wider">{t('shopSettings.preview')}</Label>
                                                     <Button
                                                         type="button"
