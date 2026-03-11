@@ -383,7 +383,8 @@
                 "Service_Linktree": "Linktree",
                 "Service_Eight": "Eight",
                 "exchange_date": "名刺交換日",
-                "others": "その他 (例: 誕生日、血液型)"
+                "others": "その他 (例: 誕生日、血液型)",
+                "detail_html": "詳細(HTML)"
             }
         },
         "shopinfo": "ショップのご紹介",

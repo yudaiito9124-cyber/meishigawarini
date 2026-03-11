@@ -586,7 +586,14 @@ export default function ShopPage() {
                                                         </CardTitle>
                                                         {/* </CardHeader> */}
                                                         <CardContent className="min-h-0 flex flex-1 p-0">
-                                                            <SandboxedHtml html={debouncedPreviewHtml} />
+                                                            <div className="mt-0 mr-0 ml-0 p-0 shadow relative">
+                                                                {/* Top fade effect */}
+                                                                <div className="absolute top-0 left-0 right-0 h-5 bg-gradient-to-b from-white to-transparent pointer-events-none z-10" />
+                                                                {/* content */}
+                                                                <SandboxedHtml html={debouncedPreviewHtml} />
+                                                                {/* Bottom fade effect */}
+                                                                <div className="absolute bottom-0 left-0 right-0 h-5 bg-gradient-to-t from-white to-transparent pointer-events-none z-10" />
+                                                            </div>
                                                         </CardContent>
                                                     </Card>
                                                     {/* <div className="max-w-xl mx-auto lg:mx-0 bg-white shadow-sm border rounded-lg p-6 min-h-full">

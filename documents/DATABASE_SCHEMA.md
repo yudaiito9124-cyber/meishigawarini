@@ -116,7 +116,7 @@ QRコードのライフサイクルや注文ステータス、商品との紐付
 | `messages` | Array | チャット本文の配列 （例: `[{ sender: "SHOP"\| "USER" \| "SYSTEM", content: "...", timestamp: "ISO時間" }]`） |
 | `notification_emails` | StringSet | 新着通知の設定先メールリスト （購読を希望したユーザーのメールアドレス集合） |
 | `email_preferences` | Map | メール通知の設定情報マップ （言語情報等、例: `{"user@example.com": "ja"}`） |
-| `sender_info` | JSon | プレゼントを渡した人の名刺情報等
+| `sender_info` | JSon | プレゼントを渡した人の名刺情報等（`detail_html` を含む）
 
 ### 2.6 レコードが保持可能な状態 (ステータス) 一覧
 

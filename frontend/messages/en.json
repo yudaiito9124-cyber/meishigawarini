@@ -308,12 +308,13 @@
                 "SNS_Threads": "Threads",
                 "SNS_X": "X",
                 "SNS_YouTube": "YouTube",
-                "SNS_LINE": "LINE",
+            "SNS_LINE": "LINE",
                 "SNS_TikTok": "TikTok",
                 "Service_Linktree": "Linktree",
                 "Service_Eight": "Eight",
                 "exchange_date": "Exchange Date",
-                "others": "Others (e.g. Birthday)"
+                "others": "Others (e.g., Birthday, Blood Type)",
+                "detail_html": "Details (HTML)"
             }
         }
     },

@@ -196,7 +196,7 @@ const ShakingGiftBox = ({ isShaking }: { isShaking?: boolean }) => (
 const EmptySenderInfo = (senderinfo: any) => {
     return !senderinfo || Object.keys(senderinfo).every(key => {
         if (key.startsWith("ts_")) return true;
-        return senderinfo[key] === "";
+        return !senderinfo[key];
     });
 };
 
@@ -204,7 +204,7 @@ const EmptySenderInfoWithLinks = (senderinfo: any) => {
     return !senderinfo || Object.keys(senderinfo).every(key => {
         if (key.startsWith("ts_")) return true;
         if (!key.startsWith("Service_") && !key.startsWith("SNS_")) return true;
-        return senderinfo[key] === "";
+        return !senderinfo[key];
     });
 };
 
@@ -269,6 +269,7 @@ export default function ReceivePage() {
         SNS_TikTok: "",
         Service_Eight: "",
         Service_Linktree: "",
+        detail_html: "",
     });
 
     const updateSenderForm = (field: string, value: string) => {
@@ -1200,255 +1201,269 @@ export default function ReceivePage() {
             {
                 // 送り主情報を閲覧・編集
                 (isEditingSender || !EmptySenderInfo(senderInfo)) ? (
-                    < Card className="w-full max-w-xl mt-20 flex flex-col">
+                    <Card className="w-full max-w-xl mt-20 flex flex-col">
+                        <CardHeader className="flex justify-between items-center">
+                            <CardTitle className="text-xl text-center flex items-center justify-left gap-2">
+                                <User className="w-5 h-5 text-gray-600" />
+                                {t('senderInfo.title')}
+                            </CardTitle>
+                            <div className="flex flex-row items-center">
+                                {(senderInfo && senderInfo.ts_updated_at) && (
+                                    <span className="text-[10px] text-gray-400 flex items-center">
+                                        {new Date(senderInfo.ts_updated_at).toLocaleString()} {t('senderInfo.updated')}
+                                    </span>
+                                )}
+                                {(senderInfo && step === "FORM") ? (
+                                    <div className="flex items-center flex items-center">
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-10 w-10 text-gray-400 hover:text-gray-600"
+                                            onClick={() => setIsEditingSender(!isEditingSender)}
+                                        >
+                                            {isEditingSender ? <X className="h-4 w-4" /> : <Pencil className="h-4 w-4" />}
+                                        </Button>
+                                    </div>
+                                ) : ""}
+                            </div>
+                        </CardHeader>
+                        <CardContent className="min-h-0 flex flex-col animate-in fade-in slide-in-from-bottom-2 relative group/card p-0">
 
-                        <CardContent className="min-h-0 flex flex-col">
-                            {/* --- Sender Info Section --- */}
-                            <div className="animate-in fade-in slide-in-from-bottom-2">
-                                <div className="flex justify-between gap-2">
-                                    <Label className="font-bold text-gray-800 flex items-center text-lg">
-                                        {/* <div className="w-1.5 h-6 bg-blue-600 rounded-full" /> */}
-                                        <User className="w-5 h-5 text-gray-600" />
-                                        {t('senderInfo.title')}
-                                    </Label>
-                                    <div className="flex flex-row items-center">
-                                        {(senderInfo && senderInfo.ts_updated_at) && (
-                                            <span className="text-[10px] text-gray-400 flex items-center">
-                                                {new Date(senderInfo.ts_updated_at).toLocaleString()} {t('senderInfo.updated')}
-                                            </span>
-                                        )}
-                                        {(senderInfo && step === "FORM") ? (
-                                            <div className="flex items-center flex items-center">
+                            {/* 編集箇所 */}
+                            {(step === "FORM" && isEditingSender) ? (
+                                <div className="space-y-6 p-6">
+                                    <div
+                                        className="aspect-[1.6/1] w-full flex flex-col items-center justify-center gap-3 cursor-pointer p-6 border rounded-xl bg-gray-50/50 hover:bg-white transition-colors"
+                                        onClick={() => document.getElementById('senderCardUpload')?.click()}
+                                    >
+                                        {senderInfo.card_image_url && (
+                                            <div className="relative w-full h-full">
+                                                <img
+                                                    src={senderInfo.card_image_url}
+                                                    alt="Business Card"
+                                                    className="w-full h-full object-contain rounded-lg shadow-md bg-white ring-1 ring-black/5"
+                                                />
                                                 <Button
-                                                    variant="ghost"
+                                                    variant="destructive"
                                                     size="icon"
-                                                    className="h-10 w-10 text-gray-400 hover:text-gray-600"
-                                                    onClick={() => setIsEditingSender(!isEditingSender)}
+                                                    className="absolute -top-2 -right-2 h-8 w-8 rounded-full shadow-lg z-10"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleRemoveSenderImage();
+                                                    }}
                                                 >
-                                                    {isEditingSender ? <X className="h-4 w-4" /> : <Pencil className="h-4 w-4" />}
+                                                    <X className="h-4 w-4" />
                                                 </Button>
                                             </div>
-                                        ) : ""}
+                                        )}
+                                        <p className="text-xs text-gray-500">
+                                            {t('senderInfo.description')}
+                                        </p>
+                                        <div className="w-16 h-16 rounded-full bg-blue-50 flex items-center justify-center group-hover/card:scale-110 transition-transform">
+                                            <FileIcon className="w-8 h-8 text-blue-500" />
+                                        </div>
+                                        <div className="text-center">
+                                            <p className="font-semibold text-gray-800">{t('senderInfo.uploadPlaceholder')}</p>
+                                            <p className="text-xs text-gray-400 mt-1">{t('senderInfo.uploadHint')}</p>
+                                        </div>
+                                        <p className="text-[10px] text-gray-400 text-center italic">
+                                            {t('senderInfo.notice')}
+                                        </p>
                                     </div>
-                                </div>
-                                {/* 編集箇所 */}
-                                <div className="relative group/card overflow-hidden">
-                                    {(step === "FORM" && isEditingSender) ? (
-                                        <div className="space-y-6">
-                                            <div
-                                                className="aspect-[1.6/1] w-full flex flex-col items-center justify-center gap-3 cursor-pointer p-6 border rounded-xl bg-gray-50/50 hover:bg-white transition-colors"
-                                                onClick={() => document.getElementById('senderCardUpload')?.click()}
-                                            >
-                                                {senderInfo.card_image_url && (
-                                                    <div className="relative w-full h-full">
-                                                        <img
-                                                            src={senderInfo.card_image_url}
-                                                            alt="Business Card"
-                                                            className="w-full h-full object-contain rounded-lg shadow-md bg-white ring-1 ring-black/5"
-                                                        />
-                                                        <Button
-                                                            variant="destructive"
-                                                            size="icon"
-                                                            className="absolute -top-2 -right-2 h-8 w-8 rounded-full shadow-lg z-10"
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                handleRemoveSenderImage();
-                                                            }}
-                                                        >
-                                                            <X className="h-4 w-4" />
-                                                        </Button>
-                                                    </div>
-                                                )}
-                                                <p className="text-xs text-gray-500">
-                                                    {t('senderInfo.description')}
-                                                </p>
-                                                <div className="w-16 h-16 rounded-full bg-blue-50 flex items-center justify-center group-hover/card:scale-110 transition-transform">
-                                                    <FileIcon className="w-8 h-8 text-blue-500" />
-                                                </div>
-                                                <div className="text-center">
-                                                    <p className="font-semibold text-gray-800">{t('senderInfo.uploadPlaceholder')}</p>
-                                                    <p className="text-xs text-gray-400 mt-1">{t('senderInfo.uploadHint')}</p>
-                                                </div>
-                                                <p className="text-[10px] text-gray-400 text-center italic">
-                                                    {t('senderInfo.notice')}
-                                                </p>
-                                            </div>
 
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t pt-6">
-                                                {Object.keys(senderForm).map((field) => (
-                                                    field !== 'card_image_url' && field !== 'card_image_name' && field !== 'ts_updated_at' && (
-                                                        <div key={field} className={cn("space-y-1.5", (field === 'memo' || field === 'address') && "md:col-span-2")}>
-                                                            <Label htmlFor={`sender-${field}`} className="text-xs font-bold text-gray-600 flex items-center gap-1">
-                                                                {field === "SNS_X" ? <SiX size={14} color="default" /> :
-                                                                    field === "SNS_Instagram" ? <SiInstagram size={14} color="default" /> :
-                                                                        field === "SNS_YouTube" ? <SiYoutube size={14} color="default" /> :
-                                                                            field === "SNS_Facebook" ? <SiFacebook size={14} color="default" /> :
-                                                                                field === "SNS_LINE" ? <SiLine size={14} color="default" /> :
-                                                                                    field === "SNS_TikTok" ? <SiTiktok size={14} color="default" /> :
-                                                                                        field === "SNS_Threads" ? <SiThreads size={14} color="default" /> :
-                                                                                            field === "Service_Linktree" ? <SiLinktree size={14} color="default" /> :
-                                                                                                field === "Service_Eight" ? <SiEight size={14} color="default" /> :
-                                                                                                    (field.startsWith("SNS_") || field.startsWith("Service_") || field === "HP" || field === "url") ? <Globe size={14} /> :
-                                                                                                        null
-                                                                }
-                                                                {t(`senderInfo.labels.${field}`)}
-                                                            </Label>
-                                                            {field === 'memo' || field === 'address' ? (
-                                                                <Textarea
-                                                                    id={`sender-${field}`}
-                                                                    value={(senderForm as any)[field] || ""}
-                                                                    onChange={(e) => updateSenderForm(field, e.target.value)}
-                                                                    disabled={senderInfoLoading}
-                                                                    className="min-h-[80px] text-sm"
-                                                                    placeholder={t(`senderInfo.labels.${field}`)}
-                                                                />
-                                                            ) : (
-                                                                <Input
-                                                                    id={`sender-${field}`}
-                                                                    value={(senderForm as any)[field] || ""}
-                                                                    onChange={(e) => updateSenderForm(field, e.target.value)}
-                                                                    disabled={senderInfoLoading}
-                                                                    className="h-9 text-sm"
-                                                                    placeholder={t(`senderInfo.labels.${field}`)}
-                                                                    type={field === 'email' ? 'email' : field === 'phone' ? 'tel' : 'text'}
-                                                                />
-                                                            )}
-                                                        </div>
-                                                    )
-                                                ))}
-                                                <div className="md:col-span-2 pt-2 flex flex-col gap-2">
-                                                    <Button
-                                                        onClick={() => handleSenderInfoUpdate()}
-                                                        disabled={senderInfoLoading}
-                                                        className="w-full"
-                                                    >
-                                                        {senderInfoLoading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <SendHorizontal className="w-4 h-4 mr-2" />}
-                                                        {senderInfoLoading ? t('senderInfo.saving') : t('senderInfo.save')}
-                                                    </Button>
-                                                    {isEditingSender && (
-                                                        <Button
-                                                            type="button"
-                                                            variant="ghost"
-                                                            onClick={() => setIsEditingSender(false)}
-                                                        >
-                                                            {t('senderInfo.cancel')}
-                                                        </Button>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t pt-6">
+                                        {Object.keys(senderForm).map((field) => (
+                                            field !== 'card_image_url' && field !== 'card_image_name' && field !== 'ts_updated_at' && (
+                                                <div key={field} className={cn("space-y-1.5", (field === 'memo' || field === 'address' || field === 'detail_html') && "md:col-span-2")}>
+                                                    <Label htmlFor={`sender-${field}`} className="text-xs font-bold text-gray-600 flex items-center gap-1">
+                                                        {field === "SNS_X" ? <SiX size={14} color="default" /> :
+                                                            field === "SNS_Instagram" ? <SiInstagram size={14} color="default" /> :
+                                                                field === "SNS_YouTube" ? <SiYoutube size={14} color="default" /> :
+                                                                    field === "SNS_Facebook" ? <SiFacebook size={14} color="default" /> :
+                                                                        field === "SNS_LINE" ? <SiLine size={14} color="default" /> :
+                                                                            field === "SNS_TikTok" ? <SiTiktok size={14} color="default" /> :
+                                                                                field === "SNS_Threads" ? <SiThreads size={14} color="default" /> :
+                                                                                    field === "Service_Linktree" ? <SiLinktree size={14} color="default" /> :
+                                                                                        field === "Service_Eight" ? <SiEight size={14} color="default" /> :
+                                                                                            (field.startsWith("SNS_") || field.startsWith("Service_") || field === "HP" || field === "url") ? <Globe size={14} /> :
+                                                                                                null
+                                                        }
+                                                        {t(`senderInfo.labels.${field}`)}
+                                                    </Label>
+                                                    {field === 'memo' || field === 'address' || field === 'detail_html' ? (
+                                                        <Textarea
+                                                            id={`sender-${field}`}
+                                                            value={(senderForm as any)[field] || ""}
+                                                            onChange={(e) => updateSenderForm(field, e.target.value)}
+                                                            disabled={senderInfoLoading}
+                                                            className="min-h-[80px] text-sm"
+                                                            placeholder={t(`senderInfo.labels.${field}`)}
+                                                        />
+                                                    ) : (
+                                                        <Input
+                                                            id={`sender-${field}`}
+                                                            value={(senderForm as any)[field] || ""}
+                                                            onChange={(e) => updateSenderForm(field, e.target.value)}
+                                                            disabled={senderInfoLoading}
+                                                            className="h-9 text-sm"
+                                                            placeholder={t(`senderInfo.labels.${field}`)}
+                                                            type={field === 'email' ? 'email' : field === 'phone' ? 'tel' : 'text'}
+                                                        />
                                                     )}
                                                 </div>
-                                            </div>
-                                            <div className="mt-20 border-b" />
-                                            <Label className="w-full flex flex-col text-center text-xl border border-blue-100 bg-blue-200 rounded-xl">{t('senderInfo.preview')}</Label>
-                                        </div>
-                                    ) : ""}
-
-                                    {/* 実際に表示する箇所 */}
-                                    { }
-                                    {senderInfo ? (
-                                        <div>
-                                            {/* 名刺画像・顔写真 */}
-                                            {senderInfo.card_image_url && (
-                                                <div className="w-full p-4 mt-8">
-                                                    <img
-                                                        src={senderInfo.card_image_url}
-                                                        alt="Business Card"
-                                                        className="w-full h-full object-contain rounded-lg shadow-md bg-white ring-1 ring-black/5 mb-8 border"
-                                                    />
-                                                </div>
-                                            )}
-                                            {/* 名前 */}
-                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 ml-6 mr-6">
-                                                {Object.entries(senderForm).map(([field, value]) => value &&
-                                                    field == "name" && (
-                                                        <div key={field} className={cn("flex flex-col border-b border-gray-50 pb-2 sm:col-span-2")}>
-                                                            <span className="text-[10px] font-bold text-gray-400 uppercase">
-                                                                {t(`senderInfo.labels.${field}`)}
-                                                            </span>
-                                                            <span className={cn("text-gray-800 break-words whitespace-pre-wrap text-xl font-bold")}>
-                                                                {value}
-                                                            </span>
-                                                        </div>
-                                                    ))}
-                                            </div>
-                                            {/* 名前・LINK以外(メール・住所・電話番号・ホームページ等) */}
-                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 ml-6 mr-6">
-                                                {Object.entries(senderForm).map(([field, value]) => value &&
-                                                    field !== 'card_image_url' &&
-                                                    field !== 'card_image_name' &&
-                                                    field !== 'ts_updated_at' &&
-                                                    field !== 'name' &&
-                                                    !field.startsWith("SNS_") &&
-                                                    !field.startsWith("Service_") && (
-                                                        <div key={field} className={cn("flex flex-col border-b border-gray-50 pb-2", (field === 'memo' || field === 'address') && "sm:col-span-2")}>
-                                                            <span className="text-[10px] font-bold text-gray-400 uppercase">
-                                                                {t(`senderInfo.labels.${field}`)}
-                                                            </span>
-                                                            <span className={cn("text-gray-800 break-words", (field === 'memo' || field === 'address') && "whitespace-pre-wrap text-sm")}>
-                                                                {field === 'HP' || field === 'memo' ? renderTextWithLinks(value) : value}
-                                                            </span>
-                                                        </div>
-                                                    ))}
-                                            </div>
-                                            {/* LINK(SNS/Webサービスリンク) */}
-                                            {!EmptySenderInfoWithLinks(senderInfo) && (
-                                                <div className="gap-1 ml-6 mr-6">
-                                                    <span className="text-[10px] font-bold text-gray-400 uppercase">
-                                                        LINK
-                                                    </span>
-                                                    <div className="flex flex-wrap gap-1">
-                                                        {Object.entries(senderForm).map(([field, value]) => value && (field.startsWith("SNS_") || field.startsWith("Service_")) ? (
-                                                            <Button
-                                                                key={field}
-                                                                variant="outline"
-                                                                size="sm"
-                                                                className="h-8 gap-2 bg-white hover:bg-gray-50 border-gray-200 text-gray-700 relative group"
-                                                                onClick={() => {
-                                                                    const url = value.startsWith('http') ? value : `https://${value}`;
-                                                                    window.open(url, '_blank', 'noopener,noreferrer');
-                                                                }}
-                                                            >
-                                                                {field === "SNS_X" ? <SiX size={14} color="default" /> :
-                                                                    field === "SNS_Instagram" ? <SiInstagram size={14} color="default" /> :
-                                                                        field === "SNS_YouTube" ? <SiYoutube size={14} color="default" /> :
-                                                                            field === "SNS_Facebook" ? <SiFacebook size={14} color="default" /> :
-                                                                                field === "SNS_LINE" ? <SiLine size={14} color="default" /> :
-                                                                                    field === "SNS_TikTok" ? <SiTiktok size={14} color="default" /> :
-                                                                                        field === "SNS_Threads" ? <SiThreads size={14} color="default" /> :
-                                                                                            field === "Service_Eight" ? <SiEight size={14} color="default" /> :
-                                                                                                field === "Service_Linktree" ? <SiLinktree size={14} color="default" /> :
-                                                                                                    <Globe size={14} />
-                                                                }
-                                                                <span className="absolute -top-8 left-1/2 -translate-x-1/2 px-2 py-1 bg-gray-800 text-white text-[10px] rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none shadow-sm z-50">
-                                                                    {t(`senderInfo.labels.${field}`)}
-                                                                    <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-gray-800 rotate-45" />
-                                                                </span>
-                                                            </Button>
-                                                        ) : "")}
-                                                    </div>
-                                                </div>
-                                            )}
-                                            <input
-                                                type="file"
-                                                id="senderCardUpload"
-                                                className="hidden"
-                                                accept="image/*"
-                                                onChange={(e) => {
-                                                    const file = e.target.files?.[0];
-                                                    if (file) handleSenderInfoUpload(file);
-                                                    e.target.value = "";
-                                                }}
-                                            />
-                                            {senderInfoLoading && (
-                                                <div className="absolute inset-0 bg-white/60 backdrop-blur-[1px] flex items-center justify-center z-10 transition-all">
-                                                    <div className="flex flex-col items-center gap-2">
-                                                        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
-                                                        <p className="text-xs font-bold text-blue-800">{t('senderInfo.uploading') || "アップロード中..."}</p>
-                                                    </div>
-                                                </div>
+                                            )
+                                        ))}
+                                        <div className="md:col-span-2 pt-2 flex flex-col gap-2">
+                                            <Button
+                                                onClick={() => handleSenderInfoUpdate()}
+                                                disabled={senderInfoLoading}
+                                                className="w-full"
+                                            >
+                                                {senderInfoLoading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <SendHorizontal className="w-4 h-4 mr-2" />}
+                                                {senderInfoLoading ? t('senderInfo.saving') : t('senderInfo.save')}
+                                            </Button>
+                                            {isEditingSender && (
+                                                <Button
+                                                    type="button"
+                                                    variant="ghost"
+                                                    onClick={() => setIsEditingSender(false)}
+                                                >
+                                                    {t('senderInfo.cancel')}
+                                                </Button>
                                             )}
                                         </div>
-                                    ) : ""}
+                                    </div>
+                                    <div className="mt-20 border-b" />
+                                    <Label className="w-full flex flex-col text-center text-xl border border-blue-100 bg-blue-200 rounded-xl">{t('senderInfo.preview')}</Label>
                                 </div>
-                            </div>
+                            ) : ""}
+
+                            {/* 実際に表示する箇所 */}
+                            {senderInfo ? (
+                                <div>
+
+                                    {/* HTML Detail */}
+                                    {senderInfo.detail_html && (
+                                        <div className="mt-0 mr-0 ml-0 p-0 shadow relative mb-10">
+                                            {/* Top fade effect */}
+                                            <div className="absolute top-0 left-0 right-0 h-5 bg-gradient-to-b from-white to-transparent pointer-events-none z-10" />
+                                            {/* content */}
+                                            <SandboxedHtml html={senderInfo.detail_html} />
+                                            {/* Bottom fade effect */}
+                                            <div className="absolute bottom-0 left-0 right-0 h-5 bg-gradient-to-t from-white to-transparent pointer-events-none z-10" />
+                                        </div>
+                                    )}
+
+                                    <div className="mr-8 ml-8">
+                                        {/* 名刺画像・顔写真 */}
+                                        {senderInfo.card_image_url && (
+                                            <div className="w-full mb-6">
+                                                <img
+                                                    src={senderInfo.card_image_url}
+                                                    alt="Business Card"
+                                                    className="w-full h-full object-contain rounded-lg shadow-md bg-white ring-1 ring-black/5 border"
+                                                />
+                                            </div>
+                                        )}
+                                        {/* 名前 */}
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 ml-6 mr-6">
+                                            {Object.entries(senderForm).map(([field, value]) => value &&
+                                                field == "name" && (
+                                                    <div key={field} className={cn("flex flex-col border-b border-gray-50 pb-2 sm:col-span-2")}>
+                                                        <span className="text-[10px] font-bold text-gray-400 uppercase">
+                                                            {t(`senderInfo.labels.${field}`)}
+                                                        </span>
+                                                        <span className={cn("text-gray-800 break-words whitespace-pre-wrap text-xl font-bold")}>
+                                                            {value}
+                                                        </span>
+                                                    </div>
+                                                ))}
+                                        </div>
+                                        {/* 名前・LINK以外(メール・住所・電話番号・ホームページ等) */}
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 ml-6 mr-6">
+                                            {Object.entries(senderForm).map(([field, value]) => value &&
+                                                field !== 'card_image_url' &&
+                                                field !== 'card_image_name' &&
+                                                field !== 'ts_updated_at' &&
+                                                field !== 'name' &&
+                                                field !== 'detail_html' &&
+                                                !field.startsWith("SNS_") &&
+                                                !field.startsWith("Service_") && (
+                                                    <div key={field} className={cn("flex flex-col border-b border-gray-50 pb-2", (field === 'memo' || field === 'address') && "sm:col-span-2")}>
+                                                        <span className="text-[10px] font-bold text-gray-400 uppercase">
+                                                            {t(`senderInfo.labels.${field}`)}
+                                                        </span>
+                                                        <span className={cn("text-gray-800 break-words", (field === 'memo' || field === 'address') && "whitespace-pre-wrap text-sm")}>
+                                                            {field === 'HP' || field === 'memo' ? renderTextWithLinks(value) : value}
+                                                        </span>
+                                                    </div>
+                                                ))}
+                                        </div>
+                                        {/* LINK(SNS/Webサービスリンク) */}
+                                        {!EmptySenderInfoWithLinks(senderInfo) && (
+                                            <div className="gap-1 ml-6 mr-6">
+                                                <span className="text-[10px] font-bold text-gray-400 uppercase">
+                                                    LINK
+                                                </span>
+                                                <div className="flex flex-wrap gap-1">
+                                                    {Object.entries(senderForm).map(([field, value]) => value && (field.startsWith("SNS_") || field.startsWith("Service_")) ? (
+                                                        <Button
+                                                            key={field}
+                                                            variant="outline"
+                                                            size="sm"
+                                                            className="h-8 gap-2 bg-white hover:bg-gray-50 border-gray-200 text-gray-700 relative group"
+                                                            onClick={() => {
+                                                                const url = value.startsWith('http') ? value : `https://${value}`;
+                                                                window.open(url, '_blank', 'noopener,noreferrer');
+                                                            }}
+                                                        >
+                                                            {field === "SNS_X" ? <SiX size={14} color="default" /> :
+                                                                field === "SNS_Instagram" ? <SiInstagram size={14} color="default" /> :
+                                                                    field === "SNS_YouTube" ? <SiYoutube size={14} color="default" /> :
+                                                                        field === "SNS_Facebook" ? <SiFacebook size={14} color="default" /> :
+                                                                            field === "SNS_LINE" ? <SiLine size={14} color="default" /> :
+                                                                                field === "SNS_TikTok" ? <SiTiktok size={14} color="default" /> :
+                                                                                    field === "SNS_Threads" ? <SiThreads size={14} color="default" /> :
+                                                                                        field === "Service_Eight" ? <SiEight size={14} color="default" /> :
+                                                                                            field === "Service_Linktree" ? <SiLinktree size={14} color="default" /> :
+                                                                                                <Globe size={14} />
+                                                            }
+                                                            <span className="absolute -top-8 left-1/2 -translate-x-1/2 px-2 py-1 bg-gray-800 text-white text-[10px] rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none shadow-sm z-50">
+                                                                {t(`senderInfo.labels.${field}`)}
+                                                                <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-gray-800 rotate-45" />
+                                                            </span>
+                                                        </Button>
+                                                    ) : "")}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+
+
+
+                                    <input
+                                        type="file"
+                                        id="senderCardUpload"
+                                        className="hidden"
+                                        accept="image/*"
+                                        onChange={(e) => {
+                                            const file = e.target.files?.[0];
+                                            if (file) handleSenderInfoUpload(file);
+                                            e.target.value = "";
+                                        }}
+                                    />
+
+                                    {senderInfoLoading && (
+                                        <div className="absolute inset-0 bg-white/60 backdrop-blur-[1px] flex items-center justify-center z-10 transition-all">
+                                            <div className="flex flex-col items-center gap-2">
+                                                <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+                                                <p className="text-xs font-bold text-blue-800">{t('senderInfo.uploading') || "アップロード中..."}</p>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                </div>
+                            ) : ""}
                             {/* --------------------------- */}
                         </CardContent>
                     </Card>
@@ -1461,7 +1476,7 @@ export default function ReceivePage() {
                 step !== "PIN" && (
                     <Card className={cn("w-full max-w-xl mt-20 flex flex-col", step !== "COMPLETED" && "max-h-[calc(100vh-12rem)] min-h-[800px] overflow-hidden")}>
 
-                        <CardHeader>
+                        <CardHeader className=" items-center">
                             <CardTitle className="text-xl text-center flex items-center justify-left gap-2">
                                 <MessagesSquare className="w-5 h-5 text-gray-600" />
                                 {t('chat.title')}
@@ -1689,7 +1704,14 @@ export default function ReceivePage() {
                             </div>
                         </CardTitle>
                         <CardContent className="min-h-0 flex flex-1 p-0">
-                            <SandboxedHtml html={gift.shop_detail_html} />
+                            <div className="mt-0 mr-0 ml-0 p-0 shadow relative">
+                                {/* Top fade effect */}
+                                <div className="absolute top-0 left-0 right-0 h-5 bg-gradient-to-b from-white to-transparent pointer-events-none z-10" />
+                                {/* content */}
+                                <SandboxedHtml html={gift.shop_detail_html} />
+                                {/* Bottom fade effect */}
+                                <div className="absolute bottom-0 left-0 right-0 h-5 bg-gradient-to-t from-white to-transparent pointer-events-none z-10" />
+                            </div>
                         </CardContent>
                     </Card>
                 )
