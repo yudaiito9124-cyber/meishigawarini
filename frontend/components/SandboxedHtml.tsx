@@ -1,65 +1,125 @@
 "use client";
-import { useEffect, useRef } from "react";
+import { useState, useEffect, useId, useMemo } from "react";
 import DOMPurify from "isomorphic-dompurify";
 
-// Register iframe domain whitelist hook once (client-side only)
-let hookAdded = false;
-
-interface SandboxedHtmlProps {
-    html: string;
-}
-
-/**
- * Renders arbitrary HTML inside a Shadow DOM root so that
- * any <style> tags inside are fully scoped and cannot affect
- * the parent page's styles, and the parent's styles don't bleed in.
- *
- * This is simpler and more reliable than an <iframe srcdoc> approach
- * because there is no height calculation needed.
- */
-export default function SandboxedHtml({ html }: SandboxedHtmlProps) {
-    const containerRef = useRef<HTMLDivElement>(null);
+export default function ResponsiveSecureFrame({ html }: { html: string }) {
+    const [height, setHeight] = useState("400px");
+    const iframeId = useId();
 
     useEffect(() => {
-        // Only runs on client
-        if (!hookAdded) {
-            hookAdded = true;
-            DOMPurify.addHook("uponSanitizeElement", (node: any, data: any) => {
-                if (data.tagName === "iframe") {
-                    const src = node.getAttribute("src") || "";
-                    if (
-                        !src.startsWith("https://www.youtube.com/") &&
-                        !src.startsWith("https://www.google.com/maps/") &&
-                        !src.startsWith("https://maps.google.com/")
-                    ) {
-                        node.parentNode?.removeChild(node);
-                    }
-                }
-            });
-        }
+        const handleMessage = (event: MessageEvent) => {
+            if (event.origin !== "null") return;
+            if (event.data && event.data.type === "resize-iframe" && event.data.id === iframeId) {
+                const nextHeight = Math.ceil(event.data.height + 50);
 
-        const container = containerRef.current;
-        if (!container) return;
+                setHeight((prev) => {
+                    const currentHeight = parseInt(prev);
+                    // 【ループ防止】変化が5px未満なら更新しない（100vhループをここで断つ）
+                    if (Math.abs(nextHeight - currentHeight) < 5) return prev;
+                    return `${nextHeight}px`;
+                });
+            }
+        };
+        window.addEventListener("message", handleMessage);
+        return () => window.removeEventListener("message", handleMessage);
+    }, [iframeId]);
 
-        const cleanHtml = DOMPurify.sanitize(html, {
-            ADD_TAGS: ["iframe", "style"],
-            ADD_ATTR: ["allow", "allowfullscreen", "frameborder", "scrolling"],
-            FORCE_BODY: true,
+    const srcDoc = useMemo(() => {
+        const sanitizedRaw = DOMPurify.sanitize(html, {
+            ADD_TAGS: ["style", "link", "meta"],
+            ADD_ATTR: ["href", "rel", "class", "style", "crossorigin", "integrity", "target"],
+            WHOLE_DOCUMENT: true,
         });
 
-        // Attach a shadow root (reuse existing if already attached)
-        const shadow =
-            (container.shadowRoot as ShadowRoot | null) ??
-            container.attachShadow({ mode: "open" });
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(sanitizedRaw, "text/html");
 
-        shadow.innerHTML = `
-<style>
-  :host { display: block; }
-  img { max-width: 100%; height: auto; }
-  iframe { max-width: 100%; aspect-ratio: 16 / 9; width: 100%; }
-</style>
-${cleanHtml}`;
-    }, [html]);
+        // 1. セキュリティ & Base設定
+        const trustedCDNs = ["https://fonts.googleapis.com", "https://fonts.gstatic.com", "https://cdnjs.cloudflare.com", "https://cdn.jsdelivr.net", "https://unpkg.com", "https://ka-f.fontawesome.com", "https://use.fontawesome.com"].join(" ");
+        const meta = doc.createElement("meta");
+        meta.httpEquiv = "Content-Security-Policy";
+        meta.content = `default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline' ${trustedCDNs}; font-src ${trustedCDNs} data:; img-src 'self' data: https:; connect-src 'none';`;
+        doc.head.prepend(meta);
 
-    return <div ref={containerRef} />;
+        const base = doc.createElement("base");
+        base.target = "_blank";
+        doc.head.append(base);
+
+        // 2. 計測スクリプト：内側のコンテナサイズだけを正確に測る
+        const script = doc.createElement("script");
+        script.textContent = `
+            (function() {
+                const sendHeight = () => {
+                    const el = document.getElementById('content-inner');
+                    if (!el) return;
+                    // getBoundingClientRect を使って小数点以下の精度で計測
+                    const rect = el.getBoundingClientRect();
+                    window.parent.postMessage({ 
+                        type: "resize-iframe", 
+                        id: "${iframeId}", 
+                        height: rect.height
+                    }, "*");
+                };
+                window.addEventListener("load", sendHeight);
+                if (typeof ResizeObserver !== 'undefined') {
+                    // content-inner そのものを監視対象にする
+                    new ResizeObserver(() => requestAnimationFrame(sendHeight)).observe(document.getElementById('content-inner'));
+                }
+            })();
+        `;
+        doc.head.append(script);
+
+        // 3. リセットスタイル：途切れを防止しつつ、100vhの連鎖を止める
+        const style = doc.createElement("style");
+        style.textContent = `
+            html, body { 
+                margin: 0; padding: 0; width: 100%; 
+                height: auto !important; /* 絶対に auto にして途切れを防止 */
+                min-height: 0 !important;
+                overflow: hidden; 
+            }
+            /* 計測用のラッパー */
+            #content-inner {
+                display: flow-root; /* float解除を自動化 */
+                width: 100%;
+                height: auto;
+            }
+            /* 100vh を使っている要素への対策：iframeの高さではなく親の想定サイズに寄せる */
+            header[style*="100vh"], section[style*="100vh"] {
+                height: 600px !important;
+            }
+        `;
+        doc.head.append(style);
+
+        // 4. ボディ全体を計測用divで包む
+        const innerWrapper = doc.createElement("div");
+        innerWrapper.id = "content-inner";
+        while (doc.body.firstChild) {
+            innerWrapper.appendChild(doc.body.firstChild);
+        }
+        doc.body.appendChild(innerWrapper);
+
+        return doc.documentElement.outerHTML;
+    }, [html, iframeId]);
+
+    return (
+        <div style={{ width: "100%", display: "block", position: "relative" }}>
+            <iframe
+                srcDoc={srcDoc}
+                sandbox="allow-scripts allow-popups"
+                scrolling="no"
+                style={{
+                    width: "100%",
+                    minWidth: "100%",
+                    height: height,
+                    border: "none",
+                    backgroundColor: "transparent",
+                    display: "block",
+                    transition: "none",
+                    overflow: "hidden"
+                }}
+                title="Secure Sandbox"
+            />
+        </div>
+    );
 }

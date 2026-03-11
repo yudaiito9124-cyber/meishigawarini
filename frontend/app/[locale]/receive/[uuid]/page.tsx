@@ -1547,11 +1547,11 @@ export default function ReceivePage() {
 
                             {/* 実際に表示する箇所 */}
                             {senderInfo ? (
-                                <div>
+                                <div className="w-full">
 
                                     {/* HTML Detail */}
                                     {senderInfo.detail_html && (
-                                        <div className="mt-0 mr-0 ml-0 p-0 shadow relative mb-10">
+                                        <div className="w-full mt-0 mr-0 ml-0 p-0 shadow relative mb-10">
                                             {/* Top fade effect */}
                                             <div className="absolute top-0 left-0 right-0 h-5 bg-gradient-to-b from-white to-transparent pointer-events-none z-10" />
                                             {/* content */}
@@ -1917,12 +1917,14 @@ export default function ReceivePage() {
                                 {t('shopinfo_description')}
                             </div>
                         </CardTitle>
-                        <CardContent className="min-h-0 flex flex-1 p-0">
-                            <div className="mt-0 mr-0 ml-0 p-0 shadow relative">
+                        <CardContent className="min-h-0 flex flex-1 p-0 w-full"> {/* w-fullを追加 */}
+                            <div className="w-full mt-0 mr-0 ml-0 p-0 shadow relative"> {/* w-fullを追加 */}
                                 {/* Top fade effect */}
                                 <div className="absolute top-0 left-0 right-0 h-5 bg-gradient-to-b from-white to-transparent pointer-events-none z-10" />
-                                {/* content */}
+
+                                {/* コンテンツ */}
                                 <SandboxedHtml html={gift.shop_detail_html} />
+
                                 {/* Bottom fade effect */}
                                 <div className="absolute bottom-0 left-0 right-0 h-5 bg-gradient-to-t from-white to-transparent pointer-events-none z-10" />
                             </div>
