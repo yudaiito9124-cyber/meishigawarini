@@ -60,3 +60,38 @@ export async function deleteFileFromS3(bucket: string, key: string): Promise<voi
     });
     await s3Client.send(command);
 }
+
+/**
+ * Finds S3 URLs in HTML and replaces them with signed URLs.
+ */
+export async function signUrlsInHtml(html: string | undefined, bucketName: string): Promise<string | undefined> {
+    if (!html) return html;
+
+    // Regex to match our S3 URLs (without query params)
+    // Matches: https://{bucket}.s3.{region}.amazonaws.com/{key}
+    const s3UrlPattern = new RegExp(`https://${bucketName}\\.s3\\.[a-z0-9-]+\\.amazonaws\\.com/[^"\\s<>]+`, 'g');
+
+    const matches = html.match(s3UrlPattern);
+    if (!matches) return html;
+
+    let signedHtml = html;
+    // Use a Map to avoid re-signing the same URL multiple times
+    const urlMap = new Map<string, string>();
+
+    for (const url of matches) {
+        if (!urlMap.has(url)) {
+            const signedUrl = await signUrlIfS3(url, bucketName);
+            if (signedUrl) {
+                urlMap.set(url, signedUrl);
+            }
+        }
+    }
+
+    // Replace all occurrences
+    for (const [original, signed] of urlMap.entries()) {
+        // Simple string replacement is fine here as we matched exactly
+        signedHtml = signedHtml.split(original).join(signed);
+    }
+
+    return signedHtml;
+}

@@ -384,7 +384,10 @@
                 "Service_Eight": "Eight",
                 "exchange_date": "名刺交換日",
                 "others": "その他 (例: 誕生日、血液型)",
-                "detail_html": "詳細(HTML)"
+                "addhtmlmessage": "HTML形式のメッセージを追加",
+                "detail_html": "HTMLソースコード",
+                "detail_html-images": "HTML用画像",
+                "detail_html-addimage": "画像を追加"
             }
         },
         "shopinfo": "ショップのご紹介",

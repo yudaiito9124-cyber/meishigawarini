@@ -4,7 +4,7 @@ import { DynamoDBDocumentClient, GetCommand, UpdateCommand } from '@aws-sdk/lib-
 import { CognitoIdentityProviderClient, AdminGetUserCommand } from '@aws-sdk/client-cognito-identity-provider';
 import * as bcrypt from 'bcryptjs';
 import { isLocked, getRateLimitUpdate, getResetRateLimitUpdate } from './utils/rate-limit';
-import { signUrlIfS3 } from './utils/s3';
+import { signUrlIfS3, signUrlsInHtml } from './utils/s3';
 
 const client = new DynamoDBClient({});
 const ddb = DynamoDBDocumentClient.from(client, {
@@ -149,6 +149,9 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             if (product && product.image_url) {
                 product.image_url = await signUrlIfS3(product.image_url, BUCKET_NAME);
             }
+            if (product && product.detail_html) {
+                product.detail_html = await signUrlsInHtml(product.detail_html, BUCKET_NAME);
+            }
         }
 
         // Fetch Shop Metadata for Email
@@ -164,7 +167,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             if (shopRes.Item) {
                 shop_email = shopRes.Item.email;
                 shop_name = shopRes.Item.name;
-                shop_detail_html = shopRes.Item.detail_html;
+                shop_detail_html = await signUrlsInHtml(shopRes.Item.detail_html, BUCKET_NAME);
                 owner_id = shopRes.Item.owner_id;
             }
 

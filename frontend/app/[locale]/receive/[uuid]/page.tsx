@@ -13,7 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card";
 import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { MessageCircleQuestion, Paperclip, X, FileText, File as FileIcon, Loader2, SendHorizontal, Pencil, UserPlus, Globe, Gift, User, MessagesSquare, Heart, Sparkles, Calendar, Clock, ShoppingBasket } from "lucide-react";
+import { MessageCircleQuestion, Paperclip, X, FileText, File as FileIcon, Loader2, SendHorizontal, Pencil, UserPlus, Globe, Gift, User, MessagesSquare, Heart, Sparkles, Calendar, Clock, ShoppingBasket, Plus, Copy, Trash2, ChevronDown, ImageIcon } from "lucide-react";
 import { SiFacebook, SiInstagram, SiThreads, SiX, SiYoutube, SiLine, SiTiktok, SiLinktree, SiEight } from "@icons-pack/react-simple-icons";
 import SandboxedHtml from "@/components/SandboxedHtml";
 import { cn } from "@/lib/utils";
@@ -270,7 +270,12 @@ export default function ReceivePage() {
         Service_Eight: "",
         Service_Linktree: "",
         detail_html: "",
+        card_image_url: "",
+        card_image_name: "",
+        html_image_urls: [] as string[]
     });
+    const [htmlImageUrls, setHtmlImageUrls] = useState<string[]>([]);
+    const [showDetailHtmlSection, setShowDetailHtmlSection] = useState(false);
 
     const updateSenderForm = (field: string, value: string) => {
         setSenderForm(prev => ({ ...prev, [field]: value }));
@@ -408,6 +413,7 @@ export default function ReceivePage() {
             setTotalSizeInfo(data.total_size_bytes || 0);
             setSenderInfo(data.sender_info || null);
             if (data.sender_info) {
+                setHtmlImageUrls(data.sender_info.html_image_urls || []);
                 // Sanitize: Convert null values to empty strings to avoid React warning
                 const sanitizedInfo = { ...data.sender_info };
                 Object.keys(sanitizedInfo).forEach(key => {
@@ -513,6 +519,48 @@ export default function ReceivePage() {
             setIsEditingSender(false);
         } catch (e: any) {
             alert("Failed to update sender info: " + e.message);
+        } finally {
+            setSenderInfoLoading(false);
+        }
+    };
+
+    const handleHtmlImageUpload = async (file: File) => {
+        if (!uuid || !pin) return;
+        setSenderInfoLoading(true);
+        try {
+            const res = await fetch(`${NEXT_PUBLIC_API_URL}/recipient/qrcodes/${uuid}/upload-url?pin=${pin}&filename=${encodeURIComponent(file.name)}&contentType=${encodeURIComponent(file.type)}&fileSize=${file.size}&folder=sendercontent`);
+            if (!res.ok) throw new Error('Failed to get upload URL');
+            const { uploadUrl, publicUrl } = await res.json();
+
+            const s3Res = await fetch(uploadUrl, {
+                method: 'PUT',
+                headers: { 'Content-Type': file.type },
+                body: file
+            });
+            if (!s3Res.ok) throw new Error('Failed to upload to S3');
+
+            const strippedUrl = publicUrl.split('?')[0];
+            const newUrlsForState = [...htmlImageUrls, publicUrl]; // Use signed URL for immediate preview
+            const newUrlsForBackend = [...(senderForm.html_image_urls || []), strippedUrl];
+
+            setHtmlImageUrls(newUrlsForState);
+
+            const newSenderInfo = { ...senderForm, html_image_urls: newUrlsForBackend };
+            await fetch(`${NEXT_PUBLIC_API_URL}/recipient/qrcodes/${uuid}/chat`, {
+                method: 'POST',
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    type: 'update_sender_info',
+                    pin,
+                    sender_info: newSenderInfo
+                })
+            });
+            // Update local senderInfo with clean URLs for next save, but UI uses htmlImageUrls for display
+            setSenderInfo(newSenderInfo);
+            setSenderForm(newSenderInfo);
+        } catch (e) {
+            console.error(e);
+            alert("Upload failed");
         } finally {
             setSenderInfoLoading(false);
         }
@@ -1269,11 +1317,16 @@ export default function ReceivePage() {
                                         <p className="text-[10px] text-gray-400 text-center italic">
                                             {t('senderInfo.notice')}
                                         </p>
+
+
+
+
+
                                     </div>
 
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t pt-6">
                                         {Object.keys(senderForm).map((field) => (
-                                            field !== 'card_image_url' && field !== 'card_image_name' && field !== 'ts_updated_at' && (
+                                            field !== 'card_image_url' && field !== 'card_image_name' && field !== 'ts_updated_at' && field !== `html_image_urls` && field !== `detail_html` && (
                                                 <div key={field} className={cn("space-y-1.5", (field === 'memo' || field === 'address' || field === 'detail_html') && "md:col-span-2")}>
                                                     <Label htmlFor={`sender-${field}`} className="text-xs font-bold text-gray-600 flex items-center gap-1">
                                                         {field === "SNS_X" ? <SiX size={14} color="default" /> :
@@ -1290,7 +1343,7 @@ export default function ReceivePage() {
                                                         }
                                                         {t(`senderInfo.labels.${field}`)}
                                                     </Label>
-                                                    {field === 'memo' || field === 'address' || field === 'detail_html' ? (
+                                                    {field === 'memo' || field === 'address' ? (
                                                         <Textarea
                                                             id={`sender-${field}`}
                                                             value={(senderForm as any)[field] || ""}
@@ -1313,7 +1366,128 @@ export default function ReceivePage() {
                                                 </div>
                                             )
                                         ))}
-                                        <div className="md:col-span-2 pt-2 flex flex-col gap-2">
+
+                                        <div className="md:col-span-2 mt-4 flex justify-center pb-0">
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="sm"
+                                                className="text-xs text-gray-500 hover:text-blue-600 gap-2 px-4 h-8"
+                                                onClick={() => setShowDetailHtmlSection(!showDetailHtmlSection)}
+                                            >
+                                                <Plus className={cn("w-3.5 h-3.5 transition-transform duration-200", showDetailHtmlSection && "rotate-180")} />
+                                                {t(`senderInfo.labels.addhtmlmessage`)}
+                                            </Button>
+                                        </div>
+
+                                        {showDetailHtmlSection && (
+                                            <div className="md:col-span-2 flex flex-col px-6 space-y-4 p-2 pt-0 border rounded-xl shadow">
+                                                <div className="mt-3" >
+                                                    <Label htmlFor={`sender-detail_html`} className="text-xs font-bold text-gray-600 flex items-center gap-1 pb-1">
+                                                        {t(`senderInfo.labels.detail_html`)}
+                                                    </Label>
+                                                    <Textarea
+                                                        id={`sender-detail_html`}
+                                                        value={(senderForm as any)["detail_html"] || ""}
+                                                        onChange={(e) => updateSenderForm("detail_html", e.target.value)}
+                                                        disabled={senderInfoLoading}
+                                                        className="min-h-[80px] text-sm"
+                                                        placeholder={t(`senderInfo.labels.detail_html`)}
+                                                    />
+                                                </div>
+
+
+                                                {/* HTML Images Section */}
+                                                <div className="md:col-span-2 flex flex-col mt-2 px-6 space-y-1 p-0 pr-0 pl-0">
+                                                    <div className="flex items-center justify-between">
+                                                        <span className="text-xs font-bold text-gray-500 uppercase tracking-wider flex items-center gap-2">
+                                                            <ImageIcon className="w-3 h-3 text-blue-500" />
+                                                            {t(`senderInfo.labels.detail_html-images`)}
+                                                        </span>
+                                                        <Button
+                                                            variant="outline"
+                                                            size="sm"
+                                                            className="h-7 text-[10px] gap-1 px-2 border-dashed bg-blue-50/50 hover:bg-blue-50 text-blue-600 border-blue-200"
+                                                            onClick={() => (document.getElementById('htmlImageUpload') as HTMLInputElement)?.click()}
+                                                        >
+                                                            <Plus className="w-3 h-3" />
+                                                            {t(`senderInfo.labels.detail_html-addimage`)}
+                                                        </Button>
+                                                    </div>
+                                                    <div className="space-y-2">
+                                                        {htmlImageUrls.length === 0 ? (
+                                                            <p className="text-[10px] text-gray-400 italic font-medium py-2">アップロードされた画像はありません。HTML内で使用する画像をここに追加できます。</p>
+                                                        ) : (
+                                                            <div className="grid grid-cols-1 gap-2">
+                                                                {htmlImageUrls.map((url, idx) => (
+                                                                    <div key={idx} className="flex items-center gap-3 p-2 bg-gray-50 rounded-md border border-gray-100 group hover:border-blue-200 transition-colors">
+                                                                        <div className="w-10 h-10 rounded-md border bg-white overflow-hidden shrink-0 shadow-sm ring-1 ring-black/5">
+                                                                            <img src={url} alt="HTML Asset" className="w-full h-full object-cover" onError={(e) => { (e.target as any).src = 'https://placehold.co/100x100?text=Error'; }} />
+                                                                        </div>
+                                                                        <div className="flex-1 min-w-0">
+                                                                            <p className="text-[10px] font-mono text-gray-400 truncate select-all">{url}</p>
+                                                                        </div>
+                                                                        <div className="flex items-center gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
+                                                                            <Button
+                                                                                variant="ghost"
+                                                                                size="icon"
+                                                                                className="h-8 w-8 text-gray-400 hover:text-blue-600 hover:bg-blue-50"
+                                                                                onClick={() => {
+                                                                                    navigator.clipboard.writeText(url);
+                                                                                    alert("URLをコピーしました");
+                                                                                }}
+                                                                            >
+                                                                                <Copy className="w-3.5 h-3.5" />
+                                                                            </Button>
+                                                                            <Button
+                                                                                variant="ghost"
+                                                                                size="icon"
+                                                                                className="h-8 w-8 text-gray-400 hover:text-red-600 hover:bg-red-50"
+                                                                                onClick={() => {
+                                                                                    if (!confirm("この画像を削除しますか？")) return;
+                                                                                    const next = htmlImageUrls.filter((_, i) => i !== idx);
+                                                                                    setHtmlImageUrls(next);
+                                                                                    const newSenderInfo = { ...senderForm, html_image_urls: next };
+                                                                                    fetch(`${NEXT_PUBLIC_API_URL}/recipient/qrcodes/${uuid}/chat`, {
+                                                                                        method: 'POST',
+                                                                                        headers: { "Content-Type": "application/json" },
+                                                                                        body: JSON.stringify({ type: 'update_sender_info', pin, sender_info: newSenderInfo })
+                                                                                    });
+                                                                                    setSenderInfo(newSenderInfo);
+                                                                                    setSenderForm(newSenderInfo);
+                                                                                }}
+                                                                            >
+                                                                                <Trash2 className="w-3.5 h-3.5" />
+                                                                            </Button>
+                                                                        </div>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                    <div className="bg-blue-50/50 p-2.5 rounded-lg border border-blue-100/50">
+                                                        <p className="text-[9px] text-blue-700 leading-relaxed font-medium">
+                                                            <span className="inline-block px-1 bg-blue-100 rounded mr-1 text-blue-800">使い方</span>
+                                                            コピーしたURLを詳細HTML内の <code>&lt;img src="..."&gt;</code> に貼り付けてください。実行時に自動的に署名付きURLへ置換され、画像が表示されます。
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                                <input
+                                                    type="file"
+                                                    id="htmlImageUpload"
+                                                    className="hidden"
+                                                    accept="image/*"
+                                                    onChange={(e) => {
+                                                        const file = e.target.files?.[0];
+                                                        if (file) handleHtmlImageUpload(file);
+                                                        e.target.value = "";
+                                                    }}
+                                                />
+                                            </div>
+                                        )}
+
+
+                                        <div className="md:col-span-2 flex flex-col gap-2 pt-5 ">
                                             <Button
                                                 onClick={() => handleSenderInfoUpdate()}
                                                 disabled={senderInfoLoading}
@@ -1334,7 +1508,7 @@ export default function ReceivePage() {
                                         </div>
                                     </div>
                                     <div className="mt-20 border-b" />
-                                    <Label className="w-full flex flex-col text-center text-xl border border-blue-100 bg-blue-200 rounded-xl">{t('senderInfo.preview')}</Label>
+                                    <Label className="w-full flex flex-col text-center text-xl border border-blue-100 border-3 border-dashed rounded-xl">{t('senderInfo.preview')}</Label>
                                 </div>
                             ) : ""}
 
@@ -1387,6 +1561,8 @@ export default function ReceivePage() {
                                                 field !== 'ts_updated_at' &&
                                                 field !== 'name' &&
                                                 field !== 'detail_html' &&
+                                                field !== 'html_image_urls' &&
+                                                typeof value === 'string' &&
                                                 !field.startsWith("SNS_") &&
                                                 !field.startsWith("Service_") && (
                                                     <div key={field} className={cn("flex flex-col border-b border-gray-50 pb-2", (field === 'memo' || field === 'address') && "sm:col-span-2")}>
@@ -1399,6 +1575,8 @@ export default function ReceivePage() {
                                                     </div>
                                                 ))}
                                         </div>
+
+
                                         {/* LINK(SNS/Webサービスリンク) */}
                                         {!EmptySenderInfoWithLinks(senderInfo) && (
                                             <div className="gap-1 ml-6 mr-6">
@@ -1413,8 +1591,10 @@ export default function ReceivePage() {
                                                             size="sm"
                                                             className="h-8 gap-2 bg-white hover:bg-gray-50 border-gray-200 text-gray-700 relative group"
                                                             onClick={() => {
-                                                                const url = value.startsWith('http') ? value : `https://${value}`;
-                                                                window.open(url, '_blank', 'noopener,noreferrer');
+                                                                if (typeof value === 'string') {
+                                                                    const url = value.startsWith('http') ? value : `https://${value}`;
+                                                                    window.open(url, '_blank', 'noopener,noreferrer');
+                                                                }
                                                             }}
                                                         >
                                                             {field === "SNS_X" ? <SiX size={14} color="default" /> :
@@ -1452,6 +1632,7 @@ export default function ReceivePage() {
                                             e.target.value = "";
                                         }}
                                     />
+
 
                                     {senderInfoLoading && (
                                         <div className="absolute inset-0 bg-white/60 backdrop-blur-[1px] flex items-center justify-center z-10 transition-all">

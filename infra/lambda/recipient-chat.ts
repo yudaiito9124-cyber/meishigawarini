@@ -5,7 +5,7 @@ import { DynamoDBDocumentClient, GetCommand, UpdateCommand } from '@aws-sdk/lib-
 import { createMessageNotificationEmail } from './templates/email';
 import { sendEmail } from './utils/email-client';
 import { isLocked, getRateLimitUpdate, getResetRateLimitUpdate } from './utils/rate-limit';
-import { signUrlIfS3, stripSignature, deleteFileFromS3 } from './utils/s3';
+import { signUrlIfS3, stripSignature, deleteFileFromS3, signUrlsInHtml } from './utils/s3';
 
 import * as crypto from 'crypto';
 
@@ -137,7 +137,8 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                     ExpressionAttributeValues: {
                         ':info': {
                             ...sender_info,
-                            card_image_url: stripSignature(sender_info.card_image_url)
+                            card_image_url: stripSignature(sender_info.card_image_url),
+                            html_image_urls: (sender_info.html_image_urls || []).map((url: string) => stripSignature(url))
                         }
                     },
                     ReturnValues: 'ALL_OLD'
@@ -156,6 +157,23 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                         console.log("Deleted old sender image from S3:", oldKey);
                     } catch (e) {
                         console.error("Failed to delete old image from S3:", e);
+                    }
+                }
+
+                // Delete removed HTML images from S3
+                const oldHtmlImageUrls = oldSenderInfo?.html_image_urls || [];
+                const newHtmlImageUrls = (sender_info.html_image_urls || []).map((url: string) => stripSignature(url));
+
+                for (const oldUrl of oldHtmlImageUrls) {
+                    if (!newHtmlImageUrls.includes(oldUrl) && oldUrl.includes(BUCKET_NAME)) {
+                        try {
+                            const urlObj = new URL(oldUrl);
+                            const oldKey = decodeURIComponent(urlObj.pathname.substring(1));
+                            await deleteFileFromS3(BUCKET_NAME, oldKey);
+                            console.log("Deleted removed HTML image from S3:", oldKey);
+                        } catch (e) {
+                            console.error("Failed to delete removed HTML image from S3:", e);
+                        }
                     }
                 }
 
@@ -323,8 +341,18 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             }
 
             // Sign URL for sender info
-            if (sender_info && sender_info.card_image_url) {
-                sender_info.card_image_url = await signUrlIfS3(sender_info.card_image_url, BUCKET_NAME);
+            if (sender_info) {
+                if (sender_info.card_image_url) {
+                    sender_info.card_image_url = await signUrlIfS3(sender_info.card_image_url, BUCKET_NAME);
+                }
+                if (sender_info.detail_html) {
+                    sender_info.detail_html = await signUrlsInHtml(sender_info.detail_html, BUCKET_NAME);
+                }
+                if (sender_info.html_image_urls && Array.isArray(sender_info.html_image_urls)) {
+                    sender_info.html_image_urls = await Promise.all(
+                        sender_info.html_image_urls.map((url: string) => signUrlIfS3(url, BUCKET_NAME))
+                    );
+                }
             }
 
             return {

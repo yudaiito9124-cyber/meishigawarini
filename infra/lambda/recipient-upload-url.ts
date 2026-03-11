@@ -46,6 +46,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         const fileSize = parseInt(fileSizeStr);
 
         const filename = event.queryStringParameters?.filename || 'unnamed';
+        const folder = event.queryStringParameters?.folder || '';
 
         // 1. Verify PIN and Check Capacity
         const getMeta = await ddb.send(new GetCommand({
@@ -78,12 +79,16 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             };
         }
 
-        // 3. Generate Naming Convention: chat/{uuid}/{YYYYMMDD-HHMMSS}_{hash}.{ext}
+        // 3. Generate Naming Convention
         const now = new Date();
         const dateStr = now.toISOString().replace(/[:T]/g, '-').split('.')[0].replace(/-/g, '').slice(0, 8) + '-' + now.toISOString().split('T')[1].split('.')[0].replace(/:/g, '');
         const hash = crypto.randomBytes(4).toString('hex');
         const ext = filename.split('.').pop() || 'bin';
-        const key = `qrcode/${uuid}/${dateStr}_${hash}.${ext}`;
+        
+        // Use folder if provided (e.g., sendercontent), otherwise default to UUID folder
+        const key = folder 
+            ? `qrcode/${uuid}/${folder}/${dateStr}_${hash}.${ext}`
+            : `qrcode/${uuid}/${dateStr}_${hash}.${ext}`;
 
         const command = new PutObjectCommand({
             Bucket: BUCKET_NAME,

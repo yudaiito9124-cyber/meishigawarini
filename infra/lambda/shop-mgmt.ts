@@ -4,7 +4,7 @@ import { DynamoDBDocumentClient, PutCommand, QueryCommand, GetCommand, UpdateCom
 import { S3Client, PutObjectCommand, CopyObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import * as crypto from 'crypto';
-import { signUrlIfS3, stripSignature } from './utils/s3';
+import { signUrlIfS3, stripSignature, signUrlsInHtml } from './utils/s3';
 
 const client = new DynamoDBClient({});
 const ddb = DynamoDBDocumentClient.from(client);
@@ -106,7 +106,11 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 
         // 2. Get Shop Details (GET /shop/{shopId})
         if (method === 'GET' && (path.endsWith(`/shop/${shopId}`) || path.endsWith(`/shop/${shopId}/`))) {
-            return { statusCode: 200, headers: corsHeaders, body: JSON.stringify(shopMetadata) };
+            const result = { ...shopMetadata };
+            if (result.detail_html) {
+                result.detail_html = await signUrlsInHtml(result.detail_html, BUCKET_NAME);
+            }
+            return { statusCode: 200, headers: corsHeaders, body: JSON.stringify(result) };
         }
 
         // 2.5 Update Shop Details (PATCH /shop/{shopId})
@@ -316,10 +320,13 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 product_id: item.SK.replace('PRODUCT#', '')
             })) as any[];
 
-            // Sign image URLs
+            // Sign image URLs and HTML
             for (const item of items) {
                 if (item.image_url) {
                     item.image_url = await signUrlIfS3(item.image_url, BUCKET_NAME);
+                }
+                if (item.detail_html) {
+                    item.detail_html = await signUrlsInHtml(item.detail_html, BUCKET_NAME);
                 }
             }
 
