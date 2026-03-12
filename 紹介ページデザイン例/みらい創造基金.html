@@ -1,0 +1,137 @@
+<style>
+    /* 1. リセット & ベース */
+    .fund-standard-root, .fund-standard-root * {
+        box-sizing: border-box !important;
+        margin: 0;
+        padding: 0;
+    }
+
+    /* 2. ページ全体の背景：ご要望の薄緑色に設定 */
+    .fund-standard-wrapper {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        width: 100%;
+        min-height: 100vh; /* 画面全体の高さを確保 */
+        background-color: #f0f7f4; /* サイトの緑に合わせた、目に優しい薄緑 */
+        padding: 40px 20px;
+        font-family: "Helvetica Neue", Arial, "Hiragino Kaku Gothic ProN", "Hiragino Sans", sans-serif;
+    }
+
+    /* 3. カード本体：白背景で視認性を確保 */
+    .f-card-main {
+        width: 100%;
+        max-width: 500px;
+        background: #ffffff;
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 10px 30px rgba(0, 169, 104, 0.08); /* 緑がかった柔らかな影 */
+        border: 1px solid rgba(0, 169, 104, 0.1);
+        height: auto;
+    }
+
+    /* 4. 公式バナー画像 */
+    .f-header-img {
+        width: 100%;
+        height: auto;
+        display: block;
+    }
+
+    /* 5. コンテンツエリア */
+    .f-body-content {
+        padding: 30px;
+        text-align: left;
+    }
+
+    .f-title-main {
+        font-size: 22px;
+        color: #00a968;
+        font-weight: 800;
+        margin-bottom: 15px;
+        line-height: 1.3;
+    }
+
+    .f-intro-text {
+        font-size: 14px;
+        color: #333333;
+        line-height: 1.8;
+        margin-bottom: 25px;
+        text-align: justify;
+    }
+
+    /* 6. 事業一覧（2列グリッド） */
+    .f-grid-list {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+        margin-bottom: 30px;
+    }
+
+    .f-grid-item {
+        background: #ffffff;
+        border: 1px solid #e0eadd;
+        border-left: 4px solid #00a968;
+        padding: 10px;
+        font-size: 12px;
+        color: #2c3e50;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+    }
+
+    /* 7. 詳細リンクボタン */
+    .f-link-btn {
+        display: block;
+        width: 100%;
+        padding: 16px;
+        background-color: #00a968; /* ボタンは視認性のため塗りつぶしに */
+        color: #ffffff !important;
+        text-align: center;
+        text-decoration: none;
+        border-radius: 6px;
+        font-weight: 800;
+        font-size: 15px;
+        transition: background-color 0.2s;
+    }
+
+    .f-link-btn:hover {
+        background-color: #008f58;
+    }
+
+    .f-copy {
+        text-align: center;
+        font-size: 11px;
+        color: #8da094;
+        margin-top: 25px;
+    }
+</style>
+
+<div class="fund-standard-wrapper fund-standard-root">
+    <div class="f-card-main">
+        <img src="https://www.akita-u.ac.jp/honbu/images/main_cover_mirai02.jpg" alt="秋田大学みらい創造基金" class="f-header-img">
+
+        <div class="f-body-content">
+            <h1 class="f-title-main">秋田大学みらい創造基金</h1>
+            
+            <p class="f-intro-text">
+                秋田大学みらい創造基金は、学生の経済的支援など大学全体の活動を広く支援いただく「一般基金」と、各学部等が実施する事業を支援いただく「特定基金」で構成しており、企業・団体や個人の皆様等多くの方々から御支援をいただいております。
+            </p>
+
+            <div class="f-grid-list">
+                <div class="f-grid-item">一般基金</div>
+                <div class="f-grid-item">特定基金</div>
+                <div class="f-grid-item">遠隔医療推進事業寄附金</div>
+                <div class="f-grid-item">ウクライナ支援事業寄附金</div>
+                <div class="f-grid-item">附属小150周年事業寄附金</div>
+                <div class="f-grid-item">鉱業博物館整備事業寄附金</div>
+                <div class="f-grid-item">返礼品付き寄附</div>
+            </div>
+
+            <a href="https://www.akita-u.ac.jp/honbu/ed_fund/index.html" target="_blank" class="f-link-btn">
+                事業内容を詳しく見る
+            </a>
+
+            <div class="f-copy">国立大学法人 秋田大学</div>
+        </div>
+    </div>
+</div>

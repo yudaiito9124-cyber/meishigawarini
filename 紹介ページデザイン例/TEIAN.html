@@ -1,0 +1,173 @@
+<style>
+    /* 1. リセット & 埋め込み環境への干渉防止 */
+    .teian-video-root, .teian-video-root * {
+        box-sizing: border-box !important;
+        margin: 0;
+        padding: 0;
+    }
+
+    /* 2. 背景：薄緑色 */
+    .teian-video-wrapper {
+        width: 100%;
+        display: flex;
+        justify-content: center;
+        background-color: #02000f; 
+        padding: 60px 20px;
+        font-family: "Shippori Mincho", "Hiragino Mincho ProN", serif;
+        -webkit-font-smoothing: antialiased;
+    }
+
+    /* 3. メインパネル：動画追加に伴い高さを 1650px に固定 */
+    .tv-box {
+        width: 580px;
+        height: 1300px; /* 固定値 */
+        background: #ffffff;
+        box-shadow: 0 10px 40px rgba(0,0,0,0.03);
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+    }
+
+    /* 4. トップビジュアル */
+    .tv-hero {
+        width: 100%;
+        height: 400px;
+        overflow: hidden;
+    }
+
+    .tv-hero img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    /* 5. コンテンツエリア */
+    .tv-content {
+        padding: 80px 50px;
+        text-align: center;
+        flex-grow: 1;
+    }
+
+    .tv-logo {
+        font-size: 30px;
+        letter-spacing: 0.5em;
+        margin-left: 0.5em;
+        color: #1a1a1a;
+        margin-bottom: 70px;
+        display: block;
+    }
+
+    /* メッセージ構成 */
+    .tv-headline {
+        font-size: 19px;
+        font-weight: 600;
+        line-height: 2.2;
+        color: #1a1a1a;
+        margin-bottom: 45px;
+        letter-spacing: 0.15em;
+    }
+
+    .tv-body-small {
+        font-size: 12px;
+        line-height: 2.8;
+        color: #555555;
+        letter-spacing: 0.1em;
+        margin-bottom: 80px;
+    }
+
+    /* 6. YouTube 埋め込みセクション */
+    .tv-video-container {
+        width: 100%;
+        margin-bottom: 80px;
+        background: #000;
+        line-height: 0; /* 下部の隙間排除 */
+        position: relative;
+        padding-top: 56.25%; /* 16:9 のアスペクト比維持 */
+    }
+
+    .tv-video-container iframe {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        border: none;
+    }
+
+    /* アワード画像 */
+    .tv-award {
+        width: 120px;
+        height: 120px;
+        margin: 0 auto 60px;
+    }
+
+    .tv-award img {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+    }
+
+    /* 7. フッター */
+    .tv-footer {
+        padding-bottom: 70px;
+    }
+
+    .tv-btn {
+        display: inline-block;
+        padding: 16px 50px;
+        border: 1px solid #1a1a1a;
+        color: #1a1a1a !important;
+        text-decoration: none;
+        font-size: 11px;
+        letter-spacing: 0.3em;
+        transition: 0.4s;
+    }
+
+    .tv-btn:hover {
+        background: #1a1a1a;
+        color: #ffffff !important;
+    }
+
+    .tv-copy {
+        margin-top: 40px;
+        font-size: 9px;
+        color: #aaa;
+        letter-spacing: 0.15em;
+    }
+</style>
+
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho&display=swap" rel="stylesheet">
+
+<div class="teian-video-wrapper teian-video-root">
+    <div class="tv-box">
+        <div class="tv-hero">
+            <img src="" alt="TEIAN Visual">
+        </div>
+
+        <div class="tv-content">
+            <span class="tv-logo">TEIAN</span>
+
+            <h2 class="tv-headline">
+                高品質の秋田県産米にて<br>
+                贈り物に喜ばれる秋田米菓を追求する
+            </h2>
+
+            <p class="tv-body-small">
+                日本を代表する米の名産地秋田から厳選した<br>
+                秋田県産あきたこまち一等米でつくる手焼きせんべいを<br>
+                発酵文化豊かな秋田の味噌醤油で味付けし<br>
+                秋田に生まれ育った私たちだからご提供できる唯一無二の米菓子を<br>
+                秋田の地より心を込めてお届けします。
+            </p>
+
+            <div class="tv-award">
+                <img src="" alt="Gold Award">
+            </div>
+
+            <div class="tv-footer">
+                <a href="https://teian-akita.com/" target="_blank" class="tv-btn">ABOUT BRAND</a>
+                <p class="tv-copy">© KANAEYA / TEIAN ALL RIGHTS RESERVED.</p>
+            </div>
+        </div>
+    </div>
+</div>

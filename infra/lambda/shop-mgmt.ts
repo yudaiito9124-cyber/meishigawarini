@@ -1,6 +1,6 @@
 import { APIGatewayProxyHandler } from 'aws-lambda';
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
-import { DynamoDBDocumentClient, PutCommand, QueryCommand, GetCommand, UpdateCommand, DeleteCommand } from '@aws-sdk/lib-dynamodb';
+import { DynamoDBDocumentClient, PutCommand, QueryCommand, GetCommand, UpdateCommand, DeleteCommand, BatchGetCommand } from '@aws-sdk/lib-dynamodb';
 import { S3Client, PutObjectCommand, CopyObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import * as crypto from 'crypto';
@@ -81,16 +81,101 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 
         // 2. List My Shops (GET /shop)
         if (method === 'GET' && path.endsWith('/shop') && !shopId) {
-            const res = await ddb.send(new QueryCommand({
+            // Check for Role Record
+            let roleRes = await ddb.send(new GetCommand({
                 TableName: TABLE_NAME,
-                IndexName: 'GSI2',
-                KeyConditionExpression: 'GSI2_PK = :uid',
-                ExpressionAttributeValues: {
-                    ':uid': `USER#${userId}`
-                }
+                Key: { PK: `USER#${userId}`, SK: 'SHOP_MANAGER' }
             }));
+            let role = 'SHOP_MANAGER';
+            
+            if (!roleRes.Item) {
+                roleRes = await ddb.send(new GetCommand({
+                    TableName: TABLE_NAME,
+                    Key: { PK: `USER#${userId}`, SK: 'GENERAL_MANAGER' }
+                }));
+                if (roleRes.Item) role = 'GENERAL_MANAGER';
+            }
 
-            return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ shops: res.Items }) };
+            let shops: any[] = [];
+
+            if (roleRes.Item) {
+                // Role exists, fetch shops
+                const targetIds = role === 'SHOP_MANAGER' 
+                    ? [roleRes.Item.shop_id] 
+                    : (roleRes.Item.shop_ids || []);
+
+                if (targetIds.length > 0) {
+                    const keys = targetIds.map((id: string) => ({ PK: `SHOP#${id}`, SK: 'METADATA' }));
+                    const batchRes = await ddb.send(new BatchGetCommand({
+                        RequestItems: {
+                            [TABLE_NAME]: { Keys: keys }
+                        }
+                    }));
+                    shops = batchRes.Responses?.[TABLE_NAME] || [];
+                }
+            } else {
+                // Legacy Fallback / No Role
+                const res = await ddb.send(new QueryCommand({
+                    TableName: TABLE_NAME,
+                    IndexName: 'GSI2',
+                    KeyConditionExpression: 'GSI2_PK = :uid',
+                    ExpressionAttributeValues: { ':uid': `USER#${userId}` }
+                }));
+                shops = res.Items || [];
+
+                if (shops.length === 0) {
+                    // AUTO-CREATION LOGIC: No shops found at all
+                    console.log(`Auto-creating shop for new user ${userId}`);
+                    const newShopId = generateId();
+                    const now = new Date().toISOString();
+                    const email = claims?.email;
+
+                    // Create Shop Metadata
+                    await ddb.send(new PutCommand({
+                        TableName: TABLE_NAME,
+                        Item: {
+                            PK: `SHOP#${newShopId}`,
+                            SK: 'METADATA',
+                            name: "My Shop",
+                            email,
+                            owner_id: userId,
+                            GSI2_PK: `USER#${userId}`,
+                            GSI2_SK: now,
+                            ts_created_at: now
+                        }
+                    }));
+
+                    // Create Role Record
+                    await ddb.send(new PutCommand({
+                        TableName: TABLE_NAME,
+                        Item: {
+                            PK: `USER#${userId}`,
+                            SK: 'SHOP_MANAGER',
+                            shop_id: newShopId,
+                            ts_created_at: now
+                        }
+                    }));
+
+                    // Return the newly created shop
+                    shops = [{
+                        PK: `SHOP#${newShopId}`,
+                        SK: 'METADATA',
+                        name: "My Shop",
+                        ts_created_at: now
+                    }];
+                    role = 'SHOP_MANAGER';
+                } else {
+                    // Existing shops without role record (transition state)
+                    // We'll treat them as SHOP_MANAGER if 1 shop, otherwise GENERAL_MANAGER
+                    role = shops.length === 1 ? 'SHOP_MANAGER' : 'GENERAL_MANAGER';
+                }
+            }
+
+            return { 
+                statusCode: 200, 
+                headers: corsHeaders, 
+                body: JSON.stringify({ shops, role }) 
+            };
         }
 
 

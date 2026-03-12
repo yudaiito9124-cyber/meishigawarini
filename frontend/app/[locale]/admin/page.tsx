@@ -35,6 +35,8 @@ export default function AdminPage() {
     const [productId, setProductId] = useState("");
     const [generatedBatches, setGeneratedBatches] = useState<any[]>([]);
     const [isAuthorized, setIsAuthorized] = useState<boolean | null>(null); // null = loading
+    const [targetUserId, setTargetUserId] = useState("");
+    const [creatingUserShop, setCreatingUserShop] = useState(false);
 
 
     useEffect(() => {
@@ -119,8 +121,40 @@ export default function AdminPage() {
                 alert(errData?.message || t('batches.alerts.failed'));
             }
         } catch (e) {
-            console.error(e);
-            alert(t('batches.alerts.error'));
+            console.error("Generate failed", e);
+            alert("QR生成に失敗しました");
+        }
+    };
+
+    const handleCreateShopForUser = async () => {
+        if (!targetUserId) return;
+        setCreatingUserShop(true);
+        try {
+            const session = await fetchAuthSession();
+            const token = session.tokens?.idToken?.toString();
+
+            const res = await fetch(`${NEXT_PUBLIC_API_URL}/admin/users/shop`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${token}`
+                },
+                body: JSON.stringify({ user_id: targetUserId }),
+            });
+
+            if (res.ok) {
+                const data = await res.json();
+                alert(`ショップ作成に成功しました: ${data.shop_id}`);
+                setTargetUserId("");
+            } else {
+                const data = await res.json();
+                alert(`失敗しました: ${data.message}`);
+            }
+        } catch (e) {
+            console.error("Create user shop failed", e);
+            alert("ショップ作成中にエラーが発生しました");
+        } finally {
+            setCreatingUserShop(false);
         }
     };
 
@@ -337,16 +371,6 @@ export default function AdminPage() {
     return (
         <div className="min-h-screen bg-gray-50 p-8">
             <div className="max-w-4xl mx-auto space-y-6">
-                <h1 className="text-2xl font-bold">{t('title')}</h1>
-
-                <Card>
-                    <CardHeader>
-                        <CardTitle>{t('generate.title')}</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                        <div className="flex flex-col gap-4">
-                            <div className="grid w-full max-w-sm items-center gap-1.5">
-                                <label htmlFor="count" className="text-sm font-medium">{t('generate.quantity')}</label>
                                 <Input
                                     id="count"
                                     type="number"
