@@ -80,11 +80,30 @@ APIの設計上、攻撃者にバックエンドの仕組みを推測させな�
 
 ---
 
-## 7. 強固なパスワードポリシー (Cognito)
+## 7. 強固なパスワードポリシーと多要素認証 (Cognito)
 
 ショップオーナーや管理者が利用するアカウントは、AWSの世界標準レベルのセキュリティで保護されます。
 
 *   **場所**: `infra/lib/infra-stack.ts` (`MeishiGawariniUserPool` の定義部分)
     *   **パスワード強度**: 最低8文字以上、大文字、小文字、数字をすべて含むことを必須 (`require***: true`) としています。
-    *   **MFA (二段階認証)**: オプションとして、SMSや認証アプリによるMFAを有効化できる設計（`mfa: cognito.Mfa.OPTIONAL`）になっています。
+    *   **Cognito ティア**: WebAuthn（パスキー）対応を見据えて **Essentials** ティアを使用しています (`cfnUserPool.userPoolTier = 'ESSENTIALS'`)。
+    *   **MFA設定**: MFA自体はCognito上では `OPTIONAL` 設定ですが、**管理者グループ (`Administrators` / `GlobalAdmins`) のメンバーに対しては、Lambda Authorizer がMFA完了を必須チェックする**ため、実際にはMFAなしでは管理APIへアクセスできません。
 
+---
+
+## 8. 管理者専用のMFA強制 (Lambda Authorizer)
+
+管理APIは、Cognitoの通常認証に加えて、独自のLambda Authorizer (`infra/lambda/admin-authorizer.ts`) による二重チェックを行います。
+
+*   **仕組み**:
+    1.  JWTトークンを検証し、正規のCognitoユーザーであることを確認します。
+    2.  `cognito:groups` クレームをチェックし、`Administrators` または `GlobalAdmins` グループに属しているかを確認します（いずれにも属していない場合はDeny）。
+    3.  JWTの `amr` クレームをチェックし、TOTPなどのMFA要素で認証されたかを確認します。
+    4.  `amr` クレームが空の場合（パスキーログイン等の一部のフローで発生する既知の挙動）は、**Cognito API (`AdminGetUser`) を呼び出してユーザーのMFA設定を直接確認するフォールバック**を実行します。
+    5.  MFA未実施と判断された場合はDenyして管理APIへのアクセスをブロックし、フロントエンドはMFA設定ページ (`/mfa-setup`) へのリンクを表示します。
+
+*   **管理者グループ構造**:
+    *   **`Administrators`**: システム管理用のQRコード生成・管理ダッシュボード (`/admin`) にアクセスできるグループ。
+    *   **`GlobalAdmins`**: ショップ管理を横断的に行える権限を持つグループ。
+
+*   **ALLOW_USER_AUTH フロー**: Cognito User Pool Client には `ALLOW_USER_AUTH` フローを有効化しており (`cfnUserPoolClient.explicitAuthFlows`)、将来的な認証方式の拡張に対応できる構成になっています。

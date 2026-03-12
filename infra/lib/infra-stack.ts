@@ -69,10 +69,25 @@ export class InfraStack extends cdk.Stack {
       removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
 
+    // パスキー (WebAuthn) 対応のために Essentials ティアに設定
+    const cfnUserPool = userPool.node.defaultChild as cognito.CfnUserPool;
+    cfnUserPool.userPoolTier = 'ESSENTIALS';
+
     const userPoolClient = new cognito.UserPoolClient(this, 'MeishiGawariniUserPoolClient', {
       userPool,
       authFlows: { userSrp: true },
+      idTokenValidity: cdk.Duration.hours(1),       // IDトークン有効期限: 1時間
+      accessTokenValidity: cdk.Duration.hours(1),   // アクセストークン有効期限: 1時間
+      refreshTokenValidity: cdk.Duration.days(30),  // リフレッシュトークン有効期限: 30日
     });
+
+    // ALLOW_USER_AUTH を有効化 (パスキー / WebAuthn に必要)
+    const cfnUserPoolClient = userPoolClient.node.defaultChild as cognito.CfnUserPoolClient;
+    cfnUserPoolClient.explicitAuthFlows = [
+      'ALLOW_USER_SRP_AUTH',
+      'ALLOW_REFRESH_TOKEN_AUTH',
+      'ALLOW_USER_AUTH'
+    ];
 
     // Lambda Layer or Bundling
     const commonProps = {
@@ -265,11 +280,16 @@ export class InfraStack extends cdk.Stack {
     } as any);
 
 
-    // Create Administrators Group
     new cognito.CfnUserPoolGroup(this, 'AdministratorsGroup', {
       userPoolId: userPool.userPoolId,
       groupName: 'Administrators',
-      description: 'Admin users with access to dashboard',
+      description: 'System administrators with access to the admin dashboard',
+    });
+
+    new cognito.CfnUserPoolGroup(this, 'GlobalAdminsGroup', {
+      userPoolId: userPool.userPoolId,
+      groupName: 'GlobalAdmins',
+      description: 'Global administrators with cross-shop access and admin dashboard access',
     });
 
     // Shop Authorizer (Cognito) - Reused for Admin for now (Authenticated User)
@@ -283,20 +303,38 @@ export class InfraStack extends cdk.Stack {
       ...commonProps,
     });
 
+    // Admin Authorizer (Lambda) - Checks for 'Administrators' group
+    const adminAuthorizerFn = new nodejs.NodejsFunction(this, 'AdminAuthorizerFn', {
+      entry: path.join(__dirname, '../lambda/admin-authorizer.ts'),
+      environment: {
+        USER_POOL_ID: userPool.userPoolId,
+        CLIENT_ID: userPoolClient.userPoolClientId,
+      },
+    });
+
+    const adminAuthorizer = new apigateway.TokenAuthorizer(this, 'AdminAuthorizer', {
+      handler: adminAuthorizerFn,
+      resultsCacheTtl: cdk.Duration.minutes(5),
+    });
+
+    // Admin Authorizer Lambdaに AdminGetUser 権限を付与
+    adminAuthorizerFn.addToRolePolicy(new iam.PolicyStatement({
+      actions: ['cognito-idp:AdminGetUser'],
+      resources: [userPool.userPoolArn]
+    }));
+
     // Admin Routes
     const adminResource = api.root.addResource('admin');
     adminResource.addMethod('GET', new apigateway.LambdaIntegration(adminCheckFn), {
-      authorizer,
-      authorizationType: apigateway.AuthorizationType.COGNITO,
+      authorizer: adminAuthorizer,
     });
 
     const qrResource = adminResource.addResource('qrcodes');
     const generateResource = qrResource.addResource('generate');
 
-    // Protect Admin API with Cognito Auth
+    // Protect Admin API with Lambda Authorizer
     generateResource.addMethod('POST', new apigateway.LambdaIntegration(adminGenerateFn), {
-      authorizer,
-      authorizationType: apigateway.AuthorizationType.COGNITO
+      authorizer: adminAuthorizer,
     });
 
     // Lambda: Admin Update (NEW)
@@ -308,8 +346,7 @@ export class InfraStack extends cdk.Stack {
 
     // Admin List Route
     qrResource.addMethod('GET', new apigateway.LambdaIntegration(adminListFn), {
-      authorizer,
-      authorizationType: apigateway.AuthorizationType.COGNITO
+      authorizer: adminAuthorizer,
     });
 
     // Lambda: Admin Delete Banned
@@ -321,29 +358,26 @@ export class InfraStack extends cdk.Stack {
 
     const bannedResource = qrResource.addResource('banned');
     bannedResource.addMethod('DELETE', new apigateway.LambdaIntegration(adminDeleteBannedFn), {
-      authorizer,
-      authorizationType: apigateway.AuthorizationType.COGNITO
+      authorizer: adminAuthorizer,
     });
 
     // Admin QR Detail Routes
     const adminQrDetail = qrResource.addResource('{uuid}');
     const banResource = adminQrDetail.addResource('ban');
     banResource.addMethod('POST', new apigateway.LambdaIntegration(adminUpdateFn), {
-      authorizer,
-      authorizationType: apigateway.AuthorizationType.COGNITO
+      authorizer: adminAuthorizer,
     });
-
 
 
     //////////////////////////////////////
     // Shop Routes
 
     const shopResource = api.root.addResource('shop'); // shop
-    // shop POST #CreateShop
-    shopResource.addMethod('POST', new apigateway.LambdaIntegration(shopMgmtFn), {
-      authorizer,
-      authorizationType: apigateway.AuthorizationType.COGNITO
-    });
+    // // shop POST #CreateShop
+    // shopResource.addMethod('POST', new apigateway.LambdaIntegration(shopMgmtFn), {
+    //   authorizer,
+    //   authorizationType: apigateway.AuthorizationType.COGNITO
+    // });
     // shop GET #ListShops
     shopResource.addMethod('GET', new apigateway.LambdaIntegration(shopMgmtFn), {
       authorizer,

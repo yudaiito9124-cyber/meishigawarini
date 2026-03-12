@@ -49,7 +49,7 @@ export const resizeImage = (file: File, maxWidth: number = 1280): Promise<Blob> 
                 } else {
                     reject(new Error("Canvas to Blob conversion failed"));
                 }
-            }, file.type, 0.85); // 品質0.85でBlob化
+            }, "image/webp", 0.85); // Convert to WebP with 0.85 quality
         };
 
         img.onerror = (err) => {

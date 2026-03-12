@@ -4,6 +4,7 @@ import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, QueryCommand, BatchGetCommand, UpdateCommand, GetCommand } from '@aws-sdk/lib-dynamodb';
 import { createShippingNotificationEmail } from './templates/email';
 import { sendEmail } from './utils/email-client';
+import { checkShopOwnerOrGM } from './share/shop-auth';
 
 const client = new DynamoDBClient({});
 // const ses = new SESClient({}); // Removed SES for Resend
@@ -25,6 +26,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 
         const claims = event.requestContext?.authorizer?.claims;
         const userId = claims?.sub;
+        const userGroups = (claims?.['cognito:groups'] as string[]) || [];
         const shopId = event.pathParameters?.shopId;
 
         if (!userId || !shopId) {
@@ -32,12 +34,9 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         }
 
         // Verify Shop Ownership
-        const shopRes = await ddb.send(new GetCommand({
-            TableName: TABLE_NAME,
-            Key: { PK: `SHOP#${shopId}`, SK: 'METADATA' }
-        }));
+        const shopMetadata = await checkShopOwnerOrGM(ddb, TABLE_NAME, shopId, userId, event);
 
-        if (!shopRes.Item || shopRes.Item.owner_id !== userId) {
+        if (!shopMetadata) {
             return { statusCode: 401, headers: corsHeaders, body: 'Unauthorized' };
         }
         //////////// ここから下は 認証済みかつショップオーナーのみアクセス可能
@@ -155,25 +154,10 @@ async function handleListShopOrders(shopId: string, queryParams?: any) {
     }
 
     // 3. BatchGet to get details (ORDER sk)
-    // Construct keys for BatchGet
-    const keys = relevantItems.map(item => ({
-        PK: item.PK,
-        SK: 'ORDER'
-    }));
-
-    // Chunking not implemented for prototype (assume < 100)
-    // If keys > 100, we should slice
-    if (keys.length > 100) {
-        // quick fix for prototype safety
-        // keys.length = 100; 
-        // But better to process in chunks if we want to support it. 
-        // For now let's just warn or slice.
-        console.warn("More than 100 items, truncating BatchGet");
-        // We can't easily truncate 'relevantItems' parallel to 'keys' without slicing both.
-        // Let's slice relevantItems first.
-        relevantItems = relevantItems.slice(0, 100);
-        // Reform keys
-        const keysSliced = relevantItems.map(item => ({
+    const allOrderDetails: any[] = [];
+    for (let i = 0; i < relevantItems.length; i += 100) {
+        const chunk = relevantItems.slice(i, i + 100);
+        const keys = chunk.map(item => ({
             PK: item.PK,
             SK: 'ORDER'
         }));
@@ -181,29 +165,22 @@ async function handleListShopOrders(shopId: string, queryParams?: any) {
         const batchRes = await ddb.send(new BatchGetCommand({
             RequestItems: {
                 [TABLE_NAME]: {
-                    Keys: keysSliced
+                    Keys: keys
                 }
             }
         }));
 
-        // ... process responses ...
-        return processBatchResponses(batchRes, relevantItems);
+        if (batchRes.Responses?.[TABLE_NAME]) {
+            allOrderDetails.push(...batchRes.Responses[TABLE_NAME]);
+        }
     }
 
-    const batchRes = await ddb.send(new BatchGetCommand({
-        RequestItems: {
-            [TABLE_NAME]: {
-                Keys: keys
-            }
-        }
-    }));
-
-    return processBatchResponses(batchRes, relevantItems);
+    return renderOrderItems(allOrderDetails, relevantItems);
 }
 
-function processBatchResponses(batchRes: any, relevantItems: any[]) {
+function renderOrderItems(allOrderDetails: any[], relevantItems: any[]) {
     const orderDetailsMap = new Map();
-    (batchRes.Responses?.[TABLE_NAME] || []).forEach((item: any) => {
+    allOrderDetails.forEach((item: any) => {
         orderDetailsMap.set(item.PK, item);
     });
 
@@ -267,67 +244,107 @@ async function handleUpdateOrder(event: any) {
         return { statusCode: 403, headers: corsHeaders, body: 'QR does not belong to this shop' };
     }
 
-    if (metaRes.Item.status !== 'USED') {
-        return { statusCode: 400, headers: corsHeaders, body: 'Order must be in USED status to ship' };
+    const currentStatus = metaRes.Item.status;
+    const isShippingTransition = (delivery_company || tracking_number) && currentStatus === 'USED';
+
+    // Update METADATA
+    const updateExpPartsMeta = [];
+    const expAttrValuesMeta: any = {};
+    const expAttrNamesMeta: any = {};
+
+    if (isShippingTransition) {
+        updateExpPartsMeta.push('#status = :s', 'ts_shipped_at = :now', 'GSI1_PK = :gsi_pk');
+        expAttrValuesMeta[':s'] = 'SHIPPED';
+        expAttrValuesMeta[':now'] = new Date().toISOString();
+        expAttrValuesMeta[':gsi_pk'] = 'QR#SHIPPED';
+        expAttrNamesMeta['#status'] = 'status';
     }
 
-    // update metadata
-    const updateExpParts = ['SET #status = :s', 'ts_shipped_at = :now', 'GSI1_PK = :gsi_pk'];
-    const expAttrValues: any = {
-        ':s': 'SHIPPED',
-        ':now': new Date().toISOString(),
-        ':gsi_pk': 'QR#SHIPPED'
-    };
     if (memo_for_users !== undefined) {
-        updateExpParts.push('memo_for_users = :mu');
-        expAttrValues[':mu'] = memo_for_users;
+        // メッセージは完了以前のステートのみ
+        if (!['COMPLETED', 'EXPIRED', 'BANNED'].includes(currentStatus)) {
+            updateExpPartsMeta.push('memo_for_users = :mu');
+            expAttrValuesMeta[':mu'] = memo_for_users;
+        }
     }
-    if (memo_for_shop !== undefined) {
-        updateExpParts.push('memo_for_shop = :ms');
-        expAttrValues[':ms'] = memo_for_shop;
-    }
-    await ddb.send(new UpdateCommand({
-        TableName: TABLE_NAME,
-        Key: { PK: `QR#${qrId}`, SK: 'METADATA' },
-        UpdateExpression: updateExpParts.join(', '),
-        ExpressionAttributeValues: expAttrValues,
-        ExpressionAttributeNames: { '#status': 'status' }, // 予約語回避
-    }));
 
-    // Update ORDER if tracking provided
-    if (tracking_number || delivery_company) {
+    if (memo_for_shop !== undefined) {
+        // メモはすべての状態に対して
+        updateExpPartsMeta.push('memo_for_shop = :ms');
+        expAttrValuesMeta[':ms'] = memo_for_shop;
+    }
+
+    if (updateExpPartsMeta.length > 0) {
+        updateExpPartsMeta.push('ts_updated_at = :now');
+        expAttrValuesMeta[':now'] = expAttrValuesMeta[':now'] || new Date().toISOString();
+
         await ddb.send(new UpdateCommand({
             TableName: TABLE_NAME,
-            Key: { PK: `QR#${qrId}`, SK: 'ORDER' },
-            UpdateExpression: 'SET delivery_company = :d, tracking_number = :t, ts_shipped_at = :now, ts_updated_at = :now',
-            ExpressionAttributeValues: {
-                ':d': delivery_company,
-                ':t': tracking_number,
-                ':now': new Date().toISOString()
-            }
+            Key: { PK: `QR#${qrId}`, SK: 'METADATA' },
+            UpdateExpression: 'SET ' + updateExpPartsMeta.join(', '),
+            ExpressionAttributeValues: expAttrValuesMeta,
+            ExpressionAttributeNames: Object.keys(expAttrNamesMeta).length > 0 ? expAttrNamesMeta : undefined,
         }));
     }
 
-    // Send Shipping Notification Email
-    const orderRes = await ddb.send(new GetCommand({
-        TableName: TABLE_NAME,
-        Key: { PK: `QR#${qrId}`, SK: 'ORDER' }
-    }));
-    const email = orderRes.Item?.email;
-    const pin = metaRes.Item?.pin;
-    if (email && pin) {
-        try {
-            const lang = 'ja';
-            const { subject, bodyText } = createShippingNotificationEmail({ uuid: qrId, pin, lang });
-            await sendEmail({ to: [email], subject: subject, text: bodyText });
-        } catch (e) {
-            console.error('Failed to send shipping notification email', e);
+    // Update ORDER if tracking provided and ORDER exists (ONLY when status is USED)
+    if ((tracking_number || delivery_company) && currentStatus === 'USED') {
+        const orderRes = await ddb.send(new GetCommand({
+            TableName: TABLE_NAME,
+            Key: { PK: `QR#${qrId}`, SK: 'ORDER' }
+        }));
+
+        if (orderRes.Item) {
+            const updateExpPartsOrder = [];
+            const expAttrValuesOrder: any = {};
+
+            if (delivery_company !== undefined) {
+                updateExpPartsOrder.push('delivery_company = :d');
+                expAttrValuesOrder[':d'] = delivery_company;
+            }
+            if (tracking_number !== undefined) {
+                updateExpPartsOrder.push('tracking_number = :t');
+                expAttrValuesOrder[':t'] = tracking_number;
+            }
+
+            updateExpPartsOrder.push('ts_updated_at = :now');
+            expAttrValuesOrder[':now'] = new Date().toISOString();
+
+            if (isShippingTransition) {
+                updateExpPartsOrder.push('ts_shipped_at = :now');
+            }
+
+            await ddb.send(new UpdateCommand({
+                TableName: TABLE_NAME,
+                Key: { PK: `QR#${qrId}`, SK: 'ORDER' },
+                UpdateExpression: 'SET ' + updateExpPartsOrder.join(', '),
+                ExpressionAttributeValues: expAttrValuesOrder
+            }));
+        }
+    }
+
+    // Send Shipping Notification Email ONLY if transitioning from USED to SHIPPED
+    if (isShippingTransition) {
+        const orderRes = await ddb.send(new GetCommand({
+            TableName: TABLE_NAME,
+            Key: { PK: `QR#${qrId}`, SK: 'ORDER' }
+        }));
+        const email = orderRes.Item?.email;
+        const pin = metaRes.Item?.pin;
+        if (email && pin) {
+            try {
+                const lang = 'ja';
+                const { subject, bodyText } = createShippingNotificationEmail({ uuid: qrId, pin, lang });
+                await sendEmail({ to: [email], subject: subject, text: bodyText });
+            } catch (e) {
+                console.error('Failed to send shipping notification email', e);
+            }
         }
     }
 
     return {
         statusCode: 200,
         headers: corsHeaders,
-        body: JSON.stringify({ message: 'Order marked as shipped' })
+        body: JSON.stringify({ message: isShippingTransition ? 'Order marked as shipped' : 'Order meta updated' })
     };
 }

@@ -44,7 +44,14 @@ export default function ShopListPage() {
             const res = await fetchWithAuth('/shop');
             if (res.ok) {
                 const data = await res.json();
-                setShops(data.shops || []);
+                const shopList = data.shops || [];
+                setShops(shopList);
+
+                // Auto-redirect if SHOP_MANAGER and has exactly one shop
+                if (shopList.length === 1) {
+                    const shopId = shopList[0].id;
+                    router.replace(`/shop/${shopId}`);
+                }
             } else {
                 console.error('Failed to fetch shop');
             }
@@ -52,32 +59,6 @@ export default function ShopListPage() {
             console.error(e);
         } finally {
             setLoading(false);
-        }
-    };
-
-    const handleCreateShop = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setCreating(true);
-        try {
-            const res = await fetchWithAuth('/shop', {
-                method: 'POST',
-                body: JSON.stringify({ name: createName })
-            });
-
-            if (res.ok) {
-                const data = await res.json();
-                // Redirect to the new shop
-                router.push(`/shop/${data.shop_id}`);
-            } else {
-                const text = await res.text();
-                console.error('Create Shop Failed:', text);
-                alert(`Failed to create shop: ${text}`);
-            }
-        } catch (e) {
-            console.error(e);
-            alert('Error creating shop');
-        } finally {
-            setCreating(false);
         }
     };
 
@@ -115,16 +96,11 @@ export default function ShopListPage() {
                         </div>
                     ) : (
                         shops.map((shop) => (
-                            <Card key={shop.PK} className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => router.push(`/shop/${shop.PK.replace('SHOP#', '')}`)}>
+                            <Card key={shop.id} className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => router.push(`/shop/${shop.id}`)}>
                                 <CardHeader>
                                     <CardTitle>{shop.name}</CardTitle>
                                     <CardDescription>{t('created', { date: new Date(shop.ts_created_at).toLocaleString() })}</CardDescription>
                                 </CardHeader>
-                                {/* <CardContent>
-                                    <div className="h-24 bg-gray-100 rounded flex items-center justify-center text-gray-400">
-                                        Shop Logo / Image
-                                    </div>
-                                </CardContent> */}
                                 <CardFooter>
                                     <Button className="w-full" variant="secondary" asChild>
                                         <div>{t('manageShop')}</div>
@@ -133,37 +109,6 @@ export default function ShopListPage() {
                             </Card>
                         ))
                     )}
-                </div>
-
-                <div className="gap-4 flex flex-col sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
-                    <Dialog>
-                        <DialogTrigger asChild>
-                            <Button size="lg" className="text-xs md:text-sm" >{t('createShop')}</Button>
-                        </DialogTrigger>
-                        <DialogContent>
-                            <DialogHeader>
-                                <DialogTitle>{t('createDialog.title')}</DialogTitle>
-                                <DialogDescription>{t('createDialog.description')}</DialogDescription>
-                            </DialogHeader>
-                            <form onSubmit={handleCreateShop}>
-                                <div className="grid gap-4 py-4">
-                                    <Label htmlFor="name">{t('createDialog.label')}</Label>
-                                    <Input
-                                        id="name"
-                                        value={createName}
-                                        onChange={(e) => setCreateName(e.target.value)}
-                                        placeholder={t('createDialog.placeholder')}
-                                        required
-                                    />
-                                </div>
-                                <DialogFooter>
-                                    <Button type="submit" disabled={creating}>
-                                        {creating ? t('createDialog.submitting') : t('createDialog.submit')}
-                                    </Button>
-                                </DialogFooter>
-                            </form>
-                        </DialogContent>
-                    </Dialog>
                 </div>
 
             </div>

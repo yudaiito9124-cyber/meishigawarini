@@ -14,7 +14,7 @@ export function generateId(): string {
     const min = pad(now.getUTCMinutes());
     const s = pad(now.getUTCSeconds());
     
-    const timestamp = `${y}${m}${d}${h}${min}${s}`;
+    const timestamp = `${y}${m}${d}${h}${min}${s}${now.getUTCMilliseconds().toString().padStart(3, '0')}`;
     
     // Use crypto.randomUUID if available, otherwise fallback to a semi-random string
     let uuid = '';

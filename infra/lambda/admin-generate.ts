@@ -2,12 +2,14 @@ import { APIGatewayProxyHandler } from 'aws-lambda';
 import { DynamoDBClient, BatchWriteItemCommand } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, GetCommand, QueryCommand } from '@aws-sdk/lib-dynamodb';
 import * as crypto from 'crypto';
-import { verifyAdmin } from './share/admin-auth-inlambda';
 import { generateId } from './utils/id';
+import { checkUserShopPermission } from './share/shop-auth';
+import { stripSignaturesInHtml, stripSignature } from './utils/s3';
 
 const client = new DynamoDBClient({});
 const ddbDocClient = DynamoDBDocumentClient.from(client);
 const TABLE_NAME = process.env.TABLE_NAME || '';
+const BUCKET_NAME = process.env.BUCKET_NAME || '';
 
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
@@ -16,12 +18,6 @@ const corsHeaders = {
 };
 
 export const handler: APIGatewayProxyHandler = async (event) => {
-    // 最初にadmin権限をチェック
-    const { isAdmin, errorResponse } = verifyAdmin(event);
-    // 管理者でなければ、ここで処理を終了して404を返す
-    if (!isAdmin) {
-        return errorResponse!;
-    }
 
     try {
         // Only allow POST
@@ -33,11 +29,33 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         const count = body.count || 1;
         let shopId = body.shopId;
         let productId = body.productId;
+        const expiryDate = body.expiry_date;
+        const ownerUuid = body.owner_uuid;
+        const senderInfo = body.sender_info;
 
 
         // Limit max count for safety
         if (count > 100) { // DynamoDB BatchWrite limit is 25 items
             return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Max 100 items per batch' }) };
+        }
+
+        // Validate owner_uuid if provided
+        if (ownerUuid) {
+            const userRes = await ddbDocClient.send(new GetCommand({
+                TableName: TABLE_NAME,
+                Key: { PK: `USER#${ownerUuid}`, SK: 'SHOP' }
+            }));
+            if (!userRes.Item) {
+                return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: '指定されたオーナーIDが存在しません' }) };
+            }
+
+            // If shopID is also provided, verify ownership
+            if (shopId) {
+                const hasPermission = await checkUserShopPermission(ddbDocClient, TABLE_NAME, shopId, ownerUuid);
+                if (!hasPermission) {
+                    return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: '指定されたショップは指定されたオーナーのものではありません' }) };
+                }
+            }
         }
 
         let isLinked = false;
@@ -78,7 +96,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 };
             }
             productId = ""
-            isLinked = true;
+            isLinked = false; // "ショップと商品IDを同時に指定した時に限って，生成時からすでにLINK状態にしてほしい"
         } else if (!shopId && productId) {
             // Verify if the product exists using GSI2
             const prodRes = await ddbDocClient.send(new QueryCommand({
@@ -104,6 +122,16 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         const ids = [];
         const batch_id = generateId();
 
+        let processedSenderInfo = null;
+        if (senderInfo) {
+            processedSenderInfo = {
+                ...senderInfo,
+                card_image_url: stripSignature(senderInfo.card_image_url),
+                html_image_urls: (senderInfo.html_image_urls || []).map((url: string) => stripSignature(url)),
+                detail_html: stripSignaturesInHtml(senderInfo.detail_html, BUCKET_NAME)
+            };
+        }
+
         for (let i = 0; i < count; i++) {
             const uuid = generateId();
             let pin = '';
@@ -122,6 +150,13 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 ts_created_at: { S: now },
                 ts_updated_at: { S: now }
             };
+
+            if (expiryDate) {
+                item.ts_expired_at = { S: expiryDate };
+            }
+            if (ownerUuid) {
+                item.owner_id = { S: ownerUuid };
+            }
 
             if (shopId) {
                 item.GSI2_PK = { S: `SHOP#${shopId}` };
@@ -146,21 +181,47 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                     Item: item
                 }
             });
+
+            if (processedSenderInfo) {
+                items.push({
+                    PutRequest: {
+                        Item: {
+                            PK: { S: `QR#${uuid}` },
+                            SK: { S: 'CHAT' },
+                            sender_info: {
+                                M: Object.entries(processedSenderInfo).reduce((acc: any, [k, v]) => {
+                                    if (typeof v === 'string') acc[k] = { S: v };
+                                    else if (Array.isArray(v)) acc[k] = { L: v.map(item => ({ S: item })) };
+                                    else acc[k] = { S: JSON.stringify(v) }; // Fallback
+                                    return acc;
+                                }, {})
+                            },
+                            ts_created_at: { S: now },
+                            ts_updated_at: { S: now }
+                        }
+                    }
+                });
+            }
+
             ids.push({ uuid, pin });
         }
 
-        await client.send(new BatchWriteItemCommand({
-            RequestItems: {
-                [TABLE_NAME]: items
-            }
-        }));
+        // DynamoDB BatchWriteItem has a limit of 25 items per request
+        for (let i = 0; i < items.length; i += 25) {
+            const chunk = items.slice(i, i + 25);
+            await client.send(new BatchWriteItemCommand({
+                RequestItems: {
+                    [TABLE_NAME]: chunk
+                }
+            }));
+        }
 
         return {
             statusCode: 200,
             headers: corsHeaders,
             body: JSON.stringify({
                 message: 'QR Codes generated',
-                count: items.length,
+                count: ids.length,
                 batch_id: batch_id,
                 data: ids
             })

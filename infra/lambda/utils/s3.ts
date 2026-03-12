@@ -129,3 +129,17 @@ export async function copyS3Object(bucket: string, sourceKey: string, destKey: s
     });
     await s3Client.send(command);
 }
+
+/**
+ * Finds S3 URLs in HTML and removes their query parameters (signatures).
+ */
+export function stripSignaturesInHtml(html: string | undefined, bucketName: string): string | undefined {
+    if (!html) return html;
+
+    // Regex to match our S3 URLs
+    const s3UrlPattern = new RegExp(`https://${bucketName}\\.s3\\.[a-z0-9-]+\\.amazonaws\\.com/[^"\\s<>]+`, 'g');
+
+    return html.replace(s3UrlPattern, (match) => {
+        return stripSignature(match) || match;
+    });
+}

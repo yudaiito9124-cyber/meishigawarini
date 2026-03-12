@@ -42,7 +42,11 @@
       "default": "ログインに失敗しました",
       "notAuthorized": "メールアドレスまたはパスワードが間違っています。",
       "notConfirmed": "ユーザーが確認されていません。メールを確認してください。"
-    }
+    },
+    "mfaLink": "2段階認証(MFA)の設定はこちら",
+    "shopAdminPage": "ショップ管理者画面",
+    "qrAdminPage": "QR生成・管理者画面",
+    "logout": "ログアウト"
   },
   "RegisterPage": {
     "title": "アカウント作成",
@@ -89,6 +93,7 @@
     "loading": "ショップの管理画面を読み込み中...",
     "title": "-",
     "movetoshops": "ショップ一覧へ戻る",
+    "logout": "ログアウト",
     "shopId": "ショップID: {id}",
     "refresh": "更新",
     "incomingOrders": "発送待ち",
@@ -108,6 +113,8 @@
       "details": "詳細",
       "userMessage": "購入者へのメッセージ(オプション)",
       "shopMemo": "メモ(ショップのみ閲覧可能)",
+      "updateMeta": "メモ・メッセージを更新",
+      "updateSuccess": "更新に成功しました",
       "timestamps": "タイムスタンプ",
       "shipDialog": {
         "title": "発送処理",
@@ -219,7 +226,7 @@
       "name": "ショップ名",
       "detailHtml": "ショップ紹介(HTML)",
       "detailHtmlPlaceholder": "HTML(CSS)形式で入力してください。",
-      "submit": "ショップ設定を保存",
+      "submit": "保存",
       "success": "ショップ設定を更新しました。",
       "failed": "更新に失敗しました。",
       "sourcecode": "ソースコード",
@@ -389,6 +396,8 @@
         "Service_Linktree": "Linktree",
         "Service_Eight": "Eight",
         "exchange_date": "名刺交換日",
+        "import_id": "インポートID",
+        "import_load": "読み込む",
         "others": "その他 (例: 誕生日、血液型)",
         "addhtmlmessage": "HTML形式のメッセージを追加",
         "detail_html": "HTMLソースコード",
@@ -397,6 +406,9 @@
         "detail_html-noimages": "アップロードされた画像はありません。HTML内で使用する画像をここに追加できます。"
       },
       "updateFailed": "送り主情報の更新に失敗しました: ",
+      "importSuccess": "情報を読み込みました。",
+      "importFailed": "読み込みに失敗しました",
+      "importIDNote": "IDを貼り付けると自動的に入力されます。",
       "confirmRemoveImage": "この画像を削除しますか？",
       "urlCopied": "URLをコピーしました",
       "usage": "使い方",
@@ -520,5 +532,23 @@
     "QR is not in a valid state": "QRコードは利用できない状態です。すでに有効化されている、使用済みか、無効化されている可能性があります。",
     "Product not found": "このカードに紐づけられていた商品が見つかりません。削除されている可能性があります。このカードは使えないため廃棄してください。",
     "Product is stopped": "このカードに紐づけられていた商品が停止されています。もしこのカードを使用したい場合はSTOPPED状態の商品を有効化してください。"
+  },
+  "MFASetupPage": {
+    "title": "2段階認証(MFA)の設定",
+    "description": "アカウントのセキュリティを強化するために、認証アプリ（Google Authenticatorなど）による2段階認証を設定します。",
+    "step1": "1. 認証アプリで以下のQRコードをスキャンしてください",
+    "step2": "2. アプリに表示された6桁のコードを入力してください",
+    "placeholder": "6桁のコード",
+    "verify": "認証して有効化",
+    "verifying": "確認中...",
+    "successTitle": "設定完了",
+    "successMessage": "2段階認証が有効になりました。次回のログインから有効になります。一度ログアウトして、再度ログインしてください。",
+    "logout": "ログアウトして再ログイン",
+    "back": "戻る",
+    "errors": {
+      "setupFailed": "設定の開始に失敗しました。ログイン状態を確認してください。",
+      "verifyFailed": "コードが正しくないか、期限が切れています。",
+      "notLoggedIn": "この操作にはログインが必要です。"
+    }
   }
 }

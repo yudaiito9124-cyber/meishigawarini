@@ -26,6 +26,8 @@ import {
     DialogTrigger,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import { useRouter } from "next/navigation";
+import { signOut } from 'aws-amplify/auth';
 
 export default function AdminPage() {
     const t = useTranslations('AdminPage');
@@ -35,36 +37,52 @@ export default function AdminPage() {
     const [productId, setProductId] = useState("");
     const [generatedBatches, setGeneratedBatches] = useState<any[]>([]);
     const [isAuthorized, setIsAuthorized] = useState<boolean | null>(null); // null = loading
-
+    const router = useRouter();
 
     useEffect(() => {
         const checkAuth = async () => {
             try {
-                const session = await fetchAuthSession();
+                let session = await fetchAuthSession();
+                let payload = session.tokens?.idToken?.payload || {};
+                let groups = (payload['cognito:groups'] as string[]) || [];
+                let isAdmin = groups.includes('Administrators') || groups.includes('GlobalAdmins');
+
+                // 1. まず管理者グループに属しているかフロントで簡易チェック
+                if (!isAdmin) {
+                    setIsAuthorized(false);
+                    return notFound();
+                }
+
+                console.log("Admin access verification in progress...");
+                let amr = (payload['amr'] as string[]) || [];
+                // amrが空の場合、一度だけ強制リフレッシュを試みる（最新の認証情報を取得するため）
+                if (amr.length === 0) {
+                    session = await fetchAuthSession({ forceRefresh: true });
+                    payload = session.tokens?.idToken?.payload || {};
+                    amr = (payload['amr'] as string[]) || [];
+                }
+
                 const token = session.tokens?.idToken?.toString();
 
-                // APIを叩く
+                // 3. 実際にAPIを叩いてAuthorizerでの検証を確認 (amrがなくてもAuthorizerがCognitoを直接チェックする)
                 const res = await fetch(`${NEXT_PUBLIC_API_URL}/admin`, {
                     headers: { "Authorization": `Bearer ${token}` }
                 });
 
-                // 404が返ってきたら、即座に notFound 実行
-                if (res.status === 404) {
+                if (res.status === 404 || res.status === 403) {
+                    console.error("Access denied by backend authorizer.");
                     setIsAuthorized(false);
-                    return notFound(); // 直接 return する
+                    return;
                 }
 
                 if (res.ok) {
                     setIsAuthorized(true);
                 } else {
                     setIsAuthorized(false);
-                    return notFound();
                 }
             } catch (e) {
                 console.error("Auth check failed", e);
                 setIsAuthorized(false);
-                return notFound(); // ここで標準404へ
-
             }
         };
         checkAuth();

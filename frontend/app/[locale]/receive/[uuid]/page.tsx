@@ -19,6 +19,7 @@ import SandboxedHtml from "@/components/SandboxedHtml";
 import { cn } from "@/lib/utils";
 import confetti from "canvas-confetti";
 import { resizeImage } from "@/lib/image-utils";
+import { generateId } from "@/lib/id";
 
 
 const NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || "";
@@ -164,6 +165,8 @@ const ShakingGiftBox = ({ isShaking, isExpanding }: { isShaking?: boolean, isExp
 const EmptySenderInfo = (senderinfo: any) => {
     return !senderinfo || Object.keys(senderinfo).every(key => {
         if (key.startsWith("ts_")) return true;
+        if (key === "import_id") return true;
+        if (key === "html_image_urls") return true;
         return !senderinfo[key];
     });
 };
@@ -171,6 +174,8 @@ const EmptySenderInfo = (senderinfo: any) => {
 const EmptySenderInfoWithLinks = (senderinfo: any) => {
     return !senderinfo || Object.keys(senderinfo).every(key => {
         if (key.startsWith("ts_")) return true;
+        if (key === "import_id") return true;
+        if (key === "html_image_urls") return true;
         if (!key.startsWith("Service_") && !key.startsWith("SNS_")) return true;
         return !senderinfo[key];
     });
@@ -241,13 +246,60 @@ export default function ReceivePage() {
         detail_html: "",
         card_image_url: "",
         card_image_name: "",
-        html_image_urls: [] as string[]
+        html_image_urls: [] as string[],
+        import_id: ""
     });
     const [htmlImageUrls, setHtmlImageUrls] = useState<string[]>([]);
     const [showDetailHtmlSection, setShowDetailHtmlSection] = useState(false);
 
     const updateSenderForm = (field: string, value: string) => {
         setSenderForm(prev => ({ ...prev, [field]: value }));
+        if (field === 'import_id' && value.trim().startsWith('USER#') && value.includes(', SENDER')) {
+            handleImportFromId(value.trim());
+        }
+    };
+
+    const handleImportFromId = async (id: string) => {
+        setSenderInfoLoading(true);
+        try {
+            const res = await fetch(`${NEXT_PUBLIC_API_URL}/recipient/qrcodes/${uuid}/chat`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    pin,
+                    type: 'load_from_id',
+                    id: id.trim()
+                }),
+            });
+            if (!res.ok) {
+                const errData = await res.json();
+                throw new Error(errData.message || "Failed to load info");
+            }
+            const data = await res.json();
+            if (data.sender_info) {
+                // Sanitize: Convert null values to empty strings
+                const sanitizedInfo = { ...data.sender_info };
+                Object.keys(sanitizedInfo).forEach(key => {
+                    if (sanitizedInfo[key] === null) sanitizedInfo[key] = "";
+                });
+
+                setSenderForm(prev => ({
+                    ...prev,
+                    ...sanitizedInfo,
+                    import_id: "" // Clear on success
+                }));
+
+                if (sanitizedInfo.html_image_urls) {
+                    setHtmlImageUrls(sanitizedInfo.html_image_urls);
+                }
+
+                alert(t('senderInfo.importSuccess') || "Import successful!");
+            }
+        } catch (e: any) {
+            alert(t('senderInfo.importFailed') + ": " + e.message);
+        } finally {
+            setSenderInfoLoading(false);
+        }
     };
     const [chatcontent, setChatcontent] = useState("");
 
@@ -438,8 +490,8 @@ export default function ReceivePage() {
                 const { uploadUrl, publicUrl } = await getChatUploadUrl(
                     uuid,
                     pin,
-                    selectedFile.name,
-                    uploadFile.type,
+                    `${generateId()}.webp`,
+                    'image/webp',
                     uploadFile.size
                 );
 
@@ -474,6 +526,9 @@ export default function ReceivePage() {
     const handleSenderInfoUpdate = async (fields?: any) => {
         setSenderInfoLoading(true);
         try {
+            if (fields && "import_id" in fields) {
+                delete fields["import_id"];
+            }
             const updatedSenderInfo = {
                 ...senderInfo,
                 ...(fields || senderForm),
@@ -509,7 +564,7 @@ export default function ReceivePage() {
             });
             if (!res.ok) throw new Error("Failed to save data");
             const data = await res.json();
-            alert(`Export as ${data.userid}`);
+            alert(`Export as: USER#${data.userid}, SENDER`);
         } catch (e: any) {
             alert(t('senderInfo.updateFailed') + e.message);
         } finally {
@@ -530,7 +585,7 @@ export default function ReceivePage() {
                 }
             }
 
-            const res = await fetch(`${NEXT_PUBLIC_API_URL}/recipient/qrcodes/${uuid}/upload-url?pin=${pin}&filename=${encodeURIComponent(file.name)}&contentType=${encodeURIComponent(uploadFile.type)}&fileSize=${uploadFile.size}&folder=sendercontent`);
+            const res = await fetch(`${NEXT_PUBLIC_API_URL}/recipient/qrcodes/${uuid}/upload-url?pin=${pin}&filename=${encodeURIComponent(generateId() + '.webp')}&contentType=image%2Fwebp&fileSize=${uploadFile.size}&folder=sendercontent`);
             if (!res.ok) throw new Error('Failed to get upload URL');
             const { uploadUrl, publicUrl } = await res.json();
 
@@ -613,8 +668,8 @@ export default function ReceivePage() {
             const { uploadUrl, publicUrl } = await getChatUploadUrl(
                 uuid,
                 pin,
-                file.name,
-                uploadFile.type,
+                `${generateId()}.webp`,
+                'image/webp',
                 uploadFile.size
             );
 
@@ -1073,19 +1128,36 @@ export default function ReceivePage() {
                                     </div>
                                     <div className="space-y-2">
                                         <Label htmlFor="preferredDate">{t('formStep.preferredDate')}</Label>
-                                        <div className="flex gap-2 items-center">
-                                            <Input
-                                                id="preferredDate"
-                                                type="date"
-                                                value={preferredDate}
-                                                onChange={(e) => setPreferredDate(e.target.value)}
-                                                className="flex-1"
-                                            />
+                                        <div className="flex gap-2 items-start">
+                                            <div className="flex-1 flex flex-col gap-1">
+                                                <Input
+                                                    id="preferredDate"
+                                                    type="date"
+                                                    value={preferredDate}
+                                                    onChange={(e) => setPreferredDate(e.target.value)}
+                                                    className="w-full"
+                                                />
+                                                {/* {preferredDate && (
+                                                    <p className="text-[10px] text-blue-600 font-bold ml-1 animate-in fade-in slide-in-from-top-1">
+                                                        {(() => {
+                                                            try {
+                                                                const [y, m, d] = preferredDate.split('-').map(Number);
+                                                                const date = new Date(y, m - 1, d);
+                                                                if (isNaN(date.getTime())) return "";
+                                                                    const weekday = date.toLocaleDateString(params?.locale as string || 'ja-JP', { weekday: 'short' });
+                                                                    return `(${weekday})`;
+                                                                } catch (e) {
+                                                                    return "";
+                                                                }
+                                                            })()}
+                                                        </p>
+                                                    )} */}
+                                            </div>
                                             <Button
                                                 type="button"
                                                 variant="outline"
                                                 onClick={() => setPreferredDate("")}
-                                                className="whitespace-nowrap"
+                                                className="whitespace-nowrap h-9"
                                             >
                                                 {t('formStep.noPreference')}
                                             </Button>
@@ -1331,8 +1403,39 @@ export default function ReceivePage() {
                                     </div>
 
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t pt-6">
+                                        {/* Import ID helper */}
+                                        <div className="md:col-span-2 space-y-1.5 p-3 bg-blue-50/30 rounded-lg border border-blue-100/50">
+                                            <Label htmlFor="sender-import_id" className="text-xs font-bold text-blue-600 flex items-center gap-1">
+                                                <Copy className="w-3.5 h-3.5" />
+                                                {t(`senderInfo.labels.import_id`)}
+                                            </Label>
+                                            <div className="flex gap-2">
+                                                <Input
+                                                    id="sender-import_id"
+                                                    value={senderForm.import_id}
+                                                    onChange={(e) => updateSenderForm("import_id", e.target.value)}
+                                                    disabled={senderInfoLoading}
+                                                    className="h-9 text-sm bg-white"
+                                                    placeholder="USER#..., SENDER"
+                                                />
+                                                <Button
+                                                    type="button"
+                                                    variant="outline"
+                                                    size="sm"
+                                                    className="h-9 px-3 shrink-0"
+                                                    onClick={() => handleImportFromId(senderForm.import_id)}
+                                                    disabled={senderInfoLoading || !senderForm.import_id}
+                                                >
+                                                    {senderInfoLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : t('senderInfo.labels.import_load') || "Load"}
+                                                </Button>
+                                            </div>
+                                            <p className="text-[10px] text-gray-400 italic">
+                                                * {t('senderInfo.importIDNote') || "Paste an ID here to auto-fill the form."}
+                                            </p>
+                                        </div>
+
                                         {Object.keys(senderForm).map((field) => (
-                                            field !== 'card_image_url' && field !== 'card_image_name' && field !== 'ts_updated_at' && field !== `html_image_urls` && field !== `detail_html` && (
+                                            field !== 'card_image_url' && field !== 'card_image_name' && field !== 'ts_updated_at' && field !== 'ts_created_at' && field !== `html_image_urls` && field !== `detail_html` && field !== 'import_id' && (
                                                 <div key={field} className={cn("space-y-1.5", (field === 'memo' || field === 'address' || field === 'detail_html') && "md:col-span-2")}>
                                                     <Label htmlFor={`sender-${field}`} className="text-xs font-bold text-gray-600 flex items-center gap-1">
                                                         {field === "SNS_X" ? <SiX size={14} color="default" /> :
@@ -1580,8 +1683,10 @@ export default function ReceivePage() {
                                                 field !== 'card_image_url' &&
                                                 field !== 'card_image_name' &&
                                                 field !== 'ts_updated_at' &&
+                                                field !== 'ts_created_at' &&
                                                 field !== 'name' &&
                                                 field !== 'detail_html' &&
+                                                field !== 'import_id' &&
                                                 field !== 'html_image_urls' &&
                                                 typeof value === 'string' &&
                                                 !field.startsWith("SNS_") &&
