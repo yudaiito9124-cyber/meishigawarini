@@ -152,11 +152,11 @@ const fireConfetti = () => {
 const ShakingGiftBox = ({ isShaking, isExpanding }: { isShaking?: boolean, isExpanding?: boolean }) => (
     <div className={cn(
         "flex flex-col items-center justify-center py-10 transition-all duration-700",
-        isShaking && "animate-shake",
+        isShaking && "animate-shake animate-bounce",
         isExpanding && "animate-expand"
     )}>
         <div className="relative w-24 h-24 mb-4 flex items-center justify-center">
-            <Gift size={64} className={cn("text-black stroke-[1.2] stroke-black animate-bounce")} />
+            <Gift size={64} className={cn("text-black stroke-[1.2] stroke-black")} />
         </div>
     </div>
 );
@@ -973,8 +973,8 @@ export default function ReceivePage() {
                             <div className="pr-8 pl-8">
                                 {/* Remaining Days for Active Gift */}
                                 {step === "FORM" && gift.ts_expired_at && (
-                                    <div className="border border-gray-200 bg-gray-50 p-3 rounded text-center rounded-xl">
-                                        <p className="text-sm font-semibold text-green-600 ">
+                                    <div className="border border-red-400 bg-orange-50 p-3 rounded text-center rounded-xl border-dashed border-2">
+                                        <p className="text-sm font-semibold text-red-600 ">
                                             {t('daysRemaining', getRemainingTime(gift.ts_expired_at)!)}
                                         </p>
                                         <p className="text-sm text-center text-gray-500 mt-1">
