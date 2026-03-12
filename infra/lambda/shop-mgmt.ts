@@ -6,7 +6,7 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import * as crypto from 'crypto';
 import { generateId } from './utils/id';
 import { signUrlIfS3, stripSignature, signUrlsInHtml, deleteFileByUrl, stripSignaturesInHtml } from './utils/s3';
-import { checkShopOwnerOrGM } from './share/shop-auth';
+import { checkShopOwnerOrGM, checkUserShopPermission } from './share/shop-auth';
 
 const client = new DynamoDBClient({});
 const ddb = DynamoDBDocumentClient.from(client);
@@ -473,6 +473,15 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             if (!qrCheck.Item) return { statusCode: 404, headers: corsHeaders, body: JSON.stringify({ message: 'QR not found' }) };
 
             const qrItem = qrCheck.Item;
+
+            // Check if QR has a pre-assigned owner
+            if (qrItem.owner_id) {
+                const isOwner = await checkUserShopPermission(ddb, TABLE_NAME, shopId, qrItem.owner_id);
+                if (!isOwner) {
+                    return { statusCode: 403, headers: corsHeaders, body: JSON.stringify({ message: 'This QR code is reserved for another shop owner' }) };
+                }
+            }
+
             if (qrItem.status === 'LINKED') {
                 if (qrItem.shop_id && qrItem.shop_id !== shopId) return { statusCode: 403, headers: corsHeaders, body: JSON.stringify({ message: 'QR does not belong to this shop' }) };
                 if (product_id && product_id !== qrItem.product_id) return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Product ID cannot be changed for linked QR' }) };
@@ -498,9 +507,9 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             const gsiPk = activate_now ? 'QR#ACTIVE' : 'QR#LINKED';
             const activatedAt = activate_now ? new Date().toISOString() : undefined;
 
-            // Calculate expiration if activating now
-            let expiresAt = undefined;
-            if (activate_now) {
+            // Calculate expiration if activating now (and not already set)
+            let expiresAt = qrItem.ts_expired_at;
+            if (activate_now && !expiresAt) {
                 const activationDate = new Date();
                 const expirationDate = new Date(activationDate);
                 expirationDate.setDate(expirationDate.getDate() + validDays);
@@ -598,7 +607,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                     ':linked': 'LINKED',
                     ':sid': shopId,
                     ':now': now.toISOString(),
-                    ':exp': expiresAt.toISOString(),
+                    ':exp': qrRes.Item.ts_expired_at || expiresAt.toISOString(),
                     ':gsi_pk': 'QR#ACTIVE'
                 }
             }));

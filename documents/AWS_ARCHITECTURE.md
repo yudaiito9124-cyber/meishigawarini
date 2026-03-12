@@ -28,7 +28,11 @@
 ### 🔐 **Cognito** (認証・ユーザー管理)
 *   **役割**: ショップ管理者や全体管理者のログイン、パスワード管理、認証（この人は正しいユーザーか？）を担当するサービスです。
     ログインに成功したユーザーには「トークン（通行証）」を発行し、API Gatewayはそのトークンを見て通信を許可します。
-*   **コード上の場所**: `infra/lib/infra-stack.ts` の `new cognito.UserPool(...)` で構築されています。
+*   **ユーザーグループ**:
+    *   **`Administrators`**: QRコード生成・システム管理ダッシュボード (`/admin`) にアクセスできる最上位管理者グループ。
+    *   **`GlobalAdmins`**: 複数ショップを横断管理できる権限を持つグループ。
+*   **MFA強制**: 上記グループに属するユーザーは、Lambda Authorizer (`infra/lambda/admin-authorizer.ts`) によってTOTP（認証アプリ）によるMFA完了が必須チェックされます。MFA未設定のまま管理APIを叩くことはできません。
+*   **コード上の場所**: `infra/lib/infra-stack.ts` の `new cognito.UserPool(...)` で構築されています。Cognito User Pool のティアは **Essentials** を使用しています。
 
 ### 📦 **S3** (ファイルストレージ)
 *   **役割**: データベース（DynamoDB）には入りきらない「ファイルそのもの」を保存するストレージです。

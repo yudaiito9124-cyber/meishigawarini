@@ -5,14 +5,15 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { RefreshCw, ArrowRight, HelpCircle, Camera, Settings, ShoppingBasket, Eye, Plus, Trash2, Copy, ChevronDown, ImageIcon } from 'lucide-react';
+import { RefreshCw, ArrowRight, HelpCircle, Camera, Settings, ShoppingBasket, Eye, Plus, Trash2, Copy, ChevronDown, ImageIcon, Save, Loader2 } from 'lucide-react';
 import { notFound, useParams } from 'next/navigation';
 import { useRouter } from '@/i18n/routing';
 import { useTranslations } from 'next-intl';
-import { getCurrentUser } from 'aws-amplify/auth';
+import { getCurrentUser, signOut } from 'aws-amplify/auth';
 import { fetchWithAuth } from '@/app/utils/api-client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -443,10 +444,12 @@ export default function ShopPage() {
         }
     };
 
-    const handleShipOrder = async (qrId: string, deliveryCompany: string, trackingNumber: string, memoForUsers?: string, memoForShop?: string) => {
+    const handleUpdateOrderMeta = async (qrId: string, deliveryCompany?: string, trackingNumber?: string, memoForUsers?: string, memoForShop?: string) => {
         setShippingOrderId(qrId);
         try {
-            const body: any = { delivery_company: deliveryCompany, tracking_number: trackingNumber, memo_for_users: "", memo_for_shop: "" };
+            const body: any = {};
+            if (deliveryCompany !== undefined) body.delivery_company = deliveryCompany;
+            if (trackingNumber !== undefined) body.tracking_number = trackingNumber;
             if (memoForUsers !== undefined) body.memo_for_users = memoForUsers;
             if (memoForShop !== undefined) body.memo_for_shop = memoForShop;
 
@@ -458,11 +461,11 @@ export default function ShopPage() {
                 fetchShopData();
             } else {
                 const errData = await res.json().catch(() => ({}));
-                alert('Failed to ship order: ' + (errData.message || errData.error || 'Unknown error'));
+                alert('Failed to update order: ' + (errData.message || errData.error || 'Unknown error'));
             }
         } catch (e: any) {
             console.error(e);
-            alert('Error shipping order: ' + (e.message || String(e)));
+            alert('Error updating order: ' + (e.message || String(e)));
         } finally {
             setShippingOrderId(null);
         }
@@ -752,7 +755,17 @@ export default function ShopPage() {
                                 </form>
                             </DialogContent>
                         </Dialog>
-                        <Button variant="outline" className="text-xs md:text-sm" onClick={handleShops}>{t('movetoshops')}</Button>
+                        <Button variant="default" className="text-xs md:text-sm" onClick={handleShops}>{t('movetoshops')}</Button>
+                        <Button
+                            variant="ghost"
+                            className="text-xs md:text-sm hover:bg-red-50 hover:text-red-600 border border-gray-200"
+                            onClick={async () => {
+                                await signOut();
+                                router.push('/login');
+                            }}
+                        >
+                            {t('logout')}
+                        </Button>
                     </div>
                 </div>
 
@@ -1058,7 +1071,7 @@ export default function ShopPage() {
                                                                     <form onSubmit={(e) => {
                                                                         e.preventDefault();
                                                                         const fd = new FormData(e.target as HTMLFormElement);
-                                                                        handleShipOrder(
+                                                                        handleUpdateOrderMeta(
                                                                             uuid,
                                                                             fd.get('delivery_company') as string,
                                                                             fd.get('tracking') as string,
@@ -1535,15 +1548,80 @@ export default function ShopPage() {
 
                                                             <div className="">
                                                                 <div>
-                                                                    <h4 className="text-sm font-semibold text-gray-500">{t('orders.timestamps')}</h4>
-                                                                    <p className="text-sm">{ts('ts_updated_at') + ": " + (order.ts_updated_at ? new Date(order.ts_updated_at).toLocaleString() : "-")}</p>
-                                                                    <p className="text-sm">{ts('ts_linked_at') + ": " + (order.ts_linked_at ? new Date(order.ts_linked_at).toLocaleString() : "-")}</p>
-                                                                    <p className="text-sm">{ts('ts_activated_at') + ": " + (order.ts_activated_at ? new Date(order.ts_activated_at).toLocaleString() : "-")}</p>
-                                                                    <p className="text-sm">{ts('ts_submitted_at') + ": " + (order.ts_submitted_at ? new Date(order.ts_submitted_at).toLocaleString() : "-")}</p>
-                                                                    <p className="text-sm">{ts('ts_shipped_at') + ": " + (order.ts_shipped_at ? new Date(order.ts_shipped_at).toLocaleString() : "-")}</p>
-                                                                    <p className="text-sm">{ts('ts_completed_at') + ": " + (order.ts_completed_at ? new Date(order.ts_completed_at).toLocaleString() : "-")}</p>
-                                                                    <p className="text-sm">{ts('ts_expired_at') + ": " + (order.ts_expired_at ? new Date(order.ts_expired_at).toLocaleString() : "-")}</p>
-                                                                    <p className="text-sm">{ts('ts_banned_at') + ": " + (order.ts_banned_at ? new Date(order.ts_banned_at).toLocaleString() : "-")}</p>
+                                                                    {/* Admin Meta Edit Section */}
+                                                                    <div className="pt-6 border-t border-dashed mt-6">
+                                                                        <h4 className="text-sm font-bold text-gray-900 mb-4 flex items-center gap-2">
+                                                                            <Save className="w-4 h-4 text-gray-400" />
+                                                                            {t('orders.shipDialog.title')}（{t('orders.updateMeta')}）
+                                                                        </h4>
+                                                                        <form onSubmit={async (e) => {
+                                                                            e.preventDefault();
+                                                                            const fd = new FormData(e.currentTarget);
+                                                                            await handleUpdateOrderMeta(
+                                                                                uuid,
+                                                                                undefined,
+                                                                                 undefined,
+                                                                                fd.get('memo_for_users') as string,
+                                                                                fd.get('memo_for_shop') as string
+                                                                            );
+                                                                        }} className="space-y-4">
+                                                                            <div className="grid grid-cols-2 gap-4">
+                                                                                <div className="space-y-2">
+                                                                                    <Label className="text-xs text-gray-400">{t('orders.shipDialog.deliveryCompany')}</Label>
+                                                                                    <Input value={order.delivery_company || ""} readOnly disabled className="h-8 text-xs bg-gray-50 text-gray-400 cursor-not-allowed" />
+                                                                                </div>
+                                                                                <div className="space-y-2">
+                                                                                    <Label className="text-xs text-gray-400">{t('orders.shipDialog.label')}</Label>
+                                                                                    <Input value={order.tracking_number || ""} readOnly disabled className="h-8 text-xs bg-gray-50 text-gray-400 cursor-not-allowed" />
+                                                                                </div>
+                                                                            </div>
+
+                                                                            <div className="space-y-2">
+                                                                                <Label htmlFor={`m_u-${uuid}`} className="text-xs text-gray-500">{t('orders.userMessage')}</Label>
+                                                                                <Textarea
+                                                                                    id={`m_u-${uuid}`}
+                                                                                    name="memo_for_users"
+                                                                                    defaultValue={order.memo_for_users || ""}
+                                                                                    disabled={['COMPLETED', 'EXPIRED', 'BANNED'].includes(order.status)}
+                                                                                    placeholder={['COMPLETED', 'EXPIRED', 'BANNED'].includes(order.status) ? "Completed-state messages cannot be updated" : ""}
+                                                                                    className="text-sm min-h-[60px]"
+                                                                                />
+                                                                            </div>
+
+                                                                            <div className="space-y-2">
+                                                                                <Label htmlFor={`m_s-${uuid}`} className="text-xs text-gray-500">{t('orders.shopMemo')}</Label>
+                                                                                <Textarea
+                                                                                    id={`m_s-${uuid}`}
+                                                                                    name="memo_for_shop"
+                                                                                    defaultValue={order.memo_for_shop || ""}
+                                                                                    className="text-sm min-h-[60px]"
+                                                                                />
+                                                                            </div>
+
+                                                                            <Button
+                                                                                type="submit"
+                                                                                className="w-full"
+                                                                                disabled={shippingOrderId === uuid}
+                                                                            >
+                                                                                {shippingOrderId === uuid ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}
+                                                                                {shippingOrderId === uuid ? t('orders.processing') : t('shopSettings.submit')}
+                                                                            </Button>
+                                                                        </form>
+                                                                    </div>
+
+                                                                    <div className="pt-6 border-t mt-6">
+                                                                        <div>
+                                                                            <h4 className="text-sm font-semibold text-gray-500 mb-2">{t('orders.timestamps')}</h4>
+                                                                            <p className="text-sm">{ts('ts_updated_at') + ": " + (order.ts_updated_at ? new Date(order.ts_updated_at).toLocaleString() : "-")}</p>
+                                                                            <p className="text-sm">{ts('ts_linked_at') + ": " + (order.ts_linked_at ? new Date(order.ts_linked_at).toLocaleString() : "-")}</p>
+                                                                            <p className="text-sm">{ts('ts_activated_at') + ": " + (order.ts_activated_at ? new Date(order.ts_activated_at).toLocaleString() : "-")}</p>
+                                                                            <p className="text-sm">{ts('ts_submitted_at') + ": " + (order.ts_submitted_at ? new Date(order.ts_submitted_at).toLocaleString() : "-")}</p>
+                                                                            <p className="text-sm">{ts('ts_shipped_at') + ": " + (order.ts_shipped_at ? new Date(order.ts_shipped_at).toLocaleString() : "-")}</p>
+                                                                            <p className="text-sm">{ts('ts_completed_at') + ": " + (order.ts_completed_at ? new Date(order.ts_completed_at).toLocaleString() : "-")}</p>
+                                                                            <p className="text-sm">{ts('ts_expired_at') + ": " + (order.ts_expired_at ? new Date(order.ts_expired_at).toLocaleString() : "-")}</p>
+                                                                            <p className="text-sm">{ts('ts_banned_at') + ": " + (order.ts_banned_at ? new Date(order.ts_banned_at).toLocaleString() : "-")}</p>
+                                                                        </div>
+                                                                    </div>
                                                                 </div>
                                                             </div>
                                                         </div>
@@ -1648,6 +1726,6 @@ export default function ShopPage() {
 
 
             </div>
-        </div >
+        </div>
     );
 }

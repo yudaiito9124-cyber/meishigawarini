@@ -42,35 +42,35 @@ export default function AdminPage() {
     useEffect(() => {
         const checkAuth = async () => {
             try {
-                const session = await fetchAuthSession();
-                const token = session.tokens?.idToken?.toString();
-                const groups = (session.tokens?.idToken?.payload['cognito:groups'] as string[]) || [];
+                let session = await fetchAuthSession();
+                let payload = session.tokens?.idToken?.payload || {};
+                let groups = (payload['cognito:groups'] as string[]) || [];
+                let isAdmin = groups.includes('Administrators') || groups.includes('GlobalAdmins');
 
-                // 1. まずAdministratorsグループに属しているかフロントで簡易チェック
-                if (!groups.includes('Administrators')) {
+                // 1. まず管理者グループに属しているかフロントで簡易チェック
+                if (!isAdmin) {
                     setIsAuthorized(false);
-                    return;
+                    return notFound();
                 }
 
-                // 2. Administratorsの場合、MFAが済んでいるかチェック (amrクレームを確認)
-                // Identities Tokenのamrを確認 (mfa/software_token_mfa/sms_mfa)
-                const amr = (session.tokens?.idToken?.payload['amr'] as string[]) || [];
-                const usedMfa = amr.includes('mfa') || amr.includes('software_token_mfa') || amr.includes('sms_mfa');
-
-                if (!usedMfa) {
-                    console.log("MFA required for admin access.");
-                    alert("管理者アクセスには2段階認証が必要です。一度ログアウトし、2段階認証を有効にして再度ログインしてください。");
-                    await signOut();
-                    router.push(`/${window.location.pathname.split('/')[1]}`); // トップへリダイレクト
-                    return;
+                console.log("Admin access verification in progress...");
+                let amr = (payload['amr'] as string[]) || [];
+                // amrが空の場合、一度だけ強制リフレッシュを試みる（最新の認証情報を取得するため）
+                if (amr.length === 0) {
+                    session = await fetchAuthSession({ forceRefresh: true });
+                    payload = session.tokens?.idToken?.payload || {};
+                    amr = (payload['amr'] as string[]) || [];
                 }
 
-                // 3. 実際にAPIを叩いてAuthorizerでの検証を確認
+                const token = session.tokens?.idToken?.toString();
+
+                // 3. 実際にAPIを叩いてAuthorizerでの検証を確認 (amrがなくてもAuthorizerがCognitoを直接チェックする)
                 const res = await fetch(`${NEXT_PUBLIC_API_URL}/admin`, {
                     headers: { "Authorization": `Bearer ${token}` }
                 });
 
                 if (res.status === 404 || res.status === 403) {
+                    console.error("Access denied by backend authorizer.");
                     setIsAuthorized(false);
                     return;
                 }

@@ -69,10 +69,25 @@ export class InfraStack extends cdk.Stack {
       removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
 
+    // パスキー (WebAuthn) 対応のために Essentials ティアに設定
+    const cfnUserPool = userPool.node.defaultChild as cognito.CfnUserPool;
+    cfnUserPool.userPoolTier = 'ESSENTIALS';
+
     const userPoolClient = new cognito.UserPoolClient(this, 'MeishiGawariniUserPoolClient', {
       userPool,
       authFlows: { userSrp: true },
+      idTokenValidity: cdk.Duration.hours(1),       // IDトークン有効期限: 1時間
+      accessTokenValidity: cdk.Duration.hours(1),   // アクセストークン有効期限: 1時間
+      refreshTokenValidity: cdk.Duration.days(30),  // リフレッシュトークン有効期限: 30日
     });
+
+    // ALLOW_USER_AUTH を有効化 (パスキー / WebAuthn に必要)
+    const cfnUserPoolClient = userPoolClient.node.defaultChild as cognito.CfnUserPoolClient;
+    cfnUserPoolClient.explicitAuthFlows = [
+      'ALLOW_USER_SRP_AUTH',
+      'ALLOW_REFRESH_TOKEN_AUTH',
+      'ALLOW_USER_AUTH'
+    ];
 
     // Lambda Layer or Bundling
     const commonProps = {
@@ -301,6 +316,12 @@ export class InfraStack extends cdk.Stack {
       handler: adminAuthorizerFn,
       resultsCacheTtl: cdk.Duration.minutes(5),
     });
+
+    // Admin Authorizer Lambdaに AdminGetUser 権限を付与
+    adminAuthorizerFn.addToRolePolicy(new iam.PolicyStatement({
+      actions: ['cognito-idp:AdminGetUser'],
+      resources: [userPool.userPoolArn]
+    }));
 
     // Admin Routes
     const adminResource = api.root.addResource('admin');

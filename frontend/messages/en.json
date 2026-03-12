@@ -39,7 +39,11 @@
       "default": "Failed to login",
       "notAuthorized": "Incorrect username or password.",
       "notConfirmed": "User is not confirmed. Please verify your email."
-    }
+    },
+    "mfaLink": "Set up Two-Factor Authentication (MFA)",
+    "shopAdminPage": "Shop Admin",
+    "qrAdminPage": "QR Generation / Admin",
+    "logout": "Logout"
   },
   "RegisterPage": {
     "title": "Create Account",
@@ -86,6 +90,7 @@
     "title": "Shop Dashboard",
     "shopId": "Shop ID: {id}",
     "movetoshops": "Back to shop list",
+    "logout": "Logout",
     "incomingOrders": "Incoming Orders",
     "ordersDesc": "Manage your orders and shipments.",
     "orders": {
@@ -216,8 +221,8 @@
       "title": "Delivery Details",
       "name": "Full Name",
       "address": "Delivery Address",
-      "preferredDate": "Preferred Delivery Date (Optional)",
-      "preferredTime": "Preferred Delivery Time (Optional)",
+      "preferredDate": "Preferred Delivery Date",
+      "preferredTime": "Preferred Delivery Time",
       "noPreference": "No preference",
       "timeMorning": "Morning",
       "time1416": "14:00 - 16:00",

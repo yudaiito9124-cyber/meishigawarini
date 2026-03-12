@@ -306,6 +306,48 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                     body: JSON.stringify({ message: 'User created successfully', userid })
                 };
             }
+            if (type === 'load_from_id') {
+                const { id } = body;
+                if (!id || typeof id !== 'string') {
+                    return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Missing or invalid ID' }) };
+                }
+
+                // Format: USER#[uuid], SENDER
+                const pk = id;
+                const sk = 'SENDER';
+
+                const getRes = await ddb.send(new GetCommand({
+                    TableName: TABLE_NAME,
+                    Key: { PK: pk, SK: sk }
+                }));
+
+                if (!getRes.Item) {
+                    return { statusCode: 404, headers: corsHeaders, body: JSON.stringify({ message: 'User data not found' }) };
+                }
+
+                const sender_info = { ...getRes.Item };
+                delete sender_info.PK;
+                delete sender_info.SK;
+
+                // Sign URLs
+                if (sender_info.card_image_url) {
+                    sender_info.card_image_url = await signUrlIfS3(sender_info.card_image_url, BUCKET_NAME);
+                }
+                if (sender_info.detail_html) {
+                    sender_info.detail_html = await signUrlsInHtml(sender_info.detail_html, BUCKET_NAME);
+                }
+                if (sender_info.html_image_urls && Array.isArray(sender_info.html_image_urls)) {
+                    sender_info.html_image_urls = await Promise.all(
+                        sender_info.html_image_urls.map((url: string) => signUrlIfS3(url, BUCKET_NAME))
+                    );
+                }
+
+                return {
+                    statusCode: 200,
+                    headers: corsHeaders,
+                    body: JSON.stringify({ sender_info })
+                };
+            }
 
             // === HANDLE MESSAGE ===
             if (!username || (!message && !file_url)) {
