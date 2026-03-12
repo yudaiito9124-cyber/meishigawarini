@@ -18,6 +18,7 @@ import { SiFacebook, SiInstagram, SiThreads, SiX, SiYoutube, SiLine, SiTiktok, S
 import SandboxedHtml from "@/components/SandboxedHtml";
 import { cn } from "@/lib/utils";
 import confetti from "canvas-confetti";
+import { resizeImage } from "@/lib/image-utils";
 
 
 const NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || "";
@@ -111,43 +112,6 @@ const getChatUploadUrl = async (uuid: string, pin: string, filename: string, con
     return res.json();
 };
 
-// Image Resizer Utility
-const resizeImage = (file: File, maxWidth: number = 1280): Promise<Blob> => {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.readAsDataURL(file);
-        reader.onload = (event) => {
-            const img = new Image();
-            img.src = event.target?.result as string;
-            img.onload = () => {
-                const canvas = document.createElement("canvas");
-                let width = img.width;
-                let height = img.height;
-
-                if (width > maxWidth) {
-                    height = (height * maxWidth) / width;
-                    width = maxWidth;
-                }
-                if (height > maxWidth) {
-                    width = (width * maxWidth) / height;
-                    height = maxWidth;
-                }
-
-                canvas.width = width;
-                canvas.height = height;
-                const ctx = canvas.getContext("2d");
-                ctx?.drawImage(img, 0, 0, width, height);
-
-                canvas.toBlob((blob) => {
-                    if (blob) resolve(blob);
-                    else reject(new Error("Canvas to Blob failed"));
-                }, file.type, 0.8);
-            };
-            img.onerror = reject;
-        };
-        reader.onerror = reject;
-    });
-};
 
 // Linkify Helper
 const renderTextWithLinks = (text: string) => {
@@ -557,14 +521,23 @@ export default function ReceivePage() {
         if (!uuid || !pin) return;
         setSenderInfoLoading(true);
         try {
-            const res = await fetch(`${NEXT_PUBLIC_API_URL}/recipient/qrcodes/${uuid}/upload-url?pin=${pin}&filename=${encodeURIComponent(file.name)}&contentType=${encodeURIComponent(file.type)}&fileSize=${file.size}&folder=sendercontent`);
+            let uploadFile: File | Blob = file;
+            if (file.type.startsWith("image/")) {
+                try {
+                    uploadFile = await resizeImage(file);
+                } catch (err) {
+                    console.error("Resize failed", err);
+                }
+            }
+
+            const res = await fetch(`${NEXT_PUBLIC_API_URL}/recipient/qrcodes/${uuid}/upload-url?pin=${pin}&filename=${encodeURIComponent(file.name)}&contentType=${encodeURIComponent(uploadFile.type)}&fileSize=${uploadFile.size}&folder=sendercontent`);
             if (!res.ok) throw new Error('Failed to get upload URL');
             const { uploadUrl, publicUrl } = await res.json();
 
             const s3Res = await fetch(uploadUrl, {
                 method: 'PUT',
-                headers: { 'Content-Type': file.type },
-                body: file
+                headers: { 'Content-Type': uploadFile.type },
+                body: uploadFile
             });
             if (!s3Res.ok) throw new Error('Failed to upload to S3');
 

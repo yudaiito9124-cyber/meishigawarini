@@ -21,6 +21,7 @@ import QRScanner from '@/components/ui/qr-scanner';
 import SandboxedHtml from '@/components/SandboxedHtml';
 import { APP_CONFIG } from '@/lib/config';
 import { generateId } from '@/lib/id';
+import { resizeImage } from "@/lib/image-utils";
 
 const NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
@@ -214,12 +215,21 @@ export default function ShopPage() {
 
         setIsUploadingHtmlImage(true);
         try {
+            let uploadFile: File | Blob = file;
+            if (file.type.startsWith("image/")) {
+                try {
+                    uploadFile = await resizeImage(file);
+                } catch (err) {
+                    console.error("Resize failed", err);
+                }
+            }
+
             // 1. Get Presigned URL
             const res = await fetchWithAuth(`/shop/${shopId}/products/upload-url`, {
                 method: 'POST',
                 body: JSON.stringify({
                     filename: `${generateId()}.${file.name.split('.').pop()}`,
-                    contentType: file.type,
+                    contentType: uploadFile.type,
                     folder: 'shopcontent'
                 })
             });
@@ -230,8 +240,8 @@ export default function ShopPage() {
             // 2. Upload to S3
             const uploadRes = await fetch(uploadUrl, {
                 method: 'PUT',
-                body: file,
-                headers: { 'Content-Type': file.type }
+                body: uploadFile,
+                headers: { 'Content-Type': uploadFile.type }
             });
 
             if (!uploadRes.ok) throw new Error('Failed to upload image');
@@ -254,45 +264,6 @@ export default function ShopPage() {
         }
     };
 
-    const resizeImage = (file: File): Promise<Blob> => {
-        return new Promise((resolve, reject) => {
-            const img = new Image();
-            img.src = URL.createObjectURL(file);
-            img.onload = () => {
-                const canvas = document.createElement('canvas');
-                const ctx = canvas.getContext('2d');
-                if (!ctx) return reject('No context');
-
-                // Target dimensions: 16:9 (1280x720)
-                const TARGET_WIDTH = 1280;
-                const TARGET_HEIGHT = 720;
-
-                canvas.width = TARGET_WIDTH;
-                canvas.height = TARGET_HEIGHT;
-
-                // Fill white background
-                ctx.fillStyle = '#ffffff';
-                ctx.fillRect(0, 0, TARGET_WIDTH, TARGET_HEIGHT);
-
-                // Calculate Scale for Contain (Fit within box, maintaining aspect ratio)
-                const scale = Math.min(TARGET_WIDTH / img.width, TARGET_HEIGHT / img.height);
-                const dWidth = img.width * scale;
-                const dHeight = img.height * scale;
-
-                const dx = (TARGET_WIDTH - dWidth) / 2;
-                const dy = (TARGET_HEIGHT - dHeight) / 2;
-
-                // Draw
-                ctx.drawImage(img, dx, dy, dWidth, dHeight);
-
-                canvas.toBlob((blob) => {
-                    if (blob) resolve(blob);
-                    else reject('Canvas to Blob failed');
-                }, file.type, 0.9);
-            };
-            img.onerror = reject;
-        });
-    };
 
     const handleCreateProduct = async (e: React.FormEvent) => {
         e.preventDefault();

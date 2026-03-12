@@ -102,6 +102,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 
         const items = [];
         const ids = [];
+        const batch_id = generateId();
 
         for (let i = 0; i < count; i++) {
             const uuid = generateId();
@@ -117,6 +118,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 PK: { S: `QR#${uuid}` },
                 SK: { S: 'METADATA' },
                 pin: { S: pin },
+                batch_id: { S: batch_id }, // Store the batch ID
                 ts_created_at: { S: now },
                 ts_updated_at: { S: now }
             };
@@ -159,6 +161,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             body: JSON.stringify({
                 message: 'QR Codes generated',
                 count: items.length,
+                batch_id: batch_id,
                 data: ids
             })
         };

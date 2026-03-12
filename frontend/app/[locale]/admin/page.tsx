@@ -98,7 +98,7 @@ export default function AdminPage() {
 
             if (res.ok) {
                 const data = await res.json();
-                const batchid = `batch-${generateId()}`;
+                const batchid = `batch-${data.batch_id}`;
                 const now = new Date();
 
                 const newBatch = {

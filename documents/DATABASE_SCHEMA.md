@@ -69,6 +69,7 @@ QRコードのライフサイクルや注文ステータス、商品との紐付
 | `status` | String | QRの進行状態 (`UNASSIGNED` 〜 `BANNED`) ※詳細は2.6章 |
 | `shop_id` | String | 紐付け先のショップID （未連携時は存在しないか空） |
 | `product_id` | String | 紐付け先の商品ID （未連携時は存在しないか空） |
+| `batch_id` | String | QRコード生成時のバッチID（同じタイミングで生成されたQRは同じIDを持つ） |
 | `memo_for_users` | String | ショップからの受取人向けメッセージ （任意の文字列） |
 | `memo_for_shop` | String | ショップ自身の検索・管理用メモ欄 （任意の文字列） |
 | `password_hash` | String | ユーザー設定の追加パスワードハッシュ値 (現在パスワード機能は無効化中) |
