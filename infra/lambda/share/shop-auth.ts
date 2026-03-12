@@ -1,0 +1,36 @@
+import { DynamoDBDocumentClient, GetCommand } from '@aws-sdk/lib-dynamodb';
+
+/**
+ * ユーザーがショップのオーナーまたはGMであるか確認する
+ * @param ddb DynamoDBDocumentClient
+ * @param tableName テーブル名
+ * @param shopuuid ショップのUUID
+ * @param userid ユーザーID
+ * @returns ショップのメタデータ、または権限がない場合はfalse
+ */
+export async function checkShopOwnerOrGM(ddb: DynamoDBDocumentClient, tableName: string, shopuuid: string | undefined, userid: string) {
+    if (!shopuuid || !userid) return false;
+
+    const userRes = await ddb.send(new GetCommand({
+        TableName: tableName,
+        Key: { PK: `USER#${userid}`, SK: 'SHOP' }
+    }));
+
+    if (!userRes?.Item) return false;
+    const userInfo = userRes.Item;
+
+    // owner_shop_ids または gm_shop_ids に含まれているかチェック
+    const owner_shop_ids = userInfo.owner_shop_ids || [];
+    const gm_shop_ids = userInfo.gm_shop_ids || [];
+
+    if (!owner_shop_ids.includes(shopuuid) && !gm_shop_ids.includes(shopuuid)) return false;
+
+    const shopRes = await ddb.send(new GetCommand({
+        TableName: tableName,
+        Key: { PK: `SHOP#${shopuuid}`, SK: 'METADATA' }
+    }));
+    if (!shopRes?.Item) return false;
+
+    return shopRes.Item;
+}
+

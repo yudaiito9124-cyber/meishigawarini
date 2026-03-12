@@ -4,6 +4,7 @@ import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, QueryCommand, BatchGetCommand, UpdateCommand, GetCommand } from '@aws-sdk/lib-dynamodb';
 import { createShippingNotificationEmail } from './templates/email';
 import { sendEmail } from './utils/email-client';
+import { checkShopOwnerOrGM } from './share/shop-auth';
 
 const client = new DynamoDBClient({});
 // const ses = new SESClient({}); // Removed SES for Resend
@@ -32,12 +33,9 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         }
 
         // Verify Shop Ownership
-        const shopRes = await ddb.send(new GetCommand({
-            TableName: TABLE_NAME,
-            Key: { PK: `SHOP#${shopId}`, SK: 'METADATA' }
-        }));
+        const shopMetadata = await checkShopOwnerOrGM(ddb, TABLE_NAME, shopId, userId);
 
-        if (!shopRes.Item || shopRes.Item.owner_id !== userId) {
+        if (!shopMetadata) {
             return { statusCode: 401, headers: corsHeaders, body: 'Unauthorized' };
         }
         //////////// ここから下は 認証済みかつショップオーナーのみアクセス可能
@@ -155,25 +153,10 @@ async function handleListShopOrders(shopId: string, queryParams?: any) {
     }
 
     // 3. BatchGet to get details (ORDER sk)
-    // Construct keys for BatchGet
-    const keys = relevantItems.map(item => ({
-        PK: item.PK,
-        SK: 'ORDER'
-    }));
-
-    // Chunking not implemented for prototype (assume < 100)
-    // If keys > 100, we should slice
-    if (keys.length > 100) {
-        // quick fix for prototype safety
-        // keys.length = 100; 
-        // But better to process in chunks if we want to support it. 
-        // For now let's just warn or slice.
-        console.warn("More than 100 items, truncating BatchGet");
-        // We can't easily truncate 'relevantItems' parallel to 'keys' without slicing both.
-        // Let's slice relevantItems first.
-        relevantItems = relevantItems.slice(0, 100);
-        // Reform keys
-        const keysSliced = relevantItems.map(item => ({
+    const allOrderDetails: any[] = [];
+    for (let i = 0; i < relevantItems.length; i += 100) {
+        const chunk = relevantItems.slice(i, i + 100);
+        const keys = chunk.map(item => ({
             PK: item.PK,
             SK: 'ORDER'
         }));
@@ -181,29 +164,22 @@ async function handleListShopOrders(shopId: string, queryParams?: any) {
         const batchRes = await ddb.send(new BatchGetCommand({
             RequestItems: {
                 [TABLE_NAME]: {
-                    Keys: keysSliced
+                    Keys: keys
                 }
             }
         }));
 
-        // ... process responses ...
-        return processBatchResponses(batchRes, relevantItems);
+        if (batchRes.Responses?.[TABLE_NAME]) {
+            allOrderDetails.push(...batchRes.Responses[TABLE_NAME]);
+        }
     }
 
-    const batchRes = await ddb.send(new BatchGetCommand({
-        RequestItems: {
-            [TABLE_NAME]: {
-                Keys: keys
-            }
-        }
-    }));
-
-    return processBatchResponses(batchRes, relevantItems);
+    return renderOrderItems(allOrderDetails, relevantItems);
 }
 
-function processBatchResponses(batchRes: any, relevantItems: any[]) {
+function renderOrderItems(allOrderDetails: any[], relevantItems: any[]) {
     const orderDetailsMap = new Map();
-    (batchRes.Responses?.[TABLE_NAME] || []).forEach((item: any) => {
+    allOrderDetails.forEach((item: any) => {
         orderDetailsMap.set(item.PK, item);
     });
 

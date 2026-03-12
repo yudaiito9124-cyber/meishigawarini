@@ -177,7 +177,7 @@ export default function ShopPage() {
             if (res.ok) {
                 const data = await res.json();
                 // Filter out the current shop
-                setImportShops((data.shops || []).filter((s: any) => s.PK !== `SHOP#${shopId}`));
+                setImportShops((data.shops || []).filter((s: any) => s.id !== shopId));
             }
         } catch (error) {
             console.error('Failed to fetch import shops', error);
@@ -1278,7 +1278,7 @@ export default function ShopPage() {
                                                     >
                                                         <option value="">{t('importProduct.placeholder')}</option>
                                                         {importShops.map(s => (
-                                                            <option key={s.PK} value={s.PK}>{s.name || s.PK}</option>
+                                                            <option key={s.id} value={s.id}>{s.name || s.id}</option>
                                                         ))}
                                                     </select>
                                                 </div>

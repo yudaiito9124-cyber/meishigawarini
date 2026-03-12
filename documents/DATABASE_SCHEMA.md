@@ -15,6 +15,9 @@
 | **QR Metadata (QRコード及び注文ステータス)** | `QR#{uuid}` | `METADATA` |
 | **QR Order (受取人入力の配送先情報)** | `QR#{uuid}` | `ORDER` |
 | **QR Chat (チャット履歴)** | `QR#{uuid}` | `CHAT` |
+| **User (ユーザー情報 ショップのオーナー・管理者)** | `USER#{userId}` | `SHOP` |
+| **User (ユーザー情報 プレゼントを渡す人)** | `USER#{userId}` | `SENDER` |
+
 
 ---
 
@@ -119,7 +122,21 @@ QRコードのライフサイクルや注文ステータス、商品との紐付
 | `email_preferences` | Map | メール通知の設定情報マップ （言語情報等、例: `{"user@example.com": "ja"}`） |
 | `sender_info` | JSon | プレゼントを渡した人の名刺情報等（`detail_html` を含む）
 
-### 2.6 レコードが保持可能な状態 (ステータス) 一覧
+### 2.6 User (ユーザー・権限情報)
+ユーザーの基本情報と、管理・権限を持つショップのID一覧を保持します。ユーザーが最初にショップを作成した際、または既存のショップオーナーが初めてログインした際に自動生成されます。
+
+| 属性名 | 型 | 説明 |
+| --- | --- | --- |
+| `PK` | String | `USER#{userId}` （`userId` はCognitoの `sub` 属性） |
+| `SK` | String | 常に固定値 `SHOP` |
+| `email` | String | ユーザーのメールアドレス |
+| `roles` | Array | ユーザーに付与されたロールの配列 （例: `['SHOP_MANAGER', 'GENERAL_MANAGER']`） |
+| `owner_shop_ids` | Array | 自身がオーナーであるショップID（`shopId`）の配列 |
+| `gm_shop_ids` | Array | 管理権限（General Manager）を持つショップIDの配列 |
+| `ts_created_at` | String | 作成日時 （ISO 8601形式のUTC日時文字列） |
+
+### 2.7 レコードが保持可能な状態 (ステータス) 一覧
+
 
 データベース内の `status` 属性が取りうる状態とその意味を定義します。
 

@@ -333,39 +333,16 @@ export class InfraStack extends cdk.Stack {
       authorizationType: apigateway.AuthorizationType.COGNITO
     });
 
-    // Lambda: Admin User Shops Mgmt (NEW)
-    const adminUserMgmtFn = new nodejs.NodejsFunction(this, 'AdminUserMgmtFn', {
-      entry: path.join(__dirname, '../lambda/admin-user-mgmt.ts'),
-      ...commonProps,
-      environment: {
-        ...commonProps.environment,
-        USER_POOL_ID: userPool.userPoolId,
-      }
-    });
-    table.grantReadWriteData(adminUserMgmtFn);
-    adminUserMgmtFn.addToRolePolicy(new iam.PolicyStatement({
-      actions: ['cognito-idp:AdminGetUser'],
-      resources: [userPool.userPoolArn]
-    }));
-
-    const adminUserResource = adminResource.addResource('users');
-    const adminUserShopResource = adminUserResource.addResource('shop');
-    adminUserShopResource.addMethod('POST', new apigateway.LambdaIntegration(adminUserMgmtFn), {
-      authorizer,
-      authorizationType: apigateway.AuthorizationType.COGNITO
-    });
-
-
 
     //////////////////////////////////////
     // Shop Routes
 
     const shopResource = api.root.addResource('shop'); // shop
-    // shop POST #CreateShop
-    shopResource.addMethod('POST', new apigateway.LambdaIntegration(shopMgmtFn), {
-      authorizer,
-      authorizationType: apigateway.AuthorizationType.COGNITO
-    });
+    // // shop POST #CreateShop
+    // shopResource.addMethod('POST', new apigateway.LambdaIntegration(shopMgmtFn), {
+    //   authorizer,
+    //   authorizationType: apigateway.AuthorizationType.COGNITO
+    // });
     // shop GET #ListShops
     shopResource.addMethod('GET', new apigateway.LambdaIntegration(shopMgmtFn), {
       authorizer,

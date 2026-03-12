@@ -6,6 +6,7 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import * as crypto from 'crypto';
 import { generateId } from './utils/id';
 import { signUrlIfS3, stripSignature, signUrlsInHtml, deleteFileByUrl } from './utils/s3';
+import { checkShopOwnerOrGM } from './share/shop-auth';
 
 const client = new DynamoDBClient({});
 const ddb = DynamoDBDocumentClient.from(client);
@@ -20,19 +21,8 @@ const corsHeaders = {
     'Access-Control-Allow-Methods': 'POST,GET,PATCH,DELETE'
 };
 
-const DEFAULT_VALID_DAYS = parseInt(process.env.DEFAULT_VALID_DAYS || '1');
+const DEFAULT_VALID_DAYS = parseInt(process.env.DEFAULT_VALID_DAYS || '180');
 
-async function checkShopOwner(shopuuid: string | undefined, userid: string) {
-    if (!shopuuid || !userid) return false;
-
-    const shopRes = await ddb.send(new GetCommand({
-        TableName: TABLE_NAME,
-        Key: { PK: `SHOP#${shopuuid}`, SK: 'METADATA' }
-    }));
-    if (!shopRes.Item || shopRes.Item.owner_id !== userid) return false;
-
-    return shopRes.Item;
-}
 
 export const handler: APIGatewayProxyHandler = async (event) => {
     try {
@@ -43,32 +33,72 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         const claims = event.requestContext?.authorizer?.claims;
         const userId = claims?.sub; // 'sub' is the unique user ID in Cognito
 
-
         // 認証済みか確認
         if (!userId) return { statusCode: 401, headers: corsHeaders, body: 'Unauthorized' };
         //////////// ここから下は 認証済みの場合のみアクセス可能
 
+        let roles = [];
+        let owner_shop_ids = []; // オーナー(最高責任者)となっているショップ，PK:SHOP#[shopID]のowner_idと GSI2_PK: USER#[userId] に記載されている
+        let gm_shop_ids = []; // 複数のショップを管理する立場，そのショップのオーナーではないがオーナーと同等の権限を持っている (admin画面でユーザーに既存ショップを紐づける)　'GENERAL_MANAGER'
 
-        // 1. Create Shop (POST /shop)
-        // Requires Auth
-        if (method === 'POST' && path.endsWith('/shop') && !shopId) {
-            if (!userId) return { statusCode: 401, headers: corsHeaders, body: 'Unauthorized' };
+        // Check for Role Record
+        let userRes = await ddb.send(new GetCommand({
+            TableName: TABLE_NAME,
+            Key: { PK: `USER#${userId}`, SK: 'SHOP' }
+        }));
 
-            const body = JSON.parse(event.body || '{}');
-            const { name } = body;
-            if (!name) return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Missing name' }) };
+        // regacy support (ユーザーレコードがない時代のショップの場合はGENERAL_MANAGERとしてユーザーレコードに登録)
+        if (!userRes?.Item) {
+            const res = await ddb.send(new QueryCommand({
+                TableName: TABLE_NAME,
+                IndexName: 'GSI2',
+                KeyConditionExpression: 'GSI2_PK = :uid',
+                ExpressionAttributeValues: { ':uid': `USER#${userId}` }
+            }));
+            let regacy_shop_ids = res.Items?.map((item: any) => item.PK.replace('SHOP#', '')) || [];
 
-            const email = claims.email; // Get email from Cognito claims
+            // 既存ユーザでUSERレコードがない場合、新規作成
+            if (regacy_shop_ids) {
+                console.log(`Auto-creating user record for existing user ${userId}`);
+                const now = new Date().toISOString();
+                const email = claims?.email;
 
+                // Create Role Record
+                await ddb.send(new PutCommand({
+                    TableName: TABLE_NAME,
+                    Item: {
+                        PK: `USER#${userId}`,
+                        SK: 'SHOP',
+                        email,
+                        roles: ['SHOP_MANAGER'],
+                        owner_shop_ids: regacy_shop_ids,
+                        gm_shop_ids: [],
+                        ts_created_at: now
+                    }
+                }));
+
+                roles = ['SHOP_MANAGER'];
+                owner_shop_ids = regacy_shop_ids;
+                gm_shop_ids = [];
+            }
+        }
+
+        // 新規ユーザーはSHOP_MANAGERで必ず一つはショップを持つ
+        if (!userRes?.Item && owner_shop_ids.length === 0) {
+            // AUTO-CREATION LOGIC: No roles found at all
+            console.log(`Auto-creating shop for new user ${userId}`);
             const newShopId = generateId();
             const now = new Date().toISOString();
+            const email = claims?.email;
+
+            // Create Shop Metadata
             await ddb.send(new PutCommand({
                 TableName: TABLE_NAME,
                 Item: {
                     PK: `SHOP#${newShopId}`,
                     SK: 'METADATA',
-                    name,
-                    email, // Store email
+                    name: "My Default Shop",
+                    email,
                     owner_id: userId, // Link to User
                     GSI2_PK: `USER#${userId}`, // GSI2 for Owner Listing
                     GSI2_SK: now,
@@ -76,116 +106,77 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 }
             }));
 
-            return { statusCode: 201, headers: corsHeaders, body: JSON.stringify({ shop_id: newShopId, message: 'Shop created' }) };
+            // Create Role Record
+            await ddb.send(new PutCommand({
+                TableName: TABLE_NAME,
+                Item: {
+                    PK: `USER#${userId}`,
+                    SK: 'SHOP',
+                    email,
+                    roles: ['SHOP_MANAGER'],
+                    owner_shop_ids: [newShopId],
+                    gm_shop_ids: [],
+                    ts_created_at: now
+                }
+            }));
+
+            roles = ['SHOP_MANAGER'];
+            owner_shop_ids = [newShopId];
+            gm_shop_ids = [];
         }
+        else {
+            roles = userRes?.Item?.roles;
+            owner_shop_ids = userRes?.Item?.owner_shop_ids || [];
+            gm_shop_ids = userRes?.Item?.gm_shop_ids || [];
+        }
+
 
         // 2. List My Shops (GET /shop)
         if (method === 'GET' && path.endsWith('/shop') && !shopId) {
-            // Check for Role Record
-            let roleRes = await ddb.send(new GetCommand({
-                TableName: TABLE_NAME,
-                Key: { PK: `USER#${userId}`, SK: 'SHOP_MANAGER' }
+            let shops = [...owner_shop_ids, ...gm_shop_ids];
+            if (shops.length === 0) {
+                return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ shops: [], roles, owner_shop_ids, gm_shop_ids }) };
+            }
+
+            const shopKeys = shops.map(id => ({
+                PK: `SHOP#${id}`,
+                SK: 'METADATA'
             }));
-            let role = 'SHOP_MANAGER';
-            
-            if (!roleRes.Item) {
-                roleRes = await ddb.send(new GetCommand({
-                    TableName: TABLE_NAME,
-                    Key: { PK: `USER#${userId}`, SK: 'GENERAL_MANAGER' }
-                }));
-                if (roleRes.Item) role = 'GENERAL_MANAGER';
-            }
-
-            let shops: any[] = [];
-
-            if (roleRes.Item) {
-                // Role exists, fetch shops
-                const targetIds = role === 'SHOP_MANAGER' 
-                    ? [roleRes.Item.shop_id] 
-                    : (roleRes.Item.shop_ids || []);
-
-                if (targetIds.length > 0) {
-                    const keys = targetIds.map((id: string) => ({ PK: `SHOP#${id}`, SK: 'METADATA' }));
-                    const batchRes = await ddb.send(new BatchGetCommand({
-                        RequestItems: {
-                            [TABLE_NAME]: { Keys: keys }
-                        }
-                    }));
-                    shops = batchRes.Responses?.[TABLE_NAME] || [];
+            const res = await ddb.send(new BatchGetCommand({
+                RequestItems: {
+                    [TABLE_NAME]: {
+                        Keys: shopKeys
+                    }
                 }
-            } else {
-                // Legacy Fallback / No Role
-                const res = await ddb.send(new QueryCommand({
-                    TableName: TABLE_NAME,
-                    IndexName: 'GSI2',
-                    KeyConditionExpression: 'GSI2_PK = :uid',
-                    ExpressionAttributeValues: { ':uid': `USER#${userId}` }
-                }));
-                shops = res.Items || [];
+            }));
+            const shopList = shops.map(id => {
+                const item = res.Responses?.[TABLE_NAME]?.find(s => s.PK === `SHOP#${id}`);
+                return item ? {
+                    id: id,
+                    name: item.name,
+                    ts_created_at: item.ts_created_at
+                } : null;
+            }).filter(Boolean);
 
-                if (shops.length === 0) {
-                    // AUTO-CREATION LOGIC: No shops found at all
-                    console.log(`Auto-creating shop for new user ${userId}`);
-                    const newShopId = generateId();
-                    const now = new Date().toISOString();
-                    const email = claims?.email;
-
-                    // Create Shop Metadata
-                    await ddb.send(new PutCommand({
-                        TableName: TABLE_NAME,
-                        Item: {
-                            PK: `SHOP#${newShopId}`,
-                            SK: 'METADATA',
-                            name: "My Shop",
-                            email,
-                            owner_id: userId,
-                            GSI2_PK: `USER#${userId}`,
-                            GSI2_SK: now,
-                            ts_created_at: now
-                        }
-                    }));
-
-                    // Create Role Record
-                    await ddb.send(new PutCommand({
-                        TableName: TABLE_NAME,
-                        Item: {
-                            PK: `USER#${userId}`,
-                            SK: 'SHOP_MANAGER',
-                            shop_id: newShopId,
-                            ts_created_at: now
-                        }
-                    }));
-
-                    // Return the newly created shop
-                    shops = [{
-                        PK: `SHOP#${newShopId}`,
-                        SK: 'METADATA',
-                        name: "My Shop",
-                        ts_created_at: now
-                    }];
-                    role = 'SHOP_MANAGER';
-                } else {
-                    // Existing shops without role record (transition state)
-                    // We'll treat them as SHOP_MANAGER if 1 shop, otherwise GENERAL_MANAGER
-                    role = shops.length === 1 ? 'SHOP_MANAGER' : 'GENERAL_MANAGER';
-                }
-            }
-
-            return { 
-                statusCode: 200, 
-                headers: corsHeaders, 
-                body: JSON.stringify({ shops, role }) 
+            return {
+                statusCode: 200,
+                headers: corsHeaders,
+                body: JSON.stringify({ shops: shopList, roles, owner_shop_ids, gm_shop_ids })
             };
         }
 
-
+        // ここから下はショップ権限を要求
+        if (!shopId) {
+            return { statusCode: 401, headers: corsHeaders, body: JSON.stringify({ message: 'Unauthorized' }) };
+        }
 
         let shopMetadata: any = null;
-        shopMetadata = await checkShopOwner(shopId, userId);
+        shopMetadata = await checkShopOwnerOrGM(ddb, TABLE_NAME, shopId, userId);
+
         if (shopMetadata === false) {
             return { statusCode: 401, headers: corsHeaders, body: JSON.stringify({ message: 'Unauthorized' }) };
         }
-        //////////// ここから下は 認証済みかつ指定されたショップ(shopId)のオーナーのみアクセス可能
+        //////////// ここから下は 認証済みかつ指定されたショップ(shopId)のオーナー・GMのみアクセス可能
 
 
 
@@ -272,7 +263,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 
             const productId = generateId();
             // Default valid_days to 1 if not provided
-            const validityPeriod = valid_days ? parseInt(valid_days) : DEFAULT_VALID_DAYS;
+            const validityPeriod = Math.min(valid_days ? parseInt(valid_days) : DEFAULT_VALID_DAYS, 180); // 最大180日
             const now = new Date().toISOString();
 
             await ddb.send(new PutCommand({
@@ -309,7 +300,11 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                     ':uid': `USER#${userId}`
                 }
             }));
-            return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ shops: res.Items }) };
+            const shops = (res.Items || []).map(s => ({
+                id: s.PK.replace('SHOP#', ''),
+                name: s.name
+            }));
+            return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ shops }) };
         }
 
         // 3. Import Product From My Shop (POST /shop/{shopId}/products/import)
@@ -320,7 +315,10 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 
             if (!importShopId) return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Missing importShopId' }) };
 
-            let importShopMetadata = await checkShopOwner(importShopId, userId)
+            // Ensure we use clean ID if passed with prefix
+            importShopId = String(importShopId).replace('SHOP#', '');
+
+            let importShopMetadata = await checkShopOwnerOrGM(ddb, TABLE_NAME, importShopId, userId)
             if (importShopMetadata === false) {
                 return { statusCode: 401, headers: corsHeaders, body: JSON.stringify({ message: 'Unauthorized for import source shop' }) };
             }

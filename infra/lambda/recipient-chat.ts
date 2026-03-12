@@ -198,7 +198,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                         const filename = sourceKey.split('/').pop();
                         const destKey = `user/${userid}/usercontent/${filename}`;
                         await copyS3Object(BUCKET_NAME, sourceKey, destKey);
-                        
+
                         const region = process.env.AWS_REGION || 'ap-northeast-1';
                         return `https://${BUCKET_NAME}.s3.${region}.amazonaws.com/${destKey}`;
                     } catch (e) {
@@ -227,7 +227,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 const keys = Object.keys(newSenderInfo);
                 await ddb.send(new UpdateCommand({
                     TableName: TABLE_NAME,
-                    Key: { PK: `USER#${userid}`, SK: 'SENDING' },
+                    Key: { PK: `USER#${userid}`, SK: 'SENDER' },
                     UpdateExpression: 'SET ' + ['#ts = :ts', ...keys.map((_, i) => `#field${i} = :val${i}`)].join(', '),
                     ExpressionAttributeNames: {
                         '#ts': 'ts_created_at',

@@ -46,10 +46,10 @@ export default function ShopListPage() {
                 const data = await res.json();
                 const shopList = data.shops || [];
                 setShops(shopList);
-                
+
                 // Auto-redirect if SHOP_MANAGER and has exactly one shop
-                if (data.role === 'SHOP_MANAGER' && shopList.length === 1) {
-                    const shopId = shopList[0].PK.replace('SHOP#', '');
+                if (shopList.length === 1) {
+                    const shopId = shopList[0].id;
                     router.replace(`/shop/${shopId}`);
                 }
             } else {
@@ -59,32 +59,6 @@ export default function ShopListPage() {
             console.error(e);
         } finally {
             setLoading(false);
-        }
-    };
-
-    const handleCreateShop = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setCreating(true);
-        try {
-            const res = await fetchWithAuth('/shop', {
-                method: 'POST',
-                body: JSON.stringify({ name: createName })
-            });
-
-            if (res.ok) {
-                const data = await res.json();
-                // Redirect to the new shop
-                router.push(`/shop/${data.shop_id}`);
-            } else {
-                const text = await res.text();
-                console.error('Create Shop Failed:', text);
-                alert(`Failed to create shop: ${text}`);
-            }
-        } catch (e) {
-            console.error(e);
-            alert('Error creating shop');
-        } finally {
-            setCreating(false);
         }
     };
 
@@ -122,7 +96,7 @@ export default function ShopListPage() {
                         </div>
                     ) : (
                         shops.map((shop) => (
-                            <Card key={shop.PK} className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => router.push(`/shop/${shop.PK.replace('SHOP#', '')}`)}>
+                            <Card key={shop.id} className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => router.push(`/shop/${shop.id}`)}>
                                 <CardHeader>
                                     <CardTitle>{shop.name}</CardTitle>
                                     <CardDescription>{t('created', { date: new Date(shop.ts_created_at).toLocaleString() })}</CardDescription>
