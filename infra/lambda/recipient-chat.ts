@@ -5,7 +5,7 @@ import { DynamoDBDocumentClient, GetCommand, UpdateCommand } from '@aws-sdk/lib-
 import { createMessageNotificationEmail } from './templates/email';
 import { sendEmail } from './utils/email-client';
 import { isLocked, getRateLimitUpdate, getResetRateLimitUpdate } from './utils/rate-limit';
-import { signUrlIfS3, stripSignature, signUrlsInHtml, deleteFileByUrl, copyS3Object } from './utils/s3';
+import { signUrlIfS3, stripSignature, signUrlsInHtml, deleteFileByUrl, copyS3Object, stripSignaturesInHtml } from './utils/s3';
 
 import * as crypto from 'crypto';
 import { generateId } from './utils/id';
@@ -139,14 +139,58 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                         ':info': {
                             ...sender_info,
                             card_image_url: stripSignature(sender_info.card_image_url),
-                            html_image_urls: (sender_info.html_image_urls || []).map((url: string) => stripSignature(url))
+                            html_image_urls: (sender_info.html_image_urls || []).map((url: string) => stripSignature(url)),
+                            detail_html: stripSignaturesInHtml(sender_info.detail_html, BUCKET_NAME)
                         }
                     },
                     ReturnValues: 'ALL_OLD'
                 }));
 
-                // Delete old image from S3 if it exists and has changed
+                // Mailing list management for sender email
                 const oldSenderInfo = res.Attributes?.sender_info;
+                const oldEmail = oldSenderInfo?.email;
+                const newEmail = sender_info.email;
+
+                if (oldEmail !== newEmail) {
+                    if (oldEmail) {
+                        try {
+                            await ddb.send(new UpdateCommand({
+                                TableName: TABLE_NAME,
+                                Key: { PK: `QR#${uuid}`, SK: 'CHAT' },
+                                UpdateExpression: 'DELETE notification_emails :old_email REMOVE email_preferences.#em',
+                                ExpressionAttributeNames: { '#em': oldEmail },
+                                ExpressionAttributeValues: { ':old_email': new Set([oldEmail]) }
+                            }));
+                        } catch (e) {
+                            console.error("Failed to remove old sender email from mailing list:", e);
+                        }
+                    }
+                    if (newEmail) {
+                        try {
+                            const lang = locale === 'ja' ? 'ja' : 'en';
+                            await ddb.send(new UpdateCommand({
+                                TableName: TABLE_NAME,
+                                Key: { PK: `QR#${uuid}`, SK: 'CHAT' },
+                                UpdateExpression: 'ADD notification_emails :new_email SET email_preferences = if_not_exists(email_preferences, :empty_map)',
+                                ExpressionAttributeValues: {
+                                    ':new_email': new Set([newEmail]),
+                                    ':empty_map': {}
+                                }
+                            }));
+                            await ddb.send(new UpdateCommand({
+                                TableName: TABLE_NAME,
+                                Key: { PK: `QR#${uuid}`, SK: 'CHAT' },
+                                UpdateExpression: 'SET email_preferences.#em = :lang',
+                                ExpressionAttributeNames: { '#em': newEmail },
+                                ExpressionAttributeValues: { ':lang': lang }
+                            }));
+                        } catch (e) {
+                            console.error("Failed to add new sender email to mailing list:", e);
+                        }
+                    }
+                }
+
+                // Delete old image from S3 if it exists and has changed
                 const oldImageUrl = oldSenderInfo?.card_image_url;
                 const newImageUrl = stripSignature(sender_info.card_image_url);
 
@@ -176,6 +220,23 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                     headers: corsHeaders,
                     body: JSON.stringify({ message: 'Sender info updated', data: sender_info })
                 };
+            }
+
+            // === HANDLE DELETE IMAGES ===
+            if (type === 'delete_images') {
+                const { urls } = body;
+                if (!urls || !Array.isArray(urls)) {
+                    return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Missing urls' }) };
+                }
+
+                for (const url of urls) {
+                    const cleanUrl = stripSignature(url);
+                    // Security Check: Only allow if it belongs to this qrcode and bucket
+                    if (cleanUrl && cleanUrl.includes(BUCKET_NAME) && (cleanUrl.includes(`qrcode/${uuid}/`) || cleanUrl.includes(`user/`))) {
+                        await deleteFileByUrl(cleanUrl, BUCKET_NAME);
+                    }
+                }
+                return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ message: 'Images deleted' }) };
             }
 
             // === HANDLE SAVE AS NEW USER ===

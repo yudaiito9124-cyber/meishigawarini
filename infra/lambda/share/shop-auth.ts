@@ -5,11 +5,28 @@ import { DynamoDBDocumentClient, GetCommand } from '@aws-sdk/lib-dynamodb';
  * @param ddb DynamoDBDocumentClient
  * @param tableName テーブル名
  * @param shopuuid ショップのUUID
- * @param userid ユーザーID
+ * @param event APIGatewayProxyEvent (認証情報を抽出するため)
  * @returns ショップのメタデータ、または権限がない場合はfalse
  */
-export async function checkShopOwnerOrGM(ddb: DynamoDBDocumentClient, tableName: string, shopuuid: string | undefined, userid: string) {
+export async function checkShopOwnerOrGM(ddb: DynamoDBDocumentClient, tableName: string, shopuuid: string | undefined, userid: string, event: any = null) {
+
     if (!shopuuid || !userid) return false;
+
+    if (event) {
+        const claims = event.requestContext?.authorizer?.claims;
+        const userid = claims?.sub;
+        const userGroups = (claims?.['cognito:groups'] as string[]) || [];
+        // GlobalAdmins グループに属している場合は、オーナーチェックをスキップしてメタデータを返す
+        const isGlobalAdmin = userGroups.includes('GlobalAdmins');
+
+        if (isGlobalAdmin) {
+            const shopRes = await ddb.send(new GetCommand({
+                TableName: tableName,
+                Key: { PK: `SHOP#${shopuuid}`, SK: 'METADATA' }
+            }));
+            return shopRes.Item || false;
+        }
+    }
 
     const userRes = await ddb.send(new GetCommand({
         TableName: tableName,
@@ -29,8 +46,6 @@ export async function checkShopOwnerOrGM(ddb: DynamoDBDocumentClient, tableName:
         TableName: tableName,
         Key: { PK: `SHOP#${shopuuid}`, SK: 'METADATA' }
     }));
-    if (!shopRes?.Item) return false;
-
-    return shopRes.Item;
+    return shopRes.Item || false;
 }
 

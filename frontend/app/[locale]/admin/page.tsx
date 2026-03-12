@@ -26,6 +26,8 @@ import {
     DialogTrigger,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import { useRouter } from "next/navigation";
+import { signOut } from 'aws-amplify/auth';
 
 export default function AdminPage() {
     const t = useTranslations('AdminPage');
@@ -35,38 +37,52 @@ export default function AdminPage() {
     const [productId, setProductId] = useState("");
     const [generatedBatches, setGeneratedBatches] = useState<any[]>([]);
     const [isAuthorized, setIsAuthorized] = useState<boolean | null>(null); // null = loading
-    const [targetUserId, setTargetUserId] = useState("");
-    const [creatingUserShop, setCreatingUserShop] = useState(false);
-
+    const router = useRouter();
 
     useEffect(() => {
         const checkAuth = async () => {
             try {
                 const session = await fetchAuthSession();
                 const token = session.tokens?.idToken?.toString();
+                const groups = (session.tokens?.idToken?.payload['cognito:groups'] as string[]) || [];
 
-                // APIを叩く
+                // 1. まずAdministratorsグループに属しているかフロントで簡易チェック
+                if (!groups.includes('Administrators')) {
+                    setIsAuthorized(false);
+                    return;
+                }
+
+                // 2. Administratorsの場合、MFAが済んでいるかチェック (amrクレームを確認)
+                // Identities Tokenのamrを確認 (mfa/software_token_mfa/sms_mfa)
+                const amr = (session.tokens?.idToken?.payload['amr'] as string[]) || [];
+                const usedMfa = amr.includes('mfa') || amr.includes('software_token_mfa') || amr.includes('sms_mfa');
+
+                if (!usedMfa) {
+                    console.log("MFA required for admin access.");
+                    alert("管理者アクセスには2段階認証が必要です。一度ログアウトし、2段階認証を有効にして再度ログインしてください。");
+                    await signOut();
+                    router.push(`/${window.location.pathname.split('/')[1]}`); // トップへリダイレクト
+                    return;
+                }
+
+                // 3. 実際にAPIを叩いてAuthorizerでの検証を確認
                 const res = await fetch(`${NEXT_PUBLIC_API_URL}/admin`, {
                     headers: { "Authorization": `Bearer ${token}` }
                 });
 
-                // 404が返ってきたら、即座に notFound 実行
-                if (res.status === 404) {
+                if (res.status === 404 || res.status === 403) {
                     setIsAuthorized(false);
-                    return notFound(); // 直接 return する
+                    return;
                 }
 
                 if (res.ok) {
                     setIsAuthorized(true);
                 } else {
                     setIsAuthorized(false);
-                    return notFound();
                 }
             } catch (e) {
                 console.error("Auth check failed", e);
                 setIsAuthorized(false);
-                return notFound(); // ここで標準404へ
-
             }
         };
         checkAuth();
@@ -121,40 +137,8 @@ export default function AdminPage() {
                 alert(errData?.message || t('batches.alerts.failed'));
             }
         } catch (e) {
-            console.error("Generate failed", e);
-            alert("QR生成に失敗しました");
-        }
-    };
-
-    const handleCreateShopForUser = async () => {
-        if (!targetUserId) return;
-        setCreatingUserShop(true);
-        try {
-            const session = await fetchAuthSession();
-            const token = session.tokens?.idToken?.toString();
-
-            const res = await fetch(`${NEXT_PUBLIC_API_URL}/admin/users/shop`, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    "Authorization": `Bearer ${token}`
-                },
-                body: JSON.stringify({ user_id: targetUserId }),
-            });
-
-            if (res.ok) {
-                const data = await res.json();
-                alert(`ショップ作成に成功しました: ${data.shop_id}`);
-                setTargetUserId("");
-            } else {
-                const data = await res.json();
-                alert(`失敗しました: ${data.message}`);
-            }
-        } catch (e) {
-            console.error("Create user shop failed", e);
-            alert("ショップ作成中にエラーが発生しました");
-        } finally {
-            setCreatingUserShop(false);
+            console.error(e);
+            alert(t('batches.alerts.error'));
         }
     };
 
@@ -371,6 +355,16 @@ export default function AdminPage() {
     return (
         <div className="min-h-screen bg-gray-50 p-8">
             <div className="max-w-4xl mx-auto space-y-6">
+                <h1 className="text-2xl font-bold">{t('title')}</h1>
+
+                <Card>
+                    <CardHeader>
+                        <CardTitle>{t('generate.title')}</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        <div className="flex flex-col gap-4">
+                            <div className="grid w-full max-w-sm items-center gap-1.5">
+                                <label htmlFor="count" className="text-sm font-medium">{t('generate.quantity')}</label>
                                 <Input
                                     id="count"
                                     type="number"

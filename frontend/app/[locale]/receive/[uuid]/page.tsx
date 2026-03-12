@@ -19,6 +19,7 @@ import SandboxedHtml from "@/components/SandboxedHtml";
 import { cn } from "@/lib/utils";
 import confetti from "canvas-confetti";
 import { resizeImage } from "@/lib/image-utils";
+import { generateId } from "@/lib/id";
 
 
 const NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || "";
@@ -438,8 +439,8 @@ export default function ReceivePage() {
                 const { uploadUrl, publicUrl } = await getChatUploadUrl(
                     uuid,
                     pin,
-                    selectedFile.name,
-                    uploadFile.type,
+                    `${generateId()}.webp`,
+                    'image/webp',
                     uploadFile.size
                 );
 
@@ -530,7 +531,7 @@ export default function ReceivePage() {
                 }
             }
 
-            const res = await fetch(`${NEXT_PUBLIC_API_URL}/recipient/qrcodes/${uuid}/upload-url?pin=${pin}&filename=${encodeURIComponent(file.name)}&contentType=${encodeURIComponent(uploadFile.type)}&fileSize=${uploadFile.size}&folder=sendercontent`);
+            const res = await fetch(`${NEXT_PUBLIC_API_URL}/recipient/qrcodes/${uuid}/upload-url?pin=${pin}&filename=${encodeURIComponent(generateId() + '.webp')}&contentType=image%2Fwebp&fileSize=${uploadFile.size}&folder=sendercontent`);
             if (!res.ok) throw new Error('Failed to get upload URL');
             const { uploadUrl, publicUrl } = await res.json();
 
@@ -613,8 +614,8 @@ export default function ReceivePage() {
             const { uploadUrl, publicUrl } = await getChatUploadUrl(
                 uuid,
                 pin,
-                file.name,
-                uploadFile.type,
+                `${generateId()}.webp`,
+                'image/webp',
                 uploadFile.size
             );
 

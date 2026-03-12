@@ -5,7 +5,7 @@ import { S3Client, PutObjectCommand, CopyObjectCommand, DeleteObjectCommand } fr
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import * as crypto from 'crypto';
 import { generateId } from './utils/id';
-import { signUrlIfS3, stripSignature, signUrlsInHtml, deleteFileByUrl } from './utils/s3';
+import { signUrlIfS3, stripSignature, signUrlsInHtml, deleteFileByUrl, stripSignaturesInHtml } from './utils/s3';
 import { checkShopOwnerOrGM } from './share/shop-auth';
 
 const client = new DynamoDBClient({});
@@ -32,6 +32,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         // Get User ID from Cognito
         const claims = event.requestContext?.authorizer?.claims;
         const userId = claims?.sub; // 'sub' is the unique user ID in Cognito
+        const userGroups = (claims?.['cognito:groups'] as string[]) || [];
 
         // 認証済みか確認
         if (!userId) return { statusCode: 401, headers: corsHeaders, body: 'Unauthorized' };
@@ -134,6 +135,11 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         // 2. List My Shops (GET /shop)
         if (method === 'GET' && path.endsWith('/shop') && !shopId) {
             let shops = [...owner_shop_ids, ...gm_shop_ids];
+
+            // GlobalAdmins の場合は、すべてのショップ（または便宜上自分の権限でなくても閲覧可能）
+            // ただし現状は「自分の管理ショップ」一覧を出す仕様なので、GlobalAdminであっても
+            // 明示的にオーナーとなっているものが出る。全ショップを見る場合は admin ページ等で対応。
+            // ここでは一貫性のために、特権があっても自分のリストを表示する。
             if (shops.length === 0) {
                 return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ shops: [], roles, owner_shop_ids, gm_shop_ids }) };
             }
@@ -171,7 +177,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         }
 
         let shopMetadata: any = null;
-        shopMetadata = await checkShopOwnerOrGM(ddb, TABLE_NAME, shopId, userId);
+        shopMetadata = await checkShopOwnerOrGM(ddb, TABLE_NAME, shopId, userId, event);
 
         if (shopMetadata === false) {
             return { statusCode: 401, headers: corsHeaders, body: JSON.stringify({ message: 'Unauthorized' }) };
@@ -211,7 +217,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             }
             if (detail_html !== undefined) {
                 updateExprParts.push('detail_html = :html');
-                attrValues[':html'] = detail_html;
+                attrValues[':html'] = stripSignaturesInHtml(detail_html, BUCKET_NAME);
             }
 
             // Handle html_image_urls specifically for S3 cleanup
@@ -274,7 +280,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                     product_id: productId, // Added product_id as per request
                     name,
                     description,
-                    detail_html: detail_html || '', // Store the HTML code
+                    detail_html: stripSignaturesInHtml(detail_html || '', BUCKET_NAME), // Store the HTML code
                     image_url: stripSignature(image_url),
                     price,
                     valid_days: validityPeriod,
@@ -318,7 +324,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             // Ensure we use clean ID if passed with prefix
             importShopId = String(importShopId).replace('SHOP#', '');
 
-            let importShopMetadata = await checkShopOwnerOrGM(ddb, TABLE_NAME, importShopId, userId)
+            let importShopMetadata = await checkShopOwnerOrGM(ddb, TABLE_NAME, importShopId, userId, event)
             if (importShopMetadata === false) {
                 return { statusCode: 401, headers: corsHeaders, body: JSON.stringify({ message: 'Unauthorized for import source shop' }) };
             }
@@ -795,6 +801,25 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             }
 
             return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ items }) };
+        }
+
+        // 9.5 Delete Images from S3 (POST /shop/{shopId}/delete-images)
+        if (method === 'POST' && path.endsWith('/delete-images')) {
+            const body = JSON.parse(event.body || '{}');
+            const { urls } = body;
+            if (!urls || !Array.isArray(urls)) {
+                return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Missing urls array' }) };
+            }
+
+            for (const url of urls) {
+                // Security Check: Only allow if it belongs to this shop and bucket
+                const cleanUrl = stripSignature(url);
+                if (cleanUrl && cleanUrl.includes(BUCKET_NAME) && cleanUrl.includes(`/shop/${shopId}/`)) {
+                    await deleteFileByUrl(cleanUrl, BUCKET_NAME);
+                }
+            }
+
+            return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ message: 'Images deleted' }) };
         }
 
         return { statusCode: 404, headers: corsHeaders, body: 'Not Found' };

@@ -2,7 +2,6 @@ import { APIGatewayProxyHandler } from 'aws-lambda';
 import { DynamoDBClient, BatchWriteItemCommand } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, GetCommand, QueryCommand } from '@aws-sdk/lib-dynamodb';
 import * as crypto from 'crypto';
-import { verifyAdmin } from './share/admin-auth-inlambda';
 import { generateId } from './utils/id';
 
 const client = new DynamoDBClient({});
@@ -16,12 +15,6 @@ const corsHeaders = {
 };
 
 export const handler: APIGatewayProxyHandler = async (event) => {
-    // 最初にadmin権限をチェック
-    const { isAdmin, errorResponse } = verifyAdmin(event);
-    // 管理者でなければ、ここで処理を終了して404を返す
-    if (!isAdmin) {
-        return errorResponse!;
-    }
 
     try {
         // Only allow POST

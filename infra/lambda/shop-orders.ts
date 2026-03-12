@@ -26,6 +26,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 
         const claims = event.requestContext?.authorizer?.claims;
         const userId = claims?.sub;
+        const userGroups = (claims?.['cognito:groups'] as string[]) || [];
         const shopId = event.pathParameters?.shopId;
 
         if (!userId || !shopId) {
@@ -33,7 +34,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         }
 
         // Verify Shop Ownership
-        const shopMetadata = await checkShopOwnerOrGM(ddb, TABLE_NAME, shopId, userId);
+        const shopMetadata = await checkShopOwnerOrGM(ddb, TABLE_NAME, shopId, userId, event);
 
         if (!shopMetadata) {
             return { statusCode: 401, headers: corsHeaders, body: 'Unauthorized' };

@@ -65,6 +65,7 @@ export default function ShopPage() {
     const [htmlImageUrlsToDelete, setHtmlImageUrlsToDelete] = useState<string[]>([]);
     const [isHtmlImageSectionOpen, setIsHtmlImageSectionOpen] = useState(false);
     const [isUploadingHtmlImage, setIsUploadingHtmlImage] = useState(false);
+    const [sessionUploadedUrls, setSessionUploadedUrls] = useState<string[]>([]);
 
 
     // Protect Route
@@ -207,7 +208,24 @@ export default function ShopPage() {
         setIsHtmlImageSectionOpen(false);
         setIsUploadingHtmlImage(false);
         setHtmlImageUrlsToDelete([]);
+        setSessionUploadedUrls([]);
     }, [isSettingsOpen, shop]);
+
+    const handleSettingsOpenChange = async (open: boolean) => {
+        if (!open && sessionUploadedUrls.length > 0) {
+            // Closed without save - Cleanup temporary uploads
+            try {
+                await fetchWithAuth(`/shop/${shopId}/delete-images`, {
+                    method: 'POST',
+                    body: JSON.stringify({ urls: sessionUploadedUrls })
+                });
+            } catch (e) {
+                console.error('Failed to cleanup temporary images', e);
+            }
+            setSessionUploadedUrls([]);
+        }
+        setIsSettingsOpen(open);
+    };
 
     const handleHtmlImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -228,8 +246,8 @@ export default function ShopPage() {
             const res = await fetchWithAuth(`/shop/${shopId}/products/upload-url`, {
                 method: 'POST',
                 body: JSON.stringify({
-                    filename: `${generateId()}.${file.name.split('.').pop()}`,
-                    contentType: uploadFile.type,
+                    filename: `${generateId()}.webp`,
+                    contentType: 'image/webp',
                     folder: 'shopcontent'
                 })
             });
@@ -248,6 +266,7 @@ export default function ShopPage() {
 
             // 3. Update State
             setHtmlImageUrls(prev => [...prev, publicUrl]);
+            setSessionUploadedUrls(prev => [...prev, publicUrl]);
         } catch (err: any) {
             console.error('HTML Image upload failed:', err);
             alert('Upload failed: ' + err.message);
@@ -293,8 +312,8 @@ export default function ShopPage() {
                 const uploadRes = await fetchWithAuth(`/shop/${shopId}/products/upload-url`, {
                     method: 'POST',
                     body: JSON.stringify({
-                        filename: resizedFile.name,
-                        contentType: resizedFile.type
+                        filename: `${generateId()}.webp`,
+                        contentType: 'image/webp'
                     })
                 });
                 if (!uploadRes.ok) throw new Error('Failed to get upload URL');
@@ -497,6 +516,7 @@ export default function ShopPage() {
             });
             if (res.ok) {
                 alert(t('shopSettings.success', { defaultValue: 'ショップ設定を更新しました。' }));
+                setSessionUploadedUrls([]); // Clear tracking on success
                 fetchShopData();
                 setIsSettingsOpen(false);
             } else {
@@ -564,7 +584,7 @@ export default function ShopPage() {
                         <p className="text-sm text-gray-500">{t('shopId', { id: String(shopId || '') })}</p>
                     </div>
                     <div className="flex items-center space-x-2">
-                        <Dialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
+                        <Dialog open={isSettingsOpen} onOpenChange={handleSettingsOpenChange}>
                             <DialogTrigger asChild>
                                 <Button variant="ghost" size="icon" className="text-gray-500 hover:text-gray-900">
                                     <Settings className="h-5 w-5" />
