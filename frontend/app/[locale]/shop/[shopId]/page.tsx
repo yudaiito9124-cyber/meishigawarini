@@ -5,7 +5,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { RefreshCw, ArrowRight, HelpCircle, Camera, Settings, ShoppingBasket, Eye, Plus, Trash2, Copy, ChevronDown, ImageIcon, Save, Loader2 } from 'lucide-react';
+import { RefreshCw, ArrowRight, HelpCircle, Camera, Settings, ShoppingBasket, Eye, Plus, Trash2, Copy, ChevronDown, ImageIcon, Save, Loader2, Pencil } from 'lucide-react';
 import { notFound, useParams } from 'next/navigation';
 import { useRouter } from '@/i18n/routing';
 import { useTranslations } from 'next-intl';
@@ -1551,8 +1551,8 @@ export default function ShopPage() {
                                                                     {/* Admin Meta Edit Section */}
                                                                     <div className="pt-6 border-t border-dashed mt-6">
                                                                         <h4 className="text-sm font-bold text-gray-900 mb-4 flex items-center gap-2">
-                                                                            <Save className="w-4 h-4 text-gray-400" />
-                                                                            {t('orders.shipDialog.title')}（{t('orders.updateMeta')}）
+                                                                            <Pencil className="w-4 h-4 text-gray-400" />
+                                                                            {t('orders.updateMeta')}
                                                                         </h4>
                                                                         <form onSubmit={async (e) => {
                                                                             e.preventDefault();
@@ -1560,21 +1560,11 @@ export default function ShopPage() {
                                                                             await handleUpdateOrderMeta(
                                                                                 uuid,
                                                                                 undefined,
-                                                                                 undefined,
+                                                                                undefined,
                                                                                 fd.get('memo_for_users') as string,
                                                                                 fd.get('memo_for_shop') as string
                                                                             );
                                                                         }} className="space-y-4">
-                                                                            <div className="grid grid-cols-2 gap-4">
-                                                                                <div className="space-y-2">
-                                                                                    <Label className="text-xs text-gray-400">{t('orders.shipDialog.deliveryCompany')}</Label>
-                                                                                    <Input value={order.delivery_company || ""} readOnly disabled className="h-8 text-xs bg-gray-50 text-gray-400 cursor-not-allowed" />
-                                                                                </div>
-                                                                                <div className="space-y-2">
-                                                                                    <Label className="text-xs text-gray-400">{t('orders.shipDialog.label')}</Label>
-                                                                                    <Input value={order.tracking_number || ""} readOnly disabled className="h-8 text-xs bg-gray-50 text-gray-400 cursor-not-allowed" />
-                                                                                </div>
-                                                                            </div>
 
                                                                             <div className="space-y-2">
                                                                                 <Label htmlFor={`m_u-${uuid}`} className="text-xs text-gray-500">{t('orders.userMessage')}</Label>
@@ -1583,7 +1573,7 @@ export default function ShopPage() {
                                                                                     name="memo_for_users"
                                                                                     defaultValue={order.memo_for_users || ""}
                                                                                     disabled={['COMPLETED', 'EXPIRED', 'BANNED'].includes(order.status)}
-                                                                                    placeholder={['COMPLETED', 'EXPIRED', 'BANNED'].includes(order.status) ? "Completed-state messages cannot be updated" : ""}
+                                                                                    placeholder={['COMPLETED', 'EXPIRED', 'BANNED'].includes(order.status) ? t('orders.shipDialog.Completed-state messages cannot be updated') : ""}
                                                                                     className="text-sm min-h-[60px]"
                                                                                 />
                                                                             </div>

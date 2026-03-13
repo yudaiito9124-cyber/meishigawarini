@@ -13,7 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card";
 import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { MessageCircleQuestion, Paperclip, X, FileText, File as FileIcon, Loader2, Save, SendHorizontal, Pencil, UserPlus, Globe, Gift, User, MessagesSquare, Heart, Sparkles, Calendar, Clock, ShoppingBasket, Plus, Copy, Trash2, ChevronDown, ImageIcon } from "lucide-react";
+import { MessageCircleQuestion, Paperclip, X, FileText, File as FileIcon, Loader2, Save, SendHorizontal, Pencil, UserPlus, Globe, Gift, User, MessagesSquare, Heart, Sparkles, Calendar, Clock, ShoppingBasket, Plus, Copy, Trash2, ChevronDown, ImageIcon, Import } from "lucide-react";
 import { SiFacebook, SiInstagram, SiThreads, SiX, SiYoutube, SiLine, SiTiktok, SiLinktree, SiEight } from "@icons-pack/react-simple-icons";
 import SandboxedHtml from "@/components/SandboxedHtml";
 import { cn } from "@/lib/utils";
@@ -564,7 +564,7 @@ export default function ReceivePage() {
             });
             if (!res.ok) throw new Error("Failed to save data");
             const data = await res.json();
-            alert(`Export as: USER#${data.userid}, SENDER`);
+            alert(`Export as: USER#${data.userid}`);
         } catch (e: any) {
             alert(t('senderInfo.updateFailed') + e.message);
         } finally {
@@ -855,7 +855,7 @@ export default function ReceivePage() {
 
 
 
-            {/* ========== Interactive Card Section ========== */}
+            {/* ========== Animated Product Card Section ========== */}
             <Card className="w-full max-w-xl">
                 <CardHeader>
                     <CardTitle className="text-xl text-center">
@@ -1048,6 +1048,7 @@ export default function ReceivePage() {
                             </div>
                         )}
 
+                        {/* パスワード設定時のパスワード入力フォーム */}
                         {step === "RESTRICTED" && !gift?.product && (
                             <div className={cn("space-y-6 border-t mt-4 transition-opacity", loading && "opacity-50 pointer-events-none")}>
                                 <div className="text-center space-y-2 mt-4">
@@ -1084,6 +1085,7 @@ export default function ReceivePage() {
                                             required
                                             value={name}
                                             onChange={(e) => setName(e.target.value)}
+                                            placeholder={t('formStep.name-placeholder')}
                                         />
                                     </div>
                                     <div className="space-y-2">
@@ -1093,7 +1095,7 @@ export default function ReceivePage() {
                                             required
                                             value={zipCode}
                                             onChange={(e) => setZipCode(e.target.value)}
-                                            placeholder="123-4567"
+                                            placeholder={t('formStep.zipCode-placeholder')}
                                         />
                                     </div>
                                     <div className="space-y-2">
@@ -1103,16 +1105,18 @@ export default function ReceivePage() {
                                             required
                                             value={address}
                                             onChange={(e) => setAddress(e.target.value)}
+                                            placeholder={t('formStep.address-placeholder')}
                                         />
                                     </div>
                                     <div className="space-y-2">
                                         <Label htmlFor="phone">{t('formStep.phone')}</Label>
                                         <Input
                                             id="phone"
+                                            required
                                             type="tel"
                                             value={phone}
                                             onChange={(e) => setPhone(e.target.value)}
-                                            placeholder="090-1234-5678"
+                                            placeholder={t('formStep.phone-placeholder')}
                                         />
                                     </div>
                                     <div className="space-y-2">
@@ -1123,7 +1127,7 @@ export default function ReceivePage() {
                                             type="email"
                                             value={email}
                                             onChange={(e) => setEmail(e.target.value)}
-                                            placeholder="you@example.com"
+                                            placeholder={t('formStep.email-placeholder')}
                                         />
                                     </div>
                                     <div className="space-y-2">
@@ -1358,10 +1362,14 @@ export default function ReceivePage() {
                             {/* 編集箇所 */}
                             {(step === "FORM" && isEditingSender) ? (
                                 <div className="space-y-6 p-6">
+                                    <div className="w-full flex items-center justify-center text-xs text-center text-gray-500">
+                                        {t('senderInfo.description')}
+                                    </div>
                                     <div
                                         className="aspect-[1.6/1] w-full flex flex-col items-center justify-center gap-3 cursor-pointer p-6 border rounded-xl bg-gray-50/50 hover:bg-white transition-colors"
                                         onClick={() => document.getElementById('senderCardUpload')?.click()}
                                     >
+
                                         {senderInfo?.card_image_url && (
                                             <div className="relative w-full h-full">
                                                 <img
@@ -1382,19 +1390,12 @@ export default function ReceivePage() {
                                                 </Button>
                                             </div>
                                         )}
-                                        <p className="text-xs text-gray-500">
-                                            {t('senderInfo.description')}
-                                        </p>
                                         <div className="w-16 h-16 rounded-full bg-blue-50 flex items-center justify-center group-hover/card:scale-110 transition-transform">
                                             <FileIcon className="w-8 h-8 text-blue-500" />
                                         </div>
                                         <div className="text-center">
                                             <p className="font-semibold text-gray-800">{t('senderInfo.uploadPlaceholder')}</p>
-                                            <p className="text-xs text-gray-400 mt-1">{t('senderInfo.uploadHint')}</p>
                                         </div>
-                                        <p className="text-[10px] text-gray-400 text-center italic">
-                                            {t('senderInfo.notice')}
-                                        </p>
 
 
 
@@ -1403,36 +1404,6 @@ export default function ReceivePage() {
                                     </div>
 
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t pt-6">
-                                        {/* Import ID helper */}
-                                        <div className="md:col-span-2 space-y-1.5 p-3 bg-blue-50/30 rounded-lg border border-blue-100/50">
-                                            <Label htmlFor="sender-import_id" className="text-xs font-bold text-blue-600 flex items-center gap-1">
-                                                <Copy className="w-3.5 h-3.5" />
-                                                {t(`senderInfo.labels.import_id`)}
-                                            </Label>
-                                            <div className="flex gap-2">
-                                                <Input
-                                                    id="sender-import_id"
-                                                    value={senderForm.import_id}
-                                                    onChange={(e) => updateSenderForm("import_id", e.target.value)}
-                                                    disabled={senderInfoLoading}
-                                                    className="h-9 text-sm bg-white"
-                                                    placeholder="USER#..., SENDER"
-                                                />
-                                                <Button
-                                                    type="button"
-                                                    variant="outline"
-                                                    size="sm"
-                                                    className="h-9 px-3 shrink-0"
-                                                    onClick={() => handleImportFromId(senderForm.import_id)}
-                                                    disabled={senderInfoLoading || !senderForm.import_id}
-                                                >
-                                                    {senderInfoLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : t('senderInfo.labels.import_load') || "Load"}
-                                                </Button>
-                                            </div>
-                                            <p className="text-[10px] text-gray-400 italic">
-                                                * {t('senderInfo.importIDNote') || "Paste an ID here to auto-fill the form."}
-                                            </p>
-                                        </div>
 
                                         {Object.keys(senderForm).map((field) => (
                                             field !== 'card_image_url' && field !== 'card_image_name' && field !== 'ts_updated_at' && field !== 'ts_created_at' && field !== `html_image_urls` && field !== `detail_html` && field !== 'import_id' && (
@@ -1491,28 +1462,89 @@ export default function ReceivePage() {
 
                                         {showDetailHtmlSection && (
                                             <div className="md:col-span-2 flex flex-col px-6 space-y-4 p-2 pt-0 border rounded-xl shadow">
-                                                <div className="mt-3" >
-                                                    <Label htmlFor={`sender-detail_html`} className="text-xs font-bold text-gray-600 flex items-center gap-1 pb-1">
-                                                        {t(`senderInfo.labels.detail_html`)}
-                                                    </Label>
-                                                    <Textarea
-                                                        id={`sender-detail_html`}
-                                                        value={(senderForm as any)["detail_html"] || ""}
-                                                        onChange={(e) => updateSenderForm("detail_html", e.target.value)}
-                                                        disabled={senderInfoLoading}
-                                                        className="min-h-[80px] text-sm"
-                                                        placeholder={t(`senderInfo.labels.detail_html`)}
-                                                    />
-                                                </div>
 
+                                                {/* HTML Section */}
+                                                <Label htmlFor={`sender-detail_html`} className="text-xs font-bold text-gray-600 flex items-center gap-1 mt-8">
+                                                    {t(`senderInfo.labels.detail_html`)}
+                                                </Label>
+                                                <div className="md:col-span-2 flex flex-col w-full items-center gap-2 space-y-1.5 p-0 mb-3">
+                                                    <div className="md:col-span-1 w-full flex flex-col px-6 space-y-1 p-0 pr-0 pl-0">
+                                                        <Textarea
+                                                            id={`sender-detail_html`}
+                                                            value={(senderForm as any)["detail_html"] || ""}
+                                                            onChange={(e) => updateSenderForm("detail_html", e.target.value)}
+                                                            disabled={senderInfoLoading}
+                                                            className="min-h-[80px] text-sm"
+                                                            placeholder={t(`senderInfo.labels.detail_html`)}
+                                                        />
+                                                    </div>
 
-                                                {/* HTML Images Section */}
-                                                <div className="md:col-span-2 flex flex-col mt-2 px-6 space-y-1 p-0 pr-0 pl-0">
-                                                    <div className="flex items-center justify-between">
-                                                        <span className="text-xs font-bold text-gray-500 uppercase tracking-wider flex items-center gap-2">
-                                                            <ImageIcon className="w-3 h-3 text-blue-500" />
-                                                            {t(`senderInfo.labels.detail_html-images`)}
-                                                        </span>
+                                                    {/* HTML Images Section */}
+                                                    <div className="md:col-span-1 flex flex-col px-6 space-y-1 p-0 pr-0 pl-0">
+                                                        <div className="flex items-center justify-center">
+                                                            <span className="text-xs font-bold text-gray-500 uppercase tracking-wider flex items-center gap-2">
+                                                                <ImageIcon className="w-3 h-3 text-blue-500" />
+                                                                {t(`senderInfo.labels.detail_html-images`)}
+                                                            </span>
+                                                        </div>
+                                                        <div className="space-y-2">
+                                                            {htmlImageUrls.length === 0 ? (
+                                                                <p className="text-[10px] text-gray-400 italic font-medium py-2">{t('senderInfo.labels.detail_html-noimages')}</p>
+                                                            ) : (
+                                                                <div className="grid grid-cols-1 gap-2">
+                                                                    {htmlImageUrls.map((url, idx) => (
+                                                                        <div key={idx} className="flex items-center gap-3 p-2 bg-gray-50 rounded-md border border-gray-100 group hover:border-blue-200 transition-colors">
+                                                                            <div className="w-10 h-10 rounded-md border bg-white overflow-hidden shrink-0 shadow-sm ring-1 ring-black/5">
+                                                                                <img src={url} alt="HTML Asset" className="w-full h-full object-cover" onError={(e) => { (e.target as any).src = 'https://placehold.co/100x100?text=Error'; }} />
+                                                                            </div>
+                                                                            <div className="flex-1 min-w-0">
+                                                                                <p className="text-[10px] font-mono text-gray-400 truncate select-all">{url}</p>
+                                                                            </div>
+                                                                            <div className="flex items-center gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
+                                                                                <Button
+                                                                                    variant="ghost"
+                                                                                    size="icon"
+                                                                                    className="h-8 w-8 text-gray-400 hover:text-blue-600 hover:bg-blue-50"
+                                                                                    onClick={() => {
+                                                                                        navigator.clipboard.writeText(url);
+                                                                                        alert(t('senderInfo.urlCopied'));
+                                                                                    }}
+                                                                                >
+                                                                                    <Copy className="w-3.5 h-3.5" />
+                                                                                </Button>
+                                                                                <Button
+                                                                                    variant="ghost"
+                                                                                    size="icon"
+                                                                                    className="h-8 w-8 text-gray-400 hover:text-red-600 hover:bg-red-50"
+                                                                                    onClick={() => {
+                                                                                        if (!confirm(t('senderInfo.confirmRemoveImage'))) return;
+                                                                                        const deletedUrl = htmlImageUrls[idx];
+                                                                                        const next = htmlImageUrls.filter((_, i) => i !== idx);
+                                                                                        setHtmlImageUrls(next);
+                                                                                        const newSenderInfo = { ...senderForm, html_image_urls: next };
+                                                                                        fetch(`${NEXT_PUBLIC_API_URL}/recipient/qrcodes/${uuid}/chat`, {
+                                                                                            method: 'POST',
+                                                                                            headers: { "Content-Type": "application/json" },
+                                                                                            body: JSON.stringify({
+                                                                                                type: 'update_sender_info',
+                                                                                                pin,
+                                                                                                sender_info: newSenderInfo,
+                                                                                                deleted_html_image_urls: [deletedUrl]
+                                                                                            })
+                                                                                        });
+                                                                                        setSenderInfo(newSenderInfo);
+                                                                                        setSenderForm(newSenderInfo);
+                                                                                    }}
+                                                                                >
+                                                                                    <Trash2 className="w-3.5 h-3.5" />
+                                                                                </Button>
+                                                                            </div>
+                                                                        </div>
+                                                                    ))}
+                                                                </div>
+                                                            )}
+                                                        </div>
+
                                                         <Button
                                                             variant="outline"
                                                             size="sm"
@@ -1522,91 +1554,61 @@ export default function ReceivePage() {
                                                             <Plus className="w-3 h-3" />
                                                             {t(`senderInfo.labels.detail_html-addimage`)}
                                                         </Button>
+                                                        <div className="bg-blue-50/50 p-2.5 rounded-lg border border-blue-100/50">
+                                                            <p className="text-[9px] text-blue-700 leading-relaxed font-medium">
+                                                                <span className="inline-block px-1 bg-blue-100 rounded mr-1 text-blue-800">{t('senderInfo.usage')}</span>
+                                                                {t('senderInfo.usageDesc1')} <code>&lt;img src="..."&gt;</code> {t('senderInfo.usageDesc2')}
+                                                            </p>
+                                                        </div>
+
                                                     </div>
-                                                    <div className="space-y-2">
-                                                        {htmlImageUrls.length === 0 ? (
-                                                            <p className="text-[10px] text-gray-400 italic font-medium py-2">{t('senderInfo.labels.detail_html-noimages')}</p>
-                                                        ) : (
-                                                            <div className="grid grid-cols-1 gap-2">
-                                                                {htmlImageUrls.map((url, idx) => (
-                                                                    <div key={idx} className="flex items-center gap-3 p-2 bg-gray-50 rounded-md border border-gray-100 group hover:border-blue-200 transition-colors">
-                                                                        <div className="w-10 h-10 rounded-md border bg-white overflow-hidden shrink-0 shadow-sm ring-1 ring-black/5">
-                                                                            <img src={url} alt="HTML Asset" className="w-full h-full object-cover" onError={(e) => { (e.target as any).src = 'https://placehold.co/100x100?text=Error'; }} />
-                                                                        </div>
-                                                                        <div className="flex-1 min-w-0">
-                                                                            <p className="text-[10px] font-mono text-gray-400 truncate select-all">{url}</p>
-                                                                        </div>
-                                                                        <div className="flex items-center gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
-                                                                            <Button
-                                                                                variant="ghost"
-                                                                                size="icon"
-                                                                                className="h-8 w-8 text-gray-400 hover:text-blue-600 hover:bg-blue-50"
-                                                                                onClick={() => {
-                                                                                    navigator.clipboard.writeText(url);
-                                                                                    alert(t('senderInfo.urlCopied'));
-                                                                                }}
-                                                                            >
-                                                                                <Copy className="w-3.5 h-3.5" />
-                                                                            </Button>
-                                                                            <Button
-                                                                                variant="ghost"
-                                                                                size="icon"
-                                                                                className="h-8 w-8 text-gray-400 hover:text-red-600 hover:bg-red-50"
-                                                                                onClick={() => {
-                                                                                    if (!confirm(t('senderInfo.confirmRemoveImage'))) return;
-                                                                                    const deletedUrl = htmlImageUrls[idx];
-                                                                                    const next = htmlImageUrls.filter((_, i) => i !== idx);
-                                                                                    setHtmlImageUrls(next);
-                                                                                    const newSenderInfo = { ...senderForm, html_image_urls: next };
-                                                                                    fetch(`${NEXT_PUBLIC_API_URL}/recipient/qrcodes/${uuid}/chat`, {
-                                                                                        method: 'POST',
-                                                                                        headers: { "Content-Type": "application/json" },
-                                                                                        body: JSON.stringify({
-                                                                                            type: 'update_sender_info',
-                                                                                            pin,
-                                                                                            sender_info: newSenderInfo,
-                                                                                            deleted_html_image_urls: [deletedUrl]
-                                                                                        })
-                                                                                    });
-                                                                                    setSenderInfo(newSenderInfo);
-                                                                                    setSenderForm(newSenderInfo);
-                                                                                }}
-                                                                            >
-                                                                                <Trash2 className="w-3.5 h-3.5" />
-                                                                            </Button>
-                                                                        </div>
-                                                                    </div>
-                                                                ))}
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                    <div className="bg-blue-50/50 p-2.5 rounded-lg border border-blue-100/50">
-                                                        <p className="text-[9px] text-blue-700 leading-relaxed font-medium">
-                                                            <span className="inline-block px-1 bg-blue-100 rounded mr-1 text-blue-800">{t('senderInfo.usage')}</span>
-                                                            {t('senderInfo.usageDesc1')} <code>&lt;img src="..."&gt;</code> {t('senderInfo.usageDesc2')}
-                                                        </p>
-                                                    </div>
+                                                    <input
+                                                        type="file"
+                                                        id="htmlImageUpload"
+                                                        className="hidden"
+                                                        accept="image/*"
+                                                        onChange={(e) => {
+                                                            const file = e.target.files?.[0];
+                                                            if (file) handleHtmlImageUpload(file);
+                                                            e.target.value = "";
+                                                        }}
+                                                    />
                                                 </div>
-                                                <input
-                                                    type="file"
-                                                    id="htmlImageUpload"
-                                                    className="hidden"
-                                                    accept="image/*"
-                                                    onChange={(e) => {
-                                                        const file = e.target.files?.[0];
-                                                        if (file) handleHtmlImageUpload(file);
-                                                        e.target.value = "";
-                                                    }}
-                                                />
-                                                <Button
-                                                    onClick={() => handleSaveAsNewUser()}
-                                                    disabled={senderInfoLoading}
-                                                    variant="ghost"
-                                                    className="border-blue-200 text-gray-600 justify-end"
-                                                >
-                                                    {senderInfoLoading ? <Loader2 className="w-2 h-2 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}
-                                                    {/* {senderInfoLoading ? t('senderInfo.saving') : t('senderInfo.saveData')} */}
-                                                </Button>
+
+
+                                                {/* Export / Import Section */}
+                                                <Label className="text-xs font-bold text-gray-600 flex items-center gap-1 mt-6 pb-0">
+                                                    {t(`senderInfo.labels.import_label`)}
+                                                </Label>
+                                                <div className="md:col-span-2 flex items-center gap-2 space-y-1.5 p-3 mb-3 pt-0">
+                                                    <Button
+                                                        type="button"
+                                                        variant="ghost"
+                                                        className="border-blue-200 text-gray-600"
+                                                        onClick={() => handleSaveAsNewUser()}
+                                                        disabled={senderInfoLoading}
+                                                    >
+                                                        {senderInfoLoading ? <Loader2 className="w-2 h-2 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}
+                                                    </Button>
+                                                    <Input
+                                                        id="sender-import_id"
+                                                        value={senderForm.import_id}
+                                                        onChange={(e) => updateSenderForm("import_id", e.target.value)}
+                                                        disabled={senderInfoLoading}
+                                                        className="h-9 text-sm bg-white"
+                                                        placeholder={t(`senderInfo.labels.import_id`)}
+                                                    />
+                                                    <Button
+                                                        type="button"
+                                                        variant="ghost"
+                                                        className="border-blue-200 text-gray-600"
+                                                        onClick={() => handleImportFromId(senderForm.import_id)}
+                                                        disabled={senderInfoLoading || !senderForm.import_id}
+                                                    >
+                                                        {senderInfoLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Import className="h-4 w-4" />}
+                                                    </Button>
+                                                </div>
+
                                             </div>
                                         )}
 

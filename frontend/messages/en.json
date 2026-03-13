@@ -221,6 +221,7 @@
       "title": "Delivery Details",
       "name": "Full Name",
       "address": "Delivery Address",
+      "zipCode": "Postal Code",
       "preferredDate": "Preferred Delivery Date",
       "preferredTime": "Preferred Delivery Time",
       "noPreference": "No preference",
@@ -344,6 +345,10 @@
     "generate": {
       "title": "Generate QR Codes",
       "quantity": "Quantity to Generate",
+      "ownerUuid": "Owner UUID (Optional)",
+      "expiryDate": "Expiry Date (Optional)",
+      "shopId": "Shop ID (Optional)",
+      "productId": "Product ID (Optional)",
       "button": "Generate"
     },
     "batches": {

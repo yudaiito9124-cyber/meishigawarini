@@ -35,6 +35,8 @@ export default function AdminPage() {
     const [keyword, setKeyword] = useState("");
     const [shopId, setShopId] = useState("");
     const [productId, setProductId] = useState("");
+    const [ownerUuid, setOwnerUuid] = useState("");
+    const [expiryDate, setExpiryDate] = useState("");
     const [generatedBatches, setGeneratedBatches] = useState<any[]>([]);
     const [isAuthorized, setIsAuthorized] = useState<boolean | null>(null); // null = loading
     const router = useRouter();
@@ -111,7 +113,13 @@ export default function AdminPage() {
                     "Content-Type": "application/json",
                     "Authorization": `Bearer ${token}`
                 },
-                body: JSON.stringify({ count, shopId: shopId || undefined, productId: productId || undefined }),
+                body: JSON.stringify({
+                    count,
+                    shopId: shopId || undefined,
+                    productId: productId || undefined,
+                    owner_uuid: ownerUuid || undefined,
+                    expiry_date: expiryDate ? new Date(expiryDate).toISOString() : undefined
+                }),
             });
 
             if (res.ok) {
@@ -390,6 +398,25 @@ export default function AdminPage() {
                                     value={productId}
                                     placeholder="UUID..."
                                     onChange={(e) => setProductId(e.target.value)}
+                                />
+                            </div>
+                            <div className="grid w-full max-w-sm items-center gap-1.5">
+                                <label htmlFor="ownerUuid" className="text-sm font-medium">{t('generate.ownerUuid')}</label>
+                                <Input
+                                    id="ownerUuid"
+                                    type="text"
+                                    value={ownerUuid}
+                                    placeholder="UUID..."
+                                    onChange={(e) => setOwnerUuid(e.target.value)}
+                                />
+                            </div>
+                            <div className="grid w-full max-w-sm items-center gap-1.5">
+                                <label htmlFor="expiryDate" className="text-sm font-medium">{t('generate.expiryDate')}</label>
+                                <Input
+                                    id="expiryDate"
+                                    type="datetime-local"
+                                    value={expiryDate}
+                                    onChange={(e) => setExpiryDate(e.target.value)}
                                 />
                             </div>
                             <div>
