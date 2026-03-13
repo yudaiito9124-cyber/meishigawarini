@@ -472,7 +472,7 @@ export default function AdminPage() {
                                     </div>
                                     <Switch
                                         id="activateNow"
-                                        checked={activateNow && shopId && productId}
+                                        checked={(activateNow && shopId && productId) ? true : false}
                                         disabled={!shopId || !productId}
                                         onCheckedChange={(checkedstate: boolean) => setActivateNow(checkedstate)}
                                     />
