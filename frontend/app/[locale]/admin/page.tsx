@@ -9,6 +9,7 @@ import { notFound } from "next/navigation";
 import { getCurrentUser, fetchAuthSession } from 'aws-amplify/auth';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { APP_CONFIG } from "@/lib/config";
@@ -28,6 +29,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { useRouter } from "next/navigation";
 import { signOut } from 'aws-amplify/auth';
+import { cn } from "@/lib/utils";
 
 export default function AdminPage() {
     const t = useTranslations('AdminPage');
@@ -36,7 +38,9 @@ export default function AdminPage() {
     const [shopId, setShopId] = useState("");
     const [productId, setProductId] = useState("");
     const [ownerUuid, setOwnerUuid] = useState("");
+    const [senderId, setSenderId] = useState("");
     const [expiryDate, setExpiryDate] = useState("");
+    const [activateNow, setActivateNow] = useState(false);
     const [generatedBatches, setGeneratedBatches] = useState<any[]>([]);
     const [isAuthorized, setIsAuthorized] = useState<boolean | null>(null); // null = loading
     const router = useRouter();
@@ -118,7 +122,9 @@ export default function AdminPage() {
                     shopId: shopId || undefined,
                     productId: productId || undefined,
                     owner_uuid: ownerUuid || undefined,
-                    expiry_date: expiryDate ? new Date(expiryDate).toISOString() : undefined
+                    senderId: senderId || undefined,
+                    expiry_date: expiryDate ? new Date(expiryDate).toISOString() : undefined,
+                    activate_now: activateNow
                 }),
             });
 
@@ -361,17 +367,17 @@ export default function AdminPage() {
     };
 
     return (
-        <div className="min-h-screen bg-gray-50 p-8">
+        <div className="min-h-screen bg-mist-900 p-8 text-white"> {/* bg-[#383838] */}
             <div className="max-w-4xl mx-auto space-y-6">
-                <h1 className="text-2xl font-bold">{t('title')}</h1>
+                <h1 className="text-2xl font-bold text-white">{t('title')}</h1>
 
                 <Card>
                     <CardHeader>
                         <CardTitle>{t('generate.title')}</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                        <div className="flex flex-col gap-4">
-                            <div className="grid w-full max-w-sm items-center gap-1.5">
+                        <div className="flex flex-col w-full gap-1.5">
+                            <div className="grid w-full items-center gap-1.5">
                                 <label htmlFor="count" className="text-sm font-medium">{t('generate.quantity')}</label>
                                 <Input
                                     id="count"
@@ -380,47 +386,87 @@ export default function AdminPage() {
                                     onChange={(e) => setCount(Number(e.target.value))}
                                 />
                             </div>
-                            <div className="grid w-full max-w-sm items-center gap-1.5">
-                                <label htmlFor="shopId" className="text-sm font-medium">{t('generate.shopId')}</label>
-                                <Input
-                                    id="shopId"
-                                    type="text"
-                                    value={shopId}
-                                    placeholder="UUID..."
-                                    onChange={(e) => setShopId(e.target.value)}
-                                />
+                            <label htmlFor="shopId" className="text-sm font-medium mb-0 mt-4">{t('generate.option')}</label>
+                            <div className="grid w-full items-center gap-2 p-4 rounded-xl bg-gray-100 border border-gray-200 border-dashed border-5">
+                                <div className="grid w-full items-center gap-1.5">
+                                    <div className="flex items-center gap-2">
+                                        <div className={cn("w-3 h-3 rounded-full items-center justify-center", shopId ? "bg-red-500" : "bg-gray-500")}></div>
+                                        <label htmlFor="shopId" className="text-sm font-medium">{t('generate.shopId')}</label>
+                                    </div>
+                                    <Input
+                                        id="shopId"
+                                        type="text"
+                                        value={shopId}
+                                        placeholder="UUID..."
+                                        onChange={(e) => setShopId(e.target.value)}
+                                    />
+                                </div>
+                                <div className="grid w-full items-center gap-1.5">
+                                    <div className="flex items-center gap-2">
+                                        <div className={cn("w-3 h-3 rounded-full items-center justify-center", productId ? "bg-red-500" : "bg-gray-500")}></div>
+                                        <label htmlFor="productId" className="text-sm font-medium">{t('generate.productId')}</label>
+                                    </div>
+                                    <Input
+                                        id="productId"
+                                        type="text"
+                                        value={productId}
+                                        placeholder="UUID..."
+                                        onChange={(e) => setProductId(e.target.value)}
+                                    />
+                                </div>
+                                <div className="grid w-full items-center gap-1.5">
+                                    <div className="flex items-center gap-2">
+                                        <div className={cn("w-3 h-3 rounded-full items-center justify-center", ownerUuid ? "bg-red-500" : "bg-gray-500")}></div>
+                                        <label htmlFor="ownerUuid" className="text-sm font-medium">{t('generate.ownerUuid')}</label>
+                                    </div>
+                                    <Input
+                                        id="ownerUuid"
+                                        type="text"
+                                        value={ownerUuid}
+                                        placeholder="UUID..."
+                                        onChange={(e) => setOwnerUuid(e.target.value)}
+                                    />
+                                </div>
+                                <div className="grid w-full items-center gap-1.5">
+                                    <div className="flex items-center gap-2">
+                                        <div className={cn("w-3 h-3 rounded-full items-center justify-center", senderId ? "bg-red-500" : "bg-gray-500")}></div>
+                                        <label htmlFor="senderId" className="text-sm font-medium">{t('generate.senderId')}</label>
+                                    </div>
+                                    <Input
+                                        id="senderId"
+                                        type="text"
+                                        value={senderId}
+                                        placeholder="USER#UUID..."
+                                        onChange={(e) => setSenderId(e.target.value)}
+                                    />
+                                </div>
+                                <div className="grid w-full items-center gap-1.5">
+                                    <div className="flex items-center gap-2">
+                                        <div className={cn("w-3 h-3 rounded-full items-center justify-center", expiryDate ? "bg-red-500" : "bg-gray-500")}></div>
+                                        <label htmlFor="expiryDate" className="text-sm font-medium">{t('generate.expiryDate')}</label>
+                                    </div>
+                                    <Input
+                                        id="expiryDate"
+                                        type="datetime-local"
+                                        value={expiryDate}
+                                        onChange={(e) => setExpiryDate(e.target.value)}
+                                    />
+                                </div>
+                                <div className="grid w-full items-center gap-1.5">
+                                    <div className="flex items-center gap-2">
+                                        <div className={cn("w-3 h-3 rounded-full items-center justify-center", activateNow && shopId && productId ? "bg-red-500" : shopId && productId ? "bg-green-500" : "bg-gray-500")}></div>
+                                        <label htmlFor="activateNow" className="text-sm font-medium">{t('generate.activateNow')}</label>
+                                    </div>
+                                    <Switch
+                                        id="activateNow"
+                                        checked={activateNow && shopId && productId}
+                                        disabled={!shopId || !productId}
+                                        onCheckedChange={(checkedstate: boolean) => setActivateNow(checkedstate)}
+                                    />
+                                </div>
                             </div>
-                            <div className="grid w-full max-w-sm items-center gap-1.5">
-                                <label htmlFor="productId" className="text-sm font-medium">{t('generate.productId')}</label>
-                                <Input
-                                    id="productId"
-                                    type="text"
-                                    value={productId}
-                                    placeholder="UUID..."
-                                    onChange={(e) => setProductId(e.target.value)}
-                                />
-                            </div>
-                            <div className="grid w-full max-w-sm items-center gap-1.5">
-                                <label htmlFor="ownerUuid" className="text-sm font-medium">{t('generate.ownerUuid')}</label>
-                                <Input
-                                    id="ownerUuid"
-                                    type="text"
-                                    value={ownerUuid}
-                                    placeholder="UUID..."
-                                    onChange={(e) => setOwnerUuid(e.target.value)}
-                                />
-                            </div>
-                            <div className="grid w-full max-w-sm items-center gap-1.5">
-                                <label htmlFor="expiryDate" className="text-sm font-medium">{t('generate.expiryDate')}</label>
-                                <Input
-                                    id="expiryDate"
-                                    type="datetime-local"
-                                    value={expiryDate}
-                                    onChange={(e) => setExpiryDate(e.target.value)}
-                                />
-                            </div>
-                            <div>
-                                <Button onClick={handleGenerate}>{t('generate.button')}</Button>
+                            <div className="grid w-full items-center gap-1.5 mt-4">
+                                <Button onClick={handleGenerate} className="w-full items-center gap-1.5 h-12">{t('generate.button')}</Button>
                             </div>
                         </div>
                     </CardContent>

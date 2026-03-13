@@ -27,11 +27,13 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 
         const body = JSON.parse(event.body || '{}');
         const count = body.count || 1;
-        let shopId = body.shopId;
-        let productId = body.productId;
+        const shopId = body.shopId;
+        const productId = body.productId;
         const expiryDate = body.expiry_date;
         const ownerUuid = body.owner_uuid;
         const senderInfo = body.sender_info;
+        let senderId = body.senderId;
+        const activateNow = body.activate_now === true;
 
 
         // Limit max count for safety
@@ -40,65 +42,21 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         }
 
         // Validate owner_uuid if provided
+        let shopids_fromownerid = [];
         if (ownerUuid) {
             const userRes = await ddbDocClient.send(new GetCommand({
                 TableName: TABLE_NAME,
                 Key: { PK: `USER#${ownerUuid}`, SK: 'SHOP' }
             }));
             if (!userRes.Item) {
-                return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: '指定されたオーナーIDが存在しません' }) };
+                return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: '指定されたユーザーIDが存在しません' }) };
             }
-
-            // If shopID is also provided, verify ownership
-            if (shopId) {
-                const hasPermission = await checkUserShopPermission(ddbDocClient, TABLE_NAME, shopId, ownerUuid);
-                if (!hasPermission) {
-                    return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: '指定されたショップは指定されたオーナーのものではありません' }) };
-                }
-            }
+            shopids_fromownerid = userRes.Item.shop_ids;
         }
 
-        let isLinked = false;
-        if (shopId && productId) {
-            // Verify if the shop and product exist
-            const getRes = await ddbDocClient.send(new GetCommand({
-                TableName: TABLE_NAME,
-                Key: {
-                    PK: `SHOP#${shopId}`,
-                    SK: `PRODUCT#${productId}`
-                }
-            }));
-
-            if (!getRes.Item) {
-                return {
-                    statusCode: 400,
-                    headers: corsHeaders,
-                    body: JSON.stringify({ message: '指定されたショップIDとプロダクトIDの組み合わせが存在しません' })
-                };
-            }
-            isLinked = true;
-        }
-        // Validation for shopId and productId
-        else if (shopId && !productId) {
-            // Verify if the shop exists
-            const shopRes = await ddbDocClient.send(new GetCommand({
-                TableName: TABLE_NAME,
-                Key: {
-                    PK: `SHOP#${shopId}`,
-                    SK: 'METADATA'
-                }
-            }));
-            if (!shopRes.Item) {
-                return {
-                    statusCode: 400,
-                    headers: corsHeaders,
-                    body: JSON.stringify({ message: '指定されたショップIDは存在しません' })
-                };
-            }
-            productId = ""
-            isLinked = false; // "ショップと商品IDを同時に指定した時に限って，生成時からすでにLINK状態にしてほしい"
-        } else if (!shopId && productId) {
-            // Verify if the product exists using GSI2
+        // If productID is also provided, verify ownership
+        let shopids_fromproductid = [];
+        if (productId) {
             const prodRes = await ddbDocClient.send(new QueryCommand({
                 TableName: TABLE_NAME,
                 IndexName: 'GSI2',
@@ -108,29 +66,103 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 }
             }));
             if (!prodRes.Items || prodRes.Items.length === 0) {
-                return {
-                    statusCode: 400,
-                    headers: corsHeaders,
-                    body: JSON.stringify({ message: '指定されたプロダクトIDは存在しません' })
-                };
+                return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: '指定されたプロダクトIDは存在しません' }) };
             }
-            shopId = ""
-            isLinked = false;
+
+            shopids_fromproductid = prodRes.Items.map((item: any) => item.shop_id);
         }
 
-        const items = [];
+        if (shopId) {
+            // Verify if the shop exists
+            const shopRes = await ddbDocClient.send(new GetCommand({
+                TableName: TABLE_NAME,
+                Key: {
+                    PK: `SHOP#${shopId}`,
+                    SK: 'METADATA'
+                }
+            }));
+            if (!shopRes.Item) {
+                return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: '指定されたショップIDは存在しません' }) };
+            }
+        }
+
+
+        let isLinkeable = false;
+        if (shopId && productId && ownerUuid) {
+            if (!shopids_fromproductid.includes(shopId)) {
+                return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: '指定されたショップIDとプロダクトIDの組み合わせが存在しません' }) };
+            }
+            if (!shopids_fromownerid.includes(shopId)) {
+                return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: '指定されたショップは指定されたユーザーが管理する権限がありません' }) };
+            }
+            isLinkeable = true;
+        } else if (shopId && productId) {
+            if (!shopids_fromproductid.includes(shopId)) {
+                return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: '指定されたショップIDとプロダクトIDの組み合わせが存在しません' }) };
+            }
+            isLinkeable = true;
+        } else if (shopId && ownerUuid) {
+            if (!shopids_fromownerid.includes(shopId)) {
+                return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: '指定されたショップは指定されたユーザーが管理する権限がありません' }) };
+            }
+        } else if (productId && ownerUuid) {
+            let set_shopids_fromproductid = new Set(shopids_fromproductid);
+            if (!shopids_fromownerid.some((item: any) => set_shopids_fromproductid.has(item))) {
+                return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: '指定された製品は指定されたユーザーが管理するショップのいずれにも登録されていません' }) };
+            }
+        }
+
+        if (activateNow && !isLinkeable) {
+            return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'アクティベートするにはショップIDとプロダクトIDの両方が必要です' }) };
+        }
+
+        let validDays = 180; // Default
+        if (activateNow) {
+            // Fetch product to get valid_days
+            const prodRes = await ddbDocClient.send(new GetCommand({
+                TableName: TABLE_NAME,
+                Key: { PK: `SHOP#${shopId}`, SK: `PRODUCT#${productId}` }
+            }));
+            if (prodRes.Item) {
+                validDays = prodRes.Item.valid_days || 180;
+            }
+        }
+
+
+        let processedSenderInfo = null;
+        if (senderId) {
+            senderId = senderId.replace(/^USER#/, "");
+            // Load sender info from ID (Format: USER#[uuid])
+            const senderRes = await ddbDocClient.send(new GetCommand({
+                TableName: TABLE_NAME,
+                Key: { PK: `USER#${senderId}`, SK: 'SENDER' }
+            }));
+            if (!senderRes?.Item) {
+                return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: '指定された送り主IDは存在しません' }) };
+            }
+            const info = { ...senderRes.Item };
+            delete info.PK;
+            delete info.SK;
+            processedSenderInfo = info;
+            processedSenderInfo.sender_id = senderId;
+        } else if (senderInfo) {
+            processedSenderInfo = { ...senderInfo };
+        }
+
+        if (processedSenderInfo) {
+            processedSenderInfo = {
+                ...processedSenderInfo,
+                card_image_url: stripSignature(processedSenderInfo.card_image_url),
+                html_image_urls: (processedSenderInfo.html_image_urls || []).map((url: string) => stripSignature(url)),
+                detail_html: stripSignaturesInHtml(processedSenderInfo.detail_html, BUCKET_NAME)
+            };
+        }
+
+
         const ids = [];
         const batch_id = generateId();
 
-        let processedSenderInfo = null;
-        if (senderInfo) {
-            processedSenderInfo = {
-                ...senderInfo,
-                card_image_url: stripSignature(senderInfo.card_image_url),
-                html_image_urls: (senderInfo.html_image_urls || []).map((url: string) => stripSignature(url)),
-                detail_html: stripSignaturesInHtml(senderInfo.detail_html, BUCKET_NAME)
-            };
-        }
+        const items = [];
 
         for (let i = 0; i < count; i++) {
             const uuid = generateId();
@@ -157,7 +189,6 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             if (ownerUuid) {
                 item.owner_id = { S: ownerUuid };
             }
-
             if (shopId) {
                 item.GSI2_PK = { S: `SHOP#${shopId}` };
                 item.GSI2_SK = { S: now };
@@ -166,15 +197,28 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             if (productId) {
                 item.product_id = { S: productId };
             }
-            if (isLinked) {
+            if (activateNow) {
+                const activationDate = new Date();
+                const expirationDate = new Date(activationDate);
+                expirationDate.setDate(expirationDate.getDate() + validDays);
+
+                item.GSI1_PK = { S: 'QR#ACTIVE' };
+                item.GSI1_SK = { S: now };
+                item.status = { S: 'ACTIVE' };
+                item.ts_activated_at = { S: now };
+                if (!expiryDate) {
+                    item.ts_expired_at = { S: expirationDate.toISOString() };
+                }
+            } else if (isLinkeable) {
                 item.GSI1_PK = { S: 'QR#LINKED' };
+                item.GSI1_SK = { S: now };
                 item.status = { S: 'LINKED' };
                 item.ts_linked_at = { S: now };
             } else {
                 item.GSI1_PK = { S: 'QR#UNASSIGNED' };
+                item.GSI1_SK = { S: now };
                 item.status = { S: 'UNASSIGNED' };
             }
-            item.GSI1_SK = { S: now };
 
             items.push({
                 PutRequest: {

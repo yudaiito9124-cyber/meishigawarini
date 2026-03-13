@@ -346,9 +346,11 @@
       "title": "Generate QR Codes",
       "quantity": "Quantity to Generate",
       "ownerUuid": "Owner UUID (Optional)",
+      "senderId": "Sender ID (Optional, Format: USER#[uuid])",
       "expiryDate": "Expiry Date (Optional)",
       "shopId": "Shop ID (Optional)",
       "productId": "Product ID (Optional)",
+      "activateNow": "Activate Now (Required Shop ID and Product ID)",
       "button": "Generate"
     },
     "batches": {

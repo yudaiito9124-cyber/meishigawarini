@@ -434,11 +434,14 @@
     "title": "管理ダッシュボード",
     "generate": {
       "title": "QRコード生成",
-      "quantity": "生成数",
-      "ownerUuid": "オーナーUUID (任意)",
-      "expiryDate": "有効期限 (任意)",
-      "shopId": "ショップID (任意，そのショップに限定)",
-      "productId": "商品ID (任意，その商品に限定)",
+      "option": "オプション",
+      "quantity": "生成数 (<100)",
+      "shopId": "ショップID (任意, そのショップに限定)",
+      "productId": "商品ID (任意, その商品に限定)",
+      "ownerUuid": "ユーザーID (任意, そのユーザーが閲覧できるショップに限定(/shopに存在する店))",
+      "senderId": "送り主ID (任意, USER#[uuid]形式, 指定するとその送り主情報が紐付きます)",
+      "expiryDate": "使用期限 (任意, 指定しない場合は有効化した日付 + 商品ごとの有効期間 を足した日時)",
+      "activateNow": "この場でアクティベートする (任意、ショップIDと商品IDの両方の指定が必要)",
       "button": "生成"
     },
     "batches": {

@@ -464,6 +464,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             const body = JSON.parse(event.body || '{}');
             let { qr_id, product_id, memo_for_users, memo_for_shop, activate_now } = body;
             if (!qr_id) return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Missing qr_id' }) };
+            if (!product_id) return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Missing product_id' }) };
 
             // Fetch QR to determine status and existing product_id
             const qrCheck = await ddb.send(new GetCommand({
@@ -471,40 +472,40 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 Key: { PK: `QR#${qr_id}`, SK: 'METADATA' }
             }));
             if (!qrCheck.Item) return { statusCode: 404, headers: corsHeaders, body: JSON.stringify({ message: 'QR not found' }) };
-
             const qrItem = qrCheck.Item;
-
-            // Check if QR has a pre-assigned owner
-            if (qrItem.owner_id) {
-                const isOwner = await checkUserShopPermission(ddb, TABLE_NAME, shopId, qrItem.owner_id);
-                if (!isOwner) {
-                    return { statusCode: 403, headers: corsHeaders, body: JSON.stringify({ message: 'This QR code is reserved for another shop owner' }) };
-                }
-            }
-
-            if (qrItem.status === 'LINKED') {
-                if (qrItem.shop_id && qrItem.shop_id !== shopId) return { statusCode: 403, headers: corsHeaders, body: JSON.stringify({ message: 'QR does not belong to this shop' }) };
-                if (product_id && product_id !== qrItem.product_id) return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Product ID cannot be changed for linked QR' }) };
-                product_id = qrItem.product_id;
-            } else if (qrItem.status === 'UNASSIGNED') {
-                if (!product_id) return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Missing product_id for unassigned QR' }) };
-            } else {
-                return { statusCode: 409, headers: corsHeaders, body: JSON.stringify({ message: 'QR cannot be linked/activated (not UNASSIGNED or LINKED)' }) };
-            }
-
             // Verify Product belongs to Shop
             const prodCheck = await ddb.send(new GetCommand({
                 TableName: TABLE_NAME,
                 Key: { PK: `SHOP#${shopId}`, SK: `PRODUCT#${product_id}` }
             }));
             if (!prodCheck.Item) return { statusCode: 404, headers: corsHeaders, body: JSON.stringify({ message: 'Product not found in this shop' }) };
-
             const product = prodCheck.Item;
-            const validDays = product.valid_days || DEFAULT_VALID_DAYS;
+
+            if (qrItem.state !== "UNASSIGNED") {
+                return { statusCode: 409, headers: corsHeaders, body: JSON.stringify({ message: 'QR state is not unassigned' }) };
+            }
+
+            // Check if QR has a pre-assigned owner
+            if (qrItem.owner_id && !await checkUserShopPermission(ddb, TABLE_NAME, shopId, qrItem.owner_id)) {
+                return { statusCode: 403, headers: corsHeaders, body: JSON.stringify({ message: 'This QR code is reserved for another shop owner / manager' }) };
+            }
+
+            if (qrItem.shop_id && qrItem.shop_id !== shopId) {
+                return { statusCode: 403, headers: corsHeaders, body: JSON.stringify({ message: 'QR does not belong to this shop' }) };
+            }
+
+            if (qrItem.product_id && qrItem.product_id !== product_id) {
+                return { statusCode: 409, headers: corsHeaders, body: JSON.stringify({ message: 'QR is already reserved for another product' }) };
+            }
+
+            if (product.status !== 'ACTIVE') {
+                return { statusCode: 409, headers: corsHeaders, body: JSON.stringify({ message: 'Product is not active' }) };
+            }
+
 
             // Link QR (and optionally activate)
+            const validDays = product.valid_days || DEFAULT_VALID_DAYS;
             const status = activate_now ? 'ACTIVE' : 'LINKED';
-            const gsiPk = activate_now ? 'QR#ACTIVE' : 'QR#LINKED';
             const activatedAt = activate_now ? new Date().toISOString() : undefined;
 
             // Calculate expiration if activating now (and not already set)
@@ -522,7 +523,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 ':linked': 'LINKED',
                 ':sid': shopId,
                 ':pid': product_id,
-                ':gsi_pk': gsiPk,
+                ':gsi_pk': `QR#${status}`,
                 ':gsi2_pk': `SHOP#${shopId}`,
                 ':now': new Date().toISOString(),
                 ':unassigned': 'UNASSIGNED'
