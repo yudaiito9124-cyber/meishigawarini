@@ -1049,24 +1049,15 @@ export default function ShopPage() {
                                                                 <p className="text-sm">{order.preferred_date}  /  {order.preferred_time}</p>
                                                             </div>
 
-                                                            <div>
-                                                                <h4 className="text-sm font-semibold text-gray-500">{t('orders.userMessage')}</h4>
-                                                                <p className="text-sm bg-blue-50 p-2 rounded">{order.memo_for_users || '-'}</p>
-                                                            </div>
-                                                            {/* )}
-                                                                    {order.memo_for_shop && ( */}
-                                                            <div>
-                                                                <h4 className="text-sm font-semibold text-gray-500">{t('orders.shopMemo')}</h4>
-                                                                <p className="text-sm bg-gray-50 p-2 rounded">{order.memo_for_shop || '-'}</p>
-                                                            </div>
+                                                            {/* User Message & Shop Memo Section (Editable - Unified for all statuses) */}
 
-                                                            {/* Memos (if available) - Assuming these fields might exist on order object or shipping_info */}
-                                                            {/* These are now handled within the shipping form for 'USED' status and read-only for 'SHIPPED' */}
+
+                                                            {/* Shipping Action Section (Visible only when status is USED) */}
                                                             {order.status === 'USED' && (
-                                                                <div className="mt-4 p-4 border-2 border-orange-200 rounded-lg bg-orange-50/50">
+                                                                <div className="mt-4 p-4 border-2 border-orange-200 rounded-xl bg-orange-50/50 shadow-sm">
                                                                     <div className="flex items-center gap-2 mb-4">
-                                                                        <div className="w-2 h-2 rounded-full bg-orange-500 animate-pulse" />
-                                                                        <h4 className="text-sm font-bold text-orange-900">{t('orders.action')}</h4>
+                                                                        <div className="w-2.5 h-2.5 rounded-full bg-orange-500 animate-pulse shadow-[0_0_8px_rgba(249,115,22,0.6)]" />
+                                                                        <h4 className="text-sm font-bold text-orange-900 uppercase tracking-wide">{t('orders.action')}</h4>
                                                                     </div>
                                                                     <form onSubmit={(e) => {
                                                                         e.preventDefault();
@@ -1074,55 +1065,81 @@ export default function ShopPage() {
                                                                         handleUpdateOrderMeta(
                                                                             uuid,
                                                                             fd.get('delivery_company') as string,
-                                                                            fd.get('tracking') as string,
-                                                                            fd.get('memo_for_users') as string,
-                                                                            fd.get('memo_for_shop') as string
+                                                                            fd.get('tracking') as string
                                                                         );
                                                                     }} className="space-y-4">
                                                                         <div className="space-y-2">
-                                                                            <Label htmlFor={`delivery_company-${uuid}`}>{t('orders.shipDialog.deliveryCompany')}</Label>
-                                                                            <Input id={`delivery_company-${uuid}`} name="delivery_company" placeholder="〇〇運輸" required />
+                                                                            <Label htmlFor={`delivery_company-${uuid}`} className="text-orange-900/70">{t('orders.shipDialog.deliveryCompany')}</Label>
+                                                                            <Input id={`delivery_company-${uuid}`} name="delivery_company" placeholder="〇〇運輸" required className="bg-white border-orange-100 focus:border-orange-500 focus:ring-orange-500" />
                                                                         </div>
                                                                         <div className="space-y-2">
-                                                                            <Label htmlFor={`tracking-${uuid}`}>{t('orders.shipDialog.label')}</Label>
-                                                                            <Input id={`tracking-${uuid}`} name="tracking" placeholder="1234-5678..." required />
+                                                                            <Label htmlFor={`tracking-${uuid}`} className="text-orange-900/70">{t('orders.shipDialog.label')}</Label>
+                                                                            <Input id={`tracking-${uuid}`} name="tracking" placeholder="1234-5678..." required className="bg-white border-orange-100 focus:border-orange-500 focus:ring-orange-500" />
                                                                         </div>
-                                                                        {shipOptionOpenId === uuid ? (
-                                                                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                                                                                <div className="space-y-2">
-                                                                                    <Label htmlFor={`memo_users-${uuid}`}>{t('orders.userMessage')}</Label>
-                                                                                    <Input id={`memo_users-${uuid}`} name="memo_for_users" defaultValue={order.memo_for_users} placeholder={t('linkQr.memoForUsersPlaceholder')} />
-                                                                                </div>
-                                                                                <div className="space-y-2">
-                                                                                    <Label htmlFor={`memo_shop-${uuid}`}>{t('orders.shopMemo')}</Label>
-                                                                                    <Input id={`memo_shop-${uuid}`} name="memo_for_shop" defaultValue={order.memo_for_shop} placeholder={t('linkQr.memoForShopPlaceholder')} />
-                                                                                </div>
-                                                                            </div>
-                                                                        ) : (
-                                                                            <div className="flex justify-start">
-                                                                                <Button type="button" variant="ghost" size="sm" onClick={() => setShipOptionOpenId(uuid)} className="h-8 text-xs text-gray-500 hover:text-gray-900 px-2 -ml-2">
-                                                                                    + {t('linkQr.option')}
-                                                                                </Button>
-                                                                            </div>
-                                                                        )}
-                                                                        <Button type="submit" className="w-full" disabled={shippingOrderId === uuid}>
-                                                                            {shippingOrderId === uuid ? t('linkQr.processing') : t('orders.shipDialog.submit')}
+
+                                                                        <Button type="submit" className="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold h-10 shadow-md transition-all active:scale-[0.98]" disabled={shippingOrderId === uuid}>
+                                                                            {shippingOrderId === uuid ? (
+                                                                                <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> {t('linkQr.processing')}</>
+                                                                            ) : (
+                                                                                t('orders.shipDialog.submit')
+                                                                            )}
                                                                         </Button>
                                                                     </form>
                                                                 </div>
                                                             )}
-                                                            {order.status !== 'USED' && (
-                                                                <div className="pt-2 space-y-4">
-                                                                    <div>
-                                                                        <h4 className="text-sm font-semibold text-gray-500">{t('orders.shipDialog.deliveryCompany')}</h4>
-                                                                        <p className="font-mono">{order.delivery_company || '-'}</p>
+
+
+                                                            {/* Admin Meta Edit Section */}
+                                                            <div className="pt-6 border-t border-dashed mt-6">
+                                                                <h4 className="text-sm font-bold text-gray-900 mb-4 flex items-center gap-2">
+                                                                    <Pencil className="w-4 h-4 text-gray-400" />
+                                                                    {t('orders.updateMeta')}
+                                                                </h4>
+                                                                <form onSubmit={async (e) => {
+                                                                    e.preventDefault();
+                                                                    const fd = new FormData(e.currentTarget);
+                                                                    await handleUpdateOrderMeta(
+                                                                        uuid,
+                                                                        undefined,
+                                                                        undefined,
+                                                                        fd.get('memo_for_users') as string,
+                                                                        fd.get('memo_for_shop') as string
+                                                                    );
+                                                                }} className="space-y-4">
+
+                                                                    <div className="space-y-2">
+                                                                        <Label htmlFor={`m_u-${uuid}`} className="text-xs text-gray-500">{t('orders.userMessage')}</Label>
+                                                                        <Textarea
+                                                                            id={`m_u-${uuid}`}
+                                                                            name="memo_for_users"
+                                                                            defaultValue={order.memo_for_users || ""}
+                                                                            disabled={['COMPLETED', 'EXPIRED', 'BANNED'].includes(order.status)}
+                                                                            placeholder={['COMPLETED', 'EXPIRED', 'BANNED'].includes(order.status) ? t('orders.shipDialog.Completed-state messages cannot be updated') : ""}
+                                                                            className="text-sm min-h-[60px]"
+                                                                        />
                                                                     </div>
-                                                                    <div>
-                                                                        <h4 className="text-sm font-semibold text-gray-500">{t('orders.shipDialog.label')}</h4>
-                                                                        <p className="font-mono">{order.tracking_number || '-'}</p>
+
+                                                                    <div className="space-y-2">
+                                                                        <Label htmlFor={`m_s-${uuid}`} className="text-xs text-gray-500">{t('orders.shopMemo')}</Label>
+                                                                        <Textarea
+                                                                            id={`m_s-${uuid}`}
+                                                                            name="memo_for_shop"
+                                                                            defaultValue={order.memo_for_shop || ""}
+                                                                            className="text-sm min-h-[60px]"
+                                                                        />
                                                                     </div>
-                                                                </div>
-                                                            )}
+
+                                                                    <Button
+                                                                        type="submit"
+                                                                        className="w-full"
+                                                                        disabled={shippingOrderId === uuid}
+                                                                    >
+                                                                        {shippingOrderId === uuid ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}
+                                                                        {shippingOrderId === uuid ? t('orders.processing') : t('shopSettings.submit')}
+                                                                    </Button>
+                                                                </form>
+                                                            </div>
+
                                                             <div className="">
                                                                 <div>
                                                                     <h4 className="text-sm font-semibold text-gray-500">{t('orders.timestamps')}</h4>
@@ -1373,6 +1390,12 @@ export default function ShopPage() {
                         </div>
                     </div>
                 </Card>
+
+
+
+
+
+
 
 
 

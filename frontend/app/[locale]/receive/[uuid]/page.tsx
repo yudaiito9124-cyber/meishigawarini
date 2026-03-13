@@ -223,6 +223,12 @@ export default function ReceivePage() {
     const [senderInfo, setSenderInfo] = useState<any>(null);
     const [senderInfoLoading, setSenderInfoLoading] = useState(false);
     const [isEditingSender, setIsEditingSender] = useState(false);
+    const SENDER_FORM_KEYS = [
+        "name", "job_title", "company", "department", "email", "phone", "phone_direct",
+        "address", "HP", "memo", "SNS_Facebook", "SNS_Instagram", "SNS_Threads",
+        "SNS_X", "SNS_YouTube", "SNS_LINE", "SNS_TikTok", "Service_Eight", "Service_Linktree"
+    ];
+
     const [senderForm, setSenderForm] = useState({
         name: "",
         job_title: "",
@@ -259,8 +265,14 @@ export default function ReceivePage() {
         }
     };
 
-    const handleImportFromId = async (id: string) => {
-        setSenderInfoLoading(true);
+    const handleImportFromId = useCallback(async (id: string, silent: boolean = false) => {
+        let importId = id.trim().replace(', SENDER', '');
+        // Ensure prefix if missing
+        if (!importId.startsWith('USER#')) {
+            importId = `USER#${importId}`;
+        }
+
+        if (!silent) setSenderInfoLoading(true);
         try {
             const res = await fetch(`${NEXT_PUBLIC_API_URL}/recipient/qrcodes/${uuid}/chat`, {
                 method: "POST",
@@ -268,7 +280,7 @@ export default function ReceivePage() {
                 body: JSON.stringify({
                     pin,
                     type: 'load_from_id',
-                    id: id.trim()
+                    id: importId
                 }),
             });
             if (!res.ok) {
@@ -283,24 +295,28 @@ export default function ReceivePage() {
                     if (sanitizedInfo[key] === null) sanitizedInfo[key] = "";
                 });
 
-                setSenderForm(prev => ({
-                    ...prev,
+                const cleanId = importId.replace('USER#', '').trim();
+                const newInfo = {
                     ...sanitizedInfo,
                     import_id: "" // Clear on success
-                }));
+                };
+
+                setSenderForm(newInfo);
+                setSenderInfo({ ...newInfo, sender_id: cleanId }); // Keep sender_id in UI state to hide edit button
 
                 if (sanitizedInfo.html_image_urls) {
                     setHtmlImageUrls(sanitizedInfo.html_image_urls);
                 }
 
-                alert(t('senderInfo.importSuccess') || "Import successful!");
+                if (!silent) alert(t('senderInfo.importSuccess'));
             }
         } catch (e: any) {
-            alert(t('senderInfo.importFailed') + ": " + e.message);
+            console.error("Import failed:", e);
+            if (!silent) alert(t('senderInfo.importFailed') + ": " + e.message);
         } finally {
-            setSenderInfoLoading(false);
+            if (!silent) setSenderInfoLoading(false);
         }
-    };
+    }, [uuid, pin, t]);
     const [chatcontent, setChatcontent] = useState("");
 
     // Steps: PIN -> FORM (or SHIPPED/SUCCESS) -> RESTRICTED (if blocked)
@@ -438,8 +454,11 @@ export default function ReceivePage() {
             const data = await fetchChatMessages(uuid, pin);
             setMessages(data.messages || []);
             setTotalSizeInfo(data.total_size_bytes || 0);
-            setSenderInfo(data.sender_info || null);
-            if (data.sender_info) {
+
+            if (data.sender_id) {
+                // Prioritize top-level sender_id
+                handleImportFromId(data.sender_id, true);
+            } else if (data.sender_info) {
                 setHtmlImageUrls(data.sender_info.html_image_urls || []);
                 // Sanitize: Convert null values to empty strings to avoid React warning
                 const sanitizedInfo = { ...data.sender_info };
@@ -450,11 +469,15 @@ export default function ReceivePage() {
                     ...prev,
                     ...sanitizedInfo
                 }));
+                // Set senderInfo for display
+                setSenderInfo(sanitizedInfo);
+            } else {
+                setSenderInfo(null);
             }
         } catch (e: any) {
             console.error(e);
         }
-    }, [uuid, pin]);
+    }, [uuid, pin, handleImportFromId]);
 
     // Toggle chat loading state if needed, or just effect.
     // Effect to reload when step changes to something other than PIN
@@ -534,6 +557,10 @@ export default function ReceivePage() {
                 ...(fields || senderForm),
                 ts_updated_at: new Date().toISOString()
             };
+            // Ensure sender_id is NOT stored inside sender_info for DB optimization
+            if (updatedSenderInfo.sender_id) {
+                delete updatedSenderInfo.sender_id;
+            }
 
             await fetch(`${NEXT_PUBLIC_API_URL}/recipient/qrcodes/${uuid}/chat`, {
                 method: "POST",
@@ -560,10 +587,21 @@ export default function ReceivePage() {
             const res = await fetch(`${NEXT_PUBLIC_API_URL}/recipient/qrcodes/${uuid}/chat`, {
                 method: 'POST',
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ type: 'save_as_new_user', pin, sender_info: senderForm })
+                body: JSON.stringify({
+                    type: 'save_as_new_user',
+                    pin,
+                    sender_info: senderForm,
+                    id: senderInfo?.sender_id
+                })
             });
             if (!res.ok) throw new Error("Failed to save data");
             const data = await res.json();
+
+            // Update local state to reflect the ID so subsequent saves update the same record
+            if (data.userid) {
+                setSenderInfo((prev: any) => ({ ...prev, sender_id: data.userid }));
+            }
+
             alert(`Export as: USER#${data.userid}`);
         } catch (e: any) {
             alert(t('senderInfo.updateFailed') + e.message);
@@ -1343,7 +1381,7 @@ export default function ReceivePage() {
                                         {new Date(senderInfo.ts_updated_at).toLocaleString()} {t('senderInfo.updated')}
                                     </span>
                                 )}
-                                {(senderInfo && step === "FORM") ? (
+                                {(senderInfo && step === "FORM" && !senderInfo.sender_id) ? (
                                     <div className="flex items-center flex items-center">
                                         <Button
                                             variant="ghost"
@@ -1405,8 +1443,8 @@ export default function ReceivePage() {
 
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t pt-6">
 
-                                        {Object.keys(senderForm).map((field) => (
-                                            field !== 'card_image_url' && field !== 'card_image_name' && field !== 'ts_updated_at' && field !== 'ts_created_at' && field !== `html_image_urls` && field !== `detail_html` && field !== 'import_id' && (
+                                        {SENDER_FORM_KEYS.map((field) => (
+                                            field !== 'card_image_url' && field !== 'card_image_name' && field !== 'ts_updated_at' && field !== 'ts_created_at' && field !== `html_image_urls` && field !== `detail_html` && field !== 'import_id' && field !== 'sender_id' && (
                                                 <div key={field} className={cn("space-y-1.5", (field === 'memo' || field === 'address' || field === 'detail_html') && "md:col-span-2")}>
                                                     <Label htmlFor={`sender-${field}`} className="text-xs font-bold text-gray-600 flex items-center gap-1">
                                                         {field === "SNS_X" ? <SiX size={14} color="default" /> :
@@ -1667,41 +1705,48 @@ export default function ReceivePage() {
                                         )}
                                         {/* 名前 */}
                                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 ml-6 mr-6">
-                                            {Object.entries(senderForm).map(([field, value]) => value &&
-                                                field == "name" && (
-                                                    <div key={field} className={cn("flex flex-col border-b border-gray-50 pb-2 sm:col-span-2")}>
-                                                        <span className="text-[10px] font-bold text-gray-400 uppercase">
-                                                            {t(`senderInfo.labels.${field}`)}
-                                                        </span>
-                                                        <span className={cn("text-gray-800 break-words whitespace-pre-wrap text-xl font-bold")}>
-                                                            {value}
-                                                        </span>
-                                                    </div>
-                                                ))}
+                                            {SENDER_FORM_KEYS.map((field) => {
+                                                const value = (senderForm as any)[field];
+                                                return value &&
+                                                    field == "name" && (
+                                                        <div key={field} className={cn("flex flex-col border-b border-gray-50 pb-2 sm:col-span-2")}>
+                                                            <span className="text-[10px] font-bold text-gray-400 uppercase">
+                                                                {t(`senderInfo.labels.${field}`)}
+                                                            </span>
+                                                            <span className={cn("text-gray-800 break-words whitespace-pre-wrap text-xl font-bold")}>
+                                                                {value}
+                                                            </span>
+                                                        </div>
+                                                    );
+                                            })}
                                         </div>
                                         {/* 名前・LINK以外(メール・住所・電話番号・ホームページ等) */}
                                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 ml-6 mr-6">
-                                            {Object.entries(senderForm).map(([field, value]) => value &&
-                                                field !== 'card_image_url' &&
-                                                field !== 'card_image_name' &&
-                                                field !== 'ts_updated_at' &&
-                                                field !== 'ts_created_at' &&
-                                                field !== 'name' &&
-                                                field !== 'detail_html' &&
-                                                field !== 'import_id' &&
-                                                field !== 'html_image_urls' &&
-                                                typeof value === 'string' &&
-                                                !field.startsWith("SNS_") &&
-                                                !field.startsWith("Service_") && (
-                                                    <div key={field} className={cn("flex flex-col border-b border-gray-50 pb-2", (field === 'memo' || field === 'address') && "sm:col-span-2")}>
-                                                        <span className="text-[10px] font-bold text-gray-400 uppercase">
-                                                            {t(`senderInfo.labels.${field}`)}
-                                                        </span>
-                                                        <span className={cn("text-gray-800 break-words", (field === 'memo' || field === 'address') && "whitespace-pre-wrap text-sm")}>
-                                                            {field === 'HP' || field === 'memo' ? renderTextWithLinks(value) : value}
-                                                        </span>
-                                                    </div>
-                                                ))}
+                                            {SENDER_FORM_KEYS.map((field) => {
+                                                const value = (senderForm as any)[field];
+                                                return value &&
+                                                    field !== 'card_image_url' &&
+                                                    field !== 'card_image_name' &&
+                                                    field !== 'ts_updated_at' &&
+                                                    field !== 'ts_created_at' &&
+                                                    field !== 'name' &&
+                                                    field !== 'detail_html' &&
+                                                    field !== 'import_id' &&
+                                                    field !== 'sender_id' &&
+                                                    field !== 'html_image_urls' &&
+                                                    typeof value === 'string' &&
+                                                    !field.startsWith("SNS_") &&
+                                                    !field.startsWith("Service_") && (
+                                                        <div key={field} className={cn("flex flex-col border-b border-gray-50 pb-2", (field === 'memo' || field === 'address') && "sm:col-span-2")}>
+                                                            <span className="text-[10px] font-bold text-gray-400 uppercase">
+                                                                {t(`senderInfo.labels.${field}`)}
+                                                            </span>
+                                                            <span className={cn("text-gray-800 break-words", (field === 'memo' || field === 'address') && "whitespace-pre-wrap text-sm")}>
+                                                                {field === 'HP' || field === 'memo' ? renderTextWithLinks(value) : value}
+                                                            </span>
+                                                        </div>
+                                                    );
+                                            })}
                                         </div>
 
 
@@ -1712,36 +1757,39 @@ export default function ReceivePage() {
                                                     LINK
                                                 </span>
                                                 <div className="flex flex-wrap gap-1">
-                                                    {Object.entries(senderForm).map(([field, value]) => value && (field.startsWith("SNS_") || field.startsWith("Service_")) ? (
-                                                        <Button
-                                                            key={field}
-                                                            variant="outline"
-                                                            size="sm"
-                                                            className="h-8 gap-2 bg-white hover:bg-gray-50 border-gray-200 text-gray-700 relative group"
-                                                            onClick={() => {
-                                                                if (typeof value === 'string') {
-                                                                    const url = value.startsWith('http') ? value : `https://${value}`;
-                                                                    window.open(url, '_blank', 'noopener,noreferrer');
+                                                    {SENDER_FORM_KEYS.map((field) => {
+                                                        const value = (senderForm as any)[field];
+                                                        return value && (field.startsWith("SNS_") || field.startsWith("Service_")) ? (
+                                                            <Button
+                                                                key={field}
+                                                                variant="outline"
+                                                                size="sm"
+                                                                className="h-8 gap-2 bg-white hover:bg-gray-50 border-gray-200 text-gray-700 relative group"
+                                                                onClick={() => {
+                                                                    if (typeof value === 'string') {
+                                                                        const url = value.startsWith('http') ? value : `https://${value}`;
+                                                                        window.open(url, '_blank', 'noopener,noreferrer');
+                                                                    }
+                                                                }}
+                                                            >
+                                                                {field === "SNS_X" ? <SiX size={14} color="default" /> :
+                                                                    field === "SNS_Instagram" ? <SiInstagram size={14} color="default" /> :
+                                                                        field === "SNS_YouTube" ? <SiYoutube size={14} color="default" /> :
+                                                                            field === "SNS_Facebook" ? <SiFacebook size={14} color="default" /> :
+                                                                                field === "SNS_LINE" ? <SiLine size={14} color="default" /> :
+                                                                                    field === "SNS_TikTok" ? <SiTiktok size={14} color="default" /> :
+                                                                                        field === "SNS_Threads" ? <SiThreads size={14} color="default" /> :
+                                                                                            field === "Service_Eight" ? <SiEight size={14} color="default" /> :
+                                                                                                field === "Service_Linktree" ? <SiLinktree size={14} color="default" /> :
+                                                                                                    <Globe size={14} />
                                                                 }
-                                                            }}
-                                                        >
-                                                            {field === "SNS_X" ? <SiX size={14} color="default" /> :
-                                                                field === "SNS_Instagram" ? <SiInstagram size={14} color="default" /> :
-                                                                    field === "SNS_YouTube" ? <SiYoutube size={14} color="default" /> :
-                                                                        field === "SNS_Facebook" ? <SiFacebook size={14} color="default" /> :
-                                                                            field === "SNS_LINE" ? <SiLine size={14} color="default" /> :
-                                                                                field === "SNS_TikTok" ? <SiTiktok size={14} color="default" /> :
-                                                                                    field === "SNS_Threads" ? <SiThreads size={14} color="default" /> :
-                                                                                        field === "Service_Eight" ? <SiEight size={14} color="default" /> :
-                                                                                            field === "Service_Linktree" ? <SiLinktree size={14} color="default" /> :
-                                                                                                <Globe size={14} />
-                                                            }
-                                                            <span className="absolute -top-8 left-1/2 -translate-x-1/2 px-2 py-1 bg-gray-800 text-white text-[10px] rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none shadow-sm z-50">
-                                                                {t(`senderInfo.labels.${field}`)}
-                                                                <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-gray-800 rotate-45" />
-                                                            </span>
-                                                        </Button>
-                                                    ) : "")}
+                                                                <span className="absolute -top-8 left-1/2 -translate-x-1/2 px-2 py-1 bg-gray-800 text-white text-[10px] rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none shadow-sm z-50">
+                                                                    {t(`senderInfo.labels.${field}`)}
+                                                                    <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-gray-800 rotate-45" />
+                                                                </span>
+                                                            </Button>
+                                                        ) : "";
+                                                    })}
                                                 </div>
                                             </div>
                                         )}
@@ -1749,30 +1797,30 @@ export default function ReceivePage() {
 
 
 
-                                    <input
-                                        type="file"
-                                        id="senderCardUpload"
-                                        className="hidden"
-                                        accept="image/*"
-                                        onChange={(e) => {
-                                            const file = e.target.files?.[0];
-                                            if (file) handleSenderInfoUpload(file);
-                                            e.target.value = "";
-                                        }}
-                                    />
 
+                                    </div>
+                                ) : ""}
 
-                                    {senderInfoLoading && (
-                                        <div className="absolute inset-0 bg-white/60 backdrop-blur-[1px] flex items-center justify-center z-10 transition-all">
-                                            <div className="flex flex-col items-center gap-2">
-                                                <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
-                                                <p className="text-xs font-bold text-blue-800">{t('senderInfo.uploading')}</p>
-                                            </div>
-                                        </div>
-                                    )}
-
+                            {senderInfoLoading && (
+                                <div className="absolute inset-0 bg-white/60 backdrop-blur-[1px] flex items-center justify-center z-10 transition-all">
+                                    <div className="flex flex-col items-center gap-2">
+                                        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+                                        <p className="text-xs font-bold text-blue-800">{t('senderInfo.uploading')}</p>
+                                    </div>
                                 </div>
-                            ) : ""}
+                            )}
+
+                            <input
+                                type="file"
+                                id="senderCardUpload"
+                                className="hidden"
+                                accept="image/*"
+                                onChange={(e) => {
+                                    const file = e.target.files?.[0];
+                                    if (file) handleSenderInfoUpload(file);
+                                    e.target.value = "";
+                                }}
+                            />
                             {/* --------------------------- */}
                         </CardContent>
                     </Card>

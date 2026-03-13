@@ -241,12 +241,12 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 
             // === HANDLE SAVE AS NEW USER ===
             if (type === 'save_as_new_user') {
-                const { sender_info } = body;
+                const { sender_info, id } = body;
                 if (!sender_info) {
                     return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Missing sender_info' }) };
                 }
 
-                const userid = generateId();
+                const userid = id ? id.replace('USER#', '').trim() : generateId();
 
                 const copyFile = async (url: string) => {
                     if (!url || !url.includes(BUCKET_NAME)) return url;
@@ -285,17 +285,24 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 
                 const newSenderInfo = JSON.parse(senderInfoStr);
 
-                const keys = Object.keys(newSenderInfo);
+                // Restricted keys to avoid collision with explicitly set attributes or internal fields
+                const restrictedKeys = ['ts_created_at', 'ts_updated_at', 'PK', 'SK', 'sender_id', 'import_id'];
+                const keys = Object.keys(newSenderInfo).filter(k => !restrictedKeys.includes(k));
+
+                const now = new Date().toISOString();
+
                 await ddb.send(new UpdateCommand({
                     TableName: TABLE_NAME,
                     Key: { PK: `USER#${userid}`, SK: 'SENDER' },
-                    UpdateExpression: 'SET ' + ['#ts = :ts', ...keys.map((_, i) => `#field${i} = :val${i}`)].join(', '),
+                    UpdateExpression: 'SET #ts_up = :now, #ts_cr = if_not_exists(#ts_cr, :now)' +
+                        (keys.length > 0 ? ', ' + keys.map((_, i) => `#field${i} = :val${i}`).join(', ') : ''),
                     ExpressionAttributeNames: {
-                        '#ts': 'ts_created_at',
+                        '#ts_cr': 'ts_created_at',
+                        '#ts_up': 'ts_updated_at',
                         ...keys.reduce((acc, k, i) => ({ ...acc, [`#field${i}`]: k }), {})
                     },
                     ExpressionAttributeValues: {
-                        ':ts': new Date().toISOString(),
+                        ':now': now,
                         ...keys.reduce((acc, k, i) => ({ ...acc, [`:val${i}`]: newSenderInfo[k] }), {})
                     }
                 }));
@@ -303,7 +310,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 return {
                     statusCode: 200,
                     headers: corsHeaders,
-                    body: JSON.stringify({ message: 'User created successfully', userid })
+                    body: JSON.stringify({ message: 'User updated successfully', userid })
                 };
             }
             if (type === 'load_from_id') {
@@ -526,7 +533,8 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 body: JSON.stringify({
                     messages,
                     total_size_bytes: getChat.Item?.total_size_bytes || 0,
-                    sender_info
+                    sender_info,
+                    sender_id: getChat.Item?.sender_id
                 })
             };
         }

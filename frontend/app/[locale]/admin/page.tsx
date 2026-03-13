@@ -16,6 +16,7 @@ import { APP_CONFIG } from "@/lib/config";
 import jsPDF from 'jspdf';
 import { generateId } from '@/lib/id';
 import { useTranslations } from 'next-intl';
+import { generatePDF } from '@/lib/generatePDF';
 const NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 const NEXT_PUBLIC_APP_URL = process.env.NEXT_PUBLIC_APP_URL || "";
 import {
@@ -41,8 +42,10 @@ export default function AdminPage() {
     const [senderId, setSenderId] = useState("");
     const [expiryDate, setExpiryDate] = useState("");
     const [activateNow, setActivateNow] = useState(false);
+    const [useMetadataOptions, setUseMetadataOptions] = useState(false);
     const [generatedBatches, setGeneratedBatches] = useState<any[]>([]);
     const [isAuthorized, setIsAuthorized] = useState<boolean | null>(null); // null = loading
+    const [papertype, setPapertype] = useState<"1S31034-gakuchousenbeiv1" | "10S31251">("1S31034-gakuchousenbeiv1");
     const router = useRouter();
 
     useEffect(() => {
@@ -119,12 +122,14 @@ export default function AdminPage() {
                 },
                 body: JSON.stringify({
                     count,
-                    shopId: shopId || undefined,
-                    productId: productId || undefined,
-                    owner_uuid: ownerUuid || undefined,
-                    senderId: senderId || undefined,
-                    expiry_date: expiryDate ? new Date(expiryDate).toISOString() : undefined,
-                    activate_now: activateNow
+                    ...(useMetadataOptions ? {
+                        shopId: shopId || undefined,
+                        productId: productId || undefined,
+                        owner_uuid: ownerUuid || undefined,
+                        senderId: senderId || undefined,
+                        expiry_date: expiryDate ? new Date(expiryDate).toISOString() : undefined,
+                        activate_now: activateNow
+                    } : {})
                 }),
             });
 
@@ -148,11 +153,13 @@ export default function AdminPage() {
                 await generatePDF(newBatch);
             } else {
                 const errData = await res.json().catch(() => null);
-                alert(errData?.message || t('batches.alerts.failed'));
+                console.error(errData);
+                alert(errData?.message || t('batches.alerts.failed') + errData?.detail?.toString());
             }
         } catch (e) {
             console.error(e);
-            alert(t('batches.alerts.error'));
+            console.error(3)
+            alert(t('batches.alerts.error') + JSON.stringify(e));
         }
     };
 
@@ -175,6 +182,7 @@ export default function AdminPage() {
             bgImgb.onload = resolve;
         });
 
+        let papertype = ""
 
         // Layout Settings for A4
         const pageWidth = 210; // mm
@@ -250,16 +258,6 @@ export default function AdminPage() {
                     },
                     dotsOptions: {
                         type: "dots",
-                        // color: "#6a1a4c",
-                        // roundSize: true,
-                        // gradient: {
-                        //     type: "radial",
-                        //     rotation: 0,
-                        //     colorStops: [
-                        //         { offset: 0, color: "#383838" },
-                        //         { offset: 1, color: "#000000" }
-                        //     ]
-                        // }
                     },
                     backgroundOptions: {
                         round: 0,
@@ -386,8 +384,23 @@ export default function AdminPage() {
                                     onChange={(e) => setCount(Number(e.target.value))}
                                 />
                             </div>
-                            <label htmlFor="shopId" className="text-sm font-medium mb-0 mt-4">{t('generate.option')}</label>
-                            <div className="grid w-full items-center gap-2 p-4 rounded-xl bg-gray-100 border border-gray-200 border-dashed border-5">
+
+                            <div className="flex items-center gap-2 mt-4">
+                                <Switch
+                                    id="useMetadataOptions"
+                                    checked={useMetadataOptions}
+                                    onCheckedChange={(checked: boolean) => setUseMetadataOptions(checked)}
+                                />
+                                <Label htmlFor="useMetadataOptions" className="text-sm font-medium cursor-pointer">
+                                    {t('generate.useMetadata')}
+                                </Label>
+                            </div>
+
+                            <label htmlFor="shopId" className="text-sm font-medium mb-0 mt-2">{t('generate.option')}</label>
+                            <div className={cn(
+                                "grid w-full items-center gap-2 p-4 rounded-xl bg-gray-100 border border-gray-200 border-dashed border-5 transition-all duration-200",
+                                !useMetadataOptions && "opacity-50 grayscale pointer-events-none"
+                            )}>
                                 <div className="grid w-full items-center gap-1.5">
                                     <div className="flex items-center gap-2">
                                         <div className={cn("w-3 h-3 rounded-full items-center justify-center", shopId ? "bg-red-500" : "bg-gray-500")}></div>

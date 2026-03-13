@@ -351,6 +351,7 @@
       "shopId": "Shop ID (Optional)",
       "productId": "Product ID (Optional)",
       "activateNow": "Activate Now (Required Shop ID and Product ID)",
+      "useMetadata": "Use optional information",
       "button": "Generate"
     },
     "batches": {

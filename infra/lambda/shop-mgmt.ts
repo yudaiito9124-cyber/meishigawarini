@@ -481,7 +481,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             if (!prodCheck.Item) return { statusCode: 404, headers: corsHeaders, body: JSON.stringify({ message: 'Product not found in this shop' }) };
             const product = prodCheck.Item;
 
-            if (qrItem.state !== "UNASSIGNED") {
+            if (qrItem.status !== "UNASSIGNED") {
                 return { statusCode: 409, headers: corsHeaders, body: JSON.stringify({ message: 'QR state is not unassigned' }) };
             }
 
