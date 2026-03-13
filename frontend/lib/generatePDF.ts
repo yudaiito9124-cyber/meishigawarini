@@ -9,8 +9,8 @@ const genQR = async (code: string) => {
     // Create Custom QR
     //https://qr-code-styling.com/
     const qr = new QRCodeStyling({
-        width: 300,
-        height: 300,
+        width: 600,
+        height: 600,
         data: `${NEXT_PUBLIC_APP_URL}/receive/${code}`,
         image: APP_CONFIG.QR_LOGO_PATH, // Placeholder Logo
         qrOptions: {
@@ -58,96 +58,123 @@ const genQR = async (code: string) => {
 }
 
 
-const paperformat = {
-    "1S31034-gakuchousenbeiv1": {
+const paperformats: { [format: string]: any } = {
+    // 切れ込みのないA4
+    "1S31034": {
         pageWidth: 210, // mm
         pageHeight: 297, // mm
-        width: 85.60 - 2,
-        height: 53.98 - 2,
         cols: 2,
         rows: 5,
+        cols_gap: 0, // mm
+        rows_gap: 0, // mm
+        offset_x: 0, // mm
+        offset_y: 0, // mm
+        uraomote: true,
+        comment: ""
     },
+    // 切れ込みのあるA4 返礼品用 印刷の際には向き注意
     "10S31251": {
-        width: 85.60 - 2,
-        height: 53.98 - 2,
+        pageWidth: 210, // mm
+        pageHeight: 297, // mm
         cols: 2,
         rows: 5,
+        cols_gap: 8, // mm
+        rows_gap: 4, // mm
+        offset_x: 17, // mm
+        offset_y: 10.7, // mm
+        uraomote: false,
+        comment: "Please pay attention to the orientation when printing. Printing in the wrong orientation (as indicated on the paper) will result in misalignment."
     }
 }
 
-const cardformat = {
-    "1S31034-gakuchousenbeiv1": {
+const cardformats: { [format: string]: any } = {
+    // 最初期 学長単体シンプル
+    "gakuchousenbeiv0": {
         bgimgf: "/cardimage-f-2.png",
         bgimgb: "/cardimage-b-2.png",
+        width: 85.60 - 2,
+        height: 53.98 - 2,
+        qrsize: 26,
         qrpos: {
-            x: 10,
-            y: 10
+            x: 83.60 - 26 - 3.2,//  QRの左端がカード左端よりどれくらい右か
+            y: 51.98 / 2 - 26 / 2 + 7.5,//  QRの上端がカード上端よりどれくらい下か
         },
-        qrsize: {
-            width: 26,
-            height: 26
-        },
+        pinsize: 20,
         pinpos: {
-            x: 10,
-            y: 10
+            x: 10, // PIN文字列の左右中心がカード左端よりどれくらい右か
+            y: 16  // PIN文字列の上端がカード上端よりどれくらい下か
         },
-        pinsize: {
-            width: 26,
-            height: 26
-        },
+        codesize: 5,
         codepos: {
-            x: 10,
-            y: 10
+            x: 0, // UUID文字列の左右中心がカード左端よりどれくらい右か
+            y: 51.98 - 1 // UUID文字列の上端がカード上端よりどれくらい下か
         },
-        codesize: {
-            width: 26,
-            height: 26
-        }
+        isfront_qr: true,
+        isfront_pin: false,
+        isfront_code: false,
     },
-    "10S31251": {
+    // 返礼品用
+    "gakuchousenbeiv1": {
+        bgimgf: "/cardimage-f-" + "gakuchousenbeiv1" + ".png",
+        bgimgb: "/cardimage-b-" + "gakuchousenbeiv1" + ".png",
+        width: 84,
+        height: 52,
+        qrsize: 30,
+        qrpos: {
+            x: 84 - 30 - 3.2,//  QRがカード右端よりどれくらい右か
+            y: 52 - 30 - 7.5,//  QRがカード下端よりどれくらい下か
+        },
+        pinsize: 20,
+        pinpos: {
+            x: 7.3, // PIN文字列の左右中心がカード左端よりどれくらい右か
+            y: 19.7  // PIN文字列の上端がカード上端よりどれくらい下か
+        },
+        codesize: 5,
+        codepos: {
+            x: 24, // UUID文字列の左右中心がカード左端よりどれくらい右か
+            y: 52 - 5.5 // UUID文字列の上端がカード上端よりどれくらい下か
+        },
+        isfront_qr: true,
+        isfront_pin: false,
+        isfront_code: true,
     }
 }
 
-export const generatePDF = async (batch: any, format: string) => {
 
-
+export const generatePDF = async (batch: any, paperformat: string, cardformat: string) => {
     const codes = batch.codes || [];
     if (codes.length === 0) return;
 
-    // Dynamic import for QRCodeStyling to ensure it runs on client
-    const QRCodeStyling = (await import('qr-code-styling')).default;
+    let doc = new jsPDF({
+        orientation: 'p',
+        unit: 'mm',
+        format: 'a4'
+    });
 
-    const doc = new jsPDF();
+    const pf = paperformats[paperformat];
+    const cf = cardformats[cardformat];
 
     // Background Image
     const bgImgf = new Image();
     const bgImgb = new Image();
-    bgImgf.src = '/cardimage-f-2.png';
-    bgImgb.src = '/cardimage-b-2.png';
+    bgImgf.src = cf.bgimgf;
+    bgImgb.src = cf.bgimgb;
     await new Promise((resolve) => {
         bgImgf.onload = resolve;
         bgImgb.onload = resolve;
     });
 
-    let papertype = ""
-
-    // Layout Settings for A4
-    const pageWidth = 210; // mm
-    const pageHeight = 297; // mm
-
-    // Card Size
-    const cardWidth = 85.60 - 2; // mm
-    const cardHeight = 53.98 - 2; // mm
-
-    const cols = 2;
-    const rows = 5;
-
-    // Calculate Margins to Center the Grid
+    // paper format
+    const pageWidth = pf.pageWidth; // mm
+    const pageHeight = pf.pageHeight; // mm
+    const cols = pf.cols;
+    const rows = pf.rows;
+    const cardWidth = cf.width; // mm
+    const cardHeight = cf.height; // mm
     const totalGridWidth = cols * cardWidth;
     const totalGridHeight = rows * cardHeight;
-    const marginLeft = (pageWidth - totalGridWidth) / 2;
-    const marginTop = (pageHeight - totalGridHeight) / 2;
-
+    const marginLeft = pf.offset_x === 0 ? (pageWidth - totalGridWidth) / 2 : 0;
+    const marginTop = pf.offset_y === 0 ? (pageHeight - totalGridHeight) / 2 : 0;
     const itemsPerPage = cols * rows;
 
     // Helper to get position
@@ -155,111 +182,123 @@ export const generatePDF = async (batch: any, format: string) => {
         const row = Math.floor(indexInPage / cols);
         const col = indexInPage % cols;
         return {
-            x: marginLeft + col * cardWidth,
-            y: marginTop + row * cardHeight
+            ax: marginLeft + col * cardWidth + pf.offset_x + pf.cols_gap * col,
+            ay: marginTop + row * cardHeight + pf.offset_y + pf.rows_gap * row
         };
     };
 
-    // Helper for Back Page (Mirrored columns)
+    // Helper for Back Page (Mirrored columns) (裏表印刷のために左右反転させて配置させるのに使用)
     // If col 0 -> print at col 1 pos (so it is behind col 0 when flipped on long edge)
     // If col 1 -> print at col 0 pos
     const getBackPos = (indexInPage: number) => {
         const row = Math.floor(indexInPage / cols);
         const col = indexInPage % cols;
-        const mirroredCol = cols - col - 1;
+        const mirroredCol = cols - (col + 1);
         return {
-            x: marginLeft + mirroredCol * cardWidth,
-            y: marginTop + row * cardHeight
+            ax: marginLeft + mirroredCol * cardWidth + pf.offset_x + pf.cols_gap * mirroredCol,
+            ay: marginTop + row * cardHeight + pf.offset_y + pf.rows_gap * row
         };
     };
 
+
     for (let i = 0; i < codes.length; i += itemsPerPage) {
         if (i > 0) doc.addPage();
+
+        doc.setTextColor(0, 0, 0);
+        doc.setFontSize(5);
+        doc.setFont("helvetica", "normal");
+        doc.text(pf.comment, 3, 3);
+
         const pageCodes = codes.slice(i, i + itemsPerPage);
 
         // FRONT PAGE (QR Codes)
         for (let j = 0; j < pageCodes.length; j++) {
             const code = pageCodes[j];
-            const { x, y } = getFrontPos(j);
+            const { ax, ay } = getFrontPos(j); // anchor point
 
             // Draw Background Image
-            doc.addImage(bgImgf, 'PNG', x, y, cardWidth, cardHeight);
+            doc.addImage(bgImgf, 'PNG', ax, ay, cardWidth, cardHeight);
 
             // Draw Corner Dots (Cut marks)
             doc.setFillColor(0, 0, 0); // Black
             const dotRadius = 0.2; // mm radius
-
-            // Top Left
-            doc.circle(x, y, dotRadius, 'F');
-            // Top Right
-            doc.circle(x + cardWidth, y, dotRadius, 'F');
-            // Bottom Left
-            doc.circle(x, y + cardHeight, dotRadius, 'F');
-            // Bottom Right
-            doc.circle(x + cardWidth, y + cardHeight, dotRadius, 'F');
-
-            const base64data = await genQR(code.uuid);
-            if (!base64data) continue;
+            doc.circle(ax, ay, dotRadius, 'F'); // Top Left
+            doc.circle(ax + cardWidth, ay, dotRadius, 'F'); // Top Right
+            doc.circle(ax, ay + cardHeight, dotRadius, 'F'); // Bottom Left
+            doc.circle(ax + cardWidth, ay + cardHeight, dotRadius, 'F');// Bottom Right
 
             // Draw QR
-            const qrSize = 26; // Slightly smaller to fit better
-            // Position QR: Center horizontally, slightly above center vertically or as per design
-            // Let's place it somewhat centrally
-            doc.addImage(base64data, 'PNG', x + (cardWidth - qrSize) - 3.2, y + cardHeight / 2 - qrSize / 2 + 7.5, qrSize, qrSize);
+            if (cf.isfront_qr) {
+                const base64data = await genQR(code.uuid);
+                if (!base64data) continue;
+                const qrSize = cf.qrsize;
+                doc.addImage(base64data, 'PNG', ax + cf.qrpos.x, ay + cf.qrpos.y, qrSize, qrSize);
+            }
 
-            doc.setFontSize(12);
-            doc.setTextColor(255, 255, 255); // White text assuming dark background, change if needed
-            doc.setFont("helvetica", "bold");
-            // const textWidth = doc.getTextWidth(`Gift for you !`);
-            // doc.text(`Gift for you !`, x + (cardWidth - textWidth) / 2, y + 10);
+            // Draw PIN
+            if (cf.isfront_pin) {
+                doc.setTextColor(0, 0, 0);
+                doc.setFontSize(cf.pinsize);
+                doc.setFont("helvetica", "bold");
+                const pinWidth = doc.getTextWidth(code.pin);
+                doc.text(code.pin, ax + (cardWidth - pinWidth) / 2 + cf.pinpos.x, ay + cf.pinpos.y);
+            }
+
+            // Draw UUID head
+            if (cf.isfront_code) {
+                doc.setTextColor(0, 0, 0);
+                doc.setFontSize(cf.codesize);
+                doc.setFont("helvetica", "normal");
+                const uuidText = `${code.uuid.substring(18, 34)}...`;
+                const uuidWidth = doc.getTextWidth(uuidText);
+                doc.text(uuidText, ax + (cardWidth - uuidWidth) / 2 + cf.codepos.x, ay + cf.codepos.y);
+            }
         }
 
         doc.addPage(); // Back Page
-
         // BACK PAGE (PIN Codes)
         for (let j = 0; j < pageCodes.length; j++) {
             const code = pageCodes[j];
-            const { x, y } = getBackPos(j);
+            const { ax, ay } = pf.uraomote ? getBackPos(j) : getFrontPos(j); // anchor point
 
             // Draw Background Image (Reuse same bg or different back bg?)
             // Assuming same bg for now, typically back has instructions
-            doc.addImage(bgImgb, 'PNG', x, y, cardWidth, cardHeight);
+            doc.addImage(bgImgb, 'PNG', ax, ay, cardWidth, cardHeight);
 
-            // Draw Corner Dots
+            // Draw Corner Dots (Cut marks)
             doc.setFillColor(0, 0, 0); // Black
-            const dotRadius = 0.5;
+            const dotRadius = 0.2; // mm radius
+            doc.circle(ax, ay, dotRadius, 'F'); // Top Left
+            doc.circle(ax + cardWidth, ay, dotRadius, 'F'); // Top Right
+            doc.circle(ax, ay + cardHeight, dotRadius, 'F'); // Bottom Left
+            doc.circle(ax + cardWidth, ay + cardHeight, dotRadius, 'F');// Bottom Right
 
-            // Top Left
-            doc.circle(x, y, dotRadius, 'F');
-            // Top Right
-            doc.circle(x + cardWidth, y, dotRadius, 'F');
-            // Bottom Left
-            doc.circle(x, y + cardHeight, dotRadius, 'F');
-            // Bottom Right
-            doc.circle(x + cardWidth, y + cardHeight, dotRadius, 'F');
+            // Draw QR
+            if (!cf.isfront_qr) {
+                const base64data = await genQR(code.uuid);
+                if (!base64data) continue;
+                const qrSize = cf.qrsize;
+                doc.addImage(base64data, 'PNG', ax + cf.qrpos.x, ay + cf.qrpos.y, qrSize, qrSize);
+            }
 
             // Draw PIN
-            doc.setTextColor(0, 0, 0); // Reset to black or keep white depending on BG
-            // Let's make a white box for text readability if bg is complex, or just use white text with shadow
-            // Simple approach: White Text
-            doc.setTextColor(255, 255, 255);
-            doc.setTextColor(0, 0, 0);
+            if (!cf.isfront_pin) {
+                doc.setTextColor(0, 0, 0);
+                doc.setFontSize(cf.pinsize);
+                doc.setFont("helvetica", "bold");
+                const pinWidth = doc.getTextWidth(code.pin);
+                doc.text(code.pin, ax + (cardWidth - pinWidth) / 2 + cf.pinpos.x, ay + cf.pinpos.y);
+            }
 
-            doc.setFontSize(10);
-            doc.setFont("helvetica", "normal");
-            // const labelWidth = doc.getTextWidth("Security PIN");
-            // doc.text("Security PIN", x + (cardWidth - labelWidth) / 2, y + cardHeight / 2 - 8);
-
-            doc.setFontSize(20);
-            doc.setFont("helvetica", "bold");
-            const pinWidth = doc.getTextWidth(code.pin);
-            doc.text(code.pin, x + (cardWidth - pinWidth) / 2 + 10, y + 16);
-
-            doc.setFontSize(5);
-            doc.setFont("helvetica", "normal");
-            const uuidText = `${code.uuid.substring(0, 16)}...`;
-            const uuidWidth = doc.getTextWidth(uuidText);
-            doc.text(uuidText, x + (cardWidth - uuidWidth) / 2, y + cardHeight - 1);
+            // Draw UUID head
+            if (!cf.isfront_code) {
+                doc.setTextColor(0, 0, 0);
+                doc.setFontSize(cf.codesize);
+                doc.setFont("helvetica", "normal");
+                const uuidText = `${code.uuid.substring(18, 34)}...`;
+                const uuidWidth = doc.getTextWidth(uuidText);
+                doc.text(uuidText, ax + (cardWidth - uuidWidth) / 2 + cf.codepos.x, ay + cf.codepos.y);
+            }
         }
     }
 

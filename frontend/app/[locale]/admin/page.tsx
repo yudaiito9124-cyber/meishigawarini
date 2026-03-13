@@ -19,6 +19,8 @@ import { useTranslations } from 'next-intl';
 import { generatePDF } from '@/lib/generatePDF';
 const NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 const NEXT_PUBLIC_APP_URL = process.env.NEXT_PUBLIC_APP_URL || "";
+const PDF_PAPER_FORMAT = "10S31251"; //"1S31034"
+const PDF_CARD_FORMAT = "gakuchousenbeiv1"; //"gakuchousenbeiv0"
 import {
     Dialog,
     DialogContent,
@@ -150,7 +152,7 @@ export default function AdminPage() {
                 console.log("Generated Codes:", data.data);
 
                 // Automatically download PDF
-                await generatePDF(newBatch);
+                await generatePDF(newBatch, PDF_PAPER_FORMAT, PDF_CARD_FORMAT);
             } else {
                 const errData = await res.json().catch(() => null);
                 console.error(errData);
@@ -163,206 +165,6 @@ export default function AdminPage() {
         }
     };
 
-    const generatePDF = async (batch: any) => {
-        const codes = batch.codes || [];
-        if (codes.length === 0) return;
-
-        // Dynamic import for QRCodeStyling to ensure it runs on client
-        const QRCodeStyling = (await import('qr-code-styling')).default;
-
-        const doc = new jsPDF();
-
-        // Background Image
-        const bgImgf = new Image();
-        const bgImgb = new Image();
-        bgImgf.src = '/cardimage-f-2.png';
-        bgImgb.src = '/cardimage-b-2.png';
-        await new Promise((resolve) => {
-            bgImgf.onload = resolve;
-            bgImgb.onload = resolve;
-        });
-
-        let papertype = ""
-
-        // Layout Settings for A4
-        const pageWidth = 210; // mm
-        const pageHeight = 297; // mm
-
-        // Card Size
-        const cardWidth = 85.60 - 2; // mm
-        const cardHeight = 53.98 - 2; // mm
-
-        const cols = 2;
-        const rows = 5;
-
-        // Calculate Margins to Center the Grid
-        const totalGridWidth = cols * cardWidth;
-        const totalGridHeight = rows * cardHeight;
-        const marginLeft = (pageWidth - totalGridWidth) / 2;
-        const marginTop = (pageHeight - totalGridHeight) / 2;
-
-        const itemsPerPage = cols * rows;
-
-        // Helper to get position
-        const getFrontPos = (indexInPage: number) => {
-            const row = Math.floor(indexInPage / cols);
-            const col = indexInPage % cols;
-            return {
-                x: marginLeft + col * cardWidth,
-                y: marginTop + row * cardHeight
-            };
-        };
-
-        // Helper for Back Page (Mirrored columns)
-        // If col 0 -> print at col 1 pos (so it is behind col 0 when flipped on long edge)
-        // If col 1 -> print at col 0 pos
-        const getBackPos = (indexInPage: number) => {
-            const row = Math.floor(indexInPage / cols);
-            const col = indexInPage % cols;
-            const mirroredCol = cols - col - 1;
-            return {
-                x: marginLeft + mirroredCol * cardWidth,
-                y: marginTop + row * cardHeight
-            };
-        };
-
-        for (let i = 0; i < codes.length; i += itemsPerPage) {
-            if (i > 0) doc.addPage();
-            const pageCodes = codes.slice(i, i + itemsPerPage);
-
-            // FRONT PAGE (QR Codes)
-            for (let j = 0; j < pageCodes.length; j++) {
-                const code = pageCodes[j];
-                const { x, y } = getFrontPos(j);
-
-                // Draw Background Image
-                doc.addImage(bgImgf, 'PNG', x, y, cardWidth, cardHeight);
-
-                // Create Custom QR
-                //https://qr-code-styling.com/
-                const qr = new QRCodeStyling({
-                    width: 300,
-                    height: 300,
-                    data: `${NEXT_PUBLIC_APP_URL}/receive/${code.uuid}`,
-                    image: APP_CONFIG.QR_LOGO_PATH, // Placeholder Logo
-                    qrOptions: {
-                        typeNumber: 0,
-                        mode: "Byte",
-                        errorCorrectionLevel: "Q"
-                    },
-                    imageOptions: {
-                        saveAsBlob: true,
-                        hideBackgroundDots: true,
-                        imageSize: 0.4,
-                        margin: 0
-                    },
-                    dotsOptions: {
-                        type: "dots",
-                    },
-                    backgroundOptions: {
-                        round: 0,
-                        color: "#ffffff" // Transparent background for QR not supported well in all viewers, keeping white for safety or custom
-                    },
-                    cornersSquareOptions: {
-                        type: "extra-rounded",
-                        color: "#000000"
-                    },
-                    cornersDotOptions: {
-                        type: "dot",
-                        color: "#000000"
-                    },
-                });
-
-                // Get Raw Data (Blob) -> Base64
-                const rawData = await qr.getRawData('png');
-                if (!rawData) continue;
-
-                // Ensure we have a Blob (qr-code-styling can return Buffer in Node environment)
-                const blob = rawData instanceof Blob ? rawData : new Blob([rawData as any]);
-
-                const base64data = await new Promise<string>((resolve) => {
-                    const reader = new FileReader();
-                    reader.onloadend = () => resolve(reader.result as string);
-                    reader.readAsDataURL(blob);
-                });
-
-                // Draw Corner Dots (Cut marks)
-                doc.setFillColor(0, 0, 0); // Black
-                const dotRadius = 0.5; // mm radius
-
-                // Top Left
-                doc.circle(x, y, dotRadius, 'F');
-                // Top Right
-                doc.circle(x + cardWidth, y, dotRadius, 'F');
-                // Bottom Left
-                doc.circle(x, y + cardHeight, dotRadius, 'F');
-                // Bottom Right
-                doc.circle(x + cardWidth, y + cardHeight, dotRadius, 'F');
-
-                // Draw QR
-                const qrSize = 26; // Slightly smaller to fit better
-                // Position QR: Center horizontally, slightly above center vertically or as per design
-                // Let's place it somewhat centrally
-                doc.addImage(base64data, 'PNG', x + (cardWidth - qrSize) - 3.2, y + cardHeight / 2 - qrSize / 2 + 7.5, qrSize, qrSize);
-
-                doc.setFontSize(12);
-                doc.setTextColor(255, 255, 255); // White text assuming dark background, change if needed
-                doc.setFont("helvetica", "bold");
-                // const textWidth = doc.getTextWidth(`Gift for you !`);
-                // doc.text(`Gift for you !`, x + (cardWidth - textWidth) / 2, y + 10);
-            }
-
-            doc.addPage(); // Back Page
-
-            // BACK PAGE (PIN Codes)
-            for (let j = 0; j < pageCodes.length; j++) {
-                const code = pageCodes[j];
-                const { x, y } = getBackPos(j);
-
-                // Draw Background Image (Reuse same bg or different back bg?)
-                // Assuming same bg for now, typically back has instructions
-                doc.addImage(bgImgb, 'PNG', x, y, cardWidth, cardHeight);
-
-                // Draw Corner Dots
-                doc.setFillColor(0, 0, 0); // Black
-                const dotRadius = 0.5;
-
-                // Top Left
-                doc.circle(x, y, dotRadius, 'F');
-                // Top Right
-                doc.circle(x + cardWidth, y, dotRadius, 'F');
-                // Bottom Left
-                doc.circle(x, y + cardHeight, dotRadius, 'F');
-                // Bottom Right
-                doc.circle(x + cardWidth, y + cardHeight, dotRadius, 'F');
-
-                // Draw PIN
-                doc.setTextColor(0, 0, 0); // Reset to black or keep white depending on BG
-                // Let's make a white box for text readability if bg is complex, or just use white text with shadow
-                // Simple approach: White Text
-                doc.setTextColor(255, 255, 255);
-                doc.setTextColor(0, 0, 0);
-
-                doc.setFontSize(10);
-                doc.setFont("helvetica", "normal");
-                // const labelWidth = doc.getTextWidth("Security PIN");
-                // doc.text("Security PIN", x + (cardWidth - labelWidth) / 2, y + cardHeight / 2 - 8);
-
-                doc.setFontSize(20);
-                doc.setFont("helvetica", "bold");
-                const pinWidth = doc.getTextWidth(code.pin);
-                doc.text(code.pin, x + (cardWidth - pinWidth) / 2 + 10, y + 16);
-
-                doc.setFontSize(5);
-                doc.setFont("helvetica", "normal");
-                const uuidText = `${code.uuid.substring(0, 16)}...`;
-                const uuidWidth = doc.getTextWidth(uuidText);
-                doc.text(uuidText, x + (cardWidth - uuidWidth) / 2, y + cardHeight - 1);
-            }
-        }
-
-        doc.save(`qrcodes-${batch.id}.pdf`);
-    };
 
     return (
         <div className="min-h-screen bg-mist-900 p-8 text-white"> {/* bg-[#383838] */}
@@ -502,7 +304,7 @@ export default function AdminPage() {
                                                 </div>
                                                 <p className="flex justify-center items-center text-sm bg-green-100 text-green-800 px-3 py-1 rounded-xl">{batch.status}</p>
                                             </div>
-                                            <Button className="ml-auto" variant="outline" size="sm" onClick={() => generatePDF(batch)}>{t('batches.downloadPdf')}</Button>
+                                            <Button className="ml-auto" variant="outline" size="sm" onClick={() => generatePDF(batch, PDF_PAPER_FORMAT, PDF_CARD_FORMAT)}>{t('batches.downloadPdf')}</Button>
                                         </div>
                                         {/* Display Codes */}
                                         <div className="mt-2 bg-gray-100 p-2 rounded text-xs font-mono overflow-auto max-h-40">
@@ -538,7 +340,7 @@ export default function AdminPage() {
     );
 }
 
-function QRCodeListSection({ apiUrl, onGeneratePDF }: { apiUrl: string, onGeneratePDF: (batch: any) => Promise<void> }) {
+function QRCodeListSection({ apiUrl, onGeneratePDF }: { apiUrl: string, onGeneratePDF: (batch: any, paperformat: string, cardformat: string) => Promise<void> }) {
     const t = useTranslations('AdminPage');
     const tShop = useTranslations('ShopPage');
     const ts = useTranslations('Timestamp');
@@ -809,7 +611,7 @@ function QRCodeListSection({ apiUrl, onGeneratePDF }: { apiUrl: string, onGenera
                                                                 onGeneratePDF({
                                                                     id: uuid,
                                                                     codes: [{ uuid, pin: item.pin }]
-                                                                });
+                                                                }, PDF_PAPER_FORMAT, PDF_CARD_FORMAT);
                                                             }}
                                                         >
                                                             {t('list.ban.pdf')}
