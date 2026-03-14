@@ -144,7 +144,7 @@
       "detailHtml": "詳細(HTML)",
       "detailHtmlPlaceholder": "詳細(HTML)",
       "price": "価格 (円)",
-      "validDays": "有効期限 (日数)",
+      "validDays": "使用期限 (日数)",
       "image": "商品画像",
       "imagePlaceholder": "対応形式: .jpg, .png, .gif, .webp",
       "submit": "商品を登録",
@@ -216,7 +216,7 @@
         "used": "受取人が住所を入力し、発送待ちの状態です（ショップ側で発送作業が必要です）。",
         "shipped": "ショップが商品を発送し、追跡番号が登録された状態です。",
         "completed": "取引が正常に完了しました（受取人が受取完了報告を行った場合など）。",
-        "expired": "有効期限が切れ、ギフトが無効になった状態です。",
+        "expired": "使用期限が切れ、ギフトが無効になった状態です。",
         "banned": "不正利用などにより、システム管理者が利用停止させた状態です。"
       }
     },
@@ -255,7 +255,7 @@
       "form": "ギフトを配送してほしい住所をお知らせください",
       "success": "配送先情報が送信されました",
       "shipped": "ギフトが発送されました",
-      "expired": "有効期限が切れています",
+      "expired": "使用期限が切れています",
       "completed": "ギフトをお楽しみください"
     },
     "pinStep": {
@@ -271,8 +271,8 @@
       "unlock": "ロック解除",
       "verifying": "確認中..."
     },
-    "daysRemaining": "有効期限まで あと {days}日 と約 {hours}時間{minutes}分 です",
-    "limitdatetime": "有効期限: {datetime} (延長はできませんのでご注意ください)",
+    "daysRemaining": "使用期限まで あと {days}日 と約 {hours}時間{minutes}分 です",
+    "limitdatetime": "使用期限: {datetime} (延長はできませんのでご注意ください)",
     "formStep": {
       "title": "配送先情報",
       "name": "お名前",
@@ -317,8 +317,8 @@
       "deliveryCompany": "配送会社: {company}"
     },
     "expiredStep": {
-      "message": "このギフトの有効期限は切れています。",
-      "subMessage": "有効期限: {date}"
+      "message": "このギフトの使用期限は切れています。",
+      "subMessage": "使用期限: {date}"
     },
     "errors": {
       "invalidPin": "PINが無効か、ギフトが見つかりません",
