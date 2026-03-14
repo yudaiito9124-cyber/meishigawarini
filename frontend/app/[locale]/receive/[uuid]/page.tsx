@@ -328,6 +328,7 @@ export default function ReceivePage() {
     const [pinError, setPinError] = useState("");
 
     const handleVerifyPin = async (e: React.FormEvent) => {
+        window.scrollTo(0, 0);
         e.preventDefault();
         setLoading(true);
         setPinError("");
@@ -343,7 +344,7 @@ export default function ReceivePage() {
             setGift(data);
             if (data.status === 'COMPLETED') {
                 setShowWhiteFade(true);
-            } else {
+            } else if (['ACTIVE', 'USED', 'SHIPPED', `RESTRICTED`].includes(data.status) && !error) {
                 fireConfetti();
             }
 
@@ -391,7 +392,7 @@ export default function ReceivePage() {
                 setGift(data);
                 if (data.status === 'COMPLETED') {
                     setShowWhiteFade(true);
-                } else {
+                } else if (['ACTIVE', 'USED', 'SHIPPED'].includes(data.status) && !error) {
                     fireConfetti();
                 }
                 setIsRestricted(false);

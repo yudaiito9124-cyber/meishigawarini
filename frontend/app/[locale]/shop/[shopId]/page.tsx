@@ -57,6 +57,7 @@ export default function ShopPage() {
     const [isCreatingProduct, setIsCreatingProduct] = useState(false);
     const [deletingProductId, setDeletingProductId] = useState<string | null>(null);
     const [togglingProductId, setTogglingProductId] = useState<string | null>(null);
+    const [singleShopOwner, setSingleShopOwner] = useState<boolean>(true);
 
     // Import Product State
     const [isImporting, setIsImporting] = useState(false);
@@ -74,6 +75,7 @@ export default function ShopPage() {
     // Protect Route
     useEffect(() => {
         checkAuth();
+        fetchShops();
     }, []);
 
     const checkAuth = async () => {
@@ -82,6 +84,23 @@ export default function ShopPage() {
             // If successful, proceed to load data
         } catch (e) {
             router.push('/login');
+        }
+    };
+
+    const fetchShops = async () => {
+        try {
+            const res = await fetchWithAuth('/shop');
+            if (res.ok) {
+                const data = await res.json();
+                const shopList = data.shops || [];
+
+                // Auto-redirect if SHOP_MANAGER and has exactly one shop
+                if (shopList.length > 1) {
+                    setSingleShopOwner(false);
+                }
+            }
+        } catch (e) {
+            // console.error(e);
         }
     };
 
@@ -592,7 +611,7 @@ export default function ShopPage() {
                     <div className="flex items-center space-x-2">
                         <Dialog open={isSettingsOpen} onOpenChange={handleSettingsOpenChange}>
                             <DialogTrigger asChild>
-                                <Button variant="ghost" size="icon" className="text-gray-500 hover:text-gray-900">
+                                <Button variant="ghost" size="icon" className="text-gray-500 hover:text-gray-900 cursor-pointer">
                                     <Settings className="h-5 w-5" />
                                     <span className="sr-only">{t('shopSettings.title')}</span>
                                 </Button>
@@ -758,10 +777,10 @@ export default function ShopPage() {
                                 </form>
                             </DialogContent>
                         </Dialog>
-                        <Button variant="default" className="text-xs md:text-sm" onClick={handleShops}>{t('movetoshops')}</Button>
+                        {!singleShopOwner && <Button variant="secondary" className="shadow-md cursor-pointer border border-gray-200" onClick={handleShops}>{t('movetoshops')}</Button>}
                         <Button
                             variant="ghost"
-                            className="text-xs md:text-sm hover:bg-red-50 hover:text-red-600 border border-gray-200"
+                            className="hover:bg-red-50 hover:text-red-600 cursor-pointer"
                             onClick={async () => {
                                 await signOut();
                                 router.push('/login');
@@ -952,7 +971,7 @@ export default function ShopPage() {
                                     .filter(o => ['USED'].includes(o.status))
                                     .filter(o => !searchUuid || (o.id || o.qr_id).includes(searchUuid))
                                     .length === 0 ? (
-                                    <TableRow><TableCell colSpan={3} className="text-center">{t('orders.noOrders')}</TableCell></TableRow>
+                                    <TableRow><TableCell colSpan={4} className="text-center">{t('orders.noOrders')}</TableCell></TableRow>
                                 ) : (
                                     orders
                                         .filter(o => ['USED'].includes(o.status))

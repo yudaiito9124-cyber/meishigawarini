@@ -12,6 +12,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
+import { cn } from '@/lib/utils';
+import { fetchWithAuth } from '@/app/utils/api-client';
 
 export default function LoginPage() {
     const t = useTranslations('LoginPage');
@@ -23,36 +25,72 @@ export default function LoginPage() {
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
     const [isLoggedIn, setIsLoggedIn] = useState(false);
+    const [userEmail, setUserEmail] = useState('');
+    const [userInfo, setUserInfo] = useState('');
+    const [singleShopOwner, setSingleShopOwner] = useState<boolean>(true);
     const [isAdmin, setIsAdmin] = useState(false);
 
-    useEffect(() => {
-        const checkAuth = async () => {
-            try {
-                const session = await fetchAuthSession();
-                if (session.tokens) {
-                    const groups = (session.tokens.idToken?.payload['cognito:groups'] as string[]) || [];
-                    const amr = (session.tokens.idToken?.payload['amr'] as string[]) || [];
-                    const isAdmin = groups.includes('Administrators') || groups.includes('GlobalAdmins');
-                    const usedMfa = amr.includes('mfa') || amr.includes('software_token_mfa') || amr.includes('sms_mfa');
+    const checkAuth = async () => {
+        try {
+            const session = await fetchAuthSession();
+            if (session.tokens) {
+                const groups = (session.tokens.idToken?.payload['cognito:groups'] as string[]) || [];
+                const amr = (session.tokens.idToken?.payload['amr'] as string[]) || [];
+                const isAdmin = groups.includes('Administrators') || groups.includes('GlobalAdmins');
+                const usedMfa = amr.includes('mfa') || amr.includes('software_token_mfa') || amr.includes('sms_mfa');
 
-                    // 管理者でMFAがまだの場合、勝手に/shopに行かずにログインページに留まる（または案内を出す）
-                    if (isAdmin && !usedMfa) {
-                        // console.log("Logged in as admin but MFA is missing.");
-                        setIsLoggedIn(true);
-                        setIsAdmin(true);
-                        return; // ログインページに留まり、MFA設定リンクを踏めるようにする
-                    }
-
-                    setIsAdmin(isAdmin);
+                // 管理者でMFAがまだの場合、勝手に/shopに行かずにログインページに留まる（または案内を出す）
+                if (isAdmin) {
+                    // console.log("Logged in as admin but MFA is missing.");
                     setIsLoggedIn(true);
-                    router.replace('/shop');
+                    setIsAdmin(true);
+                    setUserInfo(groups.join(" & "));
+                    setUserEmail(session.tokens.idToken?.payload["email"] as string || "")
+                    setSingleShopOwner(false);
+                    return; // ログインページに留まり、MFA設定リンクを踏めるようにする
                 }
-            } catch (e) {
-                // Not logged in
+
+                setIsAdmin(isAdmin);
+                setIsLoggedIn(true);
+                await redirectShopPage();
             }
-        };
+        } catch (e) {
+            // Not logged in
+        }
+    };
+
+    const redirectShopPage = async () => {
+        setLoading(true);
+        try {
+            const res = await fetchWithAuth('/shop');
+            if (res.ok) {
+                const data = await res.json();
+                const shopList = data.shops || [];
+
+                // Auto-redirect if SHOP_MANAGER and has exactly one shop
+                if (shopList.length === 1) {
+                    setSingleShopOwner(true);
+                    const shopId = shopList[0].id;
+                    router.push(`/shop/${shopId}`);
+                    console.log("replace")
+                    return;
+                }
+                setSingleShopOwner(false);
+                router.push('/shop');
+                console.log("replace2")
+            } else {
+                // console.error('Failed to fetch shop');
+            }
+        } catch (e) {
+            // console.error(e);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
         checkAuth();
-    }, [router]);
+    }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -66,7 +104,7 @@ export default function LoginPage() {
                     challengeResponse: mfaCode
                 });
                 if (isSignedIn) {
-                    router.push('/shop');
+                    await checkAuth(); // checkAuth内でredirectShopPageも呼ばれる
                 }
                 return;
             }
@@ -75,7 +113,8 @@ export default function LoginPage() {
             const { isSignedIn, nextStep } = await signIn({ username: email, password });
 
             if (isSignedIn) {
-                router.push('/shop');
+                await checkAuth(); // checkAuth内でredirectShopPageも呼ばれる
+                return;
             } else {
                 if (nextStep.signInStep === 'CONFIRM_SIGN_UP') {
                     router.push(`/verify?username=${encodeURIComponent(email)}`);
@@ -104,24 +143,26 @@ export default function LoginPage() {
     };
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-gray-100 p-4">
+        <div className={cn("min-h-screen flex items-center justify-center bg-gray-100 p-4", isAdmin && "bg-mist-900")}>
             {isLoggedIn && (
                 <div className="fixed top-4 right-4 z-50 flex items-center gap-2">
                     {isAdmin && (
                         <Link href="/admin">
-                            <Button variant="destructive" className="shadow-md">
+                            <Button variant="destructive" className="shadow-md cursor-pointer border border-red-900">
                                 {t('qrAdminPage')}
                             </Button>
                         </Link>
                     )}
-                    <Link href="/shop">
-                        <Button variant="default" className="shadow-md">
-                            {t('shopAdminPage')}
-                        </Button>
-                    </Link>
+                    {!singleShopOwner && (
+                        <Link href="/shop">
+                            <Button variant="secondary" className="shadow-md cursor-pointer border border-gray-200">
+                                {t('shopAdminPage')}
+                            </Button>
+                        </Link>
+                    )}
                     <Button
                         variant="ghost"
-                        className="shadow-md bg-white hover:bg-red-50 hover:text-red-600 border border-gray-200"
+                        className="hover:bg-red-50 hover:text-red-600 cursor-pointer text-white"
                         onClick={async () => {
                             await signOut();
                             setIsLoggedIn(false);
@@ -134,59 +175,61 @@ export default function LoginPage() {
             )}
             <Card className="w-full max-w-md">
                 <CardHeader>
-                    <CardTitle className="text-center text-2xl">{t('title')}</CardTitle>
+                    <CardTitle className="text-center text-2xl whitespace-pre-wrap">{isAdmin ? `Admin \n\n${userEmail}` : t('title')}</CardTitle>
                 </CardHeader>
                 <CardContent>
-                    <form onSubmit={handleLogin} className="space-y-4">
-                        {!showMfa ? (
-                            <>
-                                <div className="space-y-2">
-                                    <Label htmlFor="email">{t('email')}</Label>
-                                    <Input
-                                        id="email"
-                                        type="email"
-                                        placeholder="you@example.com"
-                                        value={email}
-                                        onChange={(e) => setEmail(e.target.value)}
-                                        required
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="password">{t('password')}</Label>
-                                    <Input
-                                        id="password"
-                                        type="password"
-                                        value={password}
-                                        onChange={(e) => setPassword(e.target.value)}
-                                        required
-                                    />
-                                </div>
-                            </>
-                        ) : (
-                            <div className="space-y-2">
-                                <Label htmlFor="mfaCode">{t('mfaCodeLabel')}</Label>
-                                <Input
-                                    id="mfaCode"
-                                    type="text"
-                                    placeholder={t('mfaPlaceholder')}
-                                    value={mfaCode}
-                                    onChange={(e) => setMfaCode(e.target.value)}
-                                    className="text-center text-2xl tracking-widest"
-                                    maxLength={6}
-                                    required
-                                    autoFocus
-                                />
-                                <p className="text-xs text-gray-500 text-center">
-                                    {t('mfaInstructions')}
-                                </p>
-                            </div>
-                        )}
-                        {error && <p className="text-sm text-red-500 text-center font-medium">{error}</p>}
-                        <Button type="submit" className="w-full h-11 text-base font-bold" disabled={loading}>
-                            {loading ? (showMfa ? t('verifyingMfa') : t('signingIn')) : (showMfa ? t('verifyAndSignIn') : t('signIn'))}
-                        </Button>
+                    {!isAdmin && (
 
-                        {/* 生体認証は一旦コメントアウト
+                        <form onSubmit={handleLogin} className="space-y-4">
+                            {!showMfa ? (
+                                <>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="email">{t('email')}</Label>
+                                        <Input
+                                            id="email"
+                                            type="email"
+                                            placeholder="you@example.com"
+                                            value={email}
+                                            onChange={(e) => setEmail(e.target.value)}
+                                            required
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="password">{t('password')}</Label>
+                                        <Input
+                                            id="password"
+                                            type="password"
+                                            value={password}
+                                            onChange={(e) => setPassword(e.target.value)}
+                                            required
+                                        />
+                                    </div>
+                                </>
+                            ) : (
+                                <div className="space-y-2">
+                                    <Label htmlFor="mfaCode">{t('mfaCodeLabel')}</Label>
+                                    <Input
+                                        id="mfaCode"
+                                        type="text"
+                                        placeholder={t('mfaPlaceholder')}
+                                        value={mfaCode}
+                                        onChange={(e) => setMfaCode(e.target.value)}
+                                        className="text-center text-2xl tracking-widest"
+                                        maxLength={6}
+                                        required
+                                        autoFocus
+                                    />
+                                    <p className="text-xs text-gray-500 text-center">
+                                        {t('mfaInstructions')}
+                                    </p>
+                                </div>
+                            )}
+                            {error && <p className="text-sm text-red-500 text-center font-medium">{error}</p>}
+                            <Button type="submit" className="w-full h-11 text-base font-bold" disabled={loading}>
+                                {loading ? (showMfa ? t('verifyingMfa') : t('signingIn')) : (showMfa ? t('verifyAndSignIn') : t('signIn'))}
+                            </Button>
+
+                            {/* 生体認証は一旦コメントアウト
                         {!showMfa && (
                             <div className="space-y-4 pt-2">
                                 <div className="relative">
@@ -231,27 +274,38 @@ export default function LoginPage() {
                             </div>
                         )}
                         */}
-                        {showMfa && (
-                            <Button
-                                type="button"
-                                variant="ghost"
-                                className="w-full text-gray-500"
-                                onClick={() => setShowMfa(false)}
-                            >
-                                {t('back')}
-                            </Button>
-                        )}
-                    </form>
+                            {showMfa && (
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    className="w-full text-gray-500"
+                                    onClick={() => setShowMfa(false)}
+                                >
+                                    {t('back')}
+                                </Button>
+                            )}
+                        </form>
+                    )}
+                    {isAdmin && (
+                        <p className="text-sm text-gray-500 text-center">
+                            Your roles: <br />
+                            {userInfo}
+                        </p>
+                    )}
                 </CardContent>
                 <CardFooter className="flex-col gap-4">
-                    <p className="text-sm text-gray-500">
-                        {t('noAccount')} <Link href="/register" className="text-blue-600 hover:underline">{t('signUpLink')}</Link>
-                    </p>
-                    <div className="pt-2 border-t w-full text-center">
-                        <Link href="/mfa-setup" className="text-sm text-gray-500 hover:text-blue-600 transition-colors">
-                            {t('mfaLink')}
-                        </Link>
-                    </div>
+                    {!isAdmin && (
+                        <p className="text-sm text-gray-500">
+                            {t('noAccount')} <Link href="/register" className="text-blue-600 hover:underline">{t('signUpLink')}</Link>
+                        </p>
+                    )}
+                    {isAdmin && (
+                        <div className="pt-2 border-t w-full text-center">
+                            <Link href="/mfa-setup" className="text-sm text-gray-500 hover:text-blue-600 transition-colors">
+                                {t('mfaLink')}
+                            </Link>
+                        </div>
+                    )}
                 </CardFooter>
             </Card>
         </div>

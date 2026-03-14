@@ -23,7 +23,13 @@
     "time1416": "14:00 - 16:00",
     "time1618": "16:00 - 18:00",
     "time1820": "18:00 - 20:00",
-    "time1921": "19:00 - 21:00"
+    "time1921": "19:00 - 21:00",
+    "午前中": "Morning",
+    "14-16時": "14:00 - 16:00",
+    "16-18時": "16:00 - 18:00",
+    "18-20時": "18:00 - 20:00",
+    "19-21時": "19:00 - 21:00",
+    "-": "- (Not specified)"
   },
   "Status": {
     "unassigned": "UNASSIGNED",
@@ -537,7 +543,8 @@
       "keyword": {
         "placeholder": "Enter keyword to search by UUID (at least 8 characters)",
         "tooShort": "Keyword must be at least 8 characters long."
-      }
+      },
+      "raw": "Raw Data"
     },
     "shopInfo": {
       "title": "Shop Information",

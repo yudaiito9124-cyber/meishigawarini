@@ -5,9 +5,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from '@/i18n/routing';
+import { Link, useRouter } from '@/i18n/routing';
 import { useTranslations } from 'next-intl';
-import { getCurrentUser, signOut } from 'aws-amplify/auth';
+import { fetchAuthSession, getCurrentUser, signOut } from 'aws-amplify/auth';
 import { fetchWithAuth } from '@/app/utils/api-client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
@@ -23,6 +23,19 @@ export default function ShopListPage() {
     const [createName, setCreateName] = useState('');
     const [creating, setCreating] = useState(false);
     const [userId, setUserId] = useState('');
+    const [isAdmin, setIsAdmin] = useState(false);
+
+    const checkAuth = async () => {
+        try {
+            const session = await fetchAuthSession();
+            if (session.tokens) {
+                const groups = (session.tokens.idToken?.payload['cognito:groups'] as string[]) || [];
+                const isAdmin = groups.includes('Administrators') || groups.includes('GlobalAdmins');
+                if (isAdmin) setIsAdmin(true);
+            }
+        } catch (e) {
+        }
+    };
 
     useEffect(() => {
         const init = async () => {
@@ -36,6 +49,7 @@ export default function ShopListPage() {
             }
         };
         init();
+        checkAuth();
     }, []);
 
     const fetchShops = async () => {
@@ -74,7 +88,7 @@ export default function ShopListPage() {
     return (
         <div className="min-h-screen bg-gray-50 p-6 flex flex-col items-center">
             <div className="w-full max-w-4xl space-y-8">
-                <div className="flex justify-between items-center flex flex-col space-y-4 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
+                <div className="flex justify-between items-center flex flex-col space-y-4 sm:flex-row sm:items-center sm:justify-between sm:space-y-0 sm:space-x-4">
                     <div>
                         <div>
                             <h1 className="text-3xl font-bold text-gray-900">{t('title')}</h1>
@@ -82,7 +96,16 @@ export default function ShopListPage() {
                         </div>
                         {userId && <p className="text-xs text-gray-400 mt-1">{t('userId', { id: userId })}</p>}
                     </div>
-                    <Button variant="outline" size="lg" className="text-xs md:text-sm" onClick={handleLogout}>{t('logout')}</Button>
+                    <div className="flex flex-row flex-wrap items-center justify-center mr-0">
+                        {isAdmin && (
+                            <Link href="/login">
+                                <Button variant="destructive" className="shadow-md cursor-pointer border border-red-900">
+                                    {t('qrAdminLoginPage')}
+                                </Button>
+                            </Link>
+                        )}
+                        <Button variant="ghost" size="lg" className="hover:bg-red-50 hover:text-red-600 cursor-pointer" onClick={handleLogout}>{t('logout')}</Button>
+                    </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

@@ -17,6 +17,7 @@ import jsPDF from 'jspdf';
 import { generateId } from '@/lib/id';
 import { useTranslations } from 'next-intl';
 import { generatePDF } from '@/lib/generatePDF';
+import { Link2, Copy } from 'lucide-react';
 const NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 const NEXT_PUBLIC_APP_URL = process.env.NEXT_PUBLIC_APP_URL || "";
 const PDF_PAPER_FORMAT = "10S31251"; //"1S31034"
@@ -33,6 +34,7 @@ import { Label } from "@/components/ui/label";
 import { useRouter } from "next/navigation";
 import { signOut } from 'aws-amplify/auth';
 import { cn } from "@/lib/utils";
+import { Link } from '@/i18n/routing';
 
 export default function AdminPage() {
     const t = useTranslations('AdminPage');
@@ -168,8 +170,16 @@ export default function AdminPage() {
     return (
         <div className="min-h-screen bg-mist-900 p-8 text-white"> {/* bg-[#383838] */}
             <div className="max-w-4xl mx-auto space-y-6">
-                <h1 className="text-2xl font-bold text-white">{t('title')}</h1>
+                <div className="flex justify-between items-center flex-wrap gap-4">
+                    <h1 className="text-2xl font-bold text-white">{t('title')}</h1>
+                    <Link href="/login">
+                        <Button variant="destructive" className="shadow-md cursor-pointer border border-red-900">
+                            {t('qrAdminLoginPage')}
+                        </Button>
+                    </Link>
+                </div>
 
+                {/* QRコード生成 */}
                 <Card>
                     <CardHeader>
                         <CardTitle>{t('generate.title')}</CardTitle>
@@ -178,12 +188,14 @@ export default function AdminPage() {
                         <div className="flex flex-col w-full gap-1.5">
                             <div className="grid w-full items-center gap-1.5">
                                 <label htmlFor="count" className="text-sm font-medium">{t('generate.quantity')}</label>
-                                <Input
-                                    id="count"
-                                    type="number"
-                                    value={count}
-                                    onChange={(e) => setCount(Number(e.target.value))}
-                                />
+                                <Link href="/shop">
+                                    <Input
+                                        id="count"
+                                        type="number"
+                                        value={count}
+                                        onChange={(e) => setCount(Number(e.target.value))}
+                                    />
+                                </Link>
                             </div>
 
                             <div className="flex items-center gap-2 mt-4">
@@ -286,6 +298,8 @@ export default function AdminPage() {
                     </CardContent>
                 </Card>
 
+
+                {/* このページを開いてから生成したQRコードのバッチ一覧 */}
                 <Card>
                     <CardHeader>
                         <CardTitle>{t('batches.title')}</CardTitle>
@@ -331,8 +345,8 @@ export default function AdminPage() {
                     </CardContent>
                 </Card>
 
-                {/* <div className="border-t pt-6"></div> */}
 
+                {/* すべてのQRコード一覧 */}
                 <QRCodeListSection apiUrl={NEXT_PUBLIC_API_URL} onGeneratePDF={generatePDF} />
             </div>
         </div>
@@ -571,178 +585,270 @@ function QRCodeListSection({ apiUrl, onGeneratePDF }: { apiUrl: string, onGenera
                                     </TableCell>
                                 </TableRow>
                             ) : ( // there is some codes
-                                codes.map((item: any) => {
-                                    const uuid = item.PK.replace('QR#', '');
-                                    return (
-                                        <Dialog key={item.PK}>
-                                            <DialogTrigger asChild>
-                                                <TableRow className="cursor-pointer hover:bg-gray-100">
-                                                    <TableCell className="font-mono text-xs select-all">
-                                                        {uuid}
-                                                    </TableCell>
-                                                    <TableCell className="font-mono text-xs select-all">
-                                                        {item.pin}
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        <span className={`px-2 py-1 rounded text-xs ${item.status === 'UNASSIGNED' ? 'bg-gray-100' :
-                                                            item.status === 'LINKED' ? 'bg-emerald-100 text-emerald-800' :
-                                                                item.status === 'ACTIVE' ? 'bg-yellow-100 text-yellow-800' :
-                                                                    item.status === 'USED' ? 'bg-orange-100 text-orange-800' :
-                                                                        item.status === 'SHIPPED' ? 'bg-indigo-100 text-indigo-800' :
-                                                                            item.status === 'COMPLETED' ? 'bg-purple-100 text-purple-800' :
-                                                                                item.status === 'EXPIRED' ? 'bg-gray-100 text-gray-800' :
-                                                                                    item.status === 'BANNED' ? 'bg-red-100 text-red-800' :
-                                                                                        'bg-green-100 text-green-800'
-                                                            }`}>
-                                                            {st(item.status ? item.status.toLowerCase() : 'active')}
-                                                        </span>
-                                                    </TableCell>
-                                                    <TableCell className="text-xs text-gray-500">
-                                                        {item.ts_updated_at ? new Date(item.ts_updated_at).toLocaleString() : '-'}
-                                                    </TableCell>
-                                                    <TableCell onClick={(e) => e.stopPropagation()}>
-                                                        <Button
-                                                            variant="outline"
-                                                            size="sm"
-                                                            className="mr-2 h-6 text-xs"
-                                                            onClick={(e) => {
-                                                                e.stopPropagation(); // Stop dialog trigger
-                                                                const uuid = item.PK.replace('QR#', '');
-                                                                onGeneratePDF({
-                                                                    id: uuid,
-                                                                    codes: [{ uuid, pin: item.pin }]
-                                                                }, PDF_PAPER_FORMAT, PDF_CARD_FORMAT);
-                                                            }}
-                                                        >
-                                                            {t('list.ban.pdf')}
-                                                        </Button>
-                                                        {item.status !== 'BANNED' && (
-                                                            <BanButton uuid={item.PK.replace('QR#', '')} apiUrl={apiUrl} onSuccess={fetchCodes} />
-                                                        )}
-                                                    </TableCell>
-                                                </TableRow>
-                                            </DialogTrigger>
-                                            <DialogContent className="max-w-md">
-                                                <DialogHeader>
-                                                    <DialogTitle>{tShop('orders.details')}</DialogTitle>
-                                                    <DialogDescription className="font-mono text-xs text-gray-500">
-                                                        ID: {uuid}
-                                                    </DialogDescription>
-                                                </DialogHeader>
-
-                                                <div className="space-y-4 py-4 max-h-[70vh] overflow-y-auto">
-                                                    {/* Product Info */}
-                                                    <div>
-                                                        <h4 className="text-sm font-semibold text-gray-500">{tShop('orders.productName')}</h4>
-                                                        <p className="font-medium">{item.product_name || item.product_id || '-'}</p>
-                                                    </div>
-
-
-                                                    {/* Shop Info */}
-                                                    <div>
-                                                        <h4 className="text-sm font-semibold text-gray-500">{t('shopInfo.title')}</h4>
-                                                        <div className="text-sm mt-1 grid grid-cols-[80px_1fr] gap-x-2 gap-y-1">
-                                                            <span className="text-gray-400 text-xs">{t('shopInfo.name')}</span>
-                                                            <span className="font-medium">{item.shop_name || '-'}</span>
-
-                                                            <span className="text-gray-400 text-xs">{t('shopInfo.id')}</span>
-                                                            <span className="font-mono text-xs text-gray-600">{item.shop_id || '-'}</span>
-
-                                                            <span className="text-gray-400 text-xs">{t('shopInfo.contact')}</span>
-                                                            <span className="text-gray-600 break-all">{item.shop_email || '-'}</span>
-                                                        </div>
-                                                    </div>
-
-
-                                                    {/* Status */}
-                                                    <div>
-                                                        <h4 className="text-sm font-semibold text-gray-500">{tShop('orders.status')}</h4>
-
-                                                        <span className={`px-2 py-1 rounded text-xs ${item.status === 'UNASSIGNED' ? 'bg-gray-100' :
-                                                            item.status === 'LINKED' ? 'bg-emerald-100 text-emerald-800' :
-                                                                item.status === 'ACTIVE' ? 'bg-yellow-100 text-yellow-800' :
-                                                                    item.status === 'USED' ? 'bg-orange-100 text-orange-800' :
-                                                                        item.status === 'SHIPPED' ? 'bg-indigo-100 text-indigo-800' :
-                                                                            item.status === 'COMPLETED' ? 'bg-purple-100 text-purple-800' :
-                                                                                item.status === 'EXPIRED' ? 'bg-gray-100 text-gray-800' :
-                                                                                    item.status === 'BANNED' ? 'bg-red-100 text-red-800' :
-                                                                                        'bg-green-100 text-green-800'
-                                                            }`}>{st(item.status ? item.status.toLowerCase() : 'active')}</span>
-                                                    </div>
-
-                                                    {/* Recipient Info */}
-                                                    <div className="grid grid-cols-2 gap-4">
-                                                        <div>
-                                                            <h4 className="text-sm font-semibold text-gray-500">{tShop('orders.recipient')}</h4>
-                                                            <p>{item.recipient_name || '-'}</p>
-                                                        </div>
-                                                        <div>
-                                                            <h4 className="text-sm font-semibold text-gray-500">{tShop('orders.contact')}</h4>
-                                                            <p className="break-all">{item.shipping_info?.email || '-'}</p>
-                                                            <p className="text-sm mt-1">{item.shipping_info?.phone || '-'}</p>
-                                                        </div>
-                                                    </div>
-
-                                                    <div>
-                                                        <h4 className="text-sm font-semibold text-gray-500">{tShop('orders.address')}</h4>
-                                                        {item.postal_code && <p className="text-sm">〒{item.postal_code}</p>}
-                                                        <p className="whitespace-pre-wrap text-sm">{item.address || '-'}</p>
-                                                    </div>
-
-
-                                                    <div>
-                                                        <h4 className="text-sm font-semibold text-gray-500">{tShop('orders.preferredDateTime')}</h4>
-                                                        <p className="text-sm">{item.preferred_date ? item.preferred_date : '-'}  /  {item.preferred_time ? tt(item.preferred_time) : '-'}</p>
-                                                    </div>
-
-                                                    {/* Order Info */}
-                                                    <div className="pt-2 space-y-4">
-                                                        {item.memo_for_users && (
-                                                            <div>
-                                                                <h4 className="text-sm font-semibold text-gray-500">{tShop('orders.userMessage')}</h4>
-                                                                <p className="text-sm bg-gray-50 p-2 rounded">{item.memo_for_users}</p>
-                                                            </div>
-                                                        )}
-                                                        {item.memo_for_shop && (
-                                                            <div>
-                                                                <h4 className="text-sm font-semibold text-gray-500">{tShop('orders.shopMemo')}</h4>
-                                                                <p className="text-sm bg-orange-50 p-2 rounded">{item.memo_for_shop}</p>
-                                                            </div>
-                                                        )}
-                                                        <div>
-                                                            <h4 className="text-sm font-semibold text-gray-500">{tShop('orders.shipDialog.deliveryCompany')}</h4>
-                                                            <p className="font-mono">{item.delivery_company || '-'}</p>
-                                                        </div>
-                                                        <div>
-                                                            <h4 className="text-sm font-semibold text-gray-500">{tShop('orders.shipDialog.label')}</h4>
-                                                            <p className="font-mono">{item.tracking_number || '-'}</p>
-                                                        </div>
-                                                    </div>
-
-                                                    <div className="grid grid-cols-2 gap-4">
-                                                        <div>
-                                                            <h4 className="text-sm font-semibold text-gray-500">{tShop('orders.timestamps')}</h4>
-                                                            <p className="text-sm">{ts('ts_updated_at') + ": " + (item.ts_updated_at ? new Date(item.ts_updated_at).toLocaleString() : "-")}</p>
-                                                            <p className="text-sm">{ts('ts_linked_at') + ": " + (item.ts_linked_at ? new Date(item.ts_linked_at).toLocaleString() : "-")}</p>
-                                                            <p className="text-sm">{ts('ts_activated_at') + ": " + (item.ts_activated_at ? new Date(item.ts_activated_at).toLocaleString() : "-")}</p>
-                                                            <p className="text-sm">{ts('ts_submitted_at') + ": " + (item.ts_submitted_at ? new Date(item.ts_submitted_at).toLocaleString() : "-")}</p>
-                                                            <p className="text-sm">{ts('ts_shipped_at') + ": " + (item.ts_shipped_at ? new Date(item.ts_shipped_at).toLocaleString() : "-")}</p>
-                                                            <p className="text-sm">{ts('ts_completed_at') + ": " + (item.ts_completed_at ? new Date(item.ts_completed_at).toLocaleString() : "-")}</p>
-                                                            <p className="text-sm">{ts('ts_expired_at') + ": " + (item.ts_expired_at ? new Date(item.ts_expired_at).toLocaleString() : "-")}</p>
-                                                            <p className="text-sm">{ts('ts_banned_at') + ": " + (item.ts_banned_at ? new Date(item.ts_banned_at).toLocaleString() : "-")}</p>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </DialogContent>
-                                        </Dialog>
-                                    );
-                                })
+                                codes.map((item: any) => (
+                                    <QRCodeRow
+                                        key={item.PK}
+                                        item={item}
+                                        apiUrl={apiUrl}
+                                        onGeneratePDF={onGeneratePDF}
+                                        onRefresh={fetchCodes}
+                                    />
+                                ))
                             )}
                         </TableBody>
                     </Table>
                 </div>
             </CardContent>
         </Card>
+    );
+}
+
+function QRCodeRow({ item, apiUrl, onGeneratePDF, onRefresh }: {
+    item: any;
+    apiUrl: string;
+    onGeneratePDF: (batch: any, paperformat: string, cardformat: string) => Promise<void>;
+    onRefresh: () => void;
+}) {
+    const t = useTranslations('AdminPage');
+    const tShop = useTranslations('ShopPage');
+    const ts = useTranslations('Timestamp');
+    const st = useTranslations('Status');
+    const tt = useTranslations('Time');
+    const [open, setOpen] = useState(false);
+    const uuid = item.PK.replace('QR#', '');
+
+    const statusColor = (
+        item.status === 'UNASSIGNED' ? 'bg-gray-100' :
+            item.status === 'LINKED' ? 'bg-emerald-100 text-emerald-800' :
+                item.status === 'ACTIVE' ? 'bg-yellow-100 text-yellow-800' :
+                    item.status === 'USED' ? 'bg-orange-100 text-orange-800' :
+                        item.status === 'SHIPPED' ? 'bg-indigo-100 text-indigo-800' :
+                            item.status === 'COMPLETED' ? 'bg-purple-100 text-purple-800' :
+                                item.status === 'EXPIRED' ? 'bg-gray-100 text-gray-800' :
+                                    item.status === 'BANNED' ? 'bg-red-100 text-red-800' :
+                                        'bg-green-100 text-green-800'
+    );
+
+    return (
+        <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger asChild>
+                <TableRow className="cursor-pointer hover:bg-gray-100">
+                    <TableCell className="font-mono text-xs select-all">
+                        {uuid}
+                    </TableCell>
+                    <TableCell className="font-mono text-xs select-all">
+                        {item.pin}
+                    </TableCell>
+                    <TableCell>
+                        <span className={`px-2 py-1 rounded text-xs ${statusColor}`}>
+                            {st(item.status ? item.status.toLowerCase() : 'active')}
+                        </span>
+                    </TableCell>
+                    <TableCell className="text-xs text-gray-500">
+                        {item.ts_updated_at ? new Date(item.ts_updated_at).toLocaleString() : '-'}
+                    </TableCell>
+                    <TableCell onClick={(e) => e.stopPropagation()}>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            className="mr-2 h-6 text-xs"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onGeneratePDF({
+                                    id: uuid,
+                                    codes: [{ uuid, pin: item.pin }]
+                                }, PDF_PAPER_FORMAT, PDF_CARD_FORMAT);
+                            }}
+                        >
+                            {t('list.ban.pdf')}
+                        </Button>
+                        {item.status !== 'BANNED' && (
+                            <BanButton uuid={uuid} apiUrl={apiUrl} onSuccess={onRefresh} />
+                        )}
+                    </TableCell>
+                </TableRow>
+            </DialogTrigger>
+            <DialogContent className="max-w-md">
+                <DialogHeader>
+                    <DialogTitle>{tShop('orders.details')}</DialogTitle>
+                    <DialogDescription asChild>
+                        <div className="font-mono text-sm text-gray-500 w-full flex flex-col gap-0 text-left mt-4">
+                            <div className="flex items-center gap-2">
+                                ID: {uuid}
+                                <Copy className="cursor-pointer w-4 h-4" onClick={() => navigator.clipboard.writeText(uuid)} />
+                                <Link2 className="cursor-pointer w-4 h-4" onClick={() => window.open(`${NEXT_PUBLIC_APP_URL}/receive/${uuid}`, '_blank')} />
+                            </div>
+                            <div className="flex items-center gap-2">
+                                PIN: {item.pin}
+                                <Copy className="cursor-pointer w-4 h-4" onClick={() => navigator.clipboard.writeText(item.pin)} />
+                            </div>
+                        </div>
+                    </DialogDescription>
+                </DialogHeader>
+
+                {/* ダイアログが開いている間だけ中身をレンダリング */}
+                {open && (
+                    <div className="space-y-4 py-4 max-h-[70vh] overflow-y-auto">
+                        {/* Product Info */}
+                        <div>
+                            <h4 className="text-sm font-semibold text-gray-500">{tShop('orders.productName')}</h4>
+                            <p className="font-medium">{item.product_name || item.product_id || '-'}</p>
+                        </div>
+
+                        {/* Shop Info */}
+                        <div>
+                            <h4 className="text-sm font-semibold text-gray-500">{t('shopInfo.title')}</h4>
+                            <div className="text-sm mt-1 grid grid-cols-[80px_1fr] gap-x-2 gap-y-1">
+                                <span className="text-gray-400 text-xs">{t('shopInfo.name')}</span>
+                                <span className="font-medium">{item.shop_name || '-'}</span>
+
+                                <span className="text-gray-400 text-xs">{t('shopInfo.id')}</span>
+                                <span className="font-mono text-xs text-gray-600">{item.shop_id || '-'}</span>
+
+                                <span className="text-gray-400 text-xs">{t('shopInfo.contact')}</span>
+                                <span className="text-gray-600 break-all">{item.shop_email || '-'}</span>
+                            </div>
+                        </div>
+
+                        {/* Status */}
+                        <div>
+                            <h4 className="text-sm font-semibold text-gray-500">{tShop('orders.status')}</h4>
+                            <span className={`px-2 py-1 rounded text-xs ${statusColor}`}>
+                                {st(item.status ? item.status.toLowerCase() : 'active')}
+                            </span>
+                        </div>
+
+                        {/* Recipient Info */}
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <h4 className="text-sm font-semibold text-gray-500">{tShop('orders.recipient')}</h4>
+                                <p>{item.recipient_name || '-'}</p>
+                            </div>
+                            <div>
+                                <h4 className="text-sm font-semibold text-gray-500">{tShop('orders.contact')}</h4>
+                                <p className="break-all">{item.shipping_info?.email || '-'}</p>
+                                <p className="text-sm mt-1">{item.shipping_info?.phone || '-'}</p>
+                            </div>
+                        </div>
+
+                        <div>
+                            <h4 className="text-sm font-semibold text-gray-500">{tShop('orders.address')}</h4>
+                            {item.postal_code && <p className="text-sm">〒{item.postal_code}</p>}
+                            <p className="whitespace-pre-wrap text-sm">{item.address || '-'}</p>
+                        </div>
+
+                        <div>
+                            <h4 className="text-sm font-semibold text-gray-500">{tShop('orders.preferredDateTime')}</h4>
+                            <p className="text-sm">{item.preferred_date ? item.preferred_date : '-'}  /  {item.preferred_time ? tt(item.preferred_time) : '-'}</p>
+                        </div>
+
+                        {/* Order Info */}
+                        <div className="pt-2 space-y-4">
+                            {item.memo_for_users && (
+                                <div>
+                                    <h4 className="text-sm font-semibold text-gray-500">{tShop('orders.userMessage')}</h4>
+                                    <p className="text-sm bg-gray-50 p-2 rounded">{item.memo_for_users}</p>
+                                </div>
+                            )}
+                            {item.memo_for_shop && (
+                                <div>
+                                    <h4 className="text-sm font-semibold text-gray-500">{tShop('orders.shopMemo')}</h4>
+                                    <p className="text-sm bg-orange-50 p-2 rounded">{item.memo_for_shop}</p>
+                                </div>
+                            )}
+                            <div>
+                                <h4 className="text-sm font-semibold text-gray-500">{tShop('orders.shipDialog.deliveryCompany')}</h4>
+                                <p className="font-mono">{item.delivery_company || '-'}</p>
+                            </div>
+                            <div>
+                                <h4 className="text-sm font-semibold text-gray-500">{tShop('orders.shipDialog.label')}</h4>
+                                <p className="font-mono">{item.tracking_number || '-'}</p>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <h4 className="text-sm font-semibold text-gray-500">{tShop('orders.timestamps')}</h4>
+                                <p className="text-sm">{ts('ts_updated_at') + ": " + (item.ts_updated_at ? new Date(item.ts_updated_at).toLocaleString() : "-")}</p>
+                                <p className="text-sm">{ts('ts_linked_at') + ": " + (item.ts_linked_at ? new Date(item.ts_linked_at).toLocaleString() : "-")}</p>
+                                <p className="text-sm">{ts('ts_activated_at') + ": " + (item.ts_activated_at ? new Date(item.ts_activated_at).toLocaleString() : "-")}</p>
+                                <p className="text-sm">{ts('ts_submitted_at') + ": " + (item.ts_submitted_at ? new Date(item.ts_submitted_at).toLocaleString() : "-")}</p>
+                                <p className="text-sm">{ts('ts_shipped_at') + ": " + (item.ts_shipped_at ? new Date(item.ts_shipped_at).toLocaleString() : "-")}</p>
+                                <p className="text-sm">{ts('ts_completed_at') + ": " + (item.ts_completed_at ? new Date(item.ts_completed_at).toLocaleString() : "-")}</p>
+                                <p className="text-sm">{ts('ts_expired_at') + ": " + (item.ts_expired_at ? new Date(item.ts_expired_at).toLocaleString() : "-")}</p>
+                                <p className="text-sm">{ts('ts_banned_at') + ": " + (item.ts_banned_at ? new Date(item.ts_banned_at).toLocaleString() : "-")}</p>
+                            </div>
+                        </div>
+
+                        {/* 生データ */}
+                        <div className="mt-4">
+                            <h4 className="text-sm font-semibold text-gray-500 border-b mb-2">{t('list.raw')}</h4>
+                            {Object.entries(item).map(([key, value]) => {
+                                if (key === 'shipping_info' || key.startsWith('ts_')) return null;
+                                if (key.startsWith('GSI') || key === "SK" || key === "PK") return null;
+                                return (
+                                    <div key={key} className="grid grid-cols-2 gap-1">
+                                        <h4 className="text-sm font-semibold text-gray-500">{key}</h4>
+                                        <p className="text-sm">
+                                            {value == null
+                                                ? '-'
+                                                : typeof value === 'object'
+                                                    ? JSON.stringify(value)
+                                                    : String(value)}
+                                        </p>
+                                    </div>
+                                );
+                            })}
+                            <div className="mt-0 border-t" />
+                            {item.shipping_info && Object.entries(item.shipping_info).map(([key, value]) => (
+                                <div key={`shipping_${key}`} className="grid grid-cols-2 gap-1">
+                                    <h4 className="text-sm font-semibold text-gray-500">{key}</h4>
+                                    <p className="text-sm">
+                                        {value == null
+                                            ? '-'
+                                            : typeof value === 'object'
+                                                ? JSON.stringify(value)
+                                                : String(value)}
+                                    </p>
+                                </div>
+                            ))}
+                            <div className="mt-0 border-t" />
+                            {Object.entries(item).map(([key, value]) => {
+                                if (!key.startsWith('ts_')) return null;
+                                return (
+                                    <div key={key} className="grid grid-cols-2 gap-1">
+                                        <h4 className="text-sm font-semibold text-gray-500">{key}</h4>
+                                        <p className="text-sm">
+                                            {value == null
+                                                ? '-'
+                                                : typeof value === 'object'
+                                                    ? JSON.stringify(value)
+                                                    : String(value)}
+                                        </p>
+                                    </div>
+                                );
+                            })}
+                            <div className="mt-0 border-t" />
+                            {Object.entries(item).map(([key, value]) => {
+                                if (!key.startsWith('GSI') && key !== "SK" && key !== "PK") return null;
+                                return (
+                                    <div key={key} className="grid grid-cols-2 gap-1">
+                                        <h4 className="text-sm font-semibold text-gray-500">{key}</h4>
+                                        <p className="text-sm">
+                                            {value == null
+                                                ? '-'
+                                                : typeof value === 'object'
+                                                    ? JSON.stringify(value)
+                                                    : String(value)}
+                                        </p>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                )}
+            </DialogContent>
+        </Dialog>
     );
 }
 
