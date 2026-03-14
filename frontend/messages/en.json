@@ -1,13 +1,6 @@
 {
-  "Status": {
-    "unassigned": "UNASSIGNED",
-    "linked": "LINKED",
-    "active": "ACTIVE",
-    "used": "WAITING FOR SHIPMENT",
-    "shipped": "SHIPPED",
-    "completed": "COMPLETED",
-    "expired": "EXPIRED",
-    "banned": "BANNED"
+  "Site": {
+    "name": "Meishigawarini"
   },
   "Timestamp": {
     "ts_created_at": "Created At",
@@ -19,6 +12,16 @@
     "ts_expired_at": "Expired At",
     "ts_banned_at": "Banned At",
     "ts_updated_at": "Updated At"
+  },
+  "Status": {
+    "unassigned": "UNASSIGNED",
+    "linked": "LINKED",
+    "active": "ACTIVE",
+    "used": "WAITING FOR SHIPMENT",
+    "shipped": "SHIPPED",
+    "completed": "COMPLETED",
+    "expired": "EXPIRED",
+    "banned": "BANNED"
   },
   "HomePage": {
     "title": "Welcome to meishigawarini",
@@ -68,6 +71,7 @@
     "description": "Digital gift service adding a small gift to encounters."
   },
   "ShopListPage": {
+    "loading": "Loading shop list...",
     "title": "My Shops",
     "subtitle": "Select a shop to manage or create a new one.",
     "userId": "User ID: {id}",
@@ -88,9 +92,10 @@
   "ShopPage": {
     "loading": "Loading Dashboard...",
     "title": "Shop Dashboard",
-    "shopId": "Shop ID: {id}",
     "movetoshops": "Back to shop list",
     "logout": "Logout",
+    "shopId": "Shop ID: {id}",
+    "refresh": "Refresh",
     "incomingOrders": "Incoming Orders",
     "ordersDesc": "Manage your orders and shipments.",
     "orders": {
@@ -98,6 +103,7 @@
       "recipient": "Recipient",
       "contact": "Contact",
       "address": "Address",
+      "preferredDateTime": "Preferred Date/Time",
       "status": "Status",
       "action": "Action",
       "uuid": "ID",
@@ -107,11 +113,16 @@
       "details": "Details",
       "userMessage": "User Message",
       "shopMemo": "Shop Memo",
+      "updateMeta": "Update Memo/Message",
+      "processing": "Processing",
+      "updateSuccess": "Update successful",
+      "timestamps": "Timestamps",
       "shipDialog": {
-        "title": "Mark as Shipped",
         "description": "Enter tracking number for {name}",
         "label": "Tracking Number",
-        "submit": "Confirm Shipment"
+        "deliveryCompany": "Delivery Company",
+        "submit": "Confirm Shipment",
+        "Completed-state messages cannot be updated": "Completed-state messages cannot be updated"
       }
     },
     "products": "Products",
@@ -130,6 +141,8 @@
       "title": "Add New Product",
       "name": "Product Name",
       "description": "Description",
+      "detailHtml": "Details (HTML)",
+      "detailHtmlPlaceholder": "Details (HTML)",
       "price": "Price (¥)",
       "validDays": "Valid Days",
       "image": "Product Image",
@@ -139,23 +152,38 @@
       "failed": "Failed to create product",
       "error": "Error creating product"
     },
+    "importProduct": {
+      "button": "Bulk Import Products",
+      "dialogTitle": "Import Products from Another Shop",
+      "dialogDesc": "Select a source shop. All products from the target shop will be added to this shop. Product IDs will remain the same.",
+      "selectShop": "Import Source Shop",
+      "placeholder": "Select a shop...",
+      "submit": "Import",
+      "cancel": "Cancel"
+    },
     "linkQr": {
       "title": "Link QR Code",
       "description": "Connect a physical QR card to a product.",
       "uuidLabel": "QR UUID (Scan or Type)",
       "placeholder": "e.g. 123e4567-...",
+      "productName": "Product Name",
       "scan": "Scan QR Code",
+      "manualinput": "Manual Entry?",
       "selectProduct": "Select Product",
       "selectPlaceholder": "Select a product...",
+      "option": "Options (as needed)",
       "memoForUsersLabel": "Message from shop (visible to purchasers and recipients)",
       "memoForUsersPlaceholder": "You can enter a message...",
       "memoForShopLabel": "Memo (visible only to shop)",
       "memoForShopPlaceholder": "You can enter a memo...",
       "submit": "Link & Activate",
       "processing": "Processing...",
+      "foreignQrError": "This card cannot be used.",
+      "clear": "Clear",
       "scanDialog": {
         "title": "Scan QR Code",
         "description": "Position the QR code within the frame.",
+        "apply": "Apply",
         "cancel": "Cancel"
       },
       "success": "QR Code Linked and Activated!"
@@ -176,9 +204,26 @@
       "status": "Status",
       "activatedAt": "Last Updated Date Time"
     },
+    "statusGuide": {
+      "title": "Status Guide",
+      "description": "You can check the progress of the order and the meaning of the status.",
+      "flow": "Order Flow",
+      "list": "Status Details",
+      "statuses": {
+        "unassigned": "The QR code has been generated but is not yet linked to a shop or product.",
+        "linked": "Linked to a shop and product, but not yet activated for use.",
+        "active": "Activated and ready to be given as a gift.",
+        "used": "The recipient has entered their address and is waiting for shipment (shop action required).",
+        "shipped": "The shop has shipped the item and registered a tracking number.",
+        "completed": "The transaction has been successfully completed (e.g., recipient reported receipt).",
+        "expired": "The validity period has expired and the gift is invalid.",
+        "banned": "Suspended by system administrator due to unauthorized use or other reasons."
+      }
+    },
     "shopSettings": {
       "title": "Shop Settings",
       "description": "Configure your shop's name and HTML description.",
+      "updatePreview": "Update Preview",
       "name": "Shop Name",
       "detailHtml": "Shop Description (HTML)",
       "detailHtmlPlaceholder": "Enter description in HTML format...",
@@ -209,7 +254,9 @@
       "pin": "Enter PIN to View Gift",
       "form": "You received a gift!",
       "success": "Thank You!",
-      "shipped": "Your gift is on the way!"
+      "shipped": "Your gift is on the way!",
+      "expired": "The gift has expired",
+      "completed": "Enjoy your gift!"
     },
     "pinStep": {
       "label": "Enter PIN Code",
@@ -217,11 +264,28 @@
       "submit": "View Gift",
       "verifying": "Verifying..."
     },
+    "restrictedStep": {
+      "title": "Password Confirmation",
+      "message": "Enter your password to view the gift details.",
+      "passwordLabel": "Password",
+      "unlock": "Unlock",
+      "verifying": "Verifying..."
+    },
+    "daysRemaining": "{days} days and ~{hours}h {minutes}m until expiration",
+    "limitdatetime": "Expiration Date: {datetime} (Cannot be extended)",
     "formStep": {
       "title": "Delivery Details",
       "name": "Full Name",
+      "name-placeholder": "John Doe",
       "address": "Delivery Address",
+      "address-placeholder": "1-1 Meishigawarini St., Akita",
       "zipCode": "Postal Code",
+      "zipCode-placeholder": "010-XXXX",
+      "phone": "Phone Number",
+      "phone-placeholder": "090-XXXX-XXXX",
+      "email": "Email (Optional)",
+      "email-placeholder": "your@email.address",
+      "emailDescription": "We will notify you about the shipping status, chat messages, and inquiries from the shop.",
       "preferredDate": "Preferred Delivery Date",
       "preferredTime": "Preferred Delivery Time",
       "noPreference": "No preference",
@@ -230,9 +294,15 @@
       "time1618": "16:00 - 18:00",
       "time1820": "18:00 - 20:00",
       "time1921": "19:00 - 21:00",
-      "privacyPolicy": "The personal information you enter will be used only for shipping and shipping-related communications and will not be used for any other purpose.",
       "submit": "Receive Gift",
-      "submitting": "Submitting..."
+      "submitting": "Submitting...",
+      "passwordTitle": "Password Setup (Optional)",
+      "passwordDescription": "Without a password, the sender can view the tracking number. Set a password to protect non-chat details.",
+      "passwordLabel": "Password",
+      "passwordPlaceholder": "4+ characters",
+      "confirmPasswordLabel": "Confirm Password",
+      "confirmPasswordPlaceholder": "Enter again",
+      "privacyPolicy": "The personal information you enter will be used only for shipping and shipping-related communications and will not be used for any other purpose."
     },
     "successStep": {
       "message": "Your shipping information has been sent!",
@@ -240,12 +310,23 @@
     },
     "shippedStep": {
       "message": "Your gift has been shipped!",
-      "tracking": "Tracking: {number}"
+      "tracking": "Tracking: {number}",
+      "receivedMessage": "Have you received the package?",
+      "receivedButton": "Mark as Received",
+      "compleatedMessage": "Package completely received!",
+      "deliveryCompany": "Delivery Company: {company}"
+    },
+    "expiredStep": {
+      "message": "This gift has expired.",
+      "subMessage": "Expiration: {date}"
     },
     "errors": {
       "invalidPin": "Invalid PIN or Gift not found",
       "inactive": "This card is not active.",
       "submitFailed": "Failed to submit address.",
+      "passwordMismatch": "Passwords do not match",
+      "invalidPassword": "Invalid password",
+      "unlockFailed": "Failed to unlock",
       "invalidEmailFormat": "Invalid email format",
       "uploadFailed": "Failed to upload"
     },
@@ -282,12 +363,6 @@
       "shopEmail": "Shop Contact",
       "note": "Please include your Order ID when contacting the shop. Address changes after shipment may not be possible."
     },
-    "memorySection": {
-      "title": "Memory Record",
-      "daysPassed": "{days} days since our encounter",
-      "message": "May this gift become a wonderful memory for you.",
-      "receivedAt": "Received on: {date}"
-    },
     "senderInfo": {
       "title": "Sender Info",
       "title-empty": "Add Sender Info",
@@ -295,11 +370,10 @@
       "description": "You can upload a business card or face photo.",
       "update": "Update Info",
       "uploadPlaceholder": "Upload Business Card / Photo",
-      "uploadHint": "Tap to select an image",
       "uploading": "Uploading...",
-      "removeImage": "Remove Image",
-      "notice": "* Uploaded images are stored securely and used only for this gift exchange.",
       "save": "Save Info",
+      "removeImage": "Remove Image",
+      "saveData": "Export",
       "saving": "Saving...",
       "cancel": "Cancel",
       "preview": "Preview",
@@ -326,30 +400,47 @@
         "Service_Linktree": "Linktree",
         "Service_Eight": "Eight",
         "exchange_date": "Exchange Date",
+        "import_label": "Save / Load",
+        "import_id": "Import ID",
+        "import_load": "Load",
         "others": "Others (e.g., Birthday, Blood Type)",
+        "addhtmlmessage": "Advanced Settings",
         "detail_html": "Details (HTML)",
         "detail_html-images": "Images for HTML",
         "detail_html-addimage": "Add Image",
         "detail_html-noimages": "No images uploaded. You can add images here to use in the HTML."
       },
       "updateFailed": "Failed to update sender info: ",
+      "importSuccess": "Information loaded successfully.",
+      "importFailed": "Failed to load information.",
+      "importIDNote": "Pasting the ID will automatically fill it in.",
       "confirmRemoveImage": "Are you sure you want to remove this image?",
       "urlCopied": "URL copied to clipboard",
       "usage": "Usage",
       "usageDesc1": "Copy the URL and paste it into an ",
       "usageDesc2": " tag in your HTML. It will automatically be replaced with a signed URL when displayed."
+    },
+    "shopinfo": "Shop Introduction",
+    "shopinfo_description": "Introduction to the shop selling this gift",
+    "memorySection": {
+      "title": "Memory Record",
+      "daysPassed": "{days} days since our encounter",
+      "message": "May this gift become a wonderful memory for you.",
+      "submittedAt": "Order Date: {date}",
+      "receivedAt": "Received on: {date}"
     }
   },
   "AdminPage": {
     "title": "Admin Dashboard",
     "generate": {
       "title": "Generate QR Codes",
+      "option": "Options",
       "quantity": "Quantity to Generate",
+      "shopId": "Shop ID (Optional)",
+      "productId": "Product ID (Optional)",
       "ownerUuid": "Owner UUID (Optional)",
       "senderId": "Sender ID (Optional, Format: USER#[uuid])",
       "expiryDate": "Expiry Date (Optional)",
-      "shopId": "Shop ID (Optional)",
-      "productId": "Product ID (Optional)",
       "activateNow": "Activate Now (Required Shop ID and Product ID)",
       "useMetadata": "Use optional information",
       "button": "Generate"
@@ -386,7 +477,9 @@
         "active": "ACTIVE",
         "used": "USED",
         "shipped": "SHIPPED",
+        "completed": "COMPLETED",
         "banned": "BANNED",
+        "expired": "EXPIRED",
         "search": "Search by UUID",
         "undefined": "undefined"
       },
@@ -438,6 +531,35 @@
     "errors": {
       "failed": "Failed to verify",
       "incomplete": "Verification incomplete. Next step: {step}"
+    }
+  },
+  "UI": {
+    "Error starting scanner": "Error starting QR code scanner.",
+    "Camera permission denied or error starting scanner": "Camera permission denied or error starting scanner. Please allow camera access, or if another app (e.g. video conferencing) is using it, pause or close that app and try scanning again."
+  },
+  "BackendError": {
+    "QR not found": "QR code not found.",
+    "QR does not belong to this shop": "QR code does not belong to this shop.",
+    "QR is not in a valid state": "QR code is not in a valid state. It may already be activated, used, or disabled.",
+    "Product not found": "The product linked to this card could not be found. It may have been deleted. Please discard this card as it cannot be used.",
+    "Product is stopped": "The product linked to this card is currently stopped. If you wish to use this card, please activate the STOPPED product."
+  },
+  "MFASetupPage": {
+    "title": "Set up Two-Factor Authentication (MFA)",
+    "description": "Enhance account security by setting up two-factor authentication with an authenticator app (e.g. Google Authenticator).",
+    "step1": "1. Scan the QR code below with your authenticator app",
+    "step2": "2. Enter the 6-digit code displayed in the app",
+    "placeholder": "6-digit code",
+    "verify": "Verify and Activate",
+    "verifying": "Verifying...",
+    "successTitle": "Setup Complete",
+    "successMessage": "Two-factor authentication is now active. It will be required on your next login. Please log out and log in again.",
+    "logout": "Log out & Re-login",
+    "back": "Back",
+    "errors": {
+      "setupFailed": "Failed to start setup. Please check your login status.",
+      "verifyFailed": "Incorrect or expired code.",
+      "notLoggedIn": "You must be logged in to perform this action."
     }
   }
 }
