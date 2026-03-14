@@ -27,7 +27,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
     console.log("Recipient Submit Handler Invoked", JSON.stringify(eventWithoutBody));
     try {
         if (event.httpMethod !== 'POST') {
-            return { statusCode: 405, headers: corsHeaders, body: 'Method Not Allowed' };
+            return { statusCode: 405, headers: corsHeaders, body: JSON.stringify({ message: 'Method Not Allowed' }) };
         }
 
         let body;
@@ -202,12 +202,12 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 }));
 
                 // 4. Send Confirmation Email to Recipient
-                const subject = (lang === 'ja') ? '【名刺がわりに】住所登録完了のお知らせ' : '【Meishigawarini】Address Registration Completed';
+                const subject = (lang === 'ja') ? '【名刺がわりに】住所登録完亁E�Eお知らせ' : '【Meishigawarini】Address Registration Completed';
                 const bodyText = (lang === 'ja') ? `
-住所の登録が完了しました。
-商品の発送まで今しばらくお待ちください。
+住所の登録が完亁E��ました、E
+啁E��の発送まで今しばらくお征E��ください、E
 
-荷物の状態はこちら:
+荷物の状態�EこちめE
 ${process.env.NEXT_PUBLIC_APP_URL}/receive/${qr_id}
 PIN: ${pin_code}
 `.trim() : `
@@ -250,8 +250,8 @@ PIN: ${pin_code}
                 ]);
 
                 let shopEmail = shopRes.Item?.email;
-                const shopName = shopRes.Item?.name || '不明なショップ';
-                const productName = productRes.Item?.name || '不明な商品';
+                const shopName = shopRes.Item?.name || '不�EなショチE�E';
+                const productName = productRes.Item?.name || '不�Eな啁E��';
 
                 // Fallback: If email is missing, try to get from Cognito
                 if (!shopEmail && shopRes.Item?.owner_id) {
@@ -281,17 +281,17 @@ PIN: ${pin_code}
                     const jstNow = new Date(now).toLocaleString();
 
                     const bodyText = `
-ショップオーナー様
+ショチE�Eオーナ�E槁E
 
-あなたのショップ「${shopName}」の商品にお届け先住所が登録されました。
+あなた�EショチE�E、E{shopName}」�E啁E��にお届け先住所が登録されました、E
 
-商品名: ${productName}
+啁E��吁E ${productName}
 注文ID: ${qr_id}
-登録日時: ${jstNow}
+登録日晁E ${jstNow}
 
-管理画面から注文詳細を確認し、発送準備を進めてください。
+管琁E��面から注斁E��細を確認し、発送準備を進めてください、E
 
-管理画面:
+管琁E��面:
 ${process.env.NEXT_PUBLIC_APP_URL}/shop/${shopId}
 `.trim();
 

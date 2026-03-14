@@ -104,6 +104,6 @@ APIの設計上、攻撃者にバックエンドの仕組みを推測させな�
 
 *   **管理者グループ構造**:
     *   **`Administrators`**: システム管理用のQRコード生成・管理ダッシュボード (`/admin`) にアクセスできるグループ。
-    *   **`GlobalAdmins`**: ショップ管理を横断的に行える権限を持つグループ。
+    *   **`GlobalAdmins`**: Administratorsの権限に追加して，すべてのショップの管理画面を閲覧・編集可能なすべての権限を持つグループ。
 
 *   **ALLOW_USER_AUTH フロー**: Cognito User Pool Client には `ALLOW_USER_AUTH` フローを有効化しており (`cfnUserPoolClient.explicitAuthFlows`)、将来的な認証方式の拡張に対応できる構成になっています。

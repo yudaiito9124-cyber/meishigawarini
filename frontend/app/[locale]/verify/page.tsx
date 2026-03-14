@@ -42,7 +42,7 @@ function VerifyContent() {
             }
 
         } catch (err: any) {
-            console.error('Verification error', err);
+            // console.error('Verification error', err);
             setError(err.message || t('errors.failed'));
         } finally {
             setLoading(false);

@@ -22,7 +22,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
     try {
         // Only allow POST
         if (event.httpMethod !== 'POST') {
-            return { statusCode: 405, headers: corsHeaders, body: 'Method Not Allowed' };
+            return { statusCode: 405, headers: corsHeaders, body: JSON.stringify({ message: 'Method Not Allowed' }) };
         }
 
         const body = JSON.parse(event.body || '{}');
@@ -49,7 +49,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 Key: { PK: `USER#${ownerUuid}`, SK: 'SHOP' }
             }));
             if (!userRes.Item) {
-                return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: '指定されたユーザーIDが存在しません', detail: { ownerUuid } }) };
+                return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'User ID not found', detail: { ownerUuid } }) };
             }
             user_shop_ids = [
                 ...(userRes.Item.owner_shop_ids || []),
@@ -69,7 +69,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 }
             }));
             if (!prodRes.Items || prodRes.Items.length === 0) {
-                return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: '指定されたプロダクトIDは存在しません', detail: { productId } }) };
+                return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Product ID not found', detail: { productId } }) };
             }
 
             product_shopids = prodRes.Items.map((item: any) => item.PK.replace(/^SHOP#/, ""));
@@ -85,7 +85,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 }
             }));
             if (!shopRes.Item) {
-                return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: '指定されたショップIDは存在しません', detail: { shopId } }) };
+                return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Shop ID not found', detail: { shopId } }) };
             }
         }
 
@@ -93,30 +93,30 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         let isLinkeable = false;
         if (shopId && productId && ownerUuid) {
             if (!product_shopids.includes(shopId)) {
-                return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: '指定されたショップIDとプロダクトIDの組み合わせが存在しません', detail: { shopids_fromproductid: product_shopids, shopId } }) };
+                return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Invalid shop and product ID combination', detail: { shopids_fromproductid: product_shopids, shopId } }) };
             }
             if (!user_shop_ids.includes(shopId)) {
-                return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: '指定されたショップは指定されたユーザーが管理する権限がありません', detail: { user_shop_ids, shopId } }) };
+                return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Unauthorized for target shop', detail: { user_shop_ids, shopId } }) };
             }
             isLinkeable = true;
         } else if (shopId && productId) {
             if (!product_shopids.includes(shopId)) {
-                return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: '指定されたショップIDとプロダクトIDの組み合わせが存在しません', detail: { shopids_fromproductid: product_shopids, shopId } }) };
+                return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Invalid shop and product ID combination', detail: { shopids_fromproductid: product_shopids, shopId } }) };
             }
             isLinkeable = true;
         } else if (shopId && ownerUuid) {
             if (!user_shop_ids.includes(shopId)) {
-                return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: '指定されたショップは指定されたユーザーが管理する権限がありません', detail: { user_shop_ids, shopId } }) };
+                return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Unauthorized for target shop', detail: { user_shop_ids, shopId } }) };
             }
         } else if (productId && ownerUuid) {
             let set_shopids_fromproductid = new Set(product_shopids);
             if (!user_shop_ids.some((item: any) => set_shopids_fromproductid.has(item))) {
-                return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: '指定された製品は指定されたユーザーが管理するショップのいずれにも登録されていません', detail: { user_shop_ids, shopids_fromproductid: product_shopids } }) };
+                return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Product is not associated with any authorized shop', detail: { user_shop_ids, shopids_fromproductid: product_shopids } }) };
             }
         }
 
         if (activateNow && !isLinkeable) {
-            return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'アクティベートするにはショップIDとプロダクトIDの両方が必要です', detail: { activateNow, isLinkeable } }) };
+            return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Activation requires both shop ID and product ID', detail: { activateNow, isLinkeable } }) };
         }
 
         let validDays = 180; // Default
@@ -141,7 +141,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 Key: { PK: `USER#${senderId}`, SK: 'SENDER' }
             }));
             if (!senderRes?.Item) {
-                return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: '指定された送り主IDは存在しません', detail: { senderId } }) };
+                return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Sender ID not found', detail: { senderId } }) };
             }
             const info = { ...senderRes.Item };
             delete info.PK;

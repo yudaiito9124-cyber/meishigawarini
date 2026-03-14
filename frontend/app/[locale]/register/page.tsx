@@ -39,7 +39,7 @@ export default function RegisterPage() {
                 }
             });
 
-            console.log('Sign up result:', { isSignUpComplete, nextStep });
+            // console.log('Sign up result:', { isSignUpComplete, nextStep });
 
             if (isSignUpComplete) {
                 setSuccess(true);
@@ -52,7 +52,7 @@ export default function RegisterPage() {
                 // Determine if we should log this or not. For now, let's skip logging to avoid confusion.
                 setError(t('errors.usernameExists'));
             } else {
-                console.error('Register error', err);
+                // console.error('Register error', err);
                 setError(err.message || t('errors.default'));
             }
         } finally {

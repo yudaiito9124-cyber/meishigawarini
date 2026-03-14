@@ -30,14 +30,14 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         const shopId = event.pathParameters?.shopId;
 
         if (!userId || !shopId) {
-            return { statusCode: 401, headers: corsHeaders, body: 'Unauthorized' };
+            return { statusCode: 401, headers: corsHeaders, body: JSON.stringify({ message: 'Unauthorized' }) };
         }
 
         // Verify Shop Ownership
         const shopMetadata = await checkShopOwnerOrGM(ddb, TABLE_NAME, shopId, userId, event);
 
         if (!shopMetadata) {
-            return { statusCode: 401, headers: corsHeaders, body: 'Unauthorized' };
+            return { statusCode: 401, headers: corsHeaders, body: JSON.stringify({ message: 'Unauthorized' }) };
         }
         //////////// ここから下は 認証済みかつショップオーナーのみアクセス可能
 
@@ -52,7 +52,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             return handleUpdateOrder(event); //権限確認なし注意
         }
 
-        return { statusCode: 405, headers: corsHeaders, body: 'Method Not Allowed' };
+        return { statusCode: 405, headers: corsHeaders, body: JSON.stringify({ message: 'Method Not Allowed' }) };
 
     } catch (error) {
         console.error(error);
@@ -225,9 +225,9 @@ function renderOrderItems(allOrderDetails: any[], relevantItems: any[]) {
 //内部で権限確認なし注意 -> 修正: 権限確認を追加
 async function handleUpdateOrder(event: any) {
     const qrId = event.pathParameters?.qrId; // uuid から qrId に変更
-    if (!qrId) return { statusCode: 400, headers: corsHeaders, body: 'Missing qrId' };
+    if (!qrId) return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Missing qr_id' }) };
     const shopId = event.pathParameters?.shopId;
-    if (!shopId) return { statusCode: 400, headers: corsHeaders, body: 'Missing shopID' };
+    if (!shopId) return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Shop ID not found' }) };
 
     const body = JSON.parse(event.body || '{}');
     const { delivery_company, tracking_number, memo_for_users, memo_for_shop } = body;
@@ -236,12 +236,12 @@ async function handleUpdateOrder(event: any) {
         Key: { PK: `QR#${qrId}`, SK: 'METADATA' }
     }));
     if (!metaRes.Item) {
-        return { statusCode: 404, headers: corsHeaders, body: 'Order not found' };
+        return { statusCode: 404, headers: corsHeaders, body: JSON.stringify({ message: 'Order not found' }) };
     }
 
     // セキュリティチェック: このQRコードが指定されたショップのものであるか確認
     if (metaRes.Item.shop_id !== shopId) {
-        return { statusCode: 403, headers: corsHeaders, body: 'QR does not belong to this shop' };
+        return { statusCode: 403, headers: corsHeaders, body: JSON.stringify({ message: 'QR does not belong to this shop' }) };
     }
 
     const currentStatus = metaRes.Item.status;

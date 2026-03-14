@@ -36,6 +36,7 @@ import { cn } from "@/lib/utils";
 
 export default function AdminPage() {
     const t = useTranslations('AdminPage');
+    const tb = useTranslations('Backend');
     const [count, setCount] = useState(10);
     const [keyword, setKeyword] = useState("");
     const [shopId, setShopId] = useState("");
@@ -64,7 +65,7 @@ export default function AdminPage() {
                     return notFound();
                 }
 
-                console.log("Admin access verification in progress...");
+                // console.log("Admin access verification in progress...");
                 let amr = (payload['amr'] as string[]) || [];
                 // amrが空の場合、一度だけ強制リフレッシュを試みる（最新の認証情報を取得するため）
                 if (amr.length === 0) {
@@ -81,7 +82,7 @@ export default function AdminPage() {
                 });
 
                 if (res.status === 404 || res.status === 403) {
-                    console.error("Access denied by backend authorizer.");
+                    // console.error("Access denied by backend authorizer.");
                     setIsAuthorized(false);
                     return;
                 }
@@ -92,7 +93,7 @@ export default function AdminPage() {
                     setIsAuthorized(false);
                 }
             } catch (e) {
-                console.error("Auth check failed", e);
+                // console.error("Auth check failed", e);
                 setIsAuthorized(false);
             }
         };
@@ -149,18 +150,16 @@ export default function AdminPage() {
                 };
                 setGeneratedBatches([newBatch, ...generatedBatches]);
                 // In a real app, we would process 'data.data' (UUIDs/PINs) to generate PDF/CSV 
-                console.log("Generated Codes:", data.data);
+                // console.log("Generated Codes:", data.data);
 
                 // Automatically download PDF
                 await generatePDF(newBatch, PDF_PAPER_FORMAT, PDF_CARD_FORMAT);
             } else {
                 const errData = await res.json().catch(() => null);
-                console.error(errData);
-                alert(errData?.message || t('batches.alerts.failed') + errData?.detail?.toString());
+                // console.error(errData);
+                alert((tb(errData?.message) || errData?.message) || t('batches.alerts.failed') + (errData?.detail?.toString() || ''));
             }
         } catch (e) {
-            console.error(e);
-            console.error(3)
             alert(t('batches.alerts.error') + JSON.stringify(e));
         }
     };
@@ -345,6 +344,7 @@ function QRCodeListSection({ apiUrl, onGeneratePDF }: { apiUrl: string, onGenera
     const tShop = useTranslations('ShopPage');
     const ts = useTranslations('Timestamp');
     const st = useTranslations('Status');
+    const tt = useTranslations('Time');
     const [status, setStatus] = useState("UNASSIGNED");
     const [keyword, setKeyword] = useState("");
     const [codes, setCodes] = useState<any[]>([]);
@@ -383,7 +383,7 @@ function QRCodeListSection({ apiUrl, onGeneratePDF }: { apiUrl: string, onGenera
             const email = item.shipping_info?.email || '-';
             const phone = item.shipping_info?.phone || '-';
             const contact = `${email}${phone !== '-' ? ' / ' + phone : ''}`;
-            const preferredDateTime = `${item.preferred_date || '-'} / ${item.preferred_time || '-'}`;
+            const preferredDateTime = `${item.preferred_date ? item.preferred_date : '-'} / ${item.preferred_time ? tt(item.preferred_time) : '-'}`;
 
             return [
                 uuid,
@@ -445,10 +445,10 @@ function QRCodeListSection({ apiUrl, onGeneratePDF }: { apiUrl: string, onGenera
                 const data = await res.json();
                 setCodes(data.items || []);
             } else {
-                console.error("Failed to fetch codes");
+                // console.error("Failed to fetch codes");
             }
         } catch (error) {
-            console.error(error);
+            // console.error(error);
         } finally {
             setLoading(false);
         }
@@ -477,7 +477,7 @@ function QRCodeListSection({ apiUrl, onGeneratePDF }: { apiUrl: string, onGenera
                 alert(t('list.deleteBanned.failed'));
             }
         } catch (e) {
-            console.error(e);
+            // console.error(e);
             alert(t('list.deleteBanned.error'));
         } finally {
             setLoading(false);
@@ -692,7 +692,7 @@ function QRCodeListSection({ apiUrl, onGeneratePDF }: { apiUrl: string, onGenera
 
                                                     <div>
                                                         <h4 className="text-sm font-semibold text-gray-500">{tShop('orders.preferredDateTime')}</h4>
-                                                        <p className="text-sm">{item.preferred_date}  /  {item.preferred_time}</p>
+                                                        <p className="text-sm">{item.preferred_date ? item.preferred_date : '-'}  /  {item.preferred_time ? tt(item.preferred_time) : '-'}</p>
                                                     </div>
 
                                                     {/* Order Info */}
@@ -769,7 +769,7 @@ function BanButton({ uuid, apiUrl, onSuccess }: { uuid: string, apiUrl: string, 
                 alert(t('list.ban.failed'));
             }
         } catch (e) {
-            console.error(e);
+            // console.error(e);
             alert(t('list.ban.error'));
         } finally {
             setLoading(false);

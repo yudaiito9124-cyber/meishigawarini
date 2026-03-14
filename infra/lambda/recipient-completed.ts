@@ -17,7 +17,7 @@ const corsHeaders = {
 export const handler: APIGatewayProxyHandler = async (event) => {
     try {
         if (event.httpMethod !== 'POST') {
-            return { statusCode: 405, headers: corsHeaders, body: 'Method Not Allowed' };
+            return { statusCode: 405, headers: corsHeaders, body: JSON.stringify({ message: 'Method Not Allowed' }) };
         }
 
         const body = JSON.parse(event.body || '{}');

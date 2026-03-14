@@ -1,4 +1,9 @@
 {
+  "Common": {
+    "error": "Error",
+    "unknownError": "Unknown error",
+    "failed": "Failed"
+  },
   "Site": {
     "name": "Meishigawarini"
   },
@@ -134,6 +139,8 @@
       "updateMeta": "Update Memo/Message",
       "processing": "Processing",
       "updateSuccess": "Update successful",
+      "updateFailed": "Update failed",
+      "updateError": "Error during update",
       "timestamps": "Timestamps",
       "shipDialog": {
         "description": "Enter tracking number for {name}",
@@ -169,7 +176,8 @@
       "submit": "Create Product",
       "success": "Product created!",
       "failed": "Failed to create product",
-      "error": "Error creating product"
+      "error": "Error creating product",
+      "imageUploadFailed": "Failed to upload image"
     },
     "importProduct": {
       "button": "Bulk Import Products",
@@ -178,7 +186,8 @@
       "selectShop": "Import Source Shop",
       "placeholder": "Select a shop...",
       "submit": "Import",
-      "cancel": "Cancel"
+      "cancel": "Cancel",
+      "failed": "Import failed"
     },
     "linkQr": {
       "title": "Link QR Code",
@@ -205,7 +214,8 @@
         "apply": "Apply",
         "cancel": "Cancel"
       },
-      "success": "QR Code Linked and Activated!"
+      "success": "QR Code Linked and Activated!",
+      "error": "Error"
     },
     "linkedQr": {
       "title": "Linked QR Codes",
@@ -308,11 +318,6 @@
       "preferredDate": "Preferred Delivery Date",
       "preferredTime": "Preferred Delivery Time",
       "noPreference": "No preference",
-      "timeMorning": "Morning",
-      "time1416": "14:00 - 16:00",
-      "time1618": "16:00 - 18:00",
-      "time1820": "18:00 - 20:00",
-      "time1921": "19:00 - 21:00",
       "submit": "Receive Gift",
       "submitting": "Submitting...",
       "passwordTitle": "Password Setup (Optional)",
@@ -347,7 +352,8 @@
       "invalidPassword": "Invalid password",
       "unlockFailed": "Failed to unlock",
       "invalidEmailFormat": "Invalid email format",
-      "uploadFailed": "Failed to upload"
+      "uploadFailed": "Failed to upload",
+      "receiveFailed": "Failed to receive the gift."
     },
     "chat": {
       "title": "Chat",
@@ -437,7 +443,10 @@
       "urlCopied": "URL copied to clipboard",
       "usage": "Usage",
       "usageDesc1": "Copy the URL and paste it into an ",
-      "usageDesc2": " tag in your HTML. It will automatically be replaced with a signed URL when displayed."
+      "usageDesc2": " tag in your HTML. It will automatically be replaced with a signed URL when displayed.",
+      "exportedId": "Exported: USER#{id}",
+      "removeImageFailed": "Failed to remove image",
+      "uploadCardFailed": "Failed to upload business card"
     },
     "shopinfo": "Shop Introduction",
     "shopinfo_description": "Introduction to the shop selling this gift",
@@ -559,12 +568,92 @@
   "HelpButton": {
     "ariaLabel": "Open Help Page"
   },
-  "BackendError": {
+  "Backend": {
+    "Unauthorized": "Unauthorized.",
+    "No changes provided": "No changes provided.",
+    "Shop updated": "Shop updated.",
+    "Missing product name": "Missing product name.",
+    "Product created": "Product created.",
+    "Missing importShopId": "Missing importShopId.",
+    "Unauthorized for import source shop": "Unauthorized for import source shop.",
+    "Missing filename or contentType": "Missing filename or contentType.",
+    "Invalid content type. Only images are allowed.": "Invalid content type. Only images are allowed.",
+    "Invalid file extension. Only images are allowed.": "Invalid file extension. Only images are allowed.",
+    "Missing qr_id": "Missing qr_id.",
+    "Missing product_id": "Missing product_id.",
     "QR not found": "QR code not found.",
+    "Product not found in this shop": "Product not found in this shop.",
+    "QR state is not unassigned": "QR state is not unassigned.",
+    "This QR code is reserved for another shop owner / manager": "This QR code is reserved for another shop owner / manager.",
     "QR does not belong to this shop": "QR code does not belong to this shop.",
     "QR is not in a valid state": "QR code is not in a valid state. It may already be activated, used, or disabled.",
+    "QR is already reserved for another product": "QR is already reserved for another product.",
     "Product not found": "The product linked to this card could not be found. It may have been deleted. Please discard this card as it cannot be used.",
-    "Product is stopped": "The product linked to this card is currently stopped. If you wish to use this card, please activate the STOPPED product."
+    "Product is not active": "Product is not active.",
+    "QR is not in LINKED state": "QR is not in LINKED state.",
+    "QR Activated successfully": "QR Activated successfully.",
+    "Missing product ID": "Missing product ID.",
+    "Invalid status. Must be ACTIVE or STOPPED": "Invalid status. Must be ACTIVE or STOPPED.",
+    "Product status updated": "Product status updated.",
+    "Cannot delete product unless it is STOPPED": "Cannot delete product unless it is STOPPED.",
+    "Cannot delete product with active QRs or unshipped orders": "Cannot delete product with active QRs or unshipped orders.",
+    "Product deleted": "Product deleted.",
+    "Product is stopped": "The product linked to this card is currently stopped. If you wish to use this card, please activate the STOPPED product.",
+    "Missing urls array": "Missing urls array.",
+    "Images deleted": "Images deleted.",
+    "Operation failed. QR might not be in correct state or belongs to another shop.": "Operation failed. QR might not be in correct state or belongs to another shop.",
+    "Internal Server Error": "Internal Server Error.",
+    "Missing UUID or PIN": "Missing UUID or PIN.",
+    "Invalid Gift or PIN": "Invalid Gift or PIN.",
+    "Too many attempts. Please try again later.": "Too many attempts. Please try again later.",
+    "Missing UUID": "Missing UUID.",
+    "Missing PIN": "Missing PIN.",
+    "Missing contentType": "Missing contentType.",
+    "Missing fileSize": "Missing fileSize.",
+    "Address submitted successfully": "Address submitted successfully.",
+    "Transaction failed": "Transaction failed.",
+    "Method Not Allowed": "Method Not Allowed.",
+    "Invalid JSON body": "Invalid JSON body.",
+    "Missing required fields": "Missing required fields.",
+    "Missing required address fields (name, address, zipCode)": "Missing required address fields (name, address, zipCode).",
+    "QR Code not found": "QR Code not found.",
+    "QR Code has expired": "QR Code has expired.",
+    "QR Code is not active": "QR Code is not active.",
+    "Invalid PIN": "Invalid PIN.",
+    "Error processing password": "Error processing password.",
+    "Address registration completed": "Address registration completed.",
+    "QR Codes generated": "QR Codes generated.",
+    "User ID not found": "The specified User ID was not found.",
+    "Product ID not found": "The specified Product ID was not found.",
+    "Shop ID not found": "The specified Shop ID was not found.",
+    "Invalid shop and product ID combination": "The specified combination of Shop ID and Product ID is incorrect.",
+    "Unauthorized for target shop": "You do not have permission to manage the specified shop.",
+    "Product is not associated with any authorized shop": "The specified product is not registered in any shop you have permission to manage.",
+    "Activation requires both shop ID and product ID": "Both Shop ID and Product ID are required for activation.",
+    "Sender ID not found": "The specified Sender ID was not found.",
+    "Max 100 items per batch": "Maximum 100 items can be generated at once.",
+    "Gift received successfully": "Gift received successfully.",
+    "Transaction failed (possibly already received)": "Transaction failed. It may have already been received.",
+    "Transaction failed (possibly already used)": "Transaction failed. It may have already been used, or another process is in progress.",
+    "QR Code is not shipped": "This QR code has not been shipped yet.",
+    "Authenticated as Admin": "Successfully authenticated as administrator.",
+    "QR Linked and Activated successfully": "QR Code Linked and Activated successfully.",
+    "QR Linked successfully": "QR Code Linked successfully.",
+    "Capacity limit exceeded": "Storage capacity limit exceeded.",
+    "Products imported successfully": "Products imported successfully.",
+    "The source shop has no products": "The source shop has no products to import.",
+    "Invalid username": "Invalid username.",
+    "Message posted": "Message posted.",
+    "Missing email": "Missing email address.",
+    "Missing or invalid ID": "Missing or invalid ID.",
+    "Missing sender_info": "Missing sender information.",
+    "Missing urls": "Missing URLs.",
+    "QR Code Banned": "This QR code has been banned.",
+    "Sender info updated": "Sender information has been updated.",
+    "Subscribed successfully": "Subscribed successfully.",
+    "Successfully deleted BANNED items": "Successfully deleted BANNED items.",
+    "User data not found": "User data not found.",
+    "User updated successfully": "User profile updated successfully."
   },
   "MFASetupPage": {
     "title": "Set up Two-Factor Authentication (MFA)",

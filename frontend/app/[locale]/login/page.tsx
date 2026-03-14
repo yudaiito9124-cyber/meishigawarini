@@ -37,7 +37,7 @@ export default function LoginPage() {
 
                     // 管理者でMFAがまだの場合、勝手に/shopに行かずにログインページに留まる（または案内を出す）
                     if (isAdmin && !usedMfa) {
-                        console.log("Logged in as admin but MFA is missing.");
+                        // console.log("Logged in as admin but MFA is missing.");
                         setIsLoggedIn(true);
                         setIsAdmin(true);
                         return; // ログインページに留まり、MFA設定リンクを踏めるようにする
@@ -95,7 +95,7 @@ export default function LoginPage() {
             } else if (err.name === 'CodeMismatchException') {
                 setError(t('errors.invalidAuthCode'));
             } else {
-                console.error('Login error', err);
+                // console.error('Login error', err);
                 setError(err.message || t('errors.default'));
             }
         } finally {

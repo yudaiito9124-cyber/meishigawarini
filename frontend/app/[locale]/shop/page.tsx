@@ -53,10 +53,10 @@ export default function ShopListPage() {
                     router.replace(`/shop/${shopId}`);
                 }
             } else {
-                console.error('Failed to fetch shop');
+                // console.error('Failed to fetch shop');
             }
         } catch (e) {
-            console.error(e);
+            // console.error(e);
         } finally {
             setLoading(false);
         }
@@ -67,7 +67,7 @@ export default function ShopListPage() {
             await signOut();
             router.push('/');
         } catch (error) {
-            console.error('Error signing out: ', error);
+            // console.error('Error signing out: ', error);
         }
     };
 

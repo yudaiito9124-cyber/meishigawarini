@@ -35,7 +35,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         const userGroups = (claims?.['cognito:groups'] as string[]) || [];
 
         // 認証済みか確認
-        if (!userId) return { statusCode: 401, headers: corsHeaders, body: 'Unauthorized' };
+        if (!userId) return { statusCode: 401, headers: corsHeaders, body: JSON.stringify({ message: 'Unauthorized' }) };
         //////////// ここから下は 認証済みの場合のみアクセス可能
 
         let roles = [];
@@ -559,7 +559,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             // If activating, we might want to also set GSI1 separately if our single-table design requires it, 
             // but here we are just updating the main item. GSI1 maps to status usually.
 
-            return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ message: `QR Linked successfully${activate_now ? ' and Activated' : ''}` }) };
+            return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ message: activate_now ? 'QR Linked and Activated successfully' : 'QR Linked successfully' }) };
         }
 
         // 6. Activate QR (POST /shop/{shopId}/activate)
@@ -653,7 +653,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             if (!prodRes.Item) return { statusCode: 404, headers: corsHeaders, body: JSON.stringify({ message: 'Product not found' }) };
 
             if (prodRes.Item.status !== 'STOPPED') {
-                return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Cannot delete product unless it is STOPPED (この商品が受注停止でないと削除できません)' }) };
+                return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Cannot delete product unless it is STOPPED' }) };
             }
 
             const [usedRes, activeRes] = await Promise.all([
@@ -676,7 +676,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 const qrIds = relatedQRs.map(qr => qr.PK.replace('QR#', '')).join(', ');
                 return {
                     statusCode: 409, headers: corsHeaders, body: JSON.stringify({
-                        message: `Cannot delete product with active QRs or unshipped orders (この商品に紐づけられた有効なQRコードまたは未発送の注文があります) 対象QR: ${qrIds}`,
+                        message: 'Cannot delete product with active QRs or unshipped orders',
                         relatedQRs: relatedQRs.map(qr => qr.PK.replace('QR#', ''))
                     })
                 };
@@ -723,7 +723,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             }
 
             if (qrstatus !== 'UNASSIGNED' && qrstatus !== 'LINKED') {
-                return { statusCode: 403, headers: corsHeaders, body: JSON.stringify({ message: `QR is not in a valid state`, detail: `QRcode:${qr_id}, status:${qrstatus}` }) };
+                return { statusCode: 403, headers: corsHeaders, body: JSON.stringify({ message: 'QR is not in a valid state', detail: `QRcode:${qr_id}, status:${qrstatus}` }) };
             }
 
             let qrproductName = '';
@@ -832,12 +832,12 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ message: 'Images deleted' }) };
         }
 
-        return { statusCode: 404, headers: corsHeaders, body: 'Not Found' };
+        return { statusCode: 404, headers: corsHeaders, body: JSON.stringify({ message: 'Not Found' }) };
 
     } catch (error: any) {
         console.error(error);
         if (error.name === 'ConditionalCheckFailedException') {
-            return { statusCode: 409, headers: corsHeaders, body: JSON.stringify({ message: 'Operation failed. QR might not be in correct state or belongs to another shop. (このQRコードはすでに別のショップまたは商品に紐づけられています、上書きはできません)' }) };
+            return { statusCode: 409, headers: corsHeaders, body: JSON.stringify({ message: 'Operation failed. QR might not be in correct state or belongs to another shop.' }) };
         }
         return { statusCode: 500, headers: corsHeaders, body: JSON.stringify({ message: 'Internal Server Error', error: String(error) }) };
     }

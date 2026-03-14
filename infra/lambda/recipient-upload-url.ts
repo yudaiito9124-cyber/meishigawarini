@@ -75,7 +75,8 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 statusCode: 403,
                 headers: corsHeaders,
                 body: JSON.stringify({
-                    message: `Capacity limit exceeded. Max: ${MAX_TOTAL_SIZE_MB}MB. Current: ${(totalSizeBytes / 1024 / 1024).toFixed(2)}MB`
+                    message: 'Capacity limit exceeded',
+                    detail: `Max: ${MAX_TOTAL_SIZE_MB}MB. Current: ${(totalSizeBytes / 1024 / 1024).toFixed(2)}MB`
                 })
             };
         }

@@ -33,7 +33,8 @@ export default function ShopPage() {
     const tt = useTranslations('Time');
     const ts = useTranslations('Timestamp');
     const st = useTranslations('Status');
-    const tb = useTranslations('BackendError');
+    const tc = useTranslations('Common');
+    const tb = useTranslations('Backend');
     const params = useParams();
     const router = useRouter();
     const shopId = Array.isArray(params.shopId) ? params.shopId[0] : params.shopId;
@@ -130,7 +131,7 @@ export default function ShopPage() {
                     setProducts(data.products || data.items || []);
                 }
             } catch (e) {
-                console.error(e);
+                // console.error(e);
             } finally {
                 setProductsLoading(false);
             }
@@ -144,7 +145,7 @@ export default function ShopPage() {
                     setQrCodes(data.items || []);
                 }
             } catch (e) {
-                console.error(e);
+                // console.error(e);
             }
         };
 
@@ -156,7 +157,7 @@ export default function ShopPage() {
                     setOrders(data.orders || data.items || []); // robust check
                 }
             } catch (e) {
-                console.error(e);
+                // console.error(e);
             } finally {
                 setOrdersLoading(false);
             }
@@ -183,7 +184,7 @@ export default function ShopPage() {
                 setImportShops((data.shops || []).filter((s: any) => s.id !== shopId));
             }
         } catch (error) {
-            console.error('Failed to fetch import shops', error);
+            // console.error('Failed to fetch import shops', error);
         }
     };
 
@@ -222,7 +223,7 @@ export default function ShopPage() {
                     body: JSON.stringify({ urls: sessionUploadedUrls })
                 });
             } catch (e) {
-                console.error('Failed to cleanup temporary images', e);
+                // console.error('Failed to cleanup temporary images', e);
             }
             setSessionUploadedUrls([]);
         }
@@ -240,7 +241,7 @@ export default function ShopPage() {
                 try {
                     uploadFile = await resizeImage(file);
                 } catch (err) {
-                    console.error("Resize failed", err);
+                    // console.error("Resize failed", err);
                 }
             }
 
@@ -270,8 +271,8 @@ export default function ShopPage() {
             setHtmlImageUrls(prev => [...prev, publicUrl]);
             setSessionUploadedUrls(prev => [...prev, publicUrl]);
         } catch (err: any) {
-            console.error('HTML Image upload failed:', err);
-            alert('Upload failed: ' + err.message);
+            // console.error('HTML Image upload failed:', err);
+            alert(t('addProduct.imageUploadFailed') + ': ' + (tb(err.message) || err.message));
         } finally {
             setIsUploadingHtmlImage(false);
         }
@@ -281,7 +282,7 @@ export default function ShopPage() {
         try {
             router.push('/shop');
         } catch (error) {
-            console.error('Error move to shops: ', error);
+            // console.error('Error move to shops: ', error);
         }
     };
 
@@ -356,7 +357,7 @@ export default function ShopPage() {
                 alert(t('addProduct.failed'));
             }
         } catch (err) {
-            console.error(err);
+            // console.error(err);
             alert(t('addProduct.error'));
         } finally {
             setIsCreatingProduct(false);
@@ -385,7 +386,7 @@ export default function ShopPage() {
             if (memo_for_users) body.memo_for_users = memo_for_users;
             if (memo_for_shop) body.memo_for_shop = memo_for_shop;
 
-            console.debug(body)
+            // console.debug(body)
 
             const res = await fetchWithAuth(`/shop/${shopId}/link`, {
                 method: 'POST',
@@ -404,7 +405,7 @@ export default function ShopPage() {
             setShowOptions(false);
             fetchShopData();
         } catch (err: any) {
-            alert("Error: " + err.message);
+            alert(t('linkQr.error') + ": " + (tb(err.message) || err.message));
         } finally {
             setIsLinking(false);
         }
@@ -425,7 +426,7 @@ export default function ShopPage() {
             }
             fetchShopData();
         } catch (err: any) {
-            alert(err.message);
+            alert((tb(err.message) || err.message) + (err.relatedQRs ? "\n" + err.relatedQRs.join(", ") : ""));
         } finally {
             setDeletingProductId(null);
         }
@@ -440,7 +441,8 @@ export default function ShopPage() {
                 body: JSON.stringify({ status: newStatus })
             });
             if (res.ok) fetchShopData();
-        } catch (e) { console.error(e); } finally {
+        } catch (e) { // console.error(e); 
+        } finally {
             setTogglingProductId(null);
         }
     };
@@ -462,11 +464,11 @@ export default function ShopPage() {
                 fetchShopData();
             } else {
                 const errData = await res.json().catch(() => ({}));
-                alert('Failed to update order: ' + (errData.message || errData.error || 'Unknown error'));
+                alert(t('orders.updateFailed') + ': ' + (tb(errData.message) || errData.message || errData.error || tc('unknownError')));
             }
         } catch (e: any) {
             console.error(e);
-            alert('Error updating order: ' + (e.message || String(e)));
+            alert(t('orders.updateError') + ': ' + (tb(e.message) || e.message || String(e)));
         } finally {
             setShippingOrderId(null);
         }
@@ -488,16 +490,16 @@ export default function ShopPage() {
             const data = await res.json();
 
             if (res.ok) {
-                alert(`${data.message} (${data.imported} items)`);
+                alert(`${tb(data.message) || data.message} (${data.imported} items)`);
                 setIsImportDialogOpen(false);
                 setSelectedImportShopId('');
                 fetchShopData(); // Refresh product list
             } else {
-                alert(`Error: ${data.message}`);
+                alert(`${tc('error')}: ${tb(data.message) || data.message}`);
             }
         } catch (error: any) {
             console.error('Import failed', error);
-            alert('Failed to import products: ' + error.message);
+            alert(t('importProduct.failed') + ': ' + (tb(error.message) || error.message));
         } finally {
             setIsImporting(false);
         }
@@ -567,7 +569,7 @@ export default function ShopPage() {
             setScannedUuid(uuid);
             setQrStatusDetails(data);
         } catch (error: any) {
-            console.error('Failed to get QR status', error);
+            // console.error('Failed to get QR status', error);
             alert(t('linkQr.foreignQrError') + (error.message ? ` (${tb(error.message)})` : '') + (error.detail ? ` (${error.detail})` : ''));
         } finally {
             setIsScanning(false);

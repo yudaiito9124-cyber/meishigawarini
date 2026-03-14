@@ -1,4 +1,9 @@
 {
+  "Common": {
+    "error": "エラー",
+    "unknownError": "不明なエラー",
+    "failed": "失敗しました"
+  },
   "Site": {
     "name": "名刺代わりに。"
   },
@@ -134,6 +139,8 @@
       "updateMeta": "メモ・メッセージを更新",
       "processing": "処理中",
       "updateSuccess": "更新に成功しました",
+      "updateFailed": "更新に失敗しました",
+      "updateError": "更新中にエラーが発生しました",
       "timestamps": "タイムスタンプ",
       "shipDialog": {
         "description": "{name} 様への発送情報を入力してください。",
@@ -169,7 +176,8 @@
       "submit": "商品を登録",
       "success": "商品を追加しました！",
       "failed": "商品の追加に失敗しました",
-      "error": "商品の追加中にエラーが発生しました"
+      "error": "商品の追加中にエラーが発生しました",
+      "imageUploadFailed": "画像のアップロードに失敗しました"
     },
     "importProduct": {
       "button": "商品を一括インポート",
@@ -178,7 +186,8 @@
       "selectShop": "インポート元のショップ",
       "placeholder": "ショップを選択してください...",
       "submit": "インポート",
-      "cancel": "キャンセル"
+      "cancel": "キャンセル",
+      "failed": "インポートに失敗しました"
     },
     "linkQr": {
       "title": "カード有効化",
@@ -205,7 +214,8 @@
         "apply": "適用",
         "cancel": "キャンセル"
       },
-      "success": "QRコードが連携され有効化されました！"
+      "success": "QRコードが連携され有効化されました！",
+      "error": "エラー"
     },
     "linkedQr": {
       "title": "連携済みQRコード",
@@ -342,7 +352,8 @@
       "invalidPassword": "パスワードが間違っています",
       "unlockFailed": "ロック解除に失敗しました",
       "invalidEmailFormat": "メールアドレスの形式が正しくありません",
-      "uploadFailed": "アップロードに失敗しました"
+      "uploadFailed": "アップロードに失敗しました",
+      "receiveFailed": "ギフトの受け取り処理に失敗しました。"
     },
     "chat": {
       "title": "メッセージチャット",
@@ -432,7 +443,10 @@
       "urlCopied": "URLをコピーしました",
       "usage": "使い方",
       "usageDesc1": "コピーしたURLを詳細HTML内の ",
-      "usageDesc2": " に貼り付けてください。実行時に自動的に署名付きURLへ置換され、画像が表示されます。"
+      "usageDesc2": " に貼り付けてください。実行時に自動的に署名付きURLへ置換され、画像が表示されます。",
+      "exportedId": "出力しました: USER#{id}",
+      "removeImageFailed": "画像の削除に失敗しました",
+      "uploadCardFailed": "名刺画像のアップロードに失敗しました"
     },
     "shopinfo": "ショップのご紹介",
     "shopinfo_description": "このギフトを販売しているショップのご紹介",
@@ -554,12 +568,92 @@
   "HelpButton": {
     "ariaLabel": "ヘルプページを開く"
   },
-  "BackendError": {
+  "Backend": {
+    "Unauthorized": "認証されていません。",
+    "No changes provided": "変更内容がありません。",
+    "Shop updated": "ショップ情報を更新しました。",
+    "Missing product name": "商品名を入力してください。",
+    "Product created": "商品を作成しました。",
+    "Missing importShopId": "インポート元のショップIDが指定されていません。",
+    "Unauthorized for import source shop": "インポート元のショップに対する権限がありません。",
+    "Missing filename or contentType": "ファイル名またはコンテンツタイプが不足しています。",
+    "Invalid content type. Only images are allowed.": "無効な形式です。画像ファイルのみアップロード可能です。",
+    "Invalid file extension. Only images are allowed.": "無効な拡張子です。画像ファイルのみアップロード可能です。",
+    "Missing qr_id": "QR IDが不足しています。",
+    "Missing product_id": "プロダクトIDが不足しています。",
     "QR not found": "QRコードが見つかりません。",
-    "QR does not belong to this shop": "QRコードはこのショップのものではありません。",
+    "Product not found in this shop": "このショップに指定された商品が見つかりません。",
+    "QR state is not unassigned": "このQRコードはすでに使用中か、未割り当ての状態ではありません。",
+    "This QR code is reserved for another shop owner / manager": "このQRコードは別のオーナーまたはマネージャー専用に予約されています。",
+    "QR does not belong to this shop": "このQRコードはこのショップに属していません。",
     "QR is not in a valid state": "QRコードは利用できない状態です。すでに有効化されている、使用済みか、無効化されている可能性があります。",
+    "QR is already reserved for another product": "このQRコードはすでに別の商品と紐付けられています。",
     "Product not found": "このカードに紐づけられていた商品が見つかりません。削除されている可能性があります。このカードは使えないため廃棄してください。",
-    "Product is stopped": "このカードに紐づけられていた商品が停止されています。もしこのカードを使用したい場合はSTOPPED状態の商品を有効化してください。"
+    "Product is not active": "商品は現在アクティブではありません。",
+    "QR is not in LINKED state": "QRコードが連携済みの状態ではありません。",
+    "QR Activated successfully": "QRコードを有効化しました。",
+    "Missing product ID": "プロダクトIDが不足しています。",
+    "Invalid status. Must be ACTIVE or STOPPED": "無効なステータスです。ACTIVEまたはSTOPPEDを指定してください。",
+    "Product status updated": "商品のステータスを更新しました。",
+    "Cannot delete product unless it is STOPPED": "受注停止（STOPPED）状態でない商品は削除できません。",
+    "Cannot delete product with active QRs or unshipped orders": "有効なQRコードまたは未発送の注文がある商品は削除できません。",
+    "Product deleted": "商品を削除しました。",
+    "Product is stopped": "商品は現在停止中です。",
+    "Missing urls array": "URLリストが不足しています。",
+    "Images deleted": "画像を削除しました。",
+    "Operation failed. QR might not be in correct state or belongs to another shop.": "操作に失敗しました。QRコードの状態が正しくないか、すでに別のショップ・商品に紐付けられている可能性があります。",
+    "Internal Server Error": "システムエラーが発生しました。",
+    "Missing UUID or PIN": "UUIDまたはPINが不足しています。",
+    "Invalid Gift or PIN": "ギフトまたはPINが無効です。",
+    "Too many attempts. Please try again later.": "試行回数が制限を超えました。しばらく時間をおいてから再試行してください。",
+    "Missing UUID": "UUIDが不足しています。",
+    "Missing PIN": "PINが不足しています。",
+    "Missing contentType": "コンテンツタイプが不足しています。",
+    "Missing fileSize": "ファイルサイズが不足しています。",
+    "Address submitted successfully": "配送先情報を送信しました。",
+    "Transaction failed": "処理に失敗しました。既に使用されている可能性があります。",
+    "Method Not Allowed": "許可されていないメソッドです。",
+    "Invalid JSON body": "不正なJSON形式です。",
+    "Missing required fields": "必須項目が不足しています。",
+    "Missing required address fields (name, address, zipCode)": "必須項目（お名前、住所、郵便番号）が不足しています。",
+    "QR Code not found": "QRコードが見つかりません。",
+    "QR Code has expired": "QRコードの有効期限が切れています。",
+    "QR Code is not active": "QRコードが有効ではありません。",
+    "Invalid PIN": "PINが正しくありません。",
+    "Error processing password": "パスワードの処理中にエラーが発生しました。",
+    "Address registration completed": "配送先情報の登録が完了しました。",
+    "QR Codes generated": "QRコードを生成しました。",
+    "User ID not found": "指定されたユーザーIDが見つかりません。",
+    "Product ID not found": "指定されたプロダクトIDが見つかりません。",
+    "Shop ID not found": "指定されたショップIDが見つかりません。",
+    "Invalid shop and product ID combination": "指定されたショップIDとプロダクトIDの組み合わせが正しくありません。",
+    "Unauthorized for target shop": "このユーザーは指定されたショップを管理する権限がありません。",
+    "Product is not associated with any authorized shop": "指定された製品は管理権限のあるショップに登録されていません。",
+    "Activation requires both shop ID and product ID": "有効化にはショップIDとプロダクトIDの両方が必要です。",
+    "Sender ID not found": "指定された送り主IDが見つかりません。",
+    "Max 100 items per batch": "一度に生成できるのは100件までです。",
+    "Gift received successfully": "ギフトの受け取りが完了しました。",
+    "Transaction failed (possibly already received)": "処理に失敗しました。すでに受け取り済みである可能性があります。",
+    "Transaction failed (possibly already used)": "処理に失敗しました。すでに使用済みか、別の処理が進行中である可能性があります。",
+    "QR Code is not shipped": "このQRコードはまだ発送されていません。",
+    "Authenticated as Admin": "管理者として認証されました。",
+    "QR Linked and Activated successfully": "QRコードの連携と有効化が完了しました。",
+    "QR Linked successfully": "QRコードの連携が完了しました。",
+    "Capacity limit exceeded": "容量制限を超えています。",
+    "Products imported successfully": "商品のインポートに成功しました。",
+    "The source shop has no products": "インポート元のショップに商品がありません。",
+    "Invalid username": "ユーザー名が無効です。",
+    "Message posted": "メッセージが投稿されました。",
+    "Missing email": "メールアドレスが不足しています。",
+    "Missing or invalid ID": "IDが不足しているか無効です。",
+    "Missing sender_info": "送り主情報が不足しています。",
+    "Missing urls": "URLが不足しています。",
+    "QR Code Banned": "QRコードがBANされました。",
+    "Sender info updated": "送り主情報が更新されました。",
+    "Subscribed successfully": "登録に成功しました。",
+    "Successfully deleted BANNED items": "BAN済みアイテムの削除に成功しました。",
+    "User data not found": "ユーザーデータが見つかりません。",
+    "User updated successfully": "ユーザー情報が更新されました。"
   },
   "MFASetupPage": {
     "title": "2段階認証(MFA)の設定",

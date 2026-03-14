@@ -33,7 +33,7 @@ export default function MFASetupPage() {
                 setIsLoggedIn(true);
                 initiateMFASetup();
             } catch (e) {
-                console.error('Auth check failed', e);
+                // console.error('Auth check failed', e);
                 setError('errors.notLoggedIn');
             }
         };
@@ -49,7 +49,7 @@ export default function MFASetupPage() {
             const dataUrl = await QRCode.toDataURL(setupUri.toString());
             setQrCodeUrl(dataUrl);
         } catch (err: any) {
-            console.error('MFA Setup initiation failed', err);
+            // console.error('MFA Setup initiation failed', err);
             setError('errors.setupFailed');
         } finally {
             setLoading(false);
@@ -66,7 +66,7 @@ export default function MFASetupPage() {
             await updateMFAPreference({ totp: 'PREFERRED' });
             setSuccess(true);
         } catch (err: any) {
-            console.error('Verification failed', err);
+            // console.error('Verification failed', err);
             setError(err.message || 'errors.verifyFailed');
         } finally {
             setLoading(false);
@@ -86,7 +86,7 @@ export default function MFASetupPage() {
                 throw new Error("associateWebAuthnCredential function not found in aws-amplify/auth");
             }
         } catch (err: any) {
-            console.error('Passkey registration failed', err);
+            // console.error('Passkey registration failed', err);
             setError('errors.biometricFailed');
         } finally {
             setLoading(false);

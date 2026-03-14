@@ -185,6 +185,7 @@ export default function ReceivePage() {
     const t = useTranslations('ReceivePage');
     const tt = useTranslations('Time');
     const tst = useTranslations('Status');
+    const tb = useTranslations('Backend');
     const params = useParams();
     const uuid = params?.uuid as string;
 
@@ -312,8 +313,8 @@ export default function ReceivePage() {
                 if (!silent) alert(t('senderInfo.importSuccess'));
             }
         } catch (e: any) {
-            console.error("Import failed:", e);
-            if (!silent) alert(t('senderInfo.importFailed') + ": " + e.message);
+            // console.error("Import failed:", e);
+            if (!silent) alert(t('senderInfo.importFailed') + ": " + (tb(e.message) || e.message));
         } finally {
             if (!silent) setSenderInfoLoading(false);
         }
@@ -368,7 +369,7 @@ export default function ReceivePage() {
             }
 
         } catch (err: any) {
-            console.error(err);
+            // console.error(err);
             setPinError(t('errors.invalidPin'));
         } finally {
             setLoading(false);
@@ -428,8 +429,8 @@ export default function ReceivePage() {
             await submitAddress(uuid, pin, { name, zipCode, address, phone, email, preferredDate, preferredTime }, password);
             setStep("SUCCESS");
         } catch (error: any) {
-            console.error("Submission error:", error);
-            alert(error.message || t('errors.submitFailed'));
+            // console.error("Submission error:", error);
+            alert(tb(error.message) || error.message || t('errors.submitFailed'));
         } finally {
             setLoading(false);
         }
@@ -442,8 +443,8 @@ export default function ReceivePage() {
             await receiveGift(uuid, pin);
             setStep("COMPLETED");
         } catch (error: any) {
-            console.error("Receive error:", error);
-            alert(error.message || t('errors.receiveFailed'));
+            // console.error("Receive error:", error);
+            alert(tb(error.message) || error.message || t('errors.receiveFailed'));
         } finally {
             setLoading(false);
         }
@@ -476,7 +477,7 @@ export default function ReceivePage() {
                 setSenderInfo(null);
             }
         } catch (e: any) {
-            console.error(e);
+            // console.error(e);
         }
     }, [uuid, pin, handleImportFromId]);
 
@@ -507,7 +508,7 @@ export default function ReceivePage() {
                     try {
                         uploadFile = await resizeImage(selectedFile);
                     } catch (err) {
-                        console.error("Resize failed, using original", err);
+                        // console.error("Resize failed, using original", err);
                     }
                 }
 
@@ -540,7 +541,7 @@ export default function ReceivePage() {
             setSelectedFile(null);
             await loadMessages();
         } catch (e: any) {
-            alert(t('chat.sendFailed') + e.message);
+            alert(t('chat.sendFailed') + (tb(e.message) || e.message));
         } finally {
             setChatLoading(false);
             setUploading(false);
@@ -576,7 +577,7 @@ export default function ReceivePage() {
             await loadMessages();
             setIsEditingSender(false);
         } catch (e: any) {
-            alert(t('senderInfo.updateFailed') + e.message);
+            alert(t('senderInfo.updateFailed') + (tb(e.message) || e.message));
         } finally {
             setSenderInfoLoading(false);
         }
@@ -603,9 +604,9 @@ export default function ReceivePage() {
                 setSenderInfo((prev: any) => ({ ...prev, sender_id: data.userid }));
             }
 
-            alert(`Export as: USER#${data.userid}`);
+            alert(t('senderInfo.exportedId', { id: data.userid }));
         } catch (e: any) {
-            alert(t('senderInfo.updateFailed') + e.message);
+            alert(t('senderInfo.updateFailed') + (tb(e.message) || e.message));
         } finally {
             setSenderInfoLoading(false);
         }
@@ -620,7 +621,7 @@ export default function ReceivePage() {
                 try {
                     uploadFile = await resizeImage(file);
                 } catch (err) {
-                    console.error("Resize failed", err);
+                    // console.error("Resize failed", err);
                 }
             }
 
@@ -655,7 +656,7 @@ export default function ReceivePage() {
             setSenderInfo(newSenderInfo);
             setSenderForm(newSenderInfo);
         } catch (e: any) {
-            console.error(e);
+            // console.error(e);
             alert(t('errors.uploadFailed'));
         } finally {
             setSenderInfoLoading(false);
@@ -663,7 +664,7 @@ export default function ReceivePage() {
     };
 
     const handleRemoveSenderImage = async () => {
-        if (!confirm(t('senderInfo.removeImage') + "?")) return;
+        if (!confirm(t('senderInfo.confirmRemoveImage'))) return;
 
         setSenderInfoLoading(true);
         try {
@@ -686,7 +687,7 @@ export default function ReceivePage() {
 
             await loadMessages();
         } catch (e: any) {
-            alert("Failed to remove image: " + e.message);
+            alert(t('senderInfo.removeImageFailed') + ': ' + (tb(e.message) || e.message));
         } finally {
             setSenderInfoLoading(false);
         }
@@ -700,7 +701,7 @@ export default function ReceivePage() {
                 try {
                     uploadFile = await resizeImage(file);
                 } catch (err) {
-                    console.error("Resize failed", err);
+                    // console.error("Resize failed", err);
                 }
             }
 
@@ -739,7 +740,7 @@ export default function ReceivePage() {
 
             await loadMessages();
         } catch (e: any) {
-            alert("Failed to upload business card: " + e.message);
+            alert(t('senderInfo.uploadCardFailed') + ': ' + (tb(e.message) || e.message));
         } finally {
             setSenderInfoLoading(false);
         }
