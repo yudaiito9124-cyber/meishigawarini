@@ -157,7 +157,7 @@ export default function AdminPage() {
             } else {
                 const errData = await res.json().catch(() => null);
                 // console.error(errData);
-                alert((tb(errData?.message) || errData?.message) || t('batches.alerts.failed') + (errData?.detail?.toString() || ''));
+                alert((tb(errData?.message?.replace(/\./g, '_')) || errData?.message) || t('batches.alerts.failed') + (errData?.detail?.toString() || ''));
             }
         } catch (e) {
             alert(t('batches.alerts.error') + JSON.stringify(e));

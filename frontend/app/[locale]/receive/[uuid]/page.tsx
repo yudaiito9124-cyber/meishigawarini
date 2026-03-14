@@ -314,7 +314,7 @@ export default function ReceivePage() {
             }
         } catch (e: any) {
             // console.error("Import failed:", e);
-            if (!silent) alert(t('senderInfo.importFailed') + ": " + (tb(e.message) || e.message));
+            if (!silent) alert(t('senderInfo.importFailed') + ": " + (tb(e.message.replace(/\./g, '_')) || e.message));
         } finally {
             if (!silent) setSenderInfoLoading(false);
         }
@@ -430,7 +430,7 @@ export default function ReceivePage() {
             setStep("SUCCESS");
         } catch (error: any) {
             // console.error("Submission error:", error);
-            alert(tb(error.message) || error.message || t('errors.submitFailed'));
+            alert(tb(error.message.replace(/\./g, '_')) || error.message || t('errors.submitFailed'));
         } finally {
             setLoading(false);
         }
@@ -444,7 +444,7 @@ export default function ReceivePage() {
             setStep("COMPLETED");
         } catch (error: any) {
             // console.error("Receive error:", error);
-            alert(tb(error.message) || error.message || t('errors.receiveFailed'));
+            alert(tb(error.message.replace(/\./g, '_')) || error.message || t('errors.receiveFailed'));
         } finally {
             setLoading(false);
         }
@@ -541,7 +541,7 @@ export default function ReceivePage() {
             setSelectedFile(null);
             await loadMessages();
         } catch (e: any) {
-            alert(t('chat.sendFailed') + (tb(e.message) || e.message));
+            alert(t('chat.sendFailed') + (tb(e.message.replace(/\./g, '_')) || e.message));
         } finally {
             setChatLoading(false);
             setUploading(false);
@@ -577,7 +577,7 @@ export default function ReceivePage() {
             await loadMessages();
             setIsEditingSender(false);
         } catch (e: any) {
-            alert(t('senderInfo.updateFailed') + (tb(e.message) || e.message));
+            alert(t('senderInfo.updateFailed') + (tb(e.message.replace(/\./g, '_')) || e.message));
         } finally {
             setSenderInfoLoading(false);
         }
@@ -606,7 +606,7 @@ export default function ReceivePage() {
 
             alert(t('senderInfo.exportedId', { id: data.userid }));
         } catch (e: any) {
-            alert(t('senderInfo.updateFailed') + (tb(e.message) || e.message));
+            alert(t('senderInfo.updateFailed') + (tb(e.message.replace(/\./g, '_')) || e.message));
         } finally {
             setSenderInfoLoading(false);
         }
@@ -687,7 +687,7 @@ export default function ReceivePage() {
 
             await loadMessages();
         } catch (e: any) {
-            alert(t('senderInfo.removeImageFailed') + ': ' + (tb(e.message) || e.message));
+            alert(t('senderInfo.removeImageFailed') + ': ' + (tb(e.message.replace(/\./g, '_')) || e.message));
         } finally {
             setSenderInfoLoading(false);
         }
@@ -740,7 +740,7 @@ export default function ReceivePage() {
 
             await loadMessages();
         } catch (e: any) {
-            alert(t('senderInfo.uploadCardFailed') + ': ' + (tb(e.message) || e.message));
+            alert(t('senderInfo.uploadCardFailed') + ': ' + (tb(e.message.replace(/\./g, '_')) || e.message));
         } finally {
             setSenderInfoLoading(false);
         }

@@ -272,7 +272,7 @@ export default function ShopPage() {
             setSessionUploadedUrls(prev => [...prev, publicUrl]);
         } catch (err: any) {
             // console.error('HTML Image upload failed:', err);
-            alert(t('addProduct.imageUploadFailed') + ': ' + (tb(err.message) || err.message));
+            alert(t('addProduct.imageUploadFailed') + ': ' + (tb(err.message.replace(/\./g, '_')) || err.message));
         } finally {
             setIsUploadingHtmlImage(false);
         }
@@ -405,7 +405,7 @@ export default function ShopPage() {
             setShowOptions(false);
             fetchShopData();
         } catch (err: any) {
-            alert(t('linkQr.error') + ": " + (tb(err.message) || err.message));
+            alert(t('linkQr.error') + ": " + (tb(err.message.replace(/\./g, '_')) || err.message));
         } finally {
             setIsLinking(false);
         }
@@ -426,7 +426,7 @@ export default function ShopPage() {
             }
             fetchShopData();
         } catch (err: any) {
-            alert((tb(err.message) || err.message) + (err.relatedQRs ? "\n" + err.relatedQRs.join(", ") : ""));
+            alert((tb(err.message.replace(/\./g, '_')) || err.message) + (err.relatedQRs ? "\n" + err.relatedQRs.join(", ") : ""));
         } finally {
             setDeletingProductId(null);
         }
@@ -464,11 +464,11 @@ export default function ShopPage() {
                 fetchShopData();
             } else {
                 const errData = await res.json().catch(() => ({}));
-                alert(t('orders.updateFailed') + ': ' + (tb(errData.message) || errData.message || errData.error || tc('unknownError')));
+                alert(t('orders.updateFailed') + ': ' + (tb(errData.message.replace(/\./g, '_')) || errData.message || errData.error || tc('unknownError')));
             }
         } catch (e: any) {
-            console.error(e);
-            alert(t('orders.updateError') + ': ' + (tb(e.message) || e.message || String(e)));
+            // console.error(e);
+            alert(t('orders.updateError') + ': ' + (tb(e.message.replace(/\./g, '_')) || e.message || String(e)));
         } finally {
             setShippingOrderId(null);
         }
@@ -490,16 +490,16 @@ export default function ShopPage() {
             const data = await res.json();
 
             if (res.ok) {
-                alert(`${tb(data.message) || data.message} (${data.imported} items)`);
+                alert(`${tb(data.message.replace(/\./g, '_')) || data.message} (${data.imported} items)`);
                 setIsImportDialogOpen(false);
                 setSelectedImportShopId('');
                 fetchShopData(); // Refresh product list
             } else {
-                alert(`${tc('error')}: ${tb(data.message) || data.message}`);
+                alert(`${tc('error')}: ${tb(data.message.replace(/\./g, '_')) || data.message}`);
             }
         } catch (error: any) {
-            console.error('Import failed', error);
-            alert(t('importProduct.failed') + ': ' + (tb(error.message) || error.message));
+            // console.error('Import failed', error);
+            alert(t('importProduct.failed') + ': ' + (tb(error.message.replace(/\./g, '_')) || error.message));
         } finally {
             setIsImporting(false);
         }
@@ -529,7 +529,7 @@ export default function ShopPage() {
                 alert(t('shopSettings.failed'));
             }
         } catch (err) {
-            console.error(err);
+            // console.error(err);
             alert(t('shopSettings.error'));
         }
     };
@@ -562,7 +562,7 @@ export default function ShopPage() {
             });
             if (!res.ok) {
                 const errData = await res.json().catch(() => ({}));
-                alert(t('linkQr.foreignQrError') + (errData.message ? ` (${tb(errData.message)})` : '') + (errData.detail ? ` (${errData.detail})` : ''));
+                alert(t('linkQr.foreignQrError') + (errData.message ? ` (${tb(errData.message.replace(/\./g, '_'))})` : '') + (errData.detail ? ` (${errData.detail})` : ''));
                 return;
             }
             const data = await res.json();
@@ -570,7 +570,7 @@ export default function ShopPage() {
             setQrStatusDetails(data);
         } catch (error: any) {
             // console.error('Failed to get QR status', error);
-            alert(t('linkQr.foreignQrError') + (error.message ? ` (${tb(error.message)})` : '') + (error.detail ? ` (${error.detail})` : ''));
+            alert(t('linkQr.foreignQrError') + (error.message ? ` (${tb(error.message.replace(/\./g, '_'))})` : '') + (error.detail ? ` (${error.detail})` : ''));
         } finally {
             setIsScanning(false);
         }

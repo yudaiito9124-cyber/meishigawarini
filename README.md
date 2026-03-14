@@ -40,6 +40,8 @@
 - **API Gatewayの概要**： **[APIGATEWAY_GUIDE.md](./documents/APIGATEWAY_GUIDE.md)** には、API Gatewayの役割と、プロジェクト内（CDK）での実装方法を解説しています。
 
 - **セキュリティ対策の概要**： **[SECURITY_GUIDE.md](./documents/SECURITY_GUIDE.md)** には、このプロジェクトで行われているセキュリティ対策（不正アクセス防止や権限管理など）と、それが実際のコードのどこに書かれているかを解説しています。
+- **メール通知の仕様**： **[EMAIL_NOTIFICATIONS.md](./documents/EMAIL_NOTIFICATIONS.md)** には、送信されるメールの種類、送信タイミング、環境設定などをまとめています。
+- **ヘルプ・マニュアルの管理**： **[HELP_MANAGEMENT.md](./documents/HELP_MANAGEMENT.md)** には、Markdownを使用したヘルプページの追加・編集方法を解説しています。
 
 
 
@@ -109,6 +111,10 @@ c:\git\meishigawarini\
 
 ### 💰 運用費用
 -  **[RUNNING_COSTS.md](./documents/RUNNING_COSTS.md)** 
+
+### 📊 その他資料
+- **[開発説明スライド](./slide.md)** : システム全体のコンセプトやアーキテクチャの視覚資料。
+- **[更新ログ (Update Log)](./updatelog.md)** : プロジェクトの変更履歴。
 
 ---
 
