@@ -23,6 +23,13 @@
     "expired": "期限切れ",
     "banned": "BAN済み"
   },
+  "Time": {
+    "timeMorning": "午前中",
+    "time1416": "14-16時",
+    "time1618": "16-18時",
+    "time1820": "18-20時",
+    "time1921": "19-21時"
+  },
   "HomePage": {
     "title": "名刺代わりにへようこそ",
     "shopAdmin": "ショップ管理者画面",
@@ -41,9 +48,20 @@
     "errors": {
       "default": "ログインに失敗しました",
       "notAuthorized": "メールアドレスまたはパスワードが間違っています。",
-      "notConfirmed": "ユーザーが確認されていません。メールを確認してください。"
+      "notConfirmed": "ユーザーが確認されていません。メールを確認してください。",
+      "invalidAuthCode": "認証コードが正しくありません。"
     },
     "mfaLink": "2段階認証(MFA)の設定はこちら",
+    "mfaCodeLabel": "2段階認証コード",
+    "mfaPlaceholder": "6桁のコード",
+    "mfaInstructions": "認証アプリに表示されているコードを入力してください。",
+    "verifyingMfa": "確認中...",
+    "verifyAndSignIn": "認証してログイン",
+    "or": "または",
+    "biometricEmailRequired": "生体認証でのログインには、まずメールアドレスを入力してください。",
+    "biometricFailed": "生体認証に失敗しました。デバイスが未登録か、非対応です。",
+    "signInWithBiometric": "顔認証・指紋認証でログイン",
+    "back": "戻る",
     "shopAdminPage": "ショップ管理者画面",
     "qrAdminPage": "QR生成・管理者画面",
     "logout": "ログアウト"
@@ -121,6 +139,7 @@
         "description": "{name} 様への発送情報を入力してください。",
         "label": "追跡番号(なし等でも可)",
         "deliveryCompany": "配送会社",
+        "deliveryCompanyPlaceholder": "〇〇運輸",
         "submit": "発送済みにする",
         "Completed-state messages cannot be updated": "完了状態のメッセージは更新できません"
       }
@@ -289,11 +308,6 @@
       "preferredDate": "配送希望日 (任意)",
       "preferredTime": "配送希望時間 (任意)",
       "noPreference": "指定なし",
-      "timeMorning": "午前中",
-      "time1416": "14-16時",
-      "time1618": "16-18時",
-      "time1820": "18-20時",
-      "time1921": "19-21時",
       "submit": "この住所に配送する",
       "submitting": "住所を送信中...",
       "passwordTitle": "パスワード設定 (任意)",
@@ -537,6 +551,9 @@
     "Error starting scanner": "QRコードスキャナーを起動できませんでした。",
     "Camera permission denied or error starting scanner": "カメラを起動できませんでした。カメラの使用を許可してください。または、ほかのアプリケーション(Web会議等)でカメラを使用している場合は、そのアプリケーションを閉じるか、カメラの使用を中断し、もう一度スキャンボタンを押してください。"
   },
+  "HelpButton": {
+    "ariaLabel": "ヘルプページを開く"
+  },
   "BackendError": {
     "QR not found": "QRコードが見つかりません。",
     "QR does not belong to this shop": "QRコードはこのショップのものではありません。",
@@ -555,11 +572,25 @@
     "successTitle": "設定完了",
     "successMessage": "2段階認証が有効になりました。次回のログインから有効になります。一度ログアウトして、再度ログインしてください。",
     "logout": "ログアウトして再ログイン",
+    "authError": "認証エラー",
+    "backToLogin": "ログイン画面へ",
+    "doneTitle": "完了",
+    "appSetupDone": "認証アプリの設定完了",
+    "biometricSetupDone": "生体認証の登録完了",
+    "appNextTime": "次回から6桁のコードで認証できます。",
+    "biometricNextTime": "次回からこのデバイスの顔認証や指紋認証でログインできます。",
+    "totpLabel": "1. 認証アプリ (TOTP)",
+    "totpPlaceholder": "6桁のコード",
+    "totpSubmit": "認証して登録",
+    "biometricLabel": "2. 生体認証 (パスキー)",
+    "biometricSubmit": "生体認証を登録する",
+    "biometricDesc": "このデバイス（iPhoneのFaceIDやPCのTouchIDなど）を登録します。",
     "back": "戻る",
     "errors": {
       "setupFailed": "設定の開始に失敗しました。ログイン状態を確認してください。",
       "verifyFailed": "コードが正しくないか、期限が切れています。",
-      "notLoggedIn": "この操作にはログインが必要です。"
+      "notLoggedIn": "この操作にはログインが必要です。",
+      "biometricFailed": "生体認証の登録に失敗しました。デバイスが非対応か、キャンセルされました。"
     }
   }
 }

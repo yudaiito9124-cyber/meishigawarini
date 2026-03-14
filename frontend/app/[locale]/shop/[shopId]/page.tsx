@@ -30,6 +30,7 @@ const NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 export default function ShopPage() {
     const t = useTranslations('ShopPage');
     const tr = useTranslations('ReceivePage');
+    const tt = useTranslations('Time');
     const ts = useTranslations('Timestamp');
     const st = useTranslations('Status');
     const tb = useTranslations('BackendError');
@@ -518,16 +519,16 @@ export default function ShopPage() {
                 })
             });
             if (res.ok) {
-                alert(t('shopSettings.success', { defaultValue: 'ショップ設定を更新しました。' }));
+                alert(t('shopSettings.success'));
                 setSessionUploadedUrls([]); // Clear tracking on success
                 fetchShopData();
                 setIsSettingsOpen(false);
             } else {
-                alert(t('shopSettings.failed', { defaultValue: '更新に失敗しました。' }));
+                alert(t('shopSettings.failed'));
             }
         } catch (err) {
             console.error(err);
-            alert(t('shopSettings.error', { defaultValue: 'エラーが発生しました。' }));
+            alert(t('shopSettings.error'));
         }
     };
 
@@ -559,7 +560,7 @@ export default function ShopPage() {
             });
             if (!res.ok) {
                 const errData = await res.json().catch(() => ({}));
-                alert(t('linkQr.foreignQrError', { defaultValue: 'このカードは使えません。' }) + (errData.message ? ` (${tb(errData.message)})` : '') + (errData.detail ? ` (${errData.detail})` : ''));
+                alert(t('linkQr.foreignQrError') + (errData.message ? ` (${tb(errData.message)})` : '') + (errData.detail ? ` (${errData.detail})` : ''));
                 return;
             }
             const data = await res.json();
@@ -567,7 +568,7 @@ export default function ShopPage() {
             setQrStatusDetails(data);
         } catch (error: any) {
             console.error('Failed to get QR status', error);
-            alert(t('linkQr.foreignQrError', { defaultValue: 'このカードは使えません。' }) + (error.message ? ` (${tb(error.message)})` : '') + (error.detail ? ` (${error.detail})` : ''));
+            alert(t('linkQr.foreignQrError') + (error.message ? ` (${tb(error.message)})` : '') + (error.detail ? ` (${error.detail})` : ''));
         } finally {
             setIsScanning(false);
         }
@@ -596,8 +597,8 @@ export default function ShopPage() {
                             </DialogTrigger>
                             <DialogContent key={isSettingsOpen ? 'open' : 'closed'} className="max-w-[95vw] sm:max-w-[95vw] w-full max-h-[95vh] h-[95vh] overflow-y-auto">
                                 <DialogHeader>
-                                    <DialogTitle>{t('shopSettings.title', { defaultValue: 'ショップ設定' })}</DialogTitle>
-                                    <DialogDescription>{t('shopSettings.description', { defaultValue: 'ショップの名前や紹介文を設定します。' })}</DialogDescription>
+                                    <DialogTitle>{t('shopSettings.title')}</DialogTitle>
+                                    <DialogDescription>{t('shopSettings.description')}</DialogDescription>
                                 </DialogHeader>
                                 <form onSubmit={handleUpdateShop} className="space-y-4 py-4">
                                     <div className="space-y-2">
@@ -749,7 +750,7 @@ export default function ShopPage() {
                                     </div>
                                     <DialogFooter>
                                         <Button type="submit" className="w-full">
-                                            {t('shopSettings.submit', { defaultValue: 'ショップ設定を保存' })}
+                                            {t('shopSettings.submit')}
                                         </Button>
                                     </DialogFooter>
                                 </form>
@@ -1046,7 +1047,7 @@ export default function ShopPage() {
 
                                                             <div>
                                                                 <h4 className="text-sm font-semibold text-gray-500">{t('orders.preferredDateTime')}</h4>
-                                                                <p className="text-sm">{order.preferred_date}  /  {order.preferred_time}</p>
+                                                                <p className="text-sm">{order.preferred_date ? order.preferred_date : '-'}  /  {order.preferred_time ? tt(order.preferred_time) : '-'}</p>
                                                             </div>
 
                                                             {/* User Message & Shop Memo Section (Editable - Unified for all statuses) */}
@@ -1070,7 +1071,7 @@ export default function ShopPage() {
                                                                     }} className="space-y-4">
                                                                         <div className="space-y-2">
                                                                             <Label htmlFor={`delivery_company-${uuid}`} className="text-orange-900/70">{t('orders.shipDialog.deliveryCompany')}</Label>
-                                                                            <Input id={`delivery_company-${uuid}`} name="delivery_company" placeholder="〇〇運輸" required className="bg-white border-orange-100 focus:border-orange-500 focus:ring-orange-500" />
+                                                                            <Input id={`delivery_company-${uuid}`} name="delivery_company" placeholder={t('orders.shipDialog.deliveryCompanyPlaceholder')} required className="bg-white border-orange-100 focus:border-orange-500 focus:ring-orange-500" />
                                                                         </div>
                                                                         <div className="space-y-2">
                                                                             <Label htmlFor={`tracking-${uuid}`} className="text-orange-900/70">{t('orders.shipDialog.label')}</Label>
@@ -1191,7 +1192,7 @@ export default function ShopPage() {
                                                 <CardTitle className="text-base truncate" title={product.name}>{product.name}</CardTitle>
                                                 <CardDescription className="line-clamp-1 text-xs">{product.description}</CardDescription>
                                                 <p className="text-xs text-gray-500 mt-0.5">
-                                                    {t('addProduct.validDays')}: {product.valid_days ? product.valid_days : APP_CONFIG.DEFAULT_VALID_DAYS}日
+                                                    {t('addProduct.validDays')}: {product.valid_days ? product.valid_days : APP_CONFIG.DEFAULT_VALID_DAYS}{t('productDetails.validDaysSuffix')}
                                                 </p>
                                                 <p className="text-[10px] text-gray-400 font-mono mt-1 truncate" title={product.product_id}>
                                                     ID: {product.product_id}
@@ -1541,7 +1542,7 @@ export default function ShopPage() {
 
                                                             <div>
                                                                 <h4 className="text-sm font-semibold text-gray-500">{t('orders.preferredDateTime')}</h4>
-                                                                <p className="text-sm">{order.preferred_date}  /  {order.preferred_time}</p>
+                                                                <p className="text-sm">{order.preferred_date ? order.preferred_date : '-'}  /  {order.preferred_time ? tt(order.preferred_time) : '-'}</p>
                                                             </div>
 
                                                             {/* Order Info */}

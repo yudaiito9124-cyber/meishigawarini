@@ -93,7 +93,7 @@ export default function LoginPage() {
                 setError(t('errors.notConfirmed'));
                 router.push(`/verify?username=${encodeURIComponent(email)}`);
             } else if (err.name === 'CodeMismatchException') {
-                setError("認証コードが正しくありません。");
+                setError(t('errors.invalidAuthCode'));
             } else {
                 console.error('Login error', err);
                 setError(err.message || t('errors.default'));
@@ -164,11 +164,11 @@ export default function LoginPage() {
                             </>
                         ) : (
                             <div className="space-y-2">
-                                <Label htmlFor="mfaCode">2段階認証コード</Label>
+                                <Label htmlFor="mfaCode">{t('mfaCodeLabel')}</Label>
                                 <Input
                                     id="mfaCode"
                                     type="text"
-                                    placeholder="6桁のコード"
+                                    placeholder={t('mfaPlaceholder')}
                                     value={mfaCode}
                                     onChange={(e) => setMfaCode(e.target.value)}
                                     className="text-center text-2xl tracking-widest"
@@ -177,13 +177,13 @@ export default function LoginPage() {
                                     autoFocus
                                 />
                                 <p className="text-xs text-gray-500 text-center">
-                                    認証アプリに表示されているコードを入力してください。
+                                    {t('mfaInstructions')}
                                 </p>
                             </div>
                         )}
                         {error && <p className="text-sm text-red-500 text-center font-medium">{error}</p>}
                         <Button type="submit" className="w-full h-11 text-base font-bold" disabled={loading}>
-                            {loading ? (showMfa ? "確認中..." : t('signingIn')) : (showMfa ? "認証してログイン" : t('signIn'))}
+                            {loading ? (showMfa ? t('verifyingMfa') : t('signingIn')) : (showMfa ? t('verifyAndSignIn') : t('signIn'))}
                         </Button>
 
                         {/* 生体認証は一旦コメントアウト
@@ -238,7 +238,7 @@ export default function LoginPage() {
                                 className="w-full text-gray-500"
                                 onClick={() => setShowMfa(false)}
                             >
-                                戻る
+                                {t('back')}
                             </Button>
                         )}
                     </form>

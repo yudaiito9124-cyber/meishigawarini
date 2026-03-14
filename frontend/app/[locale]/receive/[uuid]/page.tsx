@@ -183,6 +183,7 @@ const EmptySenderInfoWithLinks = (senderinfo: any) => {
 
 export default function ReceivePage() {
     const t = useTranslations('ReceivePage');
+    const tt = useTranslations('Time');
     const tst = useTranslations('Status');
     const params = useParams();
     const uuid = params?.uuid as string;
@@ -1214,11 +1215,11 @@ export default function ReceivePage() {
                                             className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
                                         >
                                             <option value="">{t('formStep.noPreference')}</option>
-                                            <option value="午前中">{t('formStep.timeMorning')}</option>
-                                            <option value="14-16時">{t('formStep.time1416')}</option>
-                                            <option value="16-18時">{t('formStep.time1618')}</option>
-                                            <option value="18-20時">{t('formStep.time1820')}</option>
-                                            <option value="19-21時">{t('formStep.time1921')}</option>
+                                            <option value="timeMorning">{tt('timeMorning')}</option>
+                                            <option value="time1416">{tt('time1416')}</option>
+                                            <option value="time1618">{tt('time1618')}</option>
+                                            <option value="time1820">{tt('time1820')}</option>
+                                            <option value="time1921">{tt('time1921')}</option>
                                         </select>
                                     </div>
 
@@ -1798,8 +1799,8 @@ export default function ReceivePage() {
 
 
 
-                                    </div>
-                                ) : ""}
+                                </div>
+                            ) : ""}
 
                             {senderInfoLoading && (
                                 <div className="absolute inset-0 bg-white/60 backdrop-blur-[1px] flex items-center justify-center z-10 transition-all">

@@ -87,7 +87,7 @@ export default function MFASetupPage() {
             }
         } catch (err: any) {
             console.error('Passkey registration failed', err);
-            setError("生体認証の登録に失敗しました。デバイスが非対応か、キャンセルされました。");
+            setError('errors.biometricFailed');
         } finally {
             setLoading(false);
         }
@@ -102,9 +102,9 @@ export default function MFASetupPage() {
         return (
             <div className="min-h-screen flex items-center justify-center bg-gray-100 p-4">
                 <Card className="w-full max-w-md">
-                    <CardHeader><CardTitle className="text-red-600 font-bold">認証エラー</CardTitle></CardHeader>
-                    <CardContent><p>この操作にはログインが必要です。</p></CardContent>
-                    <CardFooter><Button onClick={() => router.push('/login')} className="w-full">ログイン画面へ</Button></CardFooter>
+                    <CardHeader><CardTitle className="text-red-600 font-bold">{t('authError')}</CardTitle></CardHeader>
+                    <CardContent><p>{t('errors.notLoggedIn')}</p></CardContent>
+                    <CardFooter><Button onClick={() => router.push('/login')} className="w-full">{t('backToLogin')}</Button></CardFooter>
                 </Card>
             </div>
         );
@@ -114,14 +114,14 @@ export default function MFASetupPage() {
         return (
             <div className="min-h-screen flex items-center justify-center bg-gray-100 p-4">
                 <Card className="w-full max-w-md">
-                    <CardHeader><CardTitle className="text-center text-2xl font-bold">完了</CardTitle></CardHeader>
+                    <CardHeader><CardTitle className="text-center text-2xl font-bold">{t('doneTitle')}</CardTitle></CardHeader>
                     <CardContent className="space-y-4 text-center">
                         <CheckCircle2 className="h-16 w-16 text-green-500 mx-auto" />
-                        <h3 className="text-lg font-bold">{success ? "認証アプリの設定完了" : "生体認証の登録完了"}</h3>
+                        <h3 className="text-lg font-bold">{success ? t('appSetupDone') : t('biometricSetupDone')}</h3>
                         <p className="text-sm text-gray-600">
-                            {success ? "次回から6桁のコードで認証できます。" : "次回からこのデバイスの顔認証や指紋認証でログインできます。"}
+                            {success ? t('appNextTime') : t('biometricNextTime')}
                         </p>
-                        <Button onClick={handleDone} className="w-full bg-green-600 hover:bg-green-700 font-bold mt-4">ログイン画面へ戻る</Button>
+                        <Button onClick={handleDone} className="w-full bg-green-600 hover:bg-green-700 font-bold mt-4">{t('backToLogin')}</Button>
                     </CardContent>
                 </Card>
             </div>
@@ -137,21 +137,21 @@ export default function MFASetupPage() {
                 <CardContent className="space-y-8">
                     {/* 方法1: 認証アプリ */}
                     <div className="space-y-4 bg-gray-50 p-4 rounded-xl">
-                        <Label className="text-base font-bold">1. 認証アプリ (TOTP)</Label>
+                        <Label className="text-base font-bold">{t('totpLabel')}</Label>
                         <div className="flex justify-center p-2 bg-white border rounded">
                             {qrCodeUrl ? <img src={qrCodeUrl} alt="QR Code" className="w-40 h-40" /> : <div className="h-40 flex items-center">Loading...</div>}
                         </div>
                         <form onSubmit={handleVerifyToken} className="space-y-2">
                             <Input
                                 type="text"
-                                placeholder="6桁のコード"
+                                placeholder={t('totpPlaceholder')}
                                 value={code}
                                 onChange={(e) => setCode(e.target.value)}
                                 className="text-center text-2xl tracking-[0.3em] font-mono h-12"
                                 maxLength={6}
                                 required
                             />
-                            <Button type="submit" className="w-full" disabled={loading}>認証して登録</Button>
+                            <Button type="submit" className="w-full" disabled={loading}>{t('totpSubmit')}</Button>
                         </form>
                     </div>
 
@@ -187,7 +187,7 @@ export default function MFASetupPage() {
                     )}
                 </CardContent>
                 <CardFooter>
-                    <Button variant="ghost" onClick={() => router.back()} className="w-full text-gray-400">戻る</Button>
+                    <Button variant="ghost" onClick={() => router.back()} className="w-full text-gray-400">{t('back')}</Button>
                 </CardFooter>
             </Card>
         </div>
