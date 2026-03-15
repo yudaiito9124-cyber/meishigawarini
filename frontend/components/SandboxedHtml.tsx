@@ -2,20 +2,31 @@
 import { useState, useEffect, useId, useMemo } from "react";
 import DOMPurify from "isomorphic-dompurify";
 
+
+
+
+
 export default function ResponsiveSecureFrame({ html }: { html: string }) {
     const [height, setHeight] = useState("400px");
     const iframeId = useId();
 
     useEffect(() => {
         const handleMessage = (event: MessageEvent) => {
-            if (event.origin !== "null") return;
+            // sandboxに allow-same-origin がある場合はオリジンが親と同じになる
+            const isSameOrigin = event.origin === window.location.origin;
+            const isNullOrigin = event.origin === "null";
+
+            if (!isNullOrigin && !isSameOrigin) return;
+
             if (event.data && event.data.type === "resize-iframe" && event.data.id === iframeId) {
-                const nextHeight = Math.ceil(event.data.height + 2);
+                // React側の setHeight 部分
+                const nextHeight = Math.ceil(event.data.height); // +2を一旦消す
 
                 setHeight((prev) => {
                     const currentHeight = parseInt(prev);
-                    // 【ループ防止】変化が5px未満なら更新しない（100vhループをここで断つ）
-                    if (Math.abs(nextHeight - currentHeight) < 5) return prev;
+                    const diff = nextHeight - currentHeight;
+                    if (Math.abs(diff) < 4) return prev;
+
                     return `${nextHeight}px`;
                 });
             }
@@ -73,7 +84,7 @@ export default function ResponsiveSecureFrame({ html }: { html: string }) {
         const meta = doc.createElement("meta");
         meta.httpEquiv = "Content-Security-Policy";
         meta.content = `
-            default-src 'none'; 
+            default-src none;
             script-src 'unsafe-inline' 'unsafe-eval' https://www.youtube.com https://*.ytimg.com https://*.googleapis.com;
             style-src 'unsafe-inline' ${trustedCDNs}; 
             font-src ${trustedCDNs} data:; 
@@ -91,27 +102,54 @@ export default function ResponsiveSecureFrame({ html }: { html: string }) {
         // 2. 計測スクリプト：内側のコンテナサイズだけを正確に測る
         const script = doc.createElement("script");
         script.textContent = `
-            (function() {
-                const sendHeight = () => {
-                    const el = document.getElementById('content-inner');
-                    if (!el) return;
-                    // getBoundingClientRect を使って小数点以下の精度で計測
-                    const rect = el.getBoundingClientRect();
-                    window.parent.postMessage({ 
-                        type: "resize-iframe", 
-                        id: "${iframeId}", 
-                        height: rect.height
-                    }, "*");
-                };
-                window.addEventListener("load", sendHeight);
-                if (typeof ResizeObserver !== 'undefined') {
-                    // content-inner そのものを監視対象にする
-                    const target = document.getElementById('content-inner');
-                    if (target) {
-                        new ResizeObserver(() => requestAnimationFrame(sendHeight)).observe(target);
-                    }
-                }
-            })();
+        // script.textContent の中身を以下に差し替え
+        (function() {
+            const sendHeight = () => {
+                const el = document.getElementById('content-inner');
+                if (!el) return;
+
+                // 子要素も含めた真の最下部を計算
+                // getBoundingClientRect().bottom はビューポート基準なので、
+                // ページ全体の高さを取るために body の offsetHeight や scrollHeight と比較
+                const body = document.body;
+                const html = document.documentElement;
+
+                const height = Math.max(
+                    el.offsetHeight,
+                    el.scrollHeight,
+                    body.scrollHeight, 
+                    body.offsetHeight,
+                    html.clientHeight, 
+                    html.scrollHeight, 
+                    html.offsetHeight
+                );
+
+                window.parent.postMessage({ 
+                    type: "resize-iframe", 
+                    id: "${iframeId}", 
+                    height: height
+                }, "*");
+            };
+
+            // 初回、ロード時、リサイズ時
+            window.addEventListener("load", sendHeight);
+            window.addEventListener("resize", sendHeight);
+            
+            // フォント読み込み完了時に再計算（これで見切れが直るケースが多い）
+            if (document.fonts) {
+                document.fonts.ready.then(sendHeight);
+            }
+
+            if (typeof ResizeObserver !== 'undefined') {
+                const observer = new ResizeObserver(() => requestAnimationFrame(sendHeight));
+                observer.observe(document.body);
+                // コンテンツの中身が変わった際も検知
+                observer.observe(document.getElementById('content-inner'));
+            }
+
+            // 念のため、初期化から数秒間は定期的に送る（動的な埋め込み対策）
+            [500, 1000, 3000].forEach(delay => setTimeout(sendHeight, delay));
+        })();
         `;
         // Move script to the end of body to ensure it executes after elements are created
         // Update: Instead of appending to head here, we will append it after body items in doc.body
@@ -119,21 +157,26 @@ export default function ResponsiveSecureFrame({ html }: { html: string }) {
         // 3. リセットスタイル：途切れを防止しつつ、100vhの連鎖を止める
         const style = doc.createElement("style");
         style.textContent = `
-            html, body { 
-                margin: 0; padding: 0; width: 100%; 
-                height: auto !important; /* 絶対に auto にして途切れを防止 */
+        html, body { 
+                margin: 0 !important; 
+                padding: 0 !important; 
+                width: 100%; 
+                height: auto !important;
                 min-height: 0 !important;
-                overflow: hidden; 
+                overflow: visible !important;
             }
-            /* 計測用のラッパー */
             #content-inner {
-                display: flow-root; /* float解除を自動化 */
+                display: block; /* flow-root よりも確実な場合がある */
                 width: 100%;
-                height: auto;
+                height: auto !important;
+                /* 上下のマージンが突き抜けて計測不能になるのを防ぐ魔法のプロパティ */
+                padding: 1px 0; 
+                margin: 0;
+                box-sizing: border-box;
             }
-            /* 100vh を使っている要素への対策：iframeの高さではなく親の想定サイズに寄せる */
-            header[style*="100vh"], section[style*="100vh"] {
-                height: 600px !important;
+            /* 画像やiframeが親を突き破るのを防ぐ */
+            img, video, iframe {
+                max-width: 100%;
             }
         `;
         doc.head.append(style);
