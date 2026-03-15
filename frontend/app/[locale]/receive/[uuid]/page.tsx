@@ -1022,25 +1022,41 @@ export default function ReceivePage() {
                     )}
 
                     {step === "PIN" && !gift?.product && (
-                        <form onSubmit={handleVerifyPin} className={cn("space-y-6 transition-opacity", loading && "opacity-50 pointer-events-none")}>
-                            <div className="space-y-2 p-4 bg-gray-50 rounded-lg">
-                                <Label htmlFor="pin" className="font-semibold">{t('pinStep.label')}</Label>
+                        <form onSubmit={handleVerifyPin} className={cn("transition-opacity", loading && "opacity-50 pointer-events-none")}>
+                            <div className="space-y-2 p-4 rounded-lg">
+                                <Label htmlFor="pin" className="font-semibold justify-center">{t('pinStep.label')}</Label>
                                 <Input
                                     id="pin"
                                     type="text"
                                     placeholder={t('pinStep.placeholder')}
                                     value={pin}
                                     disabled={loading}
+                                    className="text-center items-center h-12"
                                     onChange={(e) => {
                                         setPin(e.target.value);
                                         setPinError("");
                                     }}
+                                    // ↓ ここを追加：デザインを維持しつつ、入力後に等倍へ戻すハック
+                                    onBlur={() => {
+                                        const viewport = document.querySelector('meta[name="viewport"]');
+                                        if (viewport) {
+                                            viewport.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=1.0');
+                                            setTimeout(() => {
+                                                // ユーザーが手動でズームできるように制限を戻す
+                                                viewport.setAttribute('content', 'width=device-width, initial-scale=1.0');
+                                            }, 300);
+                                        }
+                                    }}
+                                    // iOSの自動ズームを防ぐために、インラインスタイルで16pxを強制するのも有効です
+                                    style={{ fontSize: '30px' }}
                                 />
                                 {pinError && <p className="text-sm text-red-500">{pinError}</p>}
                             </div>
-                            <Button type="submit" className="w-full" disabled={loading || !pin}>
-                                {loading ? t('pinStep.verifying') : t('pinStep.submit')}
-                            </Button>
+                            <div className="mr-4 ml-4 pt-6">
+                                <Button type="submit" className="flex w-full h-14" disabled={loading || !pin}>
+                                    {loading ? t('pinStep.verifying') : t('pinStep.submit')}
+                                </Button>
+                            </div>
                         </form>
                     )}
                 </CardContent>

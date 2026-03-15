@@ -51,6 +51,7 @@ export default function AdminPage() {
     const [generatedBatches, setGeneratedBatches] = useState<any[]>([]);
     const [isAuthorized, setIsAuthorized] = useState<boolean | null>(null); // null = loading
     const [papertype, setPapertype] = useState<"1S31034-gakuchousenbeiv1" | "10S31251">("1S31034-gakuchousenbeiv1");
+    const [isGenerating, setIsGenerating] = useState(false);
     const router = useRouter();
 
     useEffect(() => {
@@ -115,6 +116,7 @@ export default function AdminPage() {
     }
 
     const handleGenerate = async () => {
+        setIsGenerating(true);
         try {
             const session = await fetchAuthSession();
             const token = session.tokens?.idToken?.toString();
@@ -163,13 +165,15 @@ export default function AdminPage() {
             }
         } catch (e) {
             alert(t('batches.alerts.error') + JSON.stringify(e));
+        } finally {
+            setIsGenerating(false);
         }
     };
 
 
     return (
         <div className="min-h-screen bg-mist-900 p-8 text-white"> {/* bg-[#383838] */}
-            <div className="max-w-4xl mx-auto space-y-6">
+            <div className="max-w-7xl mx-auto space-y-6">
                 <div className="flex justify-between items-center flex-wrap gap-4">
                     <h1 className="text-2xl font-bold text-white">{t('title')}</h1>
                     <Link href="/login">
@@ -188,14 +192,12 @@ export default function AdminPage() {
                         <div className="flex flex-col w-full gap-1.5">
                             <div className="grid w-full items-center gap-1.5">
                                 <label htmlFor="count" className="text-sm font-medium">{t('generate.quantity')}</label>
-                                <Link href="/shop">
-                                    <Input
-                                        id="count"
-                                        type="number"
-                                        value={count}
-                                        onChange={(e) => setCount(Number(e.target.value))}
-                                    />
-                                </Link>
+                                <Input
+                                    id="count"
+                                    type="number"
+                                    value={count}
+                                    onChange={(e) => setCount(Number(e.target.value))}
+                                />
                             </div>
 
                             <div className="flex items-center gap-2 mt-4">
@@ -292,7 +294,20 @@ export default function AdminPage() {
                                 </div>
                             </div>
                             <div className="grid w-full items-center gap-1.5 mt-4">
-                                <Button onClick={handleGenerate} className="w-full items-center gap-1.5 h-12">{t('generate.button')}</Button>
+                                <Button 
+                                    onClick={handleGenerate} 
+                                    className="w-full items-center gap-1.5 h-12" 
+                                    disabled={isGenerating}
+                                >
+                                    {isGenerating ? (
+                                        <>
+                                            <span className="animate-spin mr-2">⏳</span>
+                                            {t('generate.button')}...
+                                        </>
+                                    ) : (
+                                        t('generate.button')
+                                    )}
+                                </Button>
                             </div>
                         </div>
                     </CardContent>
@@ -499,7 +514,7 @@ function QRCodeListSection({ apiUrl, onGeneratePDF }: { apiUrl: string, onGenera
     };
 
     return (
-        <Card>
+        <Card className="w-full">
             <CardHeader>
                 <CardTitle className="flex justify-between items-center">
                     <span>{t('list.title')}</span>
