@@ -10,7 +10,7 @@ export default function ResponsiveSecureFrame({ html }: { html: string }) {
         const handleMessage = (event: MessageEvent) => {
             if (event.origin !== "null") return;
             if (event.data && event.data.type === "resize-iframe" && event.data.id === iframeId) {
-                const nextHeight = Math.ceil(event.data.height);
+                const nextHeight = Math.ceil(event.data.height + 2);
 
                 setHeight((prev) => {
                     const currentHeight = parseInt(prev);
