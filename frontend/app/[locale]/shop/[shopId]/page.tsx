@@ -5,7 +5,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { RefreshCw, ArrowRight, HelpCircle, Camera, Settings, ShoppingBasket, Eye, Plus, Trash2, Copy, ChevronDown, ImageIcon, Save, Loader2, Pencil } from 'lucide-react';
+import { RefreshCw, ArrowRight, HelpCircle, Camera, Settings, ShoppingBasket, Eye, Plus, Trash2, Copy, ImageIcon, Save, Loader2, Pencil, ChevronDown } from 'lucide-react';
 import { notFound, useParams } from 'next/navigation';
 import { useRouter } from '@/i18n/routing';
 import { useTranslations } from 'next-intl';
@@ -40,6 +40,7 @@ export default function ShopPage() {
     const shopId = Array.isArray(params.shopId) ? params.shopId[0] : params.shopId;
 
     const [shop, setShop] = useState<any>(null);
+    const [userId, setUserId] = useState<string>('');
     const [products, setProducts] = useState<any[]>([]);
     const [qrCodes, setQrCodes] = useState<any[]>([]);
     const [orders, setOrders] = useState<any[]>([]);
@@ -47,6 +48,8 @@ export default function ShopPage() {
     const [productsLoading, setProductsLoading] = useState(true);
     const [ordersLoading, setOrdersLoading] = useState(true);
     const [isRefreshing, setIsRefreshing] = useState(false);
+    const [isSettingUploading, setIsSettingUploading] = useState(false);
+    const [isSettingShowHTML, setIsSettingShowHTML] = useState(false);
     const [error, setError] = useState('');
     const [debouncedPreviewHtml, setDebouncedPreviewHtml] = useState<string>('');
     const shopDetailRef = useRef<HTMLTextAreaElement>(null);
@@ -80,7 +83,8 @@ export default function ShopPage() {
 
     const checkAuth = async () => {
         try {
-            await getCurrentUser();
+            const userinfo = await getCurrentUser();
+            setUserId(userinfo.userId)
             // If successful, proceed to load data
         } catch (e) {
             router.push('/login');
@@ -247,6 +251,7 @@ export default function ShopPage() {
             setSessionUploadedUrls([]);
         }
         setIsSettingsOpen(open);
+        setIsSettingShowHTML(false)
     };
 
     const handleHtmlImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -528,6 +533,7 @@ export default function ShopPage() {
         e.preventDefault();
         const form = e.target as HTMLFormElement;
         const formData = new FormData(form);
+        setIsSettingUploading(true);
 
         try {
             const res = await fetchWithAuth(`/shop/${shopId}`, {
@@ -550,6 +556,8 @@ export default function ShopPage() {
         } catch (err) {
             // console.error(err);
             alert(t('shopSettings.error'));
+        } finally {
+            setIsSettingUploading(false);
         }
     };
 
@@ -606,8 +614,9 @@ export default function ShopPage() {
                         <h1 className="text-2xl font-bold text-gray-900">
                             {shopLoading ? <RefreshCw className="h-5 w-5 animate-spin text-gray-400 inline-block" /> : (shop?.name || t('title'))}
                         </h1>
-                        <p className="text-sm text-gray-500">{t('shopId', { id: String(shopId || '') })}</p>
+                        <p className="text-xs text-gray-500">{t('shopId')} :  {shopId}</p>
                     </div>
+
                     <div className="flex items-center space-x-2">
                         <Dialog open={isSettingsOpen} onOpenChange={handleSettingsOpenChange}>
                             <DialogTrigger asChild>
@@ -616,7 +625,7 @@ export default function ShopPage() {
                                     <span className="sr-only">{t('shopSettings.title')}</span>
                                 </Button>
                             </DialogTrigger>
-                            <DialogContent key={isSettingsOpen ? 'open' : 'closed'} className="max-w-[95vw] sm:max-w-[95vw] w-full max-h-[95vh] h-[95vh] overflow-y-auto">
+                            <DialogContent key={isSettingsOpen ? 'open' : 'closed'} className="max-w-[95vw] sm:max-w-[95vw] w-full max-h-[95vh] overflow-y-auto">
                                 <DialogHeader>
                                     <DialogTitle>{t('shopSettings.title')}</DialogTitle>
                                     <DialogDescription>{t('shopSettings.description')}</DialogDescription>
@@ -626,156 +635,174 @@ export default function ShopPage() {
                                         <Label htmlFor="shop_name">{t('shopSettings.name')}</Label>
                                         <Input id="shop_name" name="shop_name" defaultValue={shop?.name} required />
                                     </div>
-                                    <div className="space-y-2">
-                                        <Label htmlFor="shop_detail_html">{t('shopSettings.detailHtml')}</Label>
-                                        <div className="border rounded-md overflow-hidden bg-gray-50/30 min-h-[400px] h-[calc(95vh-400px)] flex flex-col lg:flex-row">
-                                            <div className="flex-1 flex flex-col min-h-0 border-b lg:border-b-0 lg:border-r bg-white">
-                                                <div className="px-3 py-2 bg-gray-50 border-b flex justify-between items-center shrink-0 min-h-[50px]">
-                                                    <Label htmlFor="shop_detail_html" className="text-xs font-bold text-gray-600 uppercase tracking-wider">{t('shopSettings.sourcecode')}</Label>
-                                                </div>
-                                                <textarea
-                                                    ref={shopDetailRef}
-                                                    id="shop_detail_html"
-                                                    name="shop_detail_html"
-                                                    defaultValue={shop?.detail_html}
-                                                    className="flex-1 w-full p-4 text-sm font-mono focus-visible:outline-none resize-none overflow-y-auto min-h-0"
-                                                    placeholder={t('shopSettings.detailHtmlPlaceholder')}
-                                                />
-                                            </div>
-                                            <div className="flex-1 flex flex-col min-h-0 bg-gray-50/50">
-                                                <div className="px-3 py-2 bg-gray-50 border-b flex justify-between items-center shrink-0 min-h-[50px]">
-                                                    <Label className="text-xs font-bold text-gray-600 uppercase tracking-wider">{t('shopSettings.preview')}</Label>
-                                                    <Button
-                                                        type="button"
-                                                        variant="outline"
-                                                        size="sm"
-                                                        onClick={handleUpdatePreview}
-                                                        className="h-7 px-2 text-[10px] gap-1 bg-white border-blue-200 text-blue-600 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300"
-                                                    >
-                                                        <Eye className="w-3 h-3" />
-                                                        {t('shopSettings.updatePreview')}
-                                                    </Button>
-                                                </div>
-                                                <div className="flex-1 overflow-y-auto w-full min-h-0 p-4 flex flex-col items-center">
-                                                    <Card className="w-full mt-20 flex flex-col items-center max-w-xl bg-white ">
-                                                        <CardTitle className="w-full flex flex-col items-center justify-center gap-2">
-                                                            <div className="w-full flex items-center justify-center text-xl text-center gap-2">
-                                                                <ShoppingBasket className="w-5 h-5 text-gray-600" />
-                                                                {tr('shopinfo')}
-                                                            </div>
-                                                            <div className="w-full flex items-center justify-center text-xs text-center text-gray-500">
-                                                                {tr('shopinfo_description')}
-                                                            </div>
-                                                        </CardTitle>
-                                                        <CardContent className="min-h-0 flex flex-1 p-0 w-full p-4"> {/* w-fullを追加 */}
-                                                            <div className="w-full mt-0 mr-0 ml-0 p-0 relative rounded-2xl overflow-hidden border border-gray-100 shadow-sm bg-white">
-                                                                {/* コンテンツ */}
-                                                                <SandboxedHtml html={debouncedPreviewHtml} />
-                                                                {/* Overly to "gather" the corners */}
-                                                                <div className="absolute inset-0 pointer-events-none rounded-2xl ring-1 ring-black/5 ring-inset" />
-                                                            </div>
-                                                        </CardContent>
-                                                    </Card>
-                                                </div>
-                                            </div>
-                                        </div>
 
-                                        {/* HTML Images Section */}
-                                        <div className="space-y-2 pt-2">
-                                            <Button
-                                                type="button"
-                                                variant="ghost"
-                                                size="sm"
-                                                onClick={() => setIsHtmlImageSectionOpen(!isHtmlImageSectionOpen)}
-                                                className="w-full flex justify-between items-center text-gray-500 hover:text-gray-900 px-2"
-                                            >
-                                                <div className="flex items-center gap-2">
-                                                    <ImageIcon className="w-4 h-4" />
-                                                    <span className="font-semibold">{tr('senderInfo.labels.detail_html-images')}</span>
-                                                </div>
-                                                <ChevronDown className={`w-4 h-4 transition-transform ${isHtmlImageSectionOpen ? 'rotate-180' : ''}`} />
-                                            </Button>
-
-                                            {isHtmlImageSectionOpen && (
-                                                <div className="space-y-4 p-4 bg-gray-50/50 rounded-lg border border-dashed border-gray-200">
-                                                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-                                                        {htmlImageUrls.map((url, index) => (
-                                                            <div key={index} className="group relative aspect-square bg-white rounded-md border overflow-hidden shadow-sm hover:ring-2 hover:ring-primary/30 transition-all">
-                                                                {/* eslint-disable-next-line @next/next/no-img-element */}
-                                                                <img
-                                                                    src={url}
-                                                                    alt={`HTML content ${index}`}
-                                                                    className="w-full h-full object-cover"
-                                                                    onError={(e) => {
-                                                                        (e.target as HTMLImageElement).src = 'https://placehold.co/200x200?text=Error';
-                                                                    }}
-                                                                />
-                                                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                                                                    <Button
-                                                                        type="button"
-                                                                        variant="secondary"
-                                                                        size="icon"
-                                                                        className="h-8 w-8 rounded-full bg-white/90 hover:bg-white"
-                                                                        onClick={() => {
-                                                                            navigator.clipboard.writeText(url);
-                                                                            alert(t('shopSettings.copySuccess'));
-                                                                        }}
-                                                                        title={t('shopSettings.copyUrl')}
-                                                                    >
-                                                                        <Copy className="h-4 w-4 text-gray-700" />
-                                                                    </Button>
-                                                                    <Button
-                                                                        type="button"
-                                                                        variant="destructive"
-                                                                        size="icon"
-                                                                        className="h-8 w-8 rounded-full"
-                                                                        onClick={() => {
-                                                                            setHtmlImageUrlsToDelete(prev => [...prev, url]);
-                                                                            setHtmlImageUrls(prev => prev.filter((_, i) => i !== index));
-                                                                        }}
-                                                                        title={t('product.delete')}
-                                                                    >
-                                                                        <Trash2 className="h-4 w-4" />
-                                                                    </Button>
-                                                                </div>
-                                                            </div>
-                                                        ))}
-
-                                                        <label className="flex flex-col items-center justify-center aspect-square bg-white rounded-md border border-dashed border-gray-300 hover:border-primary/50 hover:bg-primary/5 cursor-pointer transition-all group">
-                                                            <div className="flex flex-col items-center gap-1 text-gray-400 group-hover:text-primary transition-colors">
-                                                                {isUploadingHtmlImage ? (
-                                                                    <RefreshCw className="w-6 h-6 animate-spin" />
-                                                                ) : (
-                                                                    <>
-                                                                        <Plus className="w-6 h-6" />
-                                                                        <span className="text-[10px] font-medium">{tr('senderInfo.labels.detail_html-addimage')}</span>
-                                                                    </>
-                                                                )}
-                                                            </div>
-                                                            <input
-                                                                type="file"
-                                                                className="hidden"
-                                                                accept="image/*"
-                                                                onChange={handleHtmlImageUpload}
-                                                                disabled={isUploadingHtmlImage}
-                                                                onClick={(e) => (e.target as HTMLInputElement).value = ''}
-                                                            />
-                                                        </label>
+                                    {isSettingShowHTML && (
+                                        <div className="space-y-2">
+                                            <Label htmlFor="shop_detail_html">{t('shopSettings.detailHtml')}</Label>
+                                            <div className="border rounded-md overflow-hidden bg-gray-50/30 min-h-[400px] h-[calc(95vh-500px)] flex flex-col lg:flex-row">
+                                                <div className="flex-1 flex flex-col min-h-0 border-b lg:border-b-0 lg:border-r bg-white">
+                                                    <div className="px-3 py-2 bg-gray-50 border-b flex justify-between items-center shrink-0 min-h-[50px]">
+                                                        <Label htmlFor="shop_detail_html" className="text-xs font-bold text-gray-600 uppercase tracking-wider">{t('shopSettings.sourcecode')}</Label>
                                                     </div>
-                                                    <p className="text-[10px] text-gray-400 italic">
-                                                        {t('shopSettings.imageHint')}
-                                                    </p>
+                                                    <textarea
+                                                        ref={shopDetailRef}
+                                                        id="shop_detail_html"
+                                                        name="shop_detail_html"
+                                                        defaultValue={shop?.detail_html}
+                                                        className="flex-1 w-full p-4 text-sm font-mono focus-visible:outline-none resize-none overflow-y-auto min-h-0"
+                                                        placeholder={t('shopSettings.detailHtmlPlaceholder')}
+                                                    />
                                                 </div>
-                                            )}
+                                                <div className="flex-1 flex flex-col min-h-0 bg-gray-50/50">
+                                                    <div className="px-3 py-2 bg-gray-50 border-b flex justify-between items-center shrink-0 min-h-[50px]">
+                                                        <Label className="text-xs font-bold text-gray-600 uppercase tracking-wider">{t('shopSettings.preview')}</Label>
+                                                        <Button
+                                                            type="button"
+                                                            variant="outline"
+                                                            size="sm"
+                                                            onClick={handleUpdatePreview}
+                                                            className="h-7 px-2 text-[10px] gap-1 bg-white border-blue-200 text-blue-600 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300"
+                                                        >
+                                                            <Eye className="w-3 h-3" />
+                                                            {t('shopSettings.updatePreview')}
+                                                        </Button>
+                                                    </div>
+                                                    <div className="flex-1 overflow-y-auto w-full min-h-0 p-4 flex flex-col items-center">
+                                                        <Card className="w-full mt-20 flex flex-col items-center max-w-xl bg-white ">
+                                                            <CardTitle className="w-full flex flex-col items-center justify-center gap-2">
+                                                                <div className="w-full flex items-center justify-center text-xl text-center gap-2">
+                                                                    <ShoppingBasket className="w-5 h-5 text-gray-600" />
+                                                                    {tr('shopinfo')}
+                                                                </div>
+                                                                <div className="w-full flex items-center justify-center text-xs text-center text-gray-500">
+                                                                    {tr('shopinfo_description')}
+                                                                </div>
+                                                            </CardTitle>
+                                                            <CardContent className="min-h-0 flex flex-1 p-0 w-full p-4"> {/* w-fullを追加 */}
+                                                                <div className="w-full mt-0 mr-0 ml-0 p-0 relative rounded-2xl overflow-hidden border border-gray-100 shadow-sm bg-white">
+                                                                    {/* コンテンツ */}
+                                                                    <SandboxedHtml html={debouncedPreviewHtml} />
+                                                                    {/* Overly to "gather" the corners */}
+                                                                    <div className="absolute inset-0 pointer-events-none rounded-2xl ring-1 ring-black/5 ring-inset" />
+                                                                </div>
+                                                            </CardContent>
+                                                        </Card>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {/* HTML Images Section */}
+                                            <div className="space-y-2 pt-2">
+                                                <Button
+                                                    type="button"
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    onClick={() => setIsHtmlImageSectionOpen(!isHtmlImageSectionOpen)}
+                                                    className="w-full flex justify-between items-center text-gray-500 hover:text-gray-900 px-2"
+                                                >
+                                                    <div className="flex items-center gap-2">
+                                                        <ImageIcon className="w-4 h-4" />
+                                                        <span className="font-semibold">{tr('senderInfo.labels.detail_html-images')}</span>
+                                                    </div>
+                                                    <ChevronDown className={`w-4 h-4 transition-transform ${isHtmlImageSectionOpen ? 'rotate-180' : ''}`} />
+                                                </Button>
+
+                                                {isHtmlImageSectionOpen && (
+                                                    <div className="space-y-4 p-4 bg-gray-50/50 rounded-lg border border-dashed border-gray-200">
+                                                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                                                            {htmlImageUrls.map((url, index) => (
+                                                                <div key={index} className="group relative aspect-square bg-white rounded-md border overflow-hidden shadow-sm hover:ring-2 hover:ring-primary/30 transition-all">
+                                                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                                                    <img
+                                                                        src={url}
+                                                                        alt={`HTML content ${index}`}
+                                                                        className="w-full h-full object-cover"
+                                                                        onError={(e) => {
+                                                                            (e.target as HTMLImageElement).src = 'https://placehold.co/200x200?text=Error';
+                                                                        }}
+                                                                    />
+                                                                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                                                                        <Button
+                                                                            type="button"
+                                                                            variant="secondary"
+                                                                            size="icon"
+                                                                            className="h-8 w-8 rounded-full bg-white/90 hover:bg-white"
+                                                                            onClick={() => {
+                                                                                navigator.clipboard.writeText(url);
+                                                                                alert(t('shopSettings.copySuccess'));
+                                                                            }}
+                                                                            title={t('shopSettings.copyUrl')}
+                                                                        >
+                                                                            <Copy className="h-4 w-4 text-gray-700" />
+                                                                        </Button>
+                                                                        <Button
+                                                                            type="button"
+                                                                            variant="destructive"
+                                                                            size="icon"
+                                                                            className="h-8 w-8 rounded-full"
+                                                                            onClick={() => {
+                                                                                setHtmlImageUrlsToDelete(prev => [...prev, url]);
+                                                                                setHtmlImageUrls(prev => prev.filter((_, i) => i !== index));
+                                                                            }}
+                                                                            title={t('product.delete')}
+                                                                        >
+                                                                            <Trash2 className="h-4 w-4" />
+                                                                        </Button>
+                                                                    </div>
+                                                                </div>
+                                                            ))}
+
+                                                            <label className="flex flex-col items-center justify-center aspect-square bg-white rounded-md border border-dashed border-gray-300 hover:border-primary/50 hover:bg-primary/5 cursor-pointer transition-all group">
+                                                                <div className="flex flex-col items-center gap-1 text-gray-400 group-hover:text-primary transition-colors">
+                                                                    {isUploadingHtmlImage ? (
+                                                                        <RefreshCw className="w-6 h-6 animate-spin" />
+                                                                    ) : (
+                                                                        <>
+                                                                            <Plus className="w-6 h-6" />
+                                                                            <span className="text-[10px] font-medium">{tr('senderInfo.labels.detail_html-addimage')}</span>
+                                                                        </>
+                                                                    )}
+                                                                </div>
+                                                                <input
+                                                                    type="file"
+                                                                    className="hidden"
+                                                                    accept="image/*"
+                                                                    onChange={handleHtmlImageUpload}
+                                                                    disabled={isUploadingHtmlImage}
+                                                                    onClick={(e) => (e.target as HTMLInputElement).value = ''}
+                                                                />
+                                                            </label>
+                                                        </div>
+                                                        <p className="text-[10px] text-gray-400 italic">
+                                                            {t('shopSettings.imageHint')}
+                                                        </p>
+                                                    </div>
+                                                )}
+                                            </div>
                                         </div>
-                                    </div>
+                                    )}
+                                    {!isSettingShowHTML && (
+                                        <div className="flex w-full justify-center items-center">
+                                            <Button variant="ghost" className="text-xs text-gray-500 text-center" onClick={() => setIsSettingShowHTML(!isSettingShowHTML)}>
+                                                <ChevronDown className="w-4, h-4" />{t('shopSettings.detailHtml')}
+                                            </Button>
+                                        </div>
+                                    )}
+
                                     <DialogFooter>
-                                        <Button type="submit" className="w-full">
-                                            {t('shopSettings.submit')}
+                                        <Button type="submit" className="w-full" disabled={isSettingUploading}>
+                                            {isSettingUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : t('shopSettings.submit')}
                                         </Button>
                                     </DialogFooter>
                                 </form>
+                                <div className="y-gap-0 border-t">
+                                    <p className="text-xs text-gray-500">{t('userId')} :  {userId}</p>
+                                    <p className="text-xs text-gray-500">{t('ownerId')} :  {shop?.owner_id}</p>
+                                    <p className="text-xs text-gray-500">{t('shopId')} :  {shopId}</p>
+                                </div>
                             </DialogContent>
+                            <DialogFooter>
+                            </DialogFooter>
                         </Dialog>
                         {!singleShopOwner && <Button variant="secondary" className="shadow-md cursor-pointer border border-gray-200" onClick={handleShops}>{t('movetoshops')}</Button>}
                         <Button
@@ -796,6 +823,9 @@ export default function ShopPage() {
 
 
             <div className="max-w-7xl mx-auto px-8 py-10 space-y-10">
+
+
+
 
 
                 {/* Link QR */}
@@ -924,6 +954,10 @@ export default function ShopPage() {
                         </CardContent>
                     </Card>
                 </div>
+
+
+
+
 
                 {/* Incoming Orders */}
                 <Card>
@@ -1186,8 +1220,11 @@ export default function ShopPage() {
                     </CardContent>
                 </Card>
 
+
+
+
                 {/* Existing Products */}
-                <Card style={{ height: 'calc(100vh - 100px)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                <Card style={{ maxHeight: 'calc(100vh - 100px)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
                     <CardHeader className="flex flex-row items-center justify-between shrink-0">
                         <CardTitle>{t('products')}</CardTitle>
                     </CardHeader>
@@ -1324,12 +1361,12 @@ export default function ShopPage() {
                                     </DialogContent>
                                 </Dialog>
                             ))}
-                            {/* フォーム部分の幅を制限し、中央寄せにするために max-w-md と mx-auto を追加 */}
-                            <Card className="col-span-2 sm:col-span-2 md:col-span-3 lg:col-span-4 max-w-lg mx-auto mt-8 mb-8 w-full">
+                            {/* 商品追加 */}
+                            <Card className="col-span-2 sm:col-span-2 md:col-span-2 lg:col-span-3 max-w-lg mx-auto mt-0 mb-0 w-full h-hul shadow-md">
                                 <CardHeader className="flex flex-row items-center justify-between">
                                     <CardTitle>{t('addProduct.title')}</CardTitle>
 
-
+                                    {/* インポート */}
                                     <Dialog open={isImportDialogOpen} onOpenChange={setIsImportDialogOpen}>
                                         <DialogTrigger asChild>
                                             <Button variant="outline" size="sm">{t('importProduct.button')}</Button>
@@ -1391,7 +1428,7 @@ export default function ShopPage() {
                                         <div className="grid grid-cols-2 gap-4">
                                             <div className="space-y-2">
                                                 <Label htmlFor="price">{t('addProduct.price')}</Label>
-                                                <Input id="price" name="price" type="number" required />
+                                                <Input id="price" name="price" type="number" min="0" required />
                                             </div>
                                             <div className="space-y-2">
                                                 <Label htmlFor="valid_days">{t('addProduct.validDays')}</Label>

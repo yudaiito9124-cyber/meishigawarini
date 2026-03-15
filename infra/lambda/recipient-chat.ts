@@ -314,12 +314,20 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 };
             }
             if (type === 'load_from_id') {
-                const { id } = body;
+                let { id } = body;
                 if (!id || typeof id !== 'string') {
                     return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Missing or invalid ID' }) };
                 }
 
                 // Format: USER#[uuid], SENDER
+                let trimid = id;
+                if (id.startsWith("USER#")) {
+                    trimid = id.replace("USER#", "")
+                }
+                else {
+                    id = "USER#" + id;
+                }
+
                 const pk = id;
                 const sk = 'SENDER';
 
@@ -348,6 +356,15 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                         sender_info.html_image_urls.map((url: string) => signUrlIfS3(url, BUCKET_NAME))
                     );
                 }
+
+                await ddb.send(new UpdateCommand({
+                    TableName: TABLE_NAME,
+                    Key: { PK: `QR#${uuid}`, SK: 'CHAT' },
+                    UpdateExpression: 'SET sender_id = :id',
+                    ExpressionAttributeValues: {
+                        ':id': trimid
+                    }
+                }));
 
                 return {
                     statusCode: 200,

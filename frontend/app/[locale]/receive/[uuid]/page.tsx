@@ -290,6 +290,7 @@ export default function ReceivePage() {
                 throw new Error(errData.message || "Failed to load info");
             }
             const data = await res.json();
+            data.sender_id = importId;
             if (data.sender_info) {
                 // Sanitize: Convert null values to empty strings
                 const sanitizedInfo = { ...data.sender_info };
@@ -312,6 +313,7 @@ export default function ReceivePage() {
 
                 if (!silent) alert(t('senderInfo.importSuccess'));
             }
+            setIsEditingSender(false)
         } catch (e: any) {
             // console.error("Import failed:", e);
             if (!silent) alert(t('senderInfo.importFailed') + ": " + (tb(e.message.replace(/\./g, '_')) || e.message));

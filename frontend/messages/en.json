@@ -407,7 +407,7 @@
       "saveData": "Export",
       "saving": "Saving...",
       "cancel": "Cancel",
-      "preview": "Preview",
+      "preview": "Before Changed",
       "labels": {
         "name": "Name",
         "job_title": "Title",
