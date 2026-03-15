@@ -10,7 +10,7 @@ export default function ResponsiveSecureFrame({ html }: { html: string }) {
         const handleMessage = (event: MessageEvent) => {
             if (event.origin !== "null") return;
             if (event.data && event.data.type === "resize-iframe" && event.data.id === iframeId) {
-                const nextHeight = Math.ceil(event.data.height + 2);
+                const nextHeight = Math.ceil(event.data.height);
 
                 setHeight((prev) => {
                     const currentHeight = parseInt(prev);
@@ -63,11 +63,15 @@ export default function ResponsiveSecureFrame({ html }: { html: string }) {
                 window.addEventListener("load", sendHeight);
                 if (typeof ResizeObserver !== 'undefined') {
                     // content-inner そのものを監視対象にする
-                    new ResizeObserver(() => requestAnimationFrame(sendHeight)).observe(document.getElementById('content-inner'));
+                    const target = document.getElementById('content-inner');
+                    if (target) {
+                        new ResizeObserver(() => requestAnimationFrame(sendHeight)).observe(target);
+                    }
                 }
             })();
         `;
-        doc.head.append(script);
+        // Move script to the end of body to ensure it executes after elements are created
+        // Update: Instead of appending to head here, we will append it after body items in doc.body
 
         // 3. リセットスタイル：途切れを防止しつつ、100vhの連鎖を止める
         const style = doc.createElement("style");
@@ -98,6 +102,7 @@ export default function ResponsiveSecureFrame({ html }: { html: string }) {
             innerWrapper.appendChild(doc.body.firstChild);
         }
         doc.body.appendChild(innerWrapper);
+        doc.body.appendChild(script); // Append script after innerWrapper
 
         return doc.documentElement.outerHTML;
     }, [html, iframeId]);
