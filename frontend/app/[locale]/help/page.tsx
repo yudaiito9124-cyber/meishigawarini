@@ -87,7 +87,7 @@ export default function HelpPage() {
                     </div>
                 </div>
 
-                <div className="grid gap-6 md:grid-cols-1 md:grid-cols-1 mb-20">
+                <div className="grid gap-6 md:grid-cols-1 md:grid-cols-1 mb-20 mt-20">
                     <Link href="https://docs.google.com/forms/d/e/1FAIpQLSdsMe9rC_Ua6wyK0hPt6X9KT9ieu3l78u7U4uhpdUdDK023Wg/viewform?usp=publish-editor"
                         className="group relative rounded-xl border bg-card/90 backdrop-blur-md p-8 shadow-sm transition-all hover:border-primary/50 hover:shadow-md block w-full">
                         <div className="flex items-center gap-4">
