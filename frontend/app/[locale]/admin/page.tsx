@@ -17,7 +17,7 @@ import jsPDF from 'jspdf';
 import { generateId } from '@/lib/id';
 import { useTranslations } from 'next-intl';
 import { generatePDF } from '@/lib/generatePDF';
-import { Link2, Copy } from 'lucide-react';
+import { ExternalLink, Copy } from 'lucide-react';
 const NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 const NEXT_PUBLIC_APP_URL = process.env.NEXT_PUBLIC_APP_URL || "";
 const PDF_PAPER_FORMAT = "10S31251"; //"1S31034"
@@ -702,7 +702,7 @@ function QRCodeRow({ item, apiUrl, onGeneratePDF, onRefresh }: {
                             <div className="flex items-center gap-2">
                                 ID: {uuid}
                                 <Copy className="cursor-pointer w-4 h-4" onClick={() => navigator.clipboard.writeText(uuid)} />
-                                <Link2 className="cursor-pointer w-4 h-4" onClick={() => window.open(`${NEXT_PUBLIC_APP_URL}/receive/${uuid}`, '_blank')} />
+                                <ExternalLink className="cursor-pointer w-4 h-4" onClick={() => window.open(`${NEXT_PUBLIC_APP_URL}/receive/${uuid}`, '_blank')} />
                             </div>
                             <div className="flex items-center gap-2">
                                 PIN: {item.pin}

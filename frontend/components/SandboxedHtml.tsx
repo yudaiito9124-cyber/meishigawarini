@@ -26,19 +26,62 @@ export default function ResponsiveSecureFrame({ html }: { html: string }) {
 
     const srcDoc = useMemo(() => {
         const sanitizedRaw = DOMPurify.sanitize(html, {
-            ADD_TAGS: ["style", "link", "meta"],
-            ADD_ATTR: ["href", "rel", "class", "style", "crossorigin", "integrity", "target"],
+            ADD_TAGS: ["style", "link", "meta", "iframe"],
+            ADD_ATTR: ["href", "rel", "class", "style", "crossorigin", "integrity", "target", "src", "width", "height", "frameborder", "allow", "allowfullscreen", "title", "loading", "referrerpolicy"],
             WHOLE_DOCUMENT: true,
+        });
+        DOMPurify.removeAllHooks();
+        DOMPurify.addHook('afterSanitizeAttributes', function (node) {
+            if (node.tagName === 'IFRAME') {
+                const src = node.getAttribute('src') || '';
+                // YouTubeとGoogle Maps以外は認めない、あるいはsandboxを強制
+                const isYouTube = src.includes('youtube.com/') || src.includes('youtube-nocookie.com/');
+                const isGoogleMaps = src.includes('google.co.jp/maps') || src.includes('google.com/maps');
+
+                if (!isYouTube && !isGoogleMaps) {
+                    node.setAttribute('sandbox', 'allow-scripts');
+                }
+                // 外部のiframeが親（あなたのサイト）を操作できないよう属性を追加
+                node.setAttribute('referrerpolicy', 'no-referrer');
+            }
         });
 
         const parser = new DOMParser();
         const doc = parser.parseFromString(sanitizedRaw, "text/html");
 
         // 1. セキュリティ & Base設定
-        const trustedCDNs = ["https://fonts.googleapis.com", "https://fonts.gstatic.com", "https://cdnjs.cloudflare.com", "https://cdn.jsdelivr.net", "https://unpkg.com", "https://ka-f.fontawesome.com", "https://use.fontawesome.com", "https://cdn.tailwindcss.com"].join(" ");
+        const trustedCDNs = [
+            "https://fonts.googleapis.com",
+            "https://fonts.gstatic.com",
+            "https://cdnjs.cloudflare.com",
+            "https://cdn.jsdelivr.net",
+            "https://unpkg.com",
+            "https://ka-f.fontawesome.com",
+            "https://use.fontawesome.com",
+            "https://cdn.tailwindcss.com"
+        ].join(" ");
+        const embedDomains = [
+            "https://www.youtube.com",
+            "https://www.youtube-nocookie.com",
+            "https://www.google.com",
+            "https://maps.google.com",
+            "https://www.google.co.jp",
+            "https://*.googleapis.com", // Google Maps用
+            "https://*.gstatic.com"      // Google Maps用
+        ].join(" ");
+
         const meta = doc.createElement("meta");
         meta.httpEquiv = "Content-Security-Policy";
-        meta.content = `default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline' ${trustedCDNs}; font-src ${trustedCDNs} data:; img-src 'self' data: https:; connect-src 'none';`;
+        meta.content = `
+            default-src 'none'; 
+            script-src 'unsafe-inline' 'unsafe-eval' https://www.youtube.com https://*.ytimg.com https://*.googleapis.com;
+            style-src 'unsafe-inline' ${trustedCDNs}; 
+            font-src ${trustedCDNs} data:; 
+            img-src 'self' data: https:; 
+            frame-src ${embedDomains}; 
+            connect-src https:;
+            worker-src 'self' blob:;
+        `.replace(/\s+/g, ' ');
         doc.head.prepend(meta);
 
         const base = doc.createElement("base");
@@ -111,7 +154,7 @@ export default function ResponsiveSecureFrame({ html }: { html: string }) {
         <div style={{ width: "100%", display: "block", position: "relative" }}>
             <iframe
                 srcDoc={srcDoc}
-                sandbox="allow-scripts allow-popups"
+                sandbox="allow-scripts allow-popups allow-forms allow-presentation allow-same-origin"
                 scrolling="no"
                 style={{
                     width: "100%",

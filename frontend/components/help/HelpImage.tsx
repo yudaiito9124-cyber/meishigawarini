@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogTrigger, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { Link2 } from "lucide-react";
+import { ExternalLink } from "lucide-react";
 import { X, Maximize2 } from "lucide-react";
 
 interface HelpImageProps {
@@ -23,7 +23,7 @@ const renderTextWithLinks = (text: string) => {
           rel="noopener noreferrer"
           className="ml-2 text-blue-500 hover:underline underline-offset-4 font-medium break-all"
         >
-          <Link2 className="inline-block h-4 w-4 justify-center items-center" />  {part}
+          <ExternalLink className="inline-block h-4 w-4 justify-center items-center" />  {part}
         </a>
       );
     }

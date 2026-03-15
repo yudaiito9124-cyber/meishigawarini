@@ -313,7 +313,6 @@ export default function ReceivePage() {
 
                 if (!silent) alert(t('senderInfo.importSuccess'));
             }
-            setIsEditingSender(false)
         } catch (e: any) {
             // console.error("Import failed:", e);
             if (!silent) alert(t('senderInfo.importFailed') + ": " + (tb(e.message.replace(/\./g, '_')) || e.message));

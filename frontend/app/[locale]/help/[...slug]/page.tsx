@@ -67,6 +67,17 @@ export default async function DynamicHelpPage({ params }: Props) {
         <div className="flex-grow font-sans">
           <MarkdownRenderer content={content} />
         </div>
+
+        {/* Footer Section */}
+        <div className="mt-12 pt-8 border-t">
+          <Link
+            href={parentPath}
+            className="inline-flex items-center text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            {parentSlug.length > 0 ? '戻る' : 'ヘルプのトップに戻る'}
+          </Link>
+        </div>
       </div>
     </div>
   );
