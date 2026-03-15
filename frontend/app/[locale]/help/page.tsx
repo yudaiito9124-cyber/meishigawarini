@@ -32,7 +32,7 @@ export default function HelpPage() {
                     <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                         {/* Recipient Card */}
                         <Link href="/help/receive"
-                            className="max-h-50 group relative rounded-xl border bg-card p-8 shadow-sm transition-all hover:border-primary/50 hover:shadow-md block ">
+                            className="group relative rounded-xl border bg-card p-8 shadow-sm transition-all hover:border-primary/50 hover:shadow-md block ">
                             <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary">
                                 <Gift className="h-6 w-6" />
                             </div>
