@@ -1190,7 +1190,7 @@ export default function ReceivePage() {
                                     </div>
                                     <div className="space-y-2">
                                         <Label htmlFor="preferredDate">{t('formStep.preferredDate')}</Label>
-                                        <div className="flex gap-2 items-start">
+                                        <div className="flex gap-2 items-start h-9">
                                             <div className="flex-1 flex h-full items-center justify-center">
                                                 <Input
                                                     id="preferredDate"
