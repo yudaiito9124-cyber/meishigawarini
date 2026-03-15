@@ -1191,13 +1191,13 @@ export default function ReceivePage() {
                                     <div className="space-y-2">
                                         <Label htmlFor="preferredDate">{t('formStep.preferredDate')}</Label>
                                         <div className="flex gap-2 items-start">
-                                            <div className="flex-1 flex flex-col gap-1">
+                                            <div className="flex-1 flex h-full items-center justify-center">
                                                 <Input
                                                     id="preferredDate"
                                                     type="date"
                                                     value={preferredDate}
                                                     onChange={(e) => setPreferredDate(e.target.value)}
-                                                    className="w-full"
+                                                    className="w-full h-full"
                                                 />
                                                 {/* {preferredDate && (
                                                     <p className="text-[10px] text-blue-600 font-bold ml-1 animate-in fade-in slide-in-from-top-1">
@@ -1215,14 +1215,17 @@ export default function ReceivePage() {
                                                         </p>
                                                     )} */}
                                             </div>
-                                            <Button
-                                                type="button"
-                                                variant="outline"
-                                                onClick={() => setPreferredDate("")}
-                                                className="whitespace-nowrap h-9"
-                                            >
-                                                {t('formStep.noPreference')}
-                                            </Button>
+                                            <div className="flex h-full items-center justify-center">
+
+                                                <Button
+                                                    type="button"
+                                                    variant="outline"
+                                                    onClick={() => setPreferredDate("")}
+                                                    className="flex whitespace-nowrap h-full items-center justify-center"
+                                                >
+                                                    {t('formStep.noPreference')}
+                                                </Button>
+                                            </div>
                                         </div>
                                     </div>
                                     <div className="space-y-2">
