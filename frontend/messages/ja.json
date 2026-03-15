@@ -75,6 +75,7 @@
     "back": "戻る",
     "shopAdminPage": "ショップ管理者画面",
     "qrAdminPage": "QR生成・管理者画面",
+    "AdminNeed2FA": "管理者は2段階認証が必要です",
     "logout": "ログアウト"
   },
   "RegisterPage": {
@@ -470,6 +471,7 @@
   "AdminPage": {
     "title": "管理ダッシュボード",
     "qrAdminLoginPage": "管理者ログイン画面",
+    "AdminNeed2FA": "管理者は2段階認証が必要です",
     "generate": {
       "title": "QRコード生成",
       "option": "オプション",
@@ -669,7 +671,7 @@
   "MFASetupPage": {
     "title": "2段階認証(MFA)の設定",
     "description": "アカウントのセキュリティを強化するために、認証アプリ（Google Authenticatorなど）による2段階認証を設定します。",
-    "step1": "1. 認証アプリで以下のQRコードをスキャンしてください",
+    "step1": "1. 任意の認証アプリでQRコードをスキャンしてください",
     "step2": "2. アプリに表示された6桁のコードを入力してください",
     "placeholder": "6桁のコード",
     "verify": "認証して有効化",

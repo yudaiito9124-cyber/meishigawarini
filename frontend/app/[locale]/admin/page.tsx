@@ -4,7 +4,7 @@
  */
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { notFound } from "next/navigation";
 import { getCurrentUser, fetchAuthSession } from 'aws-amplify/auth';
 import { Button } from "@/components/ui/button";
@@ -31,10 +31,8 @@ import {
     DialogTrigger,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { useRouter } from "next/navigation";
-import { signOut } from 'aws-amplify/auth';
 import { cn } from "@/lib/utils";
-import { Link } from '@/i18n/routing';
+import { Link, useRouter } from '@/i18n/routing';
 
 export default function AdminPage() {
     const t = useTranslations('AdminPage');
@@ -53,14 +51,19 @@ export default function AdminPage() {
     const [papertype, setPapertype] = useState<"1S31034-gakuchousenbeiv1" | "10S31251">("1S31034-gakuchousenbeiv1");
     const [isGenerating, setIsGenerating] = useState(false);
     const router = useRouter();
+    const hasCheckedAuth = useRef(false);
 
     useEffect(() => {
+        if (hasCheckedAuth.current) return;
+        hasCheckedAuth.current = true;
+
         const checkAuth = async () => {
+            let isAdmin = false;
             try {
                 let session = await fetchAuthSession();
                 let payload = session.tokens?.idToken?.payload || {};
                 let groups = (payload['cognito:groups'] as string[]) || [];
-                let isAdmin = groups.includes('Administrators') || groups.includes('GlobalAdmins');
+                isAdmin = groups.includes('Administrators') || groups.includes('GlobalAdmins');
 
                 // 1. まず管理者グループに属しているかフロントで簡易チェック
                 if (!isAdmin) {
@@ -94,8 +97,16 @@ export default function AdminPage() {
                     setIsAuthorized(true);
                 } else {
                     setIsAuthorized(false);
+                    alert(t("AdminNeed2FA"))
+                    router.push("/mfa-setup")
+                    return;
                 }
             } catch (e) {
+                if (isAdmin && e instanceof Error && e.message === "Failed to fetch") {
+                    alert(t("AdminNeed2FA"))
+                    router.push("/mfa-setup")
+                    return;
+                }
                 // console.error("Auth check failed", e);
                 setIsAuthorized(false);
             }
@@ -294,9 +305,9 @@ export default function AdminPage() {
                                 </div>
                             </div>
                             <div className="grid w-full items-center gap-1.5 mt-4">
-                                <Button 
-                                    onClick={handleGenerate} 
-                                    className="w-full items-center gap-1.5 h-12" 
+                                <Button
+                                    onClick={handleGenerate}
+                                    className="w-full items-center gap-1.5 h-12"
                                     disabled={isGenerating}
                                 >
                                     {isGenerating ? (

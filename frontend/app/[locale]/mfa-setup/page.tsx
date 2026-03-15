@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { setUpTOTP, verifyTOTPSetup, updateMFAPreference, fetchAuthSession, signOut } from 'aws-amplify/auth';
+import { useState, useEffect, useRef } from 'react';
+import { setUpTOTP, verifyTOTPSetup, updateMFAPreference, fetchAuthSession, signOut, getCurrentUser } from 'aws-amplify/auth';
 import { useRouter } from '@/i18n/routing';
 import { useTranslations } from 'next-intl';
 import { Button } from "@/components/ui/button";
@@ -21,6 +21,7 @@ export default function MFASetupPage() {
     const [success, setSuccess] = useState(false);
     const [passkeySuccess, setPasskeySuccess] = useState(false);
     const [isLoggedIn, setIsLoggedIn] = useState(false);
+    const isInitiating = useRef(false);
 
     useEffect(() => {
         const checkAuth = async () => {
@@ -41,14 +42,34 @@ export default function MFASetupPage() {
     }, []);
 
     const initiateMFASetup = async () => {
+        if (isInitiating.current) return;
+        isInitiating.current = true;
+
         try {
             setLoading(true);
+            const [{ username }, attributes] = await Promise.all([
+                getCurrentUser(),
+                import('aws-amplify/auth').then(m => m.fetchUserAttributes())
+            ]);
+
             const totpSetupDetails = await setUpTOTP();
             const appName = "Meishigawarini";
-            const setupUri = totpSetupDetails.getSetupUri(appName);
-            const dataUrl = await QRCode.toDataURL(setupUri.toString());
+            const accountName = attributes.email || username;
+
+            // Highly optimized URI for iOS Passwords app
+            // Use a literal ':' as the separator in the label (Issuer:Account)
+            // Issuer should match the issuer parameter exactly.
+            const label = `${appName}:${accountName}`;
+            const setupUri = `otpauth://totp/${label}?secret=${totpSetupDetails.sharedSecret}&issuer=${encodeURIComponent(appName)}`;
+
+            const dataUrl = await QRCode.toDataURL(setupUri, {
+                errorCorrectionLevel: 'H',
+                margin: 2,
+                width: 250
+            });
             setQrCodeUrl(dataUrl);
         } catch (err: any) {
+            console.error(err)
             // console.error('MFA Setup initiation failed', err);
             setError('errors.setupFailed');
         } finally {
@@ -137,21 +158,24 @@ export default function MFASetupPage() {
                 <CardContent className="space-y-8">
                     {/* 方法1: 認証アプリ */}
                     <div className="space-y-4 bg-gray-50 p-4 rounded-xl">
-                        <Label className="text-base font-bold">{t('totpLabel')}</Label>
+                        <Label className="text-base font-bold">{t('step1')}</Label>
                         <div className="flex justify-center p-2 bg-white border rounded">
                             {qrCodeUrl ? <img src={qrCodeUrl} alt="QR Code" className="w-40 h-40" /> : <div className="h-40 flex items-center">Loading...</div>}
                         </div>
-                        <form onSubmit={handleVerifyToken} className="space-y-2">
-                            <Input
-                                type="text"
-                                placeholder={t('totpPlaceholder')}
-                                value={code}
-                                onChange={(e) => setCode(e.target.value)}
-                                className="text-center text-2xl tracking-[0.3em] font-mono h-12"
-                                maxLength={6}
-                                required
-                            />
-                            <Button type="submit" className="w-full" disabled={loading}>{t('totpSubmit')}</Button>
+                        <Label className="text-base font-bold">{t('step2')}</Label>
+                        <form onSubmit={handleVerifyToken} className="space-y-4">
+                            <div className="space-y-2">
+                                <Input
+                                    type="text"
+                                    placeholder="000000"
+                                    value={code}
+                                    onChange={(e) => setCode(e.target.value)}
+                                    className="text-center text-2xl tracking-[0.3em] font-mono h-12"
+                                    maxLength={6}
+                                    required
+                                />
+                            </div>
+                            <Button type="submit" className="w-full font-bold" disabled={loading}>{t('totpSubmit')}</Button>
                         </form>
                     </div>
 

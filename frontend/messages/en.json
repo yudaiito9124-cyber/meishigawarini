@@ -75,6 +75,7 @@
     "back": "Back",
     "shopAdminPage": "Shop Admin",
     "qrAdminPage": "QR Generation / Admin",
+    "AdminNeed2FA": "Admin Required 2FA",
     "logout": "Logout"
   },
   "RegisterPage": {
@@ -105,6 +106,7 @@
     "subtitle": "Select a shop to manage or create a new one.",
     "userId": "User ID: {id}",
     "logout": "Logout",
+    "qrAdminLoginPage": "Admin Login Page",
     "createShop": "Create New Shop",
     "createDialog": {
       "title": "Create Shop",
@@ -123,6 +125,8 @@
     "title": "Shop Dashboard",
     "movetoshops": "Back to shop list",
     "logout": "Logout",
+    "userId": "UserID(You)",
+    "ownerId": "UserID(This shop owner)",
     "shopId": "Shop ID: {id}",
     "refresh": "Refresh",
     "incomingOrders": "Incoming Orders",
@@ -466,6 +470,8 @@
   },
   "AdminPage": {
     "title": "Admin Dashboard",
+    "qrAdminLoginPage": "Admin Login Page",
+    "AdminNeed2FA": "Admin Requred 2FA",
     "generate": {
       "title": "Generate QR Codes",
       "option": "Options",
