@@ -491,6 +491,14 @@
       "expiryDate": "使用期限 (任意, 指定しない場合は有効化した日付 + 商品ごとの有効期間 を足した日時)",
       "activateNow": "この場でアクティベートする (任意、ショップIDと商品IDの両方の指定が必要)",
       "useMetadata": "オプション情報を使用する",
+      "pdfOptions": "PDF形式設定",
+      "paperFormat": "用紙設定",
+      "cardFormat": "カードデザイン",
+      "cardPreview": "デザインプレビュー",
+      "front": "表面",
+      "back": "裏面",
+      "frontPreview": "表面プレビュー",
+      "backPreview": "裏面プレビュー",
       "button": "生成"
     },
     "batches": {

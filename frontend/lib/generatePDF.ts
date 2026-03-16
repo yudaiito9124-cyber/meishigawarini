@@ -58,9 +58,9 @@ const genQR = async (code: string) => {
 }
 
 
-const paperformats: { [format: string]: any } = {
-    // 切れ込みのないA4
+export const paperformats: { [format: string]: any } = {
     "1S31034": {
+        description: "[A-one 31034] 切れ込みのないA4に10枚印刷",
         pageWidth: 210, // mm
         pageHeight: 297, // mm
         cols: 2,
@@ -70,10 +70,13 @@ const paperformats: { [format: string]: any } = {
         offset_x: 0, // mm
         offset_y: 0, // mm
         uraomote: true,
-        comment: ""
+        comment: "",
+        scale: 1,
+        dots: true,
+        dotsedge: false
     },
-    // 切れ込みのあるA4 返礼品用 印刷の際には向き注意
     "10S31251": {
+        description: "[A-one 31251] A4-10切 返礼品用(はがせるタイプ・クレジットカードサイズ) 印刷時 向き注意",
         pageWidth: 210, // mm
         pageHeight: 297, // mm
         cols: 2,
@@ -81,19 +84,39 @@ const paperformats: { [format: string]: any } = {
         cols_gap: 8, // mm
         rows_gap: 4, // mm
         offset_x: 17, // mm
-        offset_y: 10.7, // mm
+        offset_y: 10.7 - 1, // mm
         uraomote: false,
-        comment: "Please pay attention to the orientation when printing. Printing in the wrong orientation (as indicated on the paper) will result in misalignment."
+        comment: "Please pay attention to the orientation when printing. Printing in the wrong orientation (as indicated on the paper) will result in misalignment.",
+        scale: 1,
+        dots: false,
+        dotsedge: true
+    },
+    "10S31370": {
+        description: "[A-one 31370] A4-10切 返礼品用(クレカより横長・縦短)",
+        pageWidth: 210, // mm
+        pageHeight: 297, // mm
+        cols: 2,
+        rows: 5,
+        cols_gap: -4.14, // mm
+        rows_gap: -.6, // mm
+        offset_x: 19 + 3, // mm
+        offset_y: 21 - 2, // mm
+        uraomote: false,
+        comment: "",
+        scale: .93,
+        dots: false,
+        dotsedge: true
     }
 }
 
-const cardformats: { [format: string]: any } = {
+export const cardformats: { [format: string]: any } = {
     // 最初期 学長単体シンプル
     "gakuchousenbeiv0": {
+        description: "初期デザイン・学長単体",
         bgimgf: "/cardimage-f-2.png",
         bgimgb: "/cardimage-b-2.png",
-        width: 85.60 - 2,
-        height: 53.98 - 2,
+        width: 84, // 固定
+        height: 52, // 固定
         qrsize: 26,
         qrpos: {
             x: 83.60 - 26 - 3.2,//  QRの左端がカード左端よりどれくらい右か
@@ -115,10 +138,11 @@ const cardformats: { [format: string]: any } = {
     },
     // 返礼品用
     "gakuchousenbeiv1": {
+        description: "みらい創造基金返礼品用20260313",
         bgimgf: "/cardimage-f-" + "gakuchousenbeiv1" + ".png",
         bgimgb: "/cardimage-b-" + "gakuchousenbeiv1" + ".png",
-        width: 84,
-        height: 52,
+        width: 84, // 固定
+        height: 52, // 固定
         qrsize: 30,
         qrpos: {
             x: 84 - 30 - 3.2,//  QRがカード右端よりどれくらい右か
@@ -176,6 +200,8 @@ export const generatePDF = async (batch: any, paperformat: string, cardformat: s
     const marginLeft = pf.offset_x === 0 ? (pageWidth - totalGridWidth) / 2 : 0;
     const marginTop = pf.offset_y === 0 ? (pageHeight - totalGridHeight) / 2 : 0;
     const itemsPerPage = cols * rows;
+    const scaleofx = (1 - pf.scale) / 2 * cardWidth;
+    const scaleofy = (1 - pf.scale) / 2 * cardHeight;
 
     // Helper to get position
     const getFrontPos = (indexInPage: number) => {
@@ -217,42 +243,52 @@ export const generatePDF = async (batch: any, paperformat: string, cardformat: s
             const { ax, ay } = getFrontPos(j); // anchor point
 
             // Draw Background Image
-            doc.addImage(bgImgf, 'PNG', ax, ay, cardWidth, cardHeight);
+            doc.addImage(bgImgf, 'PNG', scaleofx + ax, scaleofy + ay, cardWidth * pf.scale, cardHeight * pf.scale);
 
             // Draw Corner Dots (Cut marks)
-            doc.setFillColor(0, 0, 0); // Black
-            const dotRadius = 0.2; // mm radius
-            doc.circle(ax, ay, dotRadius, 'F'); // Top Left
-            doc.circle(ax + cardWidth, ay, dotRadius, 'F'); // Top Right
-            doc.circle(ax, ay + cardHeight, dotRadius, 'F'); // Bottom Left
-            doc.circle(ax + cardWidth, ay + cardHeight, dotRadius, 'F');// Bottom Right
+            if (pf.dots) {
+                const dotRadius = 0.2; // mm radius
+                doc.setFillColor(0, 0, 0); // Black
+                doc.circle(scaleofx + ax, scaleofy + ay, dotRadius, 'F'); // Top Left
+                doc.circle(scaleofx + ax + cardWidth * pf.scale, scaleofy + ay, dotRadius, 'F'); // Top Right
+                doc.circle(scaleofx + ax, scaleofy + ay + cardHeight * pf.scale, dotRadius, 'F'); // Bottom Left
+                doc.circle(scaleofx + ax + cardWidth * pf.scale, scaleofy + ay + cardHeight * pf.scale, dotRadius, 'F');// Bottom Right
+            }
 
             // Draw QR
             if (cf.isfront_qr) {
                 const base64data = await genQR(code.uuid);
                 if (!base64data) continue;
                 const qrSize = cf.qrsize;
-                doc.addImage(base64data, 'PNG', ax + cf.qrpos.x, ay + cf.qrpos.y, qrSize, qrSize);
+                doc.addImage(base64data, 'PNG', scaleofx + ax + cf.qrpos.x * pf.scale, scaleofy + ay + cf.qrpos.y * pf.scale, qrSize * pf.scale, qrSize * pf.scale);
             }
 
             // Draw PIN
             if (cf.isfront_pin) {
                 doc.setTextColor(0, 0, 0);
-                doc.setFontSize(cf.pinsize);
+                doc.setFontSize(cf.pinsize * pf.scale);
                 doc.setFont("helvetica", "bold");
                 const pinWidth = doc.getTextWidth(code.pin);
-                doc.text(code.pin, ax + (cardWidth - pinWidth) / 2 + cf.pinpos.x, ay + cf.pinpos.y);
+                doc.text(code.pin, scaleofx + ax + (cardWidth * pf.scale - pinWidth) / 2 + cf.pinpos.x * pf.scale, scaleofy + ay + cf.pinpos.y * pf.scale);
             }
 
             // Draw UUID head
             if (cf.isfront_code) {
                 doc.setTextColor(0, 0, 0);
-                doc.setFontSize(cf.codesize);
+                doc.setFontSize(cf.codesize * pf.scale);
                 doc.setFont("helvetica", "normal");
                 const uuidText = `${code.uuid.substring(18, 34)}...`;
                 const uuidWidth = doc.getTextWidth(uuidText);
-                doc.text(uuidText, ax + (cardWidth - uuidWidth) / 2 + cf.codepos.x, ay + cf.codepos.y);
+                doc.text(uuidText, scaleofx + ax + (cardWidth * pf.scale - uuidWidth) / 2 + cf.codepos.x * pf.scale, scaleofy + ay + cf.codepos.y * pf.scale);
             }
+        }
+        if (pf.dotsedge) {
+            const dotRadius = 0.2; // mm radius
+            doc.setFillColor(0, 0, 0); // Black
+            doc.circle(scaleofx + pf.offset_x, scaleofy + pf.offset_y, dotRadius, 'F'); // Top Left
+            doc.circle(pf.offset_x + cardWidth * pf.cols + pf.cols_gap * (pf.cols - 1) - scaleofx, scaleofy + pf.offset_y, dotRadius, 'F'); // Top Right
+            doc.circle(scaleofx + pf.offset_x, pf.offset_y + cardHeight * pf.rows + pf.rows_gap * (pf.rows - 1) - scaleofy, dotRadius, 'F'); // Bottom Left
+            doc.circle(pf.offset_x + cardWidth * pf.cols + pf.cols_gap * (pf.cols - 1) - scaleofx, pf.offset_y + cardHeight * pf.rows + pf.rows_gap * (pf.rows - 1) - scaleofy, dotRadius, 'F');// Bottom Right
         }
 
         doc.addPage(); // Back Page
@@ -263,42 +299,52 @@ export const generatePDF = async (batch: any, paperformat: string, cardformat: s
 
             // Draw Background Image (Reuse same bg or different back bg?)
             // Assuming same bg for now, typically back has instructions
-            doc.addImage(bgImgb, 'PNG', ax, ay, cardWidth, cardHeight);
+            doc.addImage(bgImgb, 'PNG', scaleofx + ax, scaleofy + ay, cardWidth * pf.scale, cardHeight * pf.scale);
 
             // Draw Corner Dots (Cut marks)
-            doc.setFillColor(0, 0, 0); // Black
-            const dotRadius = 0.2; // mm radius
-            doc.circle(ax, ay, dotRadius, 'F'); // Top Left
-            doc.circle(ax + cardWidth, ay, dotRadius, 'F'); // Top Right
-            doc.circle(ax, ay + cardHeight, dotRadius, 'F'); // Bottom Left
-            doc.circle(ax + cardWidth, ay + cardHeight, dotRadius, 'F');// Bottom Right
+            if (pf.dots) {
+                const dotRadius = 0.2; // mm radius
+                doc.setFillColor(0, 0, 0); // Black
+                doc.circle(scaleofx + ax, scaleofy + ay, dotRadius, 'F'); // Top Left
+                doc.circle(scaleofx + ax + cardWidth * pf.scale, scaleofy + ay, dotRadius, 'F'); // Top Right
+                doc.circle(scaleofx + ax, scaleofy + ay + cardHeight * pf.scale, dotRadius, 'F'); // Bottom Left
+                doc.circle(scaleofx + ax + cardWidth * pf.scale, scaleofy + ay + cardHeight * pf.scale, dotRadius, 'F');// Bottom Right
+            }
 
             // Draw QR
             if (!cf.isfront_qr) {
                 const base64data = await genQR(code.uuid);
                 if (!base64data) continue;
                 const qrSize = cf.qrsize;
-                doc.addImage(base64data, 'PNG', ax + cf.qrpos.x, ay + cf.qrpos.y, qrSize, qrSize);
+                doc.addImage(base64data, 'PNG', scaleofx + ax + cf.qrpos.x * pf.scale, scaleofy + ay + cf.qrpos.y * pf.scale, qrSize * pf.scale, qrSize * pf.scale);
             }
 
             // Draw PIN
             if (!cf.isfront_pin) {
                 doc.setTextColor(0, 0, 0);
-                doc.setFontSize(cf.pinsize);
+                doc.setFontSize(cf.pinsize * pf.scale);
                 doc.setFont("helvetica", "bold");
                 const pinWidth = doc.getTextWidth(code.pin);
-                doc.text(code.pin, ax + (cardWidth - pinWidth) / 2 + cf.pinpos.x, ay + cf.pinpos.y);
+                doc.text(code.pin, scaleofx + ax + (cardWidth * pf.scale - pinWidth) / 2 + (cf.pinpos.x) * pf.scale, scaleofy + ay + cf.pinpos.y * pf.scale);
             }
 
             // Draw UUID head
             if (!cf.isfront_code) {
                 doc.setTextColor(0, 0, 0);
-                doc.setFontSize(cf.codesize);
+                doc.setFontSize(cf.codesize * pf.scale);
                 doc.setFont("helvetica", "normal");
                 const uuidText = `${code.uuid.substring(18, 34)}...`;
                 const uuidWidth = doc.getTextWidth(uuidText);
-                doc.text(uuidText, ax + (cardWidth - uuidWidth) / 2 + cf.codepos.x, ay + cf.codepos.y);
+                doc.text(uuidText, scaleofx + ax + (cardWidth * pf.scale - uuidWidth) / 2 + (cf.codepos.x) * pf.scale, scaleofy + ay + cf.codepos.y * pf.scale);
             }
+        }
+        if (pf.dotsedge) {
+            const dotRadius = 0.2; // mm radius
+            doc.setFillColor(0, 0, 0); // Black
+            doc.circle(scaleofx + pf.offset_x, scaleofy + pf.offset_y, dotRadius, 'F'); // Top Left
+            doc.circle(pf.offset_x + cardWidth * pf.cols + pf.cols_gap * (pf.cols - 1) - scaleofx, scaleofy + pf.offset_y, dotRadius, 'F'); // Top Right
+            doc.circle(scaleofx + pf.offset_x, pf.offset_y + cardHeight * pf.rows + pf.rows_gap * (pf.rows - 1) - scaleofy, dotRadius, 'F'); // Bottom Left
+            doc.circle(pf.offset_x + cardWidth * pf.cols + pf.cols_gap * (pf.cols - 1) - scaleofx, pf.offset_y + cardHeight * pf.rows + pf.rows_gap * (pf.rows - 1) - scaleofy, dotRadius, 'F');// Bottom Right
         }
     }
 

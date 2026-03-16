@@ -116,8 +116,10 @@
       "label": "Shop Name",
       "placeholder": "My Awesome Shop",
       "label-owner": "Shop owner",
+      "label-owner-isMe": "Set me as owner",
       "placeholder-owner": "USERID",
       "label-gm": "Additional shop manager (separated by ;)",
+      "label-gm-isMe": "Add me as a manager",
       "placeholder-gm": "USERID",
       "submit": "Create",
       "submitting": "Creating..."
@@ -489,6 +491,14 @@
       "expiryDate": "Expiry Date (Optional)",
       "activateNow": "Activate Now (Required Shop ID and Product ID)",
       "useMetadata": "Use optional information",
+      "pdfOptions": "PDF Options",
+      "paperFormat": "Paper Format",
+      "cardFormat": "Card Design",
+      "cardPreview": "Design Preview",
+      "front": "Front",
+      "back": "Back",
+      "frontPreview": "Front Preview",
+      "backPreview": "Back Preview",
       "button": "Generate"
     },
     "batches": {

@@ -16,12 +16,12 @@ import { APP_CONFIG } from "@/lib/config";
 import jsPDF from 'jspdf';
 import { generateId } from '@/lib/id';
 import { useTranslations } from 'next-intl';
-import { generatePDF } from '@/lib/generatePDF';
-import { ExternalLink, Copy } from 'lucide-react';
+import { generatePDF, cardformats, paperformats } from '@/lib/generatePDF';
+import { ExternalLink, Copy, Eye } from 'lucide-react';
 const NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 const NEXT_PUBLIC_APP_URL = process.env.NEXT_PUBLIC_APP_URL || "";
-const PDF_PAPER_FORMAT = "10S31251"; //"1S31034"
-const PDF_CARD_FORMAT = "gakuchousenbeiv1"; //"gakuchousenbeiv0"
+// const PDF_PAPER_FORMAT = "10S31251"; //"1S31034"
+// const PDF_CARD_FORMAT = "gakuchousenbeiv1"; //"gakuchousenbeiv0"
 import {
     Dialog,
     DialogContent,
@@ -48,7 +48,8 @@ export default function AdminPage() {
     const [useMetadataOptions, setUseMetadataOptions] = useState(false);
     const [generatedBatches, setGeneratedBatches] = useState<any[]>([]);
     const [isAuthorized, setIsAuthorized] = useState<boolean | null>(null); // null = loading
-    const [papertype, setPapertype] = useState<"1S31034-gakuchousenbeiv1" | "10S31251">("1S31034-gakuchousenbeiv1");
+    const [paperFormat, setPaperFormat] = useState("10S31251");
+    const [cardFormat, setCardFormat] = useState("gakuchousenbeiv1");
     const [isGenerating, setIsGenerating] = useState(false);
     const router = useRouter();
     const hasCheckedAuth = useRef(false);
@@ -168,7 +169,7 @@ export default function AdminPage() {
                 // console.log("Generated Codes:", data.data);
 
                 // Automatically download PDF
-                await generatePDF(newBatch, PDF_PAPER_FORMAT, PDF_CARD_FORMAT);
+                await generatePDF(newBatch, paperFormat, cardFormat);
             } else {
                 const errData = await res.json().catch(() => null);
                 // console.error(errData);
@@ -304,6 +305,59 @@ export default function AdminPage() {
                                     />
                                 </div>
                             </div>
+
+                            <h3 className="text-sm font-semibold pt-8">{t('generate.pdfOptions')}</h3>
+                            <div className="space-y-4 rounded-xl bg-gray-100 border border-gray-200 border-dashed border-5 p-4">
+                                <div className="flex flex-row flex-wrap gap-1">
+                                    <div className="flex flex-row w-full">
+                                        <label className="flex w-20 items-center text-xs text-gray-700">{t('generate.paperFormat')}</label>
+                                        <select
+                                            className="w-full rounded-md p-2 text-sm border border-gray-200 shadow-sm"
+                                            value={paperFormat}
+                                            onChange={(e) => setPaperFormat(e.target.value)}
+                                        >
+                                            {Object.entries(paperformats).map(([key, value]: [string, any]) => (
+                                                <option key={key} value={key}>{value.description || key}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <div className="flex flex-row w-full">
+                                        <label className="flex w-20 items-center text-xs text-gray-700">{t('generate.cardFormat')}</label>
+                                        <select
+                                            className="w-full rounded-md p-2 text-sm border border-gray-200 shadow-sm"
+                                            value={cardFormat}
+                                            onChange={(e) => setCardFormat(e.target.value)}
+                                        >
+                                            {Object.entries(cardformats).map(([key, value]: [string, any]) => (
+                                                <option key={key} value={key}>{value.description || key}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                </div>
+
+                                {/* Card Preview */}
+                                <div className="">
+                                    {/* <div className="flex items-center gap-2 mb-3">
+                                        <Eye className="w-4 h-4 text-mist-300" />
+                                        <span className="text-xs font-semibold text-mist-300">{t('generate.cardPreview')}</span>
+                                    </div> */}
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="space-y-1">
+                                            <div className="aspect-[84/52] relative rounded shadow-lg overflow-hidden border border-gray-700 bg-white">
+                                                <img src={cardformats[cardFormat]?.bgimgf} alt={t('generate.frontPreview')} className="w-full h-full object-cover" />
+                                            </div>
+                                            <p className="text-[10px] text-gray-500 text-center uppercase tracking-wider">{t('generate.front')}</p>
+                                        </div>
+                                        <div className="space-y-1">
+                                            <div className="aspect-[84/52] relative rounded shadow-lg overflow-hidden border border-gray-700 bg-white">
+                                                <img src={cardformats[cardFormat]?.bgimgb} alt={t('generate.backPreview')} className="w-full h-full object-cover" />
+                                            </div>
+                                            <p className="text-[10px] text-gray-500 text-center uppercase tracking-wider">{t('generate.back')}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
                             <div className="grid w-full items-center gap-1.5 mt-4">
                                 <Button
                                     onClick={handleGenerate}
@@ -343,7 +397,7 @@ export default function AdminPage() {
                                                 </div>
                                                 <p className="flex justify-center items-center text-sm bg-green-100 text-green-800 px-3 py-1 rounded-xl">{batch.status}</p>
                                             </div>
-                                            <Button className="ml-auto" variant="outline" size="sm" onClick={() => generatePDF(batch, PDF_PAPER_FORMAT, PDF_CARD_FORMAT)}>{t('batches.downloadPdf')}</Button>
+                                            <Button className="ml-auto" variant="outline" size="sm" onClick={() => generatePDF(batch, paperFormat, cardFormat)}>{t('batches.downloadPdf')}</Button>
                                         </div>
                                         {/* Display Codes */}
                                         <div className="mt-2 bg-gray-100 p-2 rounded text-xs font-mono overflow-auto max-h-40">
@@ -373,13 +427,18 @@ export default function AdminPage() {
 
 
                 {/* すべてのQRコード一覧 */}
-                <QRCodeListSection apiUrl={NEXT_PUBLIC_API_URL} onGeneratePDF={generatePDF} />
+                <QRCodeListSection apiUrl={NEXT_PUBLIC_API_URL} onGeneratePDF={generatePDF} paperFormat={paperFormat} cardFormat={cardFormat} />
             </div>
         </div>
     );
 }
 
-function QRCodeListSection({ apiUrl, onGeneratePDF }: { apiUrl: string, onGeneratePDF: (batch: any, paperformat: string, cardformat: string) => Promise<void> }) {
+function QRCodeListSection({ apiUrl, onGeneratePDF, paperFormat, cardFormat }: {
+    apiUrl: string,
+    onGeneratePDF: (batch: any, paperformat: string, cardformat: string) => Promise<void>,
+    paperFormat: string,
+    cardFormat: string
+}) {
     const t = useTranslations('AdminPage');
     const tShop = useTranslations('ShopPage');
     const ts = useTranslations('Timestamp');
@@ -618,6 +677,8 @@ function QRCodeListSection({ apiUrl, onGeneratePDF }: { apiUrl: string, onGenera
                                         apiUrl={apiUrl}
                                         onGeneratePDF={onGeneratePDF}
                                         onRefresh={fetchCodes}
+                                        paperFormat={paperFormat}
+                                        cardFormat={cardFormat}
                                     />
                                 ))
                             )}
@@ -629,11 +690,13 @@ function QRCodeListSection({ apiUrl, onGeneratePDF }: { apiUrl: string, onGenera
     );
 }
 
-function QRCodeRow({ item, apiUrl, onGeneratePDF, onRefresh }: {
+function QRCodeRow({ item, apiUrl, onGeneratePDF, onRefresh, paperFormat, cardFormat }: {
     item: any;
     apiUrl: string;
     onGeneratePDF: (batch: any, paperformat: string, cardformat: string) => Promise<void>;
     onRefresh: () => void;
+    paperFormat: string;
+    cardFormat: string;
 }) {
     const t = useTranslations('AdminPage');
     const tShop = useTranslations('ShopPage');
@@ -683,7 +746,7 @@ function QRCodeRow({ item, apiUrl, onGeneratePDF, onRefresh }: {
                                 onGeneratePDF({
                                     id: uuid,
                                     codes: [{ uuid, pin: item.pin }]
-                                }, PDF_PAPER_FORMAT, PDF_CARD_FORMAT);
+                                }, paperFormat, cardFormat);
                             }}
                         >
                             {t('list.ban.pdf')}
