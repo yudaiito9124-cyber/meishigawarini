@@ -175,7 +175,6 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 
 
 
-        //////////// ここから下は 認証済みかつ指定されたショップ(shopId)のオーナー・GMのみアクセス可能
 
 
         // 1. Create Shop (POST /shop)

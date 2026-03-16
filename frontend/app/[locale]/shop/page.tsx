@@ -8,6 +8,7 @@ import { useState, useEffect } from 'react';
 import { Link, useRouter } from '@/i18n/routing';
 import { useTranslations } from 'next-intl';
 import { fetchAuthSession, getCurrentUser, signOut } from 'aws-amplify/auth';
+import { Badge } from "lucide-react";
 import { fetchWithAuth } from '@/app/utils/api-client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
@@ -15,12 +16,16 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
+import { cn } from "@/lib/utils";
 
 export default function ShopListPage() {
     const t = useTranslations('ShopListPage');
     const tb = useTranslations('Backend');
     const router = useRouter();
     const [shops, setShops] = useState<any[]>([]);
+    const [roles, setRoles] = useState<string[]>([]);
+    const [ownerShopIds, setOwnerShopIds] = useState<string[]>([]);
+    const [gmShopIds, setGmShopIds] = useState<string[]>([]);
     const [loading, setLoading] = useState(true);
     const [createName, setCreateName] = useState('');
     const [createOwnerId, setCreateOwnerId] = useState('');
@@ -65,7 +70,13 @@ export default function ShopListPage() {
             if (res.ok) {
                 const data = await res.json();
                 const shopList = data.shops || [];
+                const roles = data.roles || [];
+                const owner_shop_ids = data.owner_shop_ids || [];
+                const gm_shop_ids = data.gm_shop_ids || [];
                 setShops(shopList);
+                setRoles(roles);
+                setOwnerShopIds(owner_shop_ids);
+                setGmShopIds(gm_shop_ids);
 
                 // Use currentIsAdmin if passed (for initial load), otherwise use state
                 const checkAdmin = currentIsAdmin !== undefined ? currentIsAdmin : isAdmin;
@@ -155,10 +166,11 @@ export default function ShopListPage() {
                         </div>
                     ) : (
                         shops.map((shop) => (
-                            <Card key={shop.id} className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => router.push(`/shop/${shop.id}`)}>
+                            <Card key={shop.id} className={cn("hover:shadow-lg transition-shadow cursor-pointer border", gmShopIds.includes(shop.id) && "bg-orange-500/20")} onClick={() => router.push(`/shop/${shop.id}`)}>
                                 <CardHeader>
                                     <CardTitle>{shop.name}</CardTitle>
                                     <CardDescription>{t('created', { date: new Date(shop.ts_created_at).toLocaleString() })}</CardDescription>
+                                    {gmShopIds.includes(shop.id) ? t('gm') : t('owner')}
                                 </CardHeader>
                                 <CardFooter>
                                     <Button className="w-full" variant="secondary" asChild>

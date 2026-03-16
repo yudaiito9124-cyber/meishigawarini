@@ -108,6 +108,8 @@
     "logout": "ログアウト",
     "qrAdminLoginPage": "管理者ログイン画面",
     "createShop": "ショップ新規作成",
+    "gm": "管理者",
+    "owner": "オーナー",
     "createDialog": {
       "title": "ショップ作成",
       "description": "新しいショップの名前を入力してください。",

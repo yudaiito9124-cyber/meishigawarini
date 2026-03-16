@@ -108,6 +108,7 @@
     "logout": "Logout",
     "qrAdminLoginPage": "Admin Login Page",
     "createShop": "Create New Shop",
+    "gm": "GM",
     "createDialog": {
       "title": "Create Shop",
       "description": "Enter the name of your new shop.",
