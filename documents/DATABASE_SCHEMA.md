@@ -23,7 +23,54 @@
 
 ## 2. 各データ構造の詳細（スキーマ）
 
-### 2.1 Shop (ショップ情報)
+### 2.1 User (ユーザー・権限情報)
+ユーザーの基本情報と、管理・権限を持つショップのID一覧を保持します。ユーザーが最初にショップを作成した際、または既存のショップオーナーが初めてログインした際に自動生成されます。
+
+| 属性名 | 型 | 説明 |
+| --- | --- | --- |
+| `PK` | String | `USER#{userId}` （`userId` はCognitoの `sub` 属性） |
+| `SK` | String | 常に固定値 `SHOP` |
+| `email` | String | ユーザーのメールアドレス |
+| `roles` | Array | ユーザーに付与されたロールの配列 （例: `['SHOP_MANAGER', 'GENERAL_MANAGER']`） |
+| `owner_shop_ids` | Array | 自身がオーナーであるショップID（`shopId`）の配列 |
+| `gm_shop_ids` | Array | 管理権限（General Manager）を持つショップIDの配列 |
+| `ts_created_at` | String | 作成日時 （ISO 8601形式のUTC日時文字列） |
+
+### 2.2 User (ユーザー・権限情報)
+プレゼントを渡す人（sender）の基本情報、receive画面でexportすると作成される。このIDを指定することでインポートも可能。QRコード作成時に指定することで特定のユーザーの自己紹介専用にすることも可能。
+
+| 属性名 | 型 | 説明 |
+| --- | --- | --- |
+| `PK` | String | `USER#{senderId}` （`senderId` はChatデータのUUID形式） |
+| `SK` | String | 常に固定値 `SENDER` |
+| `address` | String | 住所 |
+| `card_image_name` | String | カード画像名 |
+| `card_image_url` | String | カード画像URL |
+| `company` | String | 会社名 |
+| `department` | String | 部署名 |
+| `detail_html` | String | 詳細HTML |
+| `email` | String | メールアドレス |
+| `HP` | String | ホームページURL |
+| `html_image_urls` | Array<String> | HTML画像URLの配列 |
+| `import_id` | String | インポートID |
+| `job_title` | String | 役職 |
+| `memo` | String | メモ |
+| `name` | String | 名前 |
+| `phone` | String | 電話番号 |
+| `phone_direct` | String | 直通電話番号 |
+| `Service_Eight` | String | EightサービスURL |
+| `Service_Linktree` | String | LinktreeサービスURL |
+| `SNS_Facebook` | String | FacebookサービスURL |
+| `SNS_Instagram` | String | InstagramサービスURL |
+| `SNS_LINE` | String | LINEサービスURL |
+| `SNS_Threads` | String | ThreadsサービスURL |
+| `SNS_TikTok` | String | TikTokサービスURL |
+| `SNS_X` | String | XサービスURL |
+| `SNS_YouTube` | String | YouTubeサービスURL |
+| `ts_created_at` | String | 作成日時 （ISO 8601形式のUTC日時文字列） |
+| `ts_updated_at` | String | 更新日時 （ISO 8601形式のUTC日時文字列） |
+
+### 2.3 Shop (ショップ情報)
 ショップの基本情報とオーナー情報を保持します。現在はショップユーザーのメールアドレスがそのまま問い合わせ先となっています。
 
 | 属性名 | 型 | 説明 |
@@ -34,11 +81,12 @@
 | `detail_html` | String | ショップ説明 （任意のHTML文字列） |
 | `email` | String | ショップの連絡先メールアドレス （例: `info@example.com`） |
 | `owner_id` | String | オーナーのCognitoユーザーID （UUID形式の `sub` 属性） |
+| `gm_ids` | Array<String> | マネージャーのCognitoユーザーIDのリスト （UUID形式の `sub` 属性） |
 | `ts_created_at` | String | 作成日時 （ISO 8601形式のUTC日時文字列、例: `2024-03-01T12:00:00.000Z`） |
 | `GSI2_PK` | String | `USER#{owner_id}` （オーナーのショップ一覧取得用、例: `USER#123e4567-...`） |
 | `GSI2_SK` | String | 作成日時等ソートキー （ISO 8601形式のUTC日時文字列） |
 
-### 2.2 Product (商品情報)
+### 2.4 Product (商品情報)
 各ショップに紐づく商品カタログ情報です。
 
 すでに有効化されたQRコードと紐づけられている商品などを変更すると混乱のもとになるため、基本的には作成した商品の変更操作は想定していません。また、同様の理由で、商品を削除する際には、statusがSTOPPED、かつすべての紐づけられたQRコードに対して発送されている必要があります(有効化済みでもなく発送待ちでもない)。
@@ -61,7 +109,7 @@
 | `GSI2_PK` | String | `PRODUCT#{productId}` （UUIDからの逆引き用） |
 | `GSI2_SK` | String | `SHOP#{productId}` (旧データ：作成日時等のソートキー （ISO 8601形式のUTC日時文字列）) |
 
-### 2.3 QR Metadata (QRコード及び注文ステータス)
+### 2.5 QR Metadata (QRコード及び注文ステータス)
 QRコードのライフサイクルや注文ステータス、商品との紐付けを管理します。
 
 | 属性名 | 型 | 説明 |
@@ -91,7 +139,7 @@ QRコードのライフサイクルや注文ステータス、商品との紐付
 | `GSI2_PK` | String | `SHOP#{shopId}` （担当ショップが持つQR一覧取得用） |
 | `GSI2_SK` | String | 作成日時等のソートキー （ISO 8601形式のUTC日時文字列） |
 
-### 2.4 Order (受取人による配送先・注文詳細)
+### 2.6 Order (受取人による配送先・注文詳細)
 受取人が入力した配送先情報や、発送時の追跡番号などを保持します。
 
 | 属性名 | 型 | 説明 |
@@ -111,7 +159,7 @@ QRコードのライフサイクルや注文ステータス、商品との紐付
 | `ts_submitted_at` | String | 受取人がこのフォームを送信した日時 （ISO 8601形式のUTC日時文字列） |
 | `ts_updated_at` | String | レコードの最終変更日時 （ISO 8601形式のUTC日時文字列） |
 
-### 2.5 Chat (チャット履歴)
+### 2.7 Chat (チャット履歴)
 ショップと受取人間の連絡用チャットデータです。
 
 | 属性名 | 型 | 説明 |
@@ -124,18 +172,7 @@ QRコードのライフサイクルや注文ステータス、商品との紐付
 | `sender_info` | JSon | プレゼントを渡した人の名刺情報等（`detail_html` を含む）
 | `sender_id` | String | (QR生成時オプション) プレゼントを渡したユーザーのID(receiveの送り主情報入力画面でexportすると保存される使いまわし専用ID、これがあるとreceive画面の送り主情報は編集不可能) |
 
-### 2.6 User (ユーザー・権限情報)
-ユーザーの基本情報と、管理・権限を持つショップのID一覧を保持します。ユーザーが最初にショップを作成した際、または既存のショップオーナーが初めてログインした際に自動生成されます。
 
-| 属性名 | 型 | 説明 |
-| --- | --- | --- |
-| `PK` | String | `USER#{userId}` （`userId` はCognitoの `sub` 属性） |
-| `SK` | String | 常に固定値 `SHOP` |
-| `email` | String | ユーザーのメールアドレス |
-| `roles` | Array | ユーザーに付与されたロールの配列 （例: `['SHOP_MANAGER', 'GENERAL_MANAGER']`） |
-| `owner_shop_ids` | Array | 自身がオーナーであるショップID（`shopId`）の配列 |
-| `gm_shop_ids` | Array | 管理権限（General Manager）を持つショップIDの配列 |
-| `ts_created_at` | String | 作成日時 （ISO 8601形式のUTC日時文字列） |
 
 ### 2.7 レコードが保持可能な状態 (ステータス) 一覧
 
@@ -144,7 +181,7 @@ QRコードのライフサイクルや注文ステータス、商品との紐付
 
 #### QR Metadata のステータス (`status`)
 QRコードのライフサイクルや注文の進捗状況を表します。
-![alt text](/documents/data/image-QRstatus.png)
+![alt text](/documents/data/image-QRstatus.webp)
 
 - **`UNASSIGNED` (未連携)**
   QRコードが生成されましたが、まだショップや商品と紐付けられていません。

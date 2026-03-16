@@ -3,7 +3,7 @@
 このドキュメントは、MeishiGawariniプロジェクトにおいて、**「フロントエンド（画面）」**と**「バックエンド（裏側のインフラ・API）」**それぞれの開発方法と、本番環境へのデプロイ（公開）方法を端的にまとめたものです。
 
 作業は必ず、カレントディレクトリを対象のフォルダ（`frontend` または `infra`）に移動してから行ってください。
-![alt text](/documents/data/image-workflow.png)
+![alt text](/documents/data/image-workflow.webp)
 
 ---
 

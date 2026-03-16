@@ -109,6 +109,7 @@
     "qrAdminLoginPage": "Admin Login Page",
     "createShop": "Create New Shop",
     "gm": "GM",
+    "owner": "Owner",
     "createDialog": {
       "title": "Create Shop",
       "description": "Enter the name of your new shop.",

@@ -23,7 +23,7 @@ DynamoDBでは、データを引き出すための「カギ（Key）」と、そ
 しかし、DynamoDBを最速・最安で使うためのベストプラクティスとして**「シングルテーブル設計（Single Table Design）」**という手法があります。
 これは**「全く形の違うデータでも、工夫して全部1つの巨大なテーブルに突っ込む」**という特殊な設計です。
 本プロジェクトも `MeishiGawariniTableV2` という1つのテーブルだけですべてのデータを管理しています。
-![table image](/documents/data/image-table.png)
+![table image](/documents/data/image-table.webp)
 **[実際のデータの例はこちら](/documents/data/sampletabledata.csv)**
 
 ---

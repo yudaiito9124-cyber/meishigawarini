@@ -15,17 +15,17 @@ title: ショップ運用のヘルプ - 発送の仕方
 
 ※配送希望日時が -/- と表示されているものは、希望なしを表しています。また、受け取り主の入力状況に応じて一部の情報が欠損している場合もあります。
 
-![受注管理・発送画面](/images/manual/shopadmin-list1.png)
+![受注管理・発送画面](/images/manual/shopadmin-list1.webp)
 
-![注文詳細画面](/images/manual/shopadmin-list1-detail-example.png)
+![注文詳細画面](/images/manual/shopadmin-list1-detail-example.webp)
 
 発送済みの商品や、有効化されたカードの情報などはページの下にある「受注待ち以外のカード」から確認可能です。
 
-![過去の注文履歴画面](/images/manual/shopadmin-list2.png)
+![過去の注文履歴画面](/images/manual/shopadmin-list2.webp)
 
 ### 2 カード・注文の状態一覧
 カードの状態がどのような状況を表しているのか、またどの段階にあるのかはページの一番下にあるステータスガイドから確認できます。
 
-![ステータスガイド](/images/manual/shopadmin-statusinfo.png)
+![ステータスガイド](/images/manual/shopadmin-statusinfo.webp)
 
 </section>

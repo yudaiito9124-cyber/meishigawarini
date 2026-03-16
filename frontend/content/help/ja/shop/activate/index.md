@@ -11,13 +11,13 @@ title: ショップ運用のヘルプ - 有効化の仕方
 
 ### 1 スキャナの起動
 「QRコードをスキャン」から、カードをスキャンしてください。このとき、ブラウザからカメラの使用に対して許可が求められますので、許可するようお願いいたします。
-![QR有効化画面](/images/manual/shopadmin-activate.png)
+![QR有効化画面](/images/manual/shopadmin-activate.webp)
 
 ### 2 QRコードのスキャン
 スキャナーが立ち上がりますので、カード上のQRコードを映してください。スキャンが完了すると自動的にウィンドウが閉じます。
 
 ※ 右下の「手動入力？」ボタンから、カードのIDを直接入力することも可能です。
-![QR有効化画面](/images/manual/shopadmin-activate-scan.png)
+![QR有効化画面](/images/manual/shopadmin-activate-scan.webp)
 
 ### 3 設定と有効化
 詳細を確認して、「有効化」ボタンを押してください。
@@ -25,4 +25,4 @@ title: ショップ運用のヘルプ - 有効化の仕方
 - 商品の選択ができない場合は、そのカードが特定の商品にしか使用できないことを表しています。
 - 「オプション(必要に応じて)」を選択することで、覚え書きとしてのメモや、商品を受け取った人に対して伝えておきたいメッセージなどを入力できます。
 
-![QR有効化画面](/images/manual/shopadmin-activate-scaned-noproduct.png)
+![QR有効化画面](/images/manual/shopadmin-activate-scaned-noproduct.webp)

@@ -11,7 +11,7 @@
 
 「名刺代わりに」は、QRコードを用いて簡単にギフトや商品を贈る・受け取ることができるサービスです。
 
-![alt text](/documents/data/image.png)
+![alt text](/documents/data/image.webp)
 
 
 ### 主な技術スタック

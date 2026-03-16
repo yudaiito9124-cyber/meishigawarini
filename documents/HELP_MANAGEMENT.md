@@ -47,7 +47,7 @@ URLのスラッグ（配列）を解析し、末尾の要素を除去するこ�
 ### 画像の追加
 1. 画像ファイルを `frontend/public/images/manual/` などの `public` ディレクトリ配下に保存します。
 2. Markdown 内で絶対パスを使用して指定します。
-   例: `![キャプション](/images/manual/example.png)`
+   例: `![キャプション](/images/manual/example.webp)`
 
 ### 特別な記法の利用
 標準の Markdown に加え、以下のスタイルが適用可能です。

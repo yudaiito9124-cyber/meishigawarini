@@ -21,7 +21,7 @@ title: ギフトを受け取る方
 - スマートフォン等でカードのQRコードを読み取って受け取りページを開いてください。
 - カードに書かれている8桁の数字(PINCODE)を入力し、「ギフトを見る」ボタンを押してください。
 
-![PINコード入力画面](/images/manual/receive-pin.png)
+![PINコード入力画面](/images/manual/receive-pin.webp)
 
 ### 2 配送先情報の入力
 氏名、住所、電話番号など、ギフトのお届けに必要な配送先情報を入力し、受け取り手続きを完了させます。
@@ -30,7 +30,7 @@ title: ギフトを受け取る方
 ※ ギフトの受け取り期限内に入力を行ってください。使用期限を過ぎたカードは無効になります。
 ※ もし入力情報を誤った場合は、「**2．の ①**」 をご確認ください
 
-![配送先情報の入力画面](/images/manual/receive-enter.png)
+![配送先情報の入力画面](/images/manual/receive-enter.webp)
 
 ## 2．配送情報の確認
 
@@ -39,7 +39,7 @@ title: ギフトを受け取る方
 
 ※ もし発送処理に関して不明点等を問い合わせたい場合は、「？お問い合わせ」ボタンからギフトの詳細情報を確認し、配送処理を対応しているショップに対して直接お問い合わせください。(詳細は「**3．の ③**」もご覧ください。)
 
-![配送待ち画面](/images/manual/receive-submit.png)
+![配送待ち画面](/images/manual/receive-submit.webp)
 
 ### 2 発送状況の確認
 ショップからギフトが発送されると、画面上で「発送済み」と表示されます。また、メールアドレスを登録している方には通知メールが届きます。
@@ -47,7 +47,7 @@ title: ギフトを受け取る方
 
 - 受取が完了した方は、**受け取り完了**ボタンの押下にご協力ください。担当者が無事に受け取れたことを知ることができます。
 
-![発送状況の確認画面](/images/manual/receive-shipped.png)
+![発送状況の確認画面](/images/manual/receive-shipped.webp)
 
 ## 3．そのほかの表示について
 
@@ -55,34 +55,34 @@ title: ギフトを受け取る方
 ページの一番上に、あなたに贈られたギフトが表示されます。
 
 ※ このギフトの配送を担当するショップからのメッセージが表示される場合があります。
-![ギフトの確認画面](/images/manual/receive-gift.png)
+![ギフトの確認画面](/images/manual/receive-gift.webp)
 
 ### 2 送り主の確認
 送り主によっては、自己紹介を入力している場合があります。
 
-![送り主の確認画面](/images/manual/receive-senderinfo-example.png)
+![送り主の確認画面](/images/manual/receive-senderinfo-example.webp)
 
 ### 3 お問い合わせ先
 「？お問い合わせ」ボタンから発送元のショップの詳細情報（名前や連絡先のメールアドレスなど）を確認することができます。配送に対するお問い合わせや、配送情報の修正などに対してはこれらの情報を利用し、ショップに直接ご連絡ください。
 
 ※ 問い合わせを行う際には、必ず「注文ID」と「ショップ名」を伝えてください。また、PINコードは伝えないようご注意ください。
 
-![ショップ情報画面](/images/manual/receive-shop.png)
+![ショップ情報画面](/images/manual/receive-shop.webp)
 
 ### 4 チャット機能
 送り主(QRコードとPINコードを知っている人)が、チャット欄にコメントを残している場合があります。名前とメッセージを入力して送信することで自由にコメントを残すことができます。画像等ファイルも送信可能です。
 
-![チャット機能画面](/images/manual/receive-chat-example.png)
+![チャット機能画面](/images/manual/receive-chat-example.webp)
 
 ### 5 閲覧機能
 受け取りが完了すると、すべての情報がアーカイブされます。受け取ってからの経過日数や連絡先情報など、今回のやり取りで保存された情報をいつでも確認できます。カードはぜひ大切に保管してください。
 
-![思い出閲覧画面-トップ](/images/manual/receive-completed-head.png)
-![思い出閲覧画面-全体](/images/manual/receive-completed.png)
+![思い出閲覧画面-トップ](/images/manual/receive-completed-head.webp)
+![思い出閲覧画面-全体](/images/manual/receive-completed.webp)
 
 ### 6 無効なカード
 以下の表示はショップによる有効化処理が行われていない、または不正利用などによって無効化されたカードを示しています。カードを渡してくれた人に確認をお願いします。また、カード購入者は購入した店舗に対する問い合わせを行ってください。
 
-![無効なカード画面](/images/manual/receive-invalid.png)
+![無効なカード画面](/images/manual/receive-invalid.webp)
 
 </section>

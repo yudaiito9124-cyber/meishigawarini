@@ -23,27 +23,27 @@ title: ギフトを贈る方
 次の手順で自分の連絡先をカードに含めることができます。
 
 
-![自分の連絡先の入力例](/images/manual/receive-senderinfo-example.png)
+![自分の連絡先の入力例](/images/manual/receive-senderinfo-example.webp)
 
 
 ### 1 パスコードの入力
 - スマートフォン等でカードのQRコードを読み取って受け取りページを開いてください。
 - カードに書かれている8桁の数字(PINCODE)を入力し、「ギフトを見る」ボタンを押してください。
 
-![PINコード入力画面](/images/manual/receive-pin.png)
+![PINコード入力画面](/images/manual/receive-pin.webp)
 
 
 ### 2．情報の入力
 
 「送り主情報を追加」ボタンから自分の連絡先などの情報を入力できます。
-![配送先情報の入力開始](/images/manual/receive-addsenderinfo.png)
+![配送先情報の入力開始](/images/manual/receive-addsenderinfo.webp)
 
 入力できる情報は、氏名、メールアドレスなどはもちろん、名刺画像や顔写真、SNSなどへのリンク、静的なコンテンツ(HTML/CSS)のソースコードなどがあります。必要に応じて任意の項目を入力してください。
-![配送先情報の入力画面](/images/manual/receive-senderinfo-enter.png)
+![配送先情報の入力画面](/images/manual/receive-senderinfo-enter.webp)
 
 入力した結果は保存して、あとから使いまわすこともできます。
 - 保存：「＋詳細設定」の左下にある保存ボタン(フロッピーマーク)を押してください。保存後にポップアップされる**ユーザーID**(USER#から始まる文字列)を控えてください。
 - 読込：「インポートID」に**ユーザーID**(USER#から始まる文字列)を入力し、右側のインポートボタンを押すことで、過去の入力結果を使用することができます。(一度インポートすると編集はできなくなりますのでご注意ください。)
-![配送先情報の入力画面](/images/manual/receive-senderinfo-enter.png)
+![配送先情報の入力画面](/images/manual/receive-senderinfo-enter.webp)
 
 </section>

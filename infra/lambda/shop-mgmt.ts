@@ -220,6 +220,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                     SK: 'METADATA',
                     name,
                     owner_id: owner_id, // Link to User
+                    gm_ids: gm_idslist,
                     email,
                     GSI2_PK: `USER#${owner_id}`, // GSI2 for Owner Listing
                     GSI2_SK: now,

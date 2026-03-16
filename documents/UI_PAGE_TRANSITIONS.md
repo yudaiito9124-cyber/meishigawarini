@@ -92,7 +92,7 @@ graph TD
 ## 2. ショップ管理者向けページ
 
 認証された既存のショップ管理者が自身の店舗や商品を管理するセクションです。
-   ![alt text](/documents/data/image-shop.png)
+   ![alt text](/documents/data/image-shop.webp)
 
 ### a. ショップ一覧 (`/[locale]/shop`) [https://meishigawarini.com/shop](https://meishigawarini.com/shop)
 * **概要**: ログイン済みユーザーが管理している（権限をもつ）ショップの一覧を表示するダッシュボードの入り口。**ショップが一つだけの場合は直接そのショップの管理者画面にリダイレクトします．**
@@ -127,7 +127,7 @@ graph TD
 
 ### a. システム管理ダッシュボード (`/[locale]/admin`) [https://meishigawarini.com/admin](https://meishigawarini.com/admin)
 * **概要**: 全体システムのQRコード一括生成、状態の個別監視、バン(Ban)処理を行う、オーナー（Administratorsグループ）のみがアクセス可能なページ。リンク直打ちでしかアクセスできない。
-  ![alt text](/documents/data/image-admin.png)
+  ![alt text](/documents/data/image-admin.webp)
 * **可能な操作一覧**:
   * **QRコードの一括生成 (Batch Generate)**:
     * **バッチ作成**: 「QRコード生成」機能から、生成したい枚数（現在MAX 10枚）を指定してバッチ処理を実行します。システムが裏側でセキュアなUUIDとランダムなPINコード（4桁等）のペアを新規に生成し、DBへ一括登録します。
@@ -149,7 +149,7 @@ graph TD
 
 ### a. ギフト受取ページ (`/[locale]/receive/[uuid]`)
 * **概要**: QRコードを読み取ったエンドユーザーが、PINを入力し、ギフトの受取先情報を入力して商品を要求・受領する動的ページ。
-![alt text](/documents/data/image-receiver.png)
+![alt text](/documents/data/image-receiver.webp)
 * **可能な操作・各ステップ状態の一覧**:
   * **PIN入力ステップ (初期アクセス時 / `ACTIVE`等)**:
     * スマホ等のカメラでQRコードを読み取ってページにアクセスすると、まずPINコードの入力画面が表示されます。ユーザーは手元の物理カードに記載されたPINコードを入力・送信します。サーバー側でUUIDと紐づくPINの整合性がチェックされ、正しい場合のみ後続のステップ（ギフト内容の表示など）へ進行できます。

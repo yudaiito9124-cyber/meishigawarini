@@ -12,20 +12,20 @@ title: ショップ運用のヘルプ - 管理の仕方
 ログイン後、以下の画面が表示された場合は、任意のショップを選択してください。
 表示されない場合は、次の手順に進んでください。
 
-![ショップ一覧画面](/images/manual/shopscut.png)
+![ショップ一覧画面](/images/manual/shopscut.webp)
 
 
 ### 2 ショップの設定
 
 ショップ管理画面の右上にある⚙(歯車)アイコンから、ショップの名前などを設定できます。
 
-![ショップ管理画面ヘッダ](/images/manual/shopadmin-header.png)
-![ショップ設定画面](/images/manual/shopadmin-shopsetting.png)
+![ショップ管理画面ヘッダ](/images/manual/shopadmin-header.webp)
+![ショップ設定画面](/images/manual/shopadmin-shopsetting.webp)
 
 ### 3 各ショップの管理画面
 以下がショップの管理画面です。最初は商品がないため、手順②を行ってください。
 
-![ショップ管理画面](/images/manual/shopadmin-example.png)
+![ショップ管理画面](/images/manual/shopadmin-example.webp)
 
 ### 4 商品の新規登録・管理
 画面を下に移動すると、商品一覧画面があります。ここから、商品の登録・停止・削除ができます。
@@ -37,6 +37,6 @@ title: ショップ運用のヘルプ - 管理の仕方
 ※商品は一度作成すると編集することはできません。これは既に印刷・有効化済みのカードに対して、交換される物品が一意に紐づいており、カードの有効化時から使用期限を迎えるまで、交換できる商品が変わらないことを保証するためになります。もし商品情報の編集を行いたい場合は、新しく同じ商品を追加し、古い商品に対する停止処理を行ってください。
 
 
-![商品管理画面](/images/manual/shopadmin-addproduct.png)
+![商品管理画面](/images/manual/shopadmin-addproduct.webp)
 
 </section>

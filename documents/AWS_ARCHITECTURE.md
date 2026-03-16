@@ -48,7 +48,7 @@
 ## 2. データの流れ（処理の全体像）
 
 システムがどのように動いているか、具体的な操作を例にデータの流れを追ってみます。
-![alt text](/documents/data/image-awsbackgroundservices.png)
+![alt text](/documents/data/image-awsbackgroundservices.webp)
 
 ### 例：「管理者がQRコードを新規生成する」ときの裏側の動き
 
