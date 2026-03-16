@@ -373,11 +373,11 @@ export class InfraStack extends cdk.Stack {
     // Shop Routes
 
     const shopResource = api.root.addResource('shop'); // shop
-    // // shop POST #CreateShop
-    // shopResource.addMethod('POST', new apigateway.LambdaIntegration(shopMgmtFn), {
-    //   authorizer,
-    //   authorizationType: apigateway.AuthorizationType.COGNITO
-    // });
+    // shop POST #CreateShop
+    shopResource.addMethod('POST', new apigateway.LambdaIntegration(shopMgmtFn), {
+      authorizer,
+      authorizationType: apigateway.AuthorizationType.COGNITO
+    });
     // shop GET #ListShops
     shopResource.addMethod('GET', new apigateway.LambdaIntegration(shopMgmtFn), {
       authorizer,

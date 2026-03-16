@@ -130,9 +130,10 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             owner_shop_ids = userRes?.Item?.owner_shop_ids || [];
             gm_shop_ids = userRes?.Item?.gm_shop_ids || [];
         }
+        let isAdmin = userGroups.includes('Administrators') || userGroups.includes('GlobalAdmins');
 
 
-        // 2. List My Shops (GET /shop)
+        // List My Shops (GET /shop)
         if (method === 'GET' && path.endsWith('/shop') && !shopId) {
             let shops = [...owner_shop_ids, ...gm_shop_ids];
 
@@ -171,6 +172,110 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             };
         }
 
+
+
+
+        //////////// ここから下は 認証済みかつ指定されたショップ(shopId)のオーナー・GMのみアクセス可能
+
+
+        // 1. Create Shop (POST /shop)
+        if (method === 'POST' && path.endsWith('/shop') && !shopId) {
+            if (!userId) return { statusCode: 401, headers: corsHeaders, body: 'Unauthorized' };
+            if (!isAdmin) return { statusCode: 401, headers: corsHeaders, body: 'Unauthorized' };
+
+            const body = JSON.parse(event.body || '{}');
+            const { name, owner_id, gm_ids } = body;
+            if (!name) return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Missing name' }) };
+            if (!owner_id) return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Missing owner_id' }) };
+
+            let userownerRes = await ddb.send(new GetCommand({
+                TableName: TABLE_NAME,
+                Key: { PK: `USER#${owner_id}`, SK: 'SHOP' }
+            }));
+            if (!userownerRes?.Item) {
+                return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Invalid owner_id' }) };
+            }
+
+            const gm_idslist: string[] = Array.isArray(gm_ids)
+                ? gm_ids
+                : (gm_ids ? gm_ids.split(';').map((gmid: string) => gmid.trim()) : []);
+
+            for (const gmid of gm_idslist) {
+                let usergmRes = await ddb.send(new GetCommand({
+                    TableName: TABLE_NAME,
+                    Key: { PK: `USER#${gmid}`, SK: 'SHOP' }
+                }));
+                if (!usergmRes?.Item) {
+                    return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Invalid gm_id', detail: gmid }) };
+                }
+            }
+
+
+            const email = userownerRes?.Item.email; // Get email from Cognito claims
+            const newShopId = generateId();
+            const now = new Date().toISOString();
+            await ddb.send(new PutCommand({
+                TableName: TABLE_NAME,
+                Item: {
+                    PK: `SHOP#${newShopId}`,
+                    SK: 'METADATA',
+                    name,
+                    owner_id: owner_id, // Link to User
+                    email,
+                    GSI2_PK: `USER#${owner_id}`, // GSI2 for Owner Listing
+                    GSI2_SK: now,
+                    ts_created_at: now
+                }
+            }));
+
+            // Update Owner's Role Record (Append instead of Overwrite)
+            await ddb.send(new UpdateCommand({
+                TableName: TABLE_NAME,
+                Key: { PK: `USER#${owner_id}`, SK: 'SHOP' },
+                UpdateExpression: 'SET owner_shop_ids = list_append(if_not_exists(owner_shop_ids, :empty_list), :new_shop_list), ts_updated_at = :now',
+                ExpressionAttributeValues: {
+                    ':new_shop_list': [newShopId],
+                    ':empty_list': [],
+                    ':now': now
+                }
+            }));
+
+            for (const gmid of gm_idslist) {
+                // 1. Always append the new shop ID to gm_shop_ids
+                await ddb.send(new UpdateCommand({
+                    TableName: TABLE_NAME,
+                    Key: { PK: `USER#${gmid}`, SK: 'SHOP' },
+                    UpdateExpression: 'SET gm_shop_ids = list_append(if_not_exists(gm_shop_ids, :empty_list), :new_shop_list), ts_updated_at = :now',
+                    ExpressionAttributeValues: {
+                        ':new_shop_list': [newShopId],
+                        ':empty_list': [],
+                        ':now': now
+                    }
+                }));
+
+                // 2. Add "GENERAL_MANAGER" role if not already present
+                try {
+                    await ddb.send(new UpdateCommand({
+                        TableName: TABLE_NAME,
+                        Key: { PK: `USER#${gmid}`, SK: 'SHOP' },
+                        UpdateExpression: 'SET #roles = list_append(if_not_exists(#roles, :empty_list), :gm_role_list)',
+                        ConditionExpression: 'attribute_not_exists(#roles) OR NOT contains(#roles, :gm_role_str)',
+                        ExpressionAttributeNames: { '#roles': 'roles' },
+                        ExpressionAttributeValues: {
+                            ':gm_role_list': ['GENERAL_MANAGER'],
+                            ':gm_role_str': 'GENERAL_MANAGER',
+                            ':empty_list': []
+                        }
+                    }));
+                } catch (e: any) {
+                    if (e.name !== 'ConditionalCheckFailedException') {
+                        throw e;
+                    }
+                }
+            }
+            return { statusCode: 201, headers: corsHeaders, body: JSON.stringify({ shop_id: newShopId, message: 'Shop created' }) };
+        }
+
         // ここから下はショップ権限を要求
         if (!shopId) {
             return { statusCode: 401, headers: corsHeaders, body: JSON.stringify({ message: 'Unauthorized' }) };
@@ -183,9 +288,6 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             return { statusCode: 401, headers: corsHeaders, body: JSON.stringify({ message: 'Unauthorized' }) };
         }
         //////////// ここから下は 認証済みかつ指定されたショップ(shopId)のオーナー・GMのみアクセス可能
-
-
-
 
         // 2. Get Shop Details (GET /shop/{shopId})
         if (method === 'GET' && (path.endsWith(`/shop/${shopId}`) || path.endsWith(`/shop/${shopId}/`))) {
