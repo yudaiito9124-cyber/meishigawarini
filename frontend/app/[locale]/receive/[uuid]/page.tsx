@@ -13,7 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card";
 import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { MessageCircleQuestion, Paperclip, X, FileText, File as FileIcon, Loader2, Save, SendHorizontal, Pencil, UserPlus, Globe, Gift, User, MessagesSquare, Heart, Sparkles, Calendar, Clock, ShoppingBasket, Plus, Copy, Trash2, ChevronDown, ImageIcon, Import } from "lucide-react";
+import { MessageCircleQuestion, Paperclip, X, FileText, File as FileIcon, Loader2, Save, SendHorizontal, Pencil, UserPlus, Globe, Gift, User, MessagesSquare, Heart, Sparkles, Calendar, Clock, ShoppingBasket, Plus, Copy, Trash2, ChevronDown, ImageIcon, Import, Download } from "lucide-react";
 import { SiFacebook, SiInstagram, SiThreads, SiX, SiYoutube, SiLine, SiTiktok, SiLinktree, SiEight } from "@icons-pack/react-simple-icons";
 import SandboxedHtml from "@/components/SandboxedHtml";
 import { cn } from "@/lib/utils";
@@ -1525,9 +1525,26 @@ export default function ReceivePage() {
                                             <div className="md:col-span-2 flex flex-col px-6 space-y-4 p-2 pt-0 border rounded-xl shadow">
 
                                                 {/* HTML Section */}
-                                                <Label htmlFor={`sender-detail_html`} className="text-xs font-bold text-gray-600 flex items-center gap-1 mt-8">
-                                                    {t(`senderInfo.labels.detail_html`)}
-                                                </Label>
+                                                <div className="flex items-center justify-between mt-8">
+                                                    <Label htmlFor={`sender-detail_html`} className="text-xs font-bold text-gray-600 flex items-center">
+                                                        {t(`senderInfo.labels.detail_html`)}
+                                                    </Label>
+                                                    <Button
+                                                        type="button"
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={() => {
+                                                            const link = document.createElement('a');
+                                                            link.href = '/prompts/landing-page-prompt.md';
+                                                            link.download = 'landing-page-prompt.md';
+                                                            link.click();
+                                                        }}
+                                                        className="h-7 px-2 text-[10px] gap-1 bg-white border-green-200 text-green-600 hover:bg-green-50 hover:text-green-700 hover:border-green-300"
+                                                    >
+                                                        <Download className="w-3 h-3" />
+                                                        {t('senderInfo.labels.detail_html-downloadPrompt')}
+                                                    </Button>
+                                                </div>
                                                 <div className="md:col-span-2 flex flex-col w-full items-center gap-2 space-y-1.5 p-0 mb-3">
                                                     <div className="md:col-span-1 w-full flex flex-col px-6 space-y-1 p-0 pr-0 pl-0">
                                                         <Textarea
@@ -1536,7 +1553,7 @@ export default function ReceivePage() {
                                                             onChange={(e) => updateSenderForm("detail_html", e.target.value)}
                                                             disabled={senderInfoLoading}
                                                             className="min-h-[80px] text-sm"
-                                                            placeholder={t(`senderInfo.labels.detail_html`)}
+                                                            placeholder={t(`senderInfo.labels.detail_html-placeholder`)}
                                                         />
                                                     </div>
 
@@ -1638,7 +1655,7 @@ export default function ReceivePage() {
 
 
                                                 {/* Export / Import Section */}
-                                                <Label className="text-xs font-bold text-gray-600 flex items-center gap-1 mt-6 pb-0">
+                                                <Label className="text-xs font-bold text-gray-600 flex items-center gap-1 mt-6 pb-0 border-t">
                                                     {t(`senderInfo.labels.import_label`)}
                                                 </Label>
                                                 <div className="md:col-span-2 flex items-center gap-2 space-y-1.5 p-3 mb-3 pt-0">

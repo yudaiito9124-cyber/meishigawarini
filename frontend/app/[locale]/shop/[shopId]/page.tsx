@@ -5,7 +5,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { RefreshCw, ArrowRight, HelpCircle, Camera, Settings, ShoppingBasket, Eye, Plus, Trash2, Copy, ImageIcon, Save, Loader2, Pencil, ChevronDown } from 'lucide-react';
+import { RefreshCw, ArrowRight, HelpCircle, Camera, Settings, ShoppingBasket, Eye, Plus, Trash2, Copy, ImageIcon, Save, Loader2, Pencil, ChevronDown, Download } from 'lucide-react';
 import { notFound, useParams } from 'next/navigation';
 import { useRouter } from '@/i18n/routing';
 import { useTranslations } from 'next-intl';
@@ -643,6 +643,33 @@ export default function ShopPage() {
                                                 <div className="flex-1 flex flex-col min-h-0 border-b lg:border-b-0 lg:border-r bg-white">
                                                     <div className="px-3 py-2 bg-gray-50 border-b flex justify-between items-center shrink-0 min-h-[50px]">
                                                         <Label htmlFor="shop_detail_html" className="text-xs font-bold text-gray-600 uppercase tracking-wider">{t('shopSettings.sourcecode')}</Label>
+                                                        <div className="flex gap-2">
+                                                            <Button
+                                                                type="button"
+                                                                variant="outline"
+                                                                size="sm"
+                                                                onClick={() => {
+                                                                    const link = document.createElement('a');
+                                                                    link.href = '/prompts/landing-page-prompt.md';
+                                                                    link.download = 'landing-page-prompt.md';
+                                                                    link.click();
+                                                                }}
+                                                                className="h-7 px-2 text-[10px] gap-1 bg-white border-green-200 text-green-600 hover:bg-green-50 hover:text-green-700 hover:border-green-300"
+                                                            >
+                                                                <Download className="w-3 h-3" />
+                                                                {t('shopSettings.downloadPrompt')}
+                                                            </Button>
+                                                            <Button
+                                                                type="button"
+                                                                variant="outline"
+                                                                size="sm"
+                                                                onClick={handleUpdatePreview}
+                                                                className="h-7 px-2 text-[10px] gap-1 bg-white border-blue-200 text-blue-600 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300"
+                                                            >
+                                                                <Eye className="w-3 h-3" />
+                                                                {t('shopSettings.updatePreview')}
+                                                            </Button>
+                                                        </div>
                                                     </div>
                                                     <textarea
                                                         ref={shopDetailRef}
@@ -656,16 +683,33 @@ export default function ShopPage() {
                                                 <div className="flex-1 flex flex-col min-h-0 bg-gray-50/50">
                                                     <div className="px-3 py-2 bg-gray-50 border-b flex justify-between items-center shrink-0 min-h-[50px]">
                                                         <Label className="text-xs font-bold text-gray-600 uppercase tracking-wider">{t('shopSettings.preview')}</Label>
-                                                        <Button
-                                                            type="button"
-                                                            variant="outline"
-                                                            size="sm"
-                                                            onClick={handleUpdatePreview}
-                                                            className="h-7 px-2 text-[10px] gap-1 bg-white border-blue-200 text-blue-600 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300"
-                                                        >
-                                                            <Eye className="w-3 h-3" />
-                                                            {t('shopSettings.updatePreview')}
-                                                        </Button>
+                                                        <div className="flex gap-2">
+                                                            <Button
+                                                                type="button"
+                                                                variant="outline"
+                                                                size="sm"
+                                                                onClick={() => {
+                                                                    const link = document.createElement('a');
+                                                                    link.href = '/prompts/landing-page-prompt.md';
+                                                                    link.download = 'landing-page-prompt.md';
+                                                                    link.click();
+                                                                }}
+                                                                className="h-7 px-2 text-[10px] gap-1 bg-white border-green-200 text-green-600 hover:bg-green-50 hover:text-green-700 hover:border-green-300"
+                                                            >
+                                                                <Download className="w-3 h-3" />
+                                                                {t('shopSettings.downloadPrompt')}
+                                                            </Button>
+                                                            <Button
+                                                                type="button"
+                                                                variant="outline"
+                                                                size="sm"
+                                                                onClick={handleUpdatePreview}
+                                                                className="h-7 px-2 text-[10px] gap-1 bg-white border-blue-200 text-blue-600 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300"
+                                                            >
+                                                                <Eye className="w-3 h-3" />
+                                                                {t('shopSettings.updatePreview')}
+                                                            </Button>
+                                                        </div>
                                                     </div>
                                                     <div className="flex-1 overflow-y-auto w-full min-h-0 p-4 flex flex-col items-center">
                                                         <Card className="w-full mt-20 flex flex-col items-center max-w-xl bg-white ">

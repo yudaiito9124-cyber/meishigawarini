@@ -270,10 +270,11 @@
     "shopSettings": {
       "title": "ショップ設定",
       "description": "ショップの名前や紹介文を設定します。",
+      "downloadPrompt": "AI生成用プロンプトをダウンロード",
       "updatePreview": "プレビュー更新",
       "name": "ショップ名",
       "detailHtml": "ショップ紹介(HTML)",
-      "detailHtmlPlaceholder": "HTML(CSS)形式で入力してください。",
+      "detailHtmlPlaceholder": "HTML(CSS)形式で入力してください。書き方がわからない場合は生成AI用のプロンプトファイルも用意しております。右上のボタンからダウンロードし、参考にするホームページのURLや作成したいイメージとともに生成AIに渡してください。",
       "submit": "保存",
       "success": "ショップ設定を更新しました。",
       "failed": "更新に失敗しました。",
@@ -449,6 +450,8 @@
         "others": "その他 (例: 誕生日、血液型)",
         "addhtmlmessage": "詳細設定",
         "detail_html": "HTMLソースコード",
+        "detail_html-placeholder": "HTML(CSS)形式で入力してください。書き方がわからない場合は生成AI用のプロンプトファイルも用意しております。上のボタンからダウンロードし、参考にするホームページのURLや作成したいイメージとともに生成AIに渡してください。",
+        "detail_html-downloadPrompt": "AI生成用プロンプトをダウンロード",
         "detail_html-images": "HTML用画像",
         "detail_html-addimage": "画像を追加",
         "detail_html-noimages": "アップロードされた画像はありません。HTML内で使用する画像をここに追加できます。"

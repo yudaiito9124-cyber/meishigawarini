@@ -270,6 +270,7 @@
     "shopSettings": {
       "title": "Shop Settings",
       "description": "Configure your shop's name and HTML description.",
+      "downloadPrompt": "Download AI Prompt",
       "updatePreview": "Update Preview",
       "name": "Shop Name",
       "detailHtml": "Shop Description (HTML)",
