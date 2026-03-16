@@ -17,7 +17,7 @@ import jsPDF from 'jspdf';
 import { generateId } from '@/lib/id';
 import { useTranslations } from 'next-intl';
 import { generatePDF, cardformats, paperformats } from '@/lib/generatePDF';
-import { ExternalLink, Copy, Eye } from 'lucide-react';
+import { ExternalLink, Copy, Eye, QrCode, Store, Wrench } from 'lucide-react';
 const NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 const NEXT_PUBLIC_APP_URL = process.env.NEXT_PUBLIC_APP_URL || "";
 // const PDF_PAPER_FORMAT = "10S31251"; //"1S31034"
@@ -52,6 +52,7 @@ export default function AdminPage() {
     const [paperFormat, setPaperFormat] = useState("10S31251");
     const [cardFormat, setCardFormat] = useState("gakuchousenbeiv1");
     const [isGenerating, setIsGenerating] = useState(false);
+    const [activeTab, setActiveTab] = useState("qrcodes");
     const router = useRouter();
     const hasCheckedAuth = useRef(false);
 
@@ -196,251 +197,298 @@ export default function AdminPage() {
                     </Link>
                 </div>
 
-                {/* QRコード生成 */}
-                <Card>
-                    <CardHeader>
-                        <CardTitle>{t('generate.title')}</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                        <div className="flex flex-col w-full gap-1.5">
-                            <div className="grid w-full items-center gap-1.5">
-                                <label htmlFor="count" className="text-sm font-medium">{t('generate.quantity')}</label>
-                                <Input
-                                    id="count"
-                                    type="number"
-                                    value={count}
-                                    onChange={(e) => setCount(Number(e.target.value))}
-                                />
-                            </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+                    <button
+                        onClick={() => setActiveTab("qrcodes")}
+                        className={cn(
+                            "flex flex-col items-center justify-center p-6 rounded-2xl border-2 transition-all duration-200 cursor-pointer shadow-sm hover:shadow-md",
+                            activeTab === "qrcodes"
+                                ? "bg-white border-white text-mist-900 ring-2 ring-mist-700 ring-offset-2 ring-offset-mist-900"
+                                : "bg-mist-800 border-mist-700 text-mist-300 hover:border-mist-600 hover:bg-mist-700/50"
+                        )}
+                    >
+                        <QrCode className={cn("w-12 h-12 mb-3", activeTab === "qrcodes" ? "text-mist-900" : "text-mist-400")} />
+                        <span className="text-lg font-bold">{t('tabs.qrcodes')}</span>
+                    </button>
+                    <button
+                        onClick={() => setActiveTab("shops")}
+                        className={cn(
+                            "flex flex-col items-center justify-center p-6 rounded-2xl border-2 transition-all duration-200 cursor-pointer shadow-sm hover:shadow-md",
+                            activeTab === "shops"
+                                ? "bg-white border-white text-mist-900 ring-2 ring-mist-700 ring-offset-2 ring-offset-mist-900"
+                                : "bg-mist-800 border-mist-700 text-mist-300 hover:border-mist-600 hover:bg-mist-700/50"
+                        )}
+                    >
+                        <Store className={cn("w-12 h-12 mb-3", activeTab === "shops" ? "text-mist-900" : "text-mist-400")} />
+                        <span className="text-lg font-bold">{t('tabs.shops')}</span>
+                    </button>
+                    <button
+                        onClick={() => setActiveTab("tools")}
+                        className={cn(
+                            "flex flex-col items-center justify-center p-6 rounded-2xl border-2 transition-all duration-200 cursor-pointer shadow-sm hover:shadow-md",
+                            activeTab === "tools"
+                                ? "bg-white border-white text-mist-900 ring-2 ring-mist-700 ring-offset-2 ring-offset-mist-900"
+                                : "bg-mist-800 border-mist-700 text-mist-300 hover:border-mist-600 hover:bg-mist-700/50"
+                        )}
+                    >
+                        <Wrench className={cn("w-12 h-12 mb-3", activeTab === "tools" ? "text-mist-900" : "text-mist-400")} />
+                        <span className="text-lg font-bold">{t('tabs.tools')}</span>
+                    </button>
+                </div>
 
-                            <div className="flex items-center gap-2 mt-4">
-                                <Switch
-                                    id="useMetadataOptions"
-                                    checked={useMetadataOptions}
-                                    onCheckedChange={(checked: boolean) => setUseMetadataOptions(checked)}
-                                />
-                                <Label htmlFor="useMetadataOptions" className="text-sm font-medium cursor-pointer">
-                                    {t('generate.useMetadata')}
-                                </Label>
-                            </div>
+                {activeTab === "qrcodes" && (
+                    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                        {/* QRコード生成 */}
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>{t('generate.title')}</CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                                <div className="flex flex-col w-full gap-1.5">
+                                    <div className="grid w-full items-center gap-1.5">
+                                        <label htmlFor="count" className="text-sm font-medium">{t('generate.quantity')}</label>
+                                        <Input
+                                            id="count"
+                                            type="number"
+                                            value={count}
+                                            onChange={(e) => setCount(Number(e.target.value))}
+                                        />
+                                    </div>
 
-                            <label htmlFor="shopId" className="text-sm font-medium mb-0 mt-2">{t('generate.option')}</label>
-                            <div className={cn(
-                                "grid w-full items-center gap-2 p-4 rounded-xl bg-gray-100 border border-gray-200 border-dashed border-5 transition-all duration-200",
-                                !useMetadataOptions && "opacity-50 grayscale pointer-events-none"
-                            )}>
-                                <div className="grid w-full items-center gap-1.5">
-                                    <div className="flex items-center gap-2">
-                                        <div className={cn("w-3 h-3 rounded-full items-center justify-center", shopId ? "bg-red-500" : "bg-gray-500")}></div>
-                                        <label htmlFor="shopId" className="text-sm font-medium">{t('generate.shopId')}</label>
+                                    <div className="flex items-center gap-2 mt-4">
+                                        <Switch
+                                            id="useMetadataOptions"
+                                            checked={useMetadataOptions}
+                                            onCheckedChange={(checked: boolean) => setUseMetadataOptions(checked)}
+                                        />
+                                        <Label htmlFor="useMetadataOptions" className="text-sm font-medium cursor-pointer">
+                                            {t('generate.useMetadata')}
+                                        </Label>
                                     </div>
-                                    <Input
-                                        id="shopId"
-                                        type="text"
-                                        value={shopId}
-                                        placeholder="UUID..."
-                                        onChange={(e) => setShopId(e.target.value)}
-                                    />
-                                </div>
-                                <div className="grid w-full items-center gap-1.5">
-                                    <div className="flex items-center gap-2">
-                                        <div className={cn("w-3 h-3 rounded-full items-center justify-center", productId ? "bg-red-500" : "bg-gray-500")}></div>
-                                        <label htmlFor="productId" className="text-sm font-medium">{t('generate.productId')}</label>
-                                    </div>
-                                    <Input
-                                        id="productId"
-                                        type="text"
-                                        value={productId}
-                                        placeholder="UUID..."
-                                        onChange={(e) => setProductId(e.target.value)}
-                                    />
-                                </div>
-                                <div className="grid w-full items-center gap-1.5">
-                                    <div className="flex items-center gap-2">
-                                        <div className={cn("w-3 h-3 rounded-full items-center justify-center", ownerUuid ? "bg-red-500" : "bg-gray-500")}></div>
-                                        <label htmlFor="ownerUuid" className="text-sm font-medium">{t('generate.ownerUuid')}</label>
-                                    </div>
-                                    <Input
-                                        id="ownerUuid"
-                                        type="text"
-                                        value={ownerUuid}
-                                        placeholder="UUID..."
-                                        onChange={(e) => setOwnerUuid(e.target.value)}
-                                    />
-                                </div>
-                                <div className="grid w-full items-center gap-1.5">
-                                    <div className="flex items-center gap-2">
-                                        <div className={cn("w-3 h-3 rounded-full items-center justify-center", senderId ? "bg-red-500" : "bg-gray-500")}></div>
-                                        <label htmlFor="senderId" className="text-sm font-medium">{t('generate.senderId')}</label>
-                                    </div>
-                                    <Input
-                                        id="senderId"
-                                        type="text"
-                                        value={senderId}
-                                        placeholder="USER#UUID..."
-                                        onChange={(e) => setSenderId(e.target.value)}
-                                    />
-                                </div>
-                                <div className="grid w-full items-center gap-1.5">
-                                    <div className="flex items-center gap-2">
-                                        <div className={cn("w-3 h-3 rounded-full items-center justify-center", expiryDate ? "bg-red-500" : "bg-gray-500")}></div>
-                                        <label htmlFor="expiryDate" className="text-sm font-medium">{t('generate.expiryDate')}</label>
-                                    </div>
-                                    <Input
-                                        id="expiryDate"
-                                        type="datetime-local"
-                                        value={expiryDate}
-                                        onChange={(e) => setExpiryDate(e.target.value)}
-                                    />
-                                </div>
-                                <div className="grid w-full items-center gap-1.5">
-                                    <div className="flex items-center gap-2">
-                                        <div className={cn("w-3 h-3 rounded-full items-center justify-center", activateNow && shopId && productId ? "bg-red-500" : shopId && productId ? "bg-green-500" : "bg-gray-500")}></div>
-                                        <label htmlFor="activateNow" className="text-sm font-medium">{t('generate.activateNow')}</label>
-                                    </div>
-                                    <Switch
-                                        id="activateNow"
-                                        checked={(activateNow && shopId && productId) ? true : false}
-                                        disabled={!shopId || !productId}
-                                        onCheckedChange={(checkedstate: boolean) => setActivateNow(checkedstate)}
-                                    />
-                                </div>
-                            </div>
 
-                            <h3 className="text-sm font-semibold pt-8">{t('generate.pdfOptions')}</h3>
-                            <div className="space-y-4 rounded-xl bg-gray-100 border border-gray-200 border-dashed border-5 p-4">
-                                <div className="flex flex-row flex-wrap gap-1">
-                                    <div className="flex flex-row w-full">
-                                        <label className="flex w-20 items-center text-xs text-gray-700">{t('generate.paperFormat')}</label>
-                                        <select
-                                            className="w-full rounded-md p-2 text-sm border border-gray-200 shadow-sm"
-                                            value={paperFormat}
-                                            onChange={(e) => setPaperFormat(e.target.value)}
-                                        >
-                                            {Object.entries(paperformats).map(([key, value]: [string, any]) => (
-                                                <option key={key} value={key}>{value.description || key}</option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                    <div className="flex flex-row w-full">
-                                        <label className="flex w-20 items-center text-xs text-gray-700">{t('generate.cardFormat')}</label>
-                                        <select
-                                            className="w-full rounded-md p-2 text-sm border border-gray-200 shadow-sm"
-                                            value={cardFormat}
-                                            onChange={(e) => setCardFormat(e.target.value)}
-                                        >
-                                            {Object.entries(cardformats).map(([key, value]: [string, any]) => (
-                                                <option key={key} value={key}>{value.description || key}</option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                </div>
-
-                                {/* Card Preview */}
-                                <div className="">
-                                    {/* <div className="flex items-center gap-2 mb-3">
-                                        <Eye className="w-4 h-4 text-mist-300" />
-                                        <span className="text-xs font-semibold text-mist-300">{t('generate.cardPreview')}</span>
-                                    </div> */}
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div className="space-y-1">
-                                            <div className="aspect-[84/52] relative rounded shadow-lg overflow-hidden border border-gray-700 bg-white">
-                                                <img src={cardformats[cardFormat]?.bgimgf} alt={t('generate.frontPreview')} className="w-full h-full object-cover" />
+                                    <label htmlFor="shopId" className="text-sm font-medium mb-0 mt-2">{t('generate.option')}</label>
+                                    <div className={cn(
+                                        "grid w-full items-center gap-2 p-4 rounded-xl bg-gray-100 border border-gray-200 border-dashed border-5 transition-all duration-200",
+                                        !useMetadataOptions && "opacity-50 grayscale pointer-events-none"
+                                    )}>
+                                        <div className="grid w-full items-center gap-1.5">
+                                            <div className="flex items-center gap-2">
+                                                <div className={cn("w-3 h-3 rounded-full items-center justify-center", shopId ? "bg-red-500" : "bg-gray-500")}></div>
+                                                <label htmlFor="shopId" className="text-sm font-medium">{t('generate.shopId')}</label>
                                             </div>
-                                            <p className="text-[10px] text-gray-500 text-center uppercase tracking-wider">{t('generate.front')}</p>
+                                            <Input
+                                                id="shopId"
+                                                type="text"
+                                                value={shopId}
+                                                placeholder="UUID..."
+                                                onChange={(e) => setShopId(e.target.value)}
+                                            />
                                         </div>
-                                        <div className="space-y-1">
-                                            <div className="aspect-[84/52] relative rounded shadow-lg overflow-hidden border border-gray-700 bg-white">
-                                                <img src={cardformats[cardFormat]?.bgimgb} alt={t('generate.backPreview')} className="w-full h-full object-cover" />
+                                        <div className="grid w-full items-center gap-1.5">
+                                            <div className="flex items-center gap-2">
+                                                <div className={cn("w-3 h-3 rounded-full items-center justify-center", productId ? "bg-red-500" : "bg-gray-500")}></div>
+                                                <label htmlFor="productId" className="text-sm font-medium">{t('generate.productId')}</label>
                                             </div>
-                                            <p className="text-[10px] text-gray-500 text-center uppercase tracking-wider">{t('generate.back')}</p>
+                                            <Input
+                                                id="productId"
+                                                type="text"
+                                                value={productId}
+                                                placeholder="UUID..."
+                                                onChange={(e) => setProductId(e.target.value)}
+                                            />
+                                        </div>
+                                        <div className="grid w-full items-center gap-1.5">
+                                            <div className="flex items-center gap-2">
+                                                <div className={cn("w-3 h-3 rounded-full items-center justify-center", ownerUuid ? "bg-red-500" : "bg-gray-500")}></div>
+                                                <label htmlFor="ownerUuid" className="text-sm font-medium">{t('generate.ownerUuid')}</label>
+                                            </div>
+                                            <Input
+                                                id="ownerUuid"
+                                                type="text"
+                                                value={ownerUuid}
+                                                placeholder="UUID..."
+                                                onChange={(e) => setOwnerUuid(e.target.value)}
+                                            />
+                                        </div>
+                                        <div className="grid w-full items-center gap-1.5">
+                                            <div className="flex items-center gap-2">
+                                                <div className={cn("w-3 h-3 rounded-full items-center justify-center", senderId ? "bg-red-500" : "bg-gray-500")}></div>
+                                                <label htmlFor="senderId" className="text-sm font-medium">{t('generate.senderId')}</label>
+                                            </div>
+                                            <Input
+                                                id="senderId"
+                                                type="text"
+                                                value={senderId}
+                                                placeholder="USER#UUID..."
+                                                onChange={(e) => setSenderId(e.target.value)}
+                                            />
+                                        </div>
+                                        <div className="grid w-full items-center gap-1.5">
+                                            <div className="flex items-center gap-2">
+                                                <div className={cn("w-3 h-3 rounded-full items-center justify-center", expiryDate ? "bg-red-500" : "bg-gray-500")}></div>
+                                                <label htmlFor="expiryDate" className="text-sm font-medium">{t('generate.expiryDate')}</label>
+                                            </div>
+                                            <Input
+                                                id="expiryDate"
+                                                type="datetime-local"
+                                                value={expiryDate}
+                                                onChange={(e) => setExpiryDate(e.target.value)}
+                                            />
+                                        </div>
+                                        <div className="grid w-full items-center gap-1.5">
+                                            <div className="flex items-center gap-2">
+                                                <div className={cn("w-3 h-3 rounded-full items-center justify-center", activateNow && shopId && productId ? "bg-red-500" : shopId && productId ? "bg-green-500" : "bg-gray-500")}></div>
+                                                <label htmlFor="activateNow" className="text-sm font-medium">{t('generate.activateNow')}</label>
+                                            </div>
+                                            <Switch
+                                                id="activateNow"
+                                                checked={(activateNow && shopId && productId) ? true : false}
+                                                disabled={!shopId || !productId}
+                                                onCheckedChange={(checkedstate: boolean) => setActivateNow(checkedstate)}
+                                            />
                                         </div>
                                     </div>
-                                </div>
-                            </div>
 
-                            <div className="grid w-full items-center gap-1.5 mt-4">
-                                <Button
-                                    onClick={handleGenerate}
-                                    className="w-full items-center gap-1.5 h-12"
-                                    disabled={isGenerating}
-                                >
-                                    {isGenerating ? (
-                                        <>
-                                            <span className="animate-spin mr-2">⏳</span>
-                                            {t('generate.button')}...
-                                        </>
-                                    ) : (
-                                        t('generate.button')
-                                    )}
-                                </Button>
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
-
-
-                {/* このページを開いてから生成したQRコードのバッチ一覧 */}
-                <Card>
-                    <CardHeader>
-                        <CardTitle>{t('batches.title')}</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="space-y-4">
-                            {generatedBatches.length === 0 ? <p className="text-gray-500">{t('batches.noBatches')}</p> : (
-                                generatedBatches.map(batch => (
-                                    <div key={batch.id} className="bg-white border p-4 rounded-md">
-                                        <div className="flex flex-wrap items-center mb-2">
-                                            <div className="flex gap-2 flex-wrap flex-rows items-center">
-                                                <div>
-                                                    <p className="font-medium">{t('batches.batchId', { id: batch.id })}</p>
-                                                    <p className="text-sm text-gray-500">{t('batches.info', { count: batch.count, date: batch.date })}</p>
-                                                </div>
-                                                <p className="flex justify-center items-center text-sm bg-green-100 text-green-800 px-3 py-1 rounded-xl">{batch.status}</p>
-                                            </div>
-                                            <Button className="ml-auto" variant="outline" size="sm" onClick={() => generatePDF(batch, paperFormat, cardFormat)}>{t('batches.downloadPdf')}</Button>
-                                        </div>
-                                        {/* Display Codes */}
-                                        <div className="mt-2 bg-gray-100 p-2 rounded text-xs font-mono overflow-auto max-h-40">
-                                            <table className="w-full text-left">
-                                                <thead>
-                                                    <tr>
-                                                        <th>{t('batches.table.uuid')}</th>
-                                                        <th>{t('batches.table.pin')}</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    {batch.codes?.map((code: any) => (
-                                                        <tr key={code.uuid}>
-                                                            <td className="pr-4 select-all">{code.uuid}</td>
-                                                            <td className="select-all">{code.pin}</td>
-                                                        </tr>
+                                    <h3 className="text-sm font-semibold pt-8">{t('generate.pdfOptions')}</h3>
+                                    <div className="space-y-4 rounded-xl bg-gray-100 border border-gray-200 border-dashed border-5 p-4">
+                                        <div className="flex flex-row flex-wrap gap-1">
+                                            <div className="flex flex-row w-full">
+                                                <label className="flex w-20 items-center text-xs text-gray-700">{t('generate.paperFormat')}</label>
+                                                <select
+                                                    className="w-full rounded-md p-2 text-sm border border-gray-200 shadow-sm"
+                                                    value={paperFormat}
+                                                    onChange={(e) => setPaperFormat(e.target.value)}
+                                                >
+                                                    {Object.entries(paperformats).map(([key, value]: [string, any]) => (
+                                                        <option key={key} value={key}>{value.description || key}</option>
                                                     ))}
-                                                </tbody>
-                                            </table>
+                                                </select>
+                                            </div>
+                                            <div className="flex flex-row w-full">
+                                                <label className="flex w-20 items-center text-xs text-gray-700">{t('generate.cardFormat')}</label>
+                                                <select
+                                                    className="w-full rounded-md p-2 text-sm border border-gray-200 shadow-sm"
+                                                    value={cardFormat}
+                                                    onChange={(e) => setCardFormat(e.target.value)}
+                                                >
+                                                    {Object.entries(cardformats).map(([key, value]: [string, any]) => (
+                                                        <option key={key} value={key}>{value.description || key}</option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                        </div>
+
+                                        {/* Card Preview */}
+                                        <div className="">
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div className="space-y-1">
+                                                    <div className="aspect-[84/52] relative rounded shadow-lg overflow-hidden border border-gray-700 bg-white">
+                                                        <img src={cardformats[cardFormat]?.bgimgf} alt={t('generate.frontPreview')} className="w-full h-full object-cover" />
+                                                    </div>
+                                                    <p className="text-[10px] text-gray-500 text-center uppercase tracking-wider">{t('generate.front')}</p>
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <div className="aspect-[84/52] relative rounded shadow-lg overflow-hidden border border-gray-700 bg-white">
+                                                        <img src={cardformats[cardFormat]?.bgimgb} alt={t('generate.backPreview')} className="w-full h-full object-cover" />
+                                                    </div>
+                                                    <p className="text-[10px] text-gray-500 text-center uppercase tracking-wider">{t('generate.back')}</p>
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
-                                ))
-                            )}
-                        </div>
-                    </CardContent>
-                </Card>
+
+                                    <div className="grid w-full items-center gap-1.5 mt-4">
+                                        <Button
+                                            onClick={handleGenerate}
+                                            className="w-full items-center gap-1.5 h-12"
+                                            disabled={isGenerating}
+                                        >
+                                            {isGenerating ? (
+                                                <>
+                                                    <span className="animate-spin mr-2">⏳</span>
+                                                    {t('generate.button')}...
+                                                </>
+                                            ) : (
+                                                t('generate.button')
+                                            )}
+                                        </Button>
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
 
 
-                {/* すべてのQRコード一覧 */}
-                <QRCodeListSection apiUrl={NEXT_PUBLIC_API_URL} onGeneratePDF={generatePDF} paperFormat={paperFormat} cardFormat={cardFormat} />
+                        {/* このページを開いてから生成したQRコードのバッチ一覧 */}
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>{t('batches.title')}</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="space-y-4">
+                                    {generatedBatches.length === 0 ? <p className="text-gray-500">{t('batches.noBatches')}</p> : (
+                                        generatedBatches.map(batch => (
+                                            <div key={batch.id} className="bg-white border p-4 rounded-md">
+                                                <div className="flex flex-wrap items-center mb-2">
+                                                    <div className="flex gap-2 flex-wrap flex-rows items-center">
+                                                        <div>
+                                                            <p className="font-medium">{t('batches.batchId', { id: batch.id })}</p>
+                                                            <p className="text-sm text-gray-500">{t('batches.info', { count: batch.count, date: batch.date })}</p>
+                                                        </div>
+                                                        <p className="flex justify-center items-center text-sm bg-green-100 text-green-800 px-3 py-1 rounded-xl">{batch.status}</p>
+                                                    </div>
+                                                    <Button className="ml-auto" variant="outline" size="sm" onClick={() => generatePDF(batch, paperFormat, cardFormat)}>{t('batches.downloadPdf')}</Button>
+                                                </div>
+                                                {/* Display Codes */}
+                                                <div className="mt-2 bg-gray-100 p-2 rounded text-xs font-mono overflow-auto max-h-40">
+                                                    <table className="w-full text-left">
+                                                        <thead>
+                                                            <tr>
+                                                                <th>{t('batches.table.uuid')}</th>
+                                                                <th>{t('batches.table.pin')}</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            {batch.codes?.map((code: any) => (
+                                                                <tr key={code.uuid}>
+                                                                    <td className="pr-4 select-all">{code.uuid}</td>
+                                                                    <td className="select-all">{code.pin}</td>
+                                                                </tr>
+                                                            ))}
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+                            </CardContent>
+                        </Card>
 
-                {/* ショップの新規作成 (NEW) */}
-                <AdminShopCreationSection apiUrl={NEXT_PUBLIC_API_URL} />
 
-                {/* ショップオーナーの変更 (NEW) */}
-                <ShopOwnerChangeSection apiUrl={NEXT_PUBLIC_API_URL} />
+                        {/* すべてのQRコード一覧 */}
+                        <QRCodeListSection apiUrl={NEXT_PUBLIC_API_URL} onGeneratePDF={generatePDF} paperFormat={paperFormat} cardFormat={cardFormat} />
+                    </div>
+                )}
 
-                {/* ショップ管理者の紐づけ (NEW) */}
-                <ManagerLinkingSection apiUrl={NEXT_PUBLIC_API_URL} />
+                {activeTab === "shops" && (
+                    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                        {/* ショップの新規作成 (NEW) */}
+                        <AdminShopCreationSection apiUrl={NEXT_PUBLIC_API_URL} />
 
-                {/* データダンプ */}
-                <DataDumpSection apiUrl={NEXT_PUBLIC_API_URL} />
+                        {/* ショップオーナーの変更 (NEW) */}
+                        <ShopOwnerChangeSection apiUrl={NEXT_PUBLIC_API_URL} />
+
+                        {/* ショップ管理者の紐づけ (NEW) */}
+                        <ManagerLinkingSection apiUrl={NEXT_PUBLIC_API_URL} />
+                    </div>
+                )}
+
+                {activeTab === "tools" && (
+                    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                        {/* データダンプ */}
+                        <DataDumpSection apiUrl={NEXT_PUBLIC_API_URL} />
+                    </div>
+                )}
 
             </div>
         </div>

@@ -479,6 +479,11 @@
   "AdminPage": {
     "title": "管理ダッシュボード",
     "qrAdminLoginPage": "管理者ログイン画面",
+    "tabs": {
+      "qrcodes": "QRコード",
+      "shops": "ショップ管理",
+      "tools": "ツール"
+    },
     "AdminNeed2FA": "管理者は2段階認証が必要です",
     "generate": {
       "title": "QRコード生成",
