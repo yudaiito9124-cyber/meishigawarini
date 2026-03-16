@@ -479,7 +479,12 @@
   "AdminPage": {
     "title": "Admin Dashboard",
     "qrAdminLoginPage": "Admin Login Page",
-    "AdminNeed2FA": "Admin Requred 2FA",
+    "tabs": {
+      "qrcodes": "QR Codes",
+      "shops": "Shop Management",
+      "tools": "Tools"
+    },
+    "AdminNeed2FA": "Admin Required 2FA",
     "generate": {
       "title": "Generate QR Codes",
       "option": "Options",
@@ -566,7 +571,63 @@
         "placeholder": "Enter keyword to search by UUID (at least 8 characters)",
         "tooShort": "Keyword must be at least 8 characters long."
       },
-      "raw": "Raw Data"
+      "raw": "Raw Data",
+      "dump": {
+        "title": "Data Dump (userId / shopId)",
+        "userId": "User ID (UUID without USER#)",
+        "shopId": "Shop ID (UUID without SHOP#)",
+        "button": "Get Data",
+        "loading": "Loading...",
+        "noItems": "No data found.",
+        "error": "An error occurred during data retrieval."
+      },
+      "managerLinking": {
+        "title": "Link Shop Managers",
+        "description": "Update multiple shops and users in bulk and grant management privileges (GM).",
+        "shopIds": "Shop ID List (new line separated)",
+        "userIds": "User ID List (new line separated)",
+        "validateButton": "Validate Linking",
+        "validating": "Validating...",
+        "confirmTitle": "Confirm Linking",
+        "confirmMessage": "The following shops and users will be linked. Are you sure?",
+        "userList": "Target Users",
+        "shopList": "Target Shops",
+        "executeButton": "Execute Linking",
+        "executing": "Executing...",
+        "success": "Linking successful",
+        "error": "An error occurred",
+        "errorMissingIds": "Contains non-existent IDs: {ids}",
+        "cancel": "Cancel"
+      },
+      "shopCreation": {
+        "title": "Create New Shop",
+        "description": "Create a new shop for a specific user with default settings.",
+        "userId": "User ID (UUID without USER#)",
+        "checkButton": "Check User",
+        "validating": "Validating...",
+        "confirmTitle": "Confirm Shop Creation",
+        "confirmMessage": "Create a shop for user \"{email}\" with a default name. Are you sure?",
+        "executeButton": "Execute Creation",
+        "executing": "Creating...",
+        "success": "Shop created successfully",
+        "error": "An error occurred",
+        "cancel": "Cancel"
+      },
+      "ownerChange": {
+        "title": "Change Shop Owner",
+        "description": "Change the owner of a specific shop to another user. The shop's owner email address and permissions will also be updated.",
+        "shopId": "Shop ID (UUID without SHOP#)",
+        "newUserId": "New owner's User ID (UUID without USER#)",
+        "checkButton": "Check Changes",
+        "validating": "Validating...",
+        "confirmTitle": "Confirm Owner Change",
+        "confirmMessage": "Change the owner of shop \"{shopName}\" from \"{oldEmail}\" to \"{newEmail}\". Are you sure?",
+        "executeButton": "Execute Change",
+        "executing": "Executing...",
+        "success": "Owner changed successfully",
+        "error": "An error occurred",
+        "cancel": "Cancel"
+      }
     },
     "shopInfo": {
       "title": "Shop Information",
