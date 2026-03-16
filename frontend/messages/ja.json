@@ -566,7 +566,63 @@
         "placeholder": "UUIDで検索 (8文字以上)",
         "tooShort": "キーワードは8文字以上で入力してください。"
       },
-      "raw": "生データ"
+      "raw": "生データ",
+      "dump": {
+        "title": "データダンプ (userId / shopId)",
+        "userId": "ユーザーID (USER#を除いたUUID)",
+        "shopId": "ショップID (SHOP#を除いたUUID)",
+        "button": "データ取得",
+        "loading": "取得中...",
+        "noItems": "データが見つかりませんでした。",
+        "error": "データ取得中にエラーが発生しました。"
+      },
+      "managerLinking": {
+        "title": "ショップ管理者の紐づけ",
+        "description": "複数のショップとユーザーをバルクで更新し，管理権限(GM)を付与します。",
+        "shopIds": "ショップID一覧 (改行区切り)",
+        "userIds": "ユーザーID一覧 (改行区切り)",
+        "validateButton": "紐づけを確認",
+        "validating": "確認中...",
+        "confirmTitle": "紐づけの確認",
+        "confirmMessage": "以下のショップとユーザーを紐づけます。よろしいですか？",
+        "userList": "対象ユーザー",
+        "shopList": "対象ショップ",
+        "executeButton": "紐づけを実行",
+        "executing": "実行中...",
+        "success": "紐づけに成功しました",
+        "error": "エラーが発生しました",
+        "errorMissingIds": "存在しないIDが含まれています: {ids}",
+        "cancel": "キャンセル"
+      },
+      "shopCreation": {
+        "title": "ショップの新規作成",
+        "description": "特定のユーザーに対して、デフォルト設定で新しいショップを作成します。",
+        "userId": "ユーザーID (USER#を除いたUUID)",
+        "checkButton": "ユーザーを確認",
+        "validating": "確認中...",
+        "confirmTitle": "ショップ作成の確認",
+        "confirmMessage": "ユーザー「{email}」のショップをデフォルト名で作成します。よろしいですか？",
+        "executeButton": "作成を実行",
+        "executing": "作成中...",
+        "success": "ショップを作成しました",
+        "error": "エラーが発生しました",
+        "cancel": "キャンセル"
+      },
+      "ownerChange": {
+        "title": "ショップオーナーの変更",
+        "description": "特定のショップのオーナーを別のユーザーに変更します。ショップのオーナーメールアドレスや権限も更新されます。",
+        "shopId": "ショップID (SHOP#を除いたUUID)",
+        "newUserId": "新オーナーのユーザーID (USER#を除いたUUID)",
+        "checkButton": "変更内容を確認",
+        "validating": "確認中...",
+        "confirmTitle": "オーナー変更の確認",
+        "confirmMessage": "ショップ「{shopName}」のオーナーを「{oldEmail}」から「{newEmail}」に変更します。よろしいですか？",
+        "executeButton": "変更を実行",
+        "executing": "実行中...",
+        "success": "オーナーを変更しました",
+        "error": "エラーが発生しました",
+        "cancel": "キャンセル"
+      }
     },
     "shopInfo": {
       "title": "ショップ情報",

@@ -33,6 +33,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { Link, useRouter } from '@/i18n/routing';
+import { Textarea } from "@/components/ui/textarea";
 
 export default function AdminPage() {
     const t = useTranslations('AdminPage');
@@ -428,6 +429,19 @@ export default function AdminPage() {
 
                 {/* すべてのQRコード一覧 */}
                 <QRCodeListSection apiUrl={NEXT_PUBLIC_API_URL} onGeneratePDF={generatePDF} paperFormat={paperFormat} cardFormat={cardFormat} />
+
+                {/* ショップの新規作成 (NEW) */}
+                <AdminShopCreationSection apiUrl={NEXT_PUBLIC_API_URL} />
+
+                {/* ショップオーナーの変更 (NEW) */}
+                <ShopOwnerChangeSection apiUrl={NEXT_PUBLIC_API_URL} />
+
+                {/* ショップ管理者の紐づけ (NEW) */}
+                <ManagerLinkingSection apiUrl={NEXT_PUBLIC_API_URL} />
+
+                {/* データダンプ */}
+                <DataDumpSection apiUrl={NEXT_PUBLIC_API_URL} />
+
             </div>
         </div>
     );
@@ -975,5 +989,526 @@ function BanButton({ uuid, apiUrl, onSuccess }: { uuid: string, apiUrl: string, 
         <Button variant="destructive" size="sm" onClick={(e) => { e.stopPropagation(); handleBan(); }} disabled={loading} className="h-6 text-xs bg-red-600 hover:bg-red-700">
             {loading ? '...' : t('list.ban.button')}
         </Button>
+    );
+}
+
+function DataDumpSection({ apiUrl }: { apiUrl: string }) {
+    const t = useTranslations('AdminPage');
+    const [userId, setUserId] = useState("");
+    const [shopId, setShopId] = useState("");
+    const [data, setData] = useState<any>(null);
+    const [loading, setLoading] = useState(false);
+
+    const handleDump = async () => {
+        if (!userId && !shopId) return;
+        setLoading(true);
+        try {
+            const session = await fetchAuthSession();
+            const token = session.tokens?.idToken?.toString();
+
+            let url = `${apiUrl}/admin/dump?`;
+            if (userId) url += `userId=${encodeURIComponent(userId)}&`;
+            if (shopId) url += `shopId=${encodeURIComponent(shopId)}`;
+
+            const res = await fetch(url, {
+                headers: {
+                    "Authorization": `Bearer ${token}`
+                }
+            });
+            if (res.ok) {
+                const result = await res.json();
+                setData(result.items);
+            } else {
+                alert(t('list.dump.error'));
+            }
+        } catch (e) {
+            alert(t('list.dump.error'));
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <Card className="flex flex-col w-full">
+            <CardHeader className="flex-none">
+                <CardTitle>{t('list.dump.title')}</CardTitle>
+            </CardHeader>
+            <CardContent className="">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                        <Label htmlFor="dumpUserId">{t('list.dump.userId')}</Label>
+                        <Input
+                            id="dumpUserId"
+                            placeholder="USER#..."
+                            value={userId}
+                            onChange={(e) => setUserId(e.target.value)}
+                        />
+                    </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="dumpShopId">{t('list.dump.shopId')}</Label>
+                        <Input
+                            id="dumpShopId"
+                            placeholder="SHOP#..."
+                            value={shopId}
+                            onChange={(e) => setShopId(e.target.value)}
+                        />
+                    </div>
+                </div>
+                <Button onClick={handleDump} disabled={loading || (!userId && !shopId)} className="w-full sticky top-0 z-10 mt-3">
+                    {loading ? t('list.dump.loading') : t('list.dump.button')}
+                </Button>
+                {data && (
+                    <div className="mt-4 ">
+                        {data.length === 0 ? (
+                            <p className="text-gray-500 text-sm">{t('list.dump.noItems')}</p>
+                        ) : (
+                            <pre className="bg-gray-100 p-4 rounded-xl text-xs font-mono overflow-auto max-h-96 text-black h-[70vh] max-h-[70vh]">
+                                {JSON.stringify(data, null, 2)}
+                            </pre>
+                        )}
+                    </div>
+                )}
+            </CardContent>
+        </Card>
+    );
+}
+
+function ManagerLinkingSection({ apiUrl }: { apiUrl: string }) {
+    const t = useTranslations('AdminPage');
+    const [userIdsStr, setUserIdsStr] = useState("");
+    const [shopIdsStr, setShopIdsStr] = useState("");
+    const [loading, setLoading] = useState(false);
+    const [validationData, setValidationData] = useState<{ users: any[], shops: any[] } | null>(null);
+    const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+
+    const handleValidate = async () => {
+        const uids = userIdsStr.split('\n').map(s => s.trim()).filter(Boolean);
+        const sids = shopIdsStr.split('\n').map(s => s.trim()).filter(Boolean);
+
+        if (uids.length === 0 || sids.length === 0) return;
+
+        setLoading(true);
+        try {
+            const session = await fetchAuthSession();
+            const token = session.tokens?.idToken?.toString();
+
+            const res = await fetch(`${apiUrl}/admin/links`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    userIds: uids,
+                    shopIds: sids,
+                    action: 'validate'
+                }),
+            });
+
+            if (res.ok) {
+                const data = await res.json();
+                setValidationData(data);
+                setIsConfirmOpen(true);
+            } else {
+                const errData = await res.json().catch(() => null);
+                if (errData?.missingIdsFormatted) {
+                    alert(t('list.managerLinking.errorMissingIds', { ids: errData.missingIdsFormatted }));
+                } else {
+                    alert(t('list.managerLinking.error'));
+                }
+            }
+        } catch (e) {
+            alert(t('list.managerLinking.error'));
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleExecute = async () => {
+        const uids = userIdsStr.split('\n').map(s => s.trim()).filter(Boolean);
+        const sids = shopIdsStr.split('\n').map(s => s.trim()).filter(Boolean);
+
+        setLoading(true);
+        try {
+            const session = await fetchAuthSession();
+            const token = session.tokens?.idToken?.toString();
+
+            const res = await fetch(`${apiUrl}/admin/links`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    userIds: uids,
+                    shopIds: sids,
+                    action: 'execute'
+                }),
+            });
+
+            if (res.ok) {
+                alert(t('list.managerLinking.success'));
+                setIsConfirmOpen(false);
+                setUserIdsStr("");
+                setShopIdsStr("");
+                setValidationData(null);
+            } else {
+                alert(t('list.managerLinking.error'));
+            }
+        } catch (e) {
+            alert(t('list.managerLinking.error'));
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle>{t('list.managerLinking.title')}</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+                <p className="text-sm text-gray-500">{t('list.managerLinking.description')}</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                        <Label htmlFor="linkingUserIds">{t('list.managerLinking.userIds')}</Label>
+                        <Textarea
+                            id="linkingUserIds"
+                            placeholder="UUID\nUUID..."
+                            value={userIdsStr}
+                            onChange={(e) => setUserIdsStr(e.target.value)}
+                            className="min-h-[120px] font-mono text-sm text-black"
+                        />
+                    </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="linkingShopIds">{t('list.managerLinking.shopIds')}</Label>
+                        <Textarea
+                            id="linkingShopIds"
+                            placeholder="UUID\nUUID..."
+                            value={shopIdsStr}
+                            onChange={(e) => setShopIdsStr(e.target.value)}
+                            className="min-h-[120px] font-mono text-sm text-black"
+                        />
+                    </div>
+                </div>
+                <Button onClick={handleValidate} disabled={loading || !userIdsStr || !shopIdsStr} className="w-full">
+                    {loading ? t('list.managerLinking.validating') : t('list.managerLinking.validateButton')}
+                </Button>
+
+                <Dialog open={isConfirmOpen} onOpenChange={setIsConfirmOpen}>
+                    <DialogContent className="max-w-2xl">
+                        <DialogHeader>
+                            <DialogTitle>{t('list.managerLinking.confirmTitle')}</DialogTitle>
+                            <DialogDescription>
+                                {t('list.managerLinking.confirmMessage')}
+                            </DialogDescription>
+                        </DialogHeader>
+                        <div className="space-y-4 py-4 max-h-[60vh] overflow-y-auto">
+                            <div className="space-y-2">
+                                <h4 className="font-semibold text-sm border-b pb-1">{t('list.managerLinking.userList')}</h4>
+                                <ul className="list-disc list-inside space-y-1 text-sm">
+                                    {validationData?.users.map((u: any) => (
+                                        <li key={u.id}>
+                                            <span className="font-mono text-xs text-gray-500 mr-2">{u.id}</span>
+                                            <span className="font-medium">{u.email}</span>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
+                            <div className="space-y-2">
+                                <h4 className="font-semibold text-sm border-b pb-1">{t('list.managerLinking.shopList')}</h4>
+                                <ul className="list-disc list-inside space-y-1 text-sm">
+                                    {validationData?.shops.map((s: any) => (
+                                        <li key={s.id}>
+                                            <span className="font-mono text-xs text-gray-500 mr-2">{s.id}</span>
+                                            <span className="font-medium">{s.name}</span>
+                                            <span className="text-gray-500 text-xs ml-2">({s.email})</span>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
+                        </div>
+                        <div className="flex gap-2 justify-end">
+                            <Button variant="outline" onClick={() => setIsConfirmOpen(false)} disabled={loading}>
+                                {t('list.managerLinking.cancel')}
+                            </Button>
+                            <Button onClick={handleExecute} disabled={loading}>
+                                {loading ? t('list.managerLinking.executing') : t('list.managerLinking.executeButton')}
+                            </Button>
+                        </div>
+                    </DialogContent>
+                </Dialog>
+            </CardContent>
+        </Card>
+    );
+}
+
+function ShopOwnerChangeSection({ apiUrl }: { apiUrl: string }) {
+    const t = useTranslations('AdminPage');
+    const [shopId, setShopId] = useState("");
+    const [newUserId, setNewUserId] = useState("");
+    const [loading, setLoading] = useState(false);
+    const [validationData, setValidationData] = useState<{ shopName: string, oldOwnerEmail: string, newOwnerEmail: string } | null>(null);
+    const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+
+    const handleValidate = async () => {
+        if (!shopId.trim() || !newUserId.trim()) return;
+        setLoading(true);
+        try {
+            const session = await fetchAuthSession();
+            const token = session.tokens?.idToken?.toString();
+
+            const res = await fetch(`${apiUrl}/admin/shops/${shopId.trim().replace(/^SHOP#/, "")}/owner`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    shopId: shopId.trim().replace(/^SHOP#/, ""),
+                    newUserId: newUserId.trim().replace(/^USER#/, ""),
+                    action: 'validate'
+                }),
+            });
+
+            if (res.ok) {
+                const data = await res.json();
+                setValidationData(data);
+                setIsConfirmOpen(true);
+            } else {
+                const errData = await res.json().catch(() => null);
+                let msg = t('list.ownerChange.error');
+                if (errData?.message) msg += ": " + errData.message;
+                if (errData?.error) msg += " (" + errData.error + ")";
+                alert(msg);
+            }
+        } catch (e) {
+            alert(t('list.ownerChange.error'));
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleExecute = async () => {
+        if (!shopId.trim() || !newUserId.trim()) return;
+        setLoading(true);
+        try {
+            const session = await fetchAuthSession();
+            const token = session.tokens?.idToken?.toString();
+
+            const res = await fetch(`${apiUrl}/admin/shops/${shopId.trim().replace(/^SHOP#/, "")}/owner`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    shopId: shopId.trim().replace(/^SHOP#/, ""),
+                    newUserId: newUserId.trim().replace(/^USER#/, ""),
+                    action: 'execute'
+                }),
+            });
+
+            if (res.ok) {
+                alert(t('list.ownerChange.success'));
+                setIsConfirmOpen(false);
+                setShopId("");
+                setNewUserId("");
+                setValidationData(null);
+            } else {
+                const errData = await res.json().catch(() => null);
+                let msg = t('list.ownerChange.error');
+                if (errData?.message) msg += ": " + errData.message;
+                if (errData?.error) msg += " (" + errData.error + ")";
+                alert(msg);
+            }
+        } catch (e) {
+            alert(t('list.ownerChange.error'));
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle>{t('list.ownerChange.title')}</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+                <p className="text-sm text-gray-500">{t('list.ownerChange.description')}</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                        <Label htmlFor="ownerChangeShopId">{t('list.ownerChange.shopId')}</Label>
+                        <Input
+                            id="ownerChangeShopId"
+                            placeholder="UUID..."
+                            value={shopId}
+                            onChange={(e) => setShopId(e.target.value)}
+                            className="font-mono text-sm text-black"
+                        />
+                    </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="ownerChangeNewUserId">{t('list.ownerChange.newUserId')}</Label>
+                        <Input
+                            id="ownerChangeNewUserId"
+                            placeholder="UUID..."
+                            value={newUserId}
+                            onChange={(e) => setNewUserId(e.target.value)}
+                            className="font-mono text-sm text-black"
+                        />
+                    </div>
+                </div>
+                <Button onClick={handleValidate} disabled={loading || !shopId.trim() || !newUserId.trim()} className="w-full">
+                    {loading ? t('list.ownerChange.validating') : t('list.ownerChange.checkButton')}
+                </Button>
+
+                <Dialog open={isConfirmOpen} onOpenChange={setIsConfirmOpen}>
+                    <DialogContent>
+                        <DialogHeader>
+                            <DialogTitle>{t('list.ownerChange.confirmTitle')}</DialogTitle>
+                            <DialogDescription>
+                                {validationData && t('list.ownerChange.confirmMessage', {
+                                    shopName: validationData.shopName,
+                                    oldEmail: validationData.oldOwnerEmail,
+                                    newEmail: validationData.newOwnerEmail
+                                })}
+                            </DialogDescription>
+                        </DialogHeader>
+                        <div className="flex gap-2 justify-end mt-4">
+                            <Button variant="outline" onClick={() => setIsConfirmOpen(false)} disabled={loading}>
+                                {t('list.ownerChange.cancel')}
+                            </Button>
+                            <Button onClick={handleExecute} disabled={loading}>
+                                {loading ? t('list.ownerChange.executing') : t('list.ownerChange.executeButton')}
+                            </Button>
+                        </div>
+                    </DialogContent>
+                </Dialog>
+            </CardContent>
+        </Card>
+    );
+}
+
+function AdminShopCreationSection({ apiUrl }: { apiUrl: string }) {
+    const t = useTranslations('AdminPage');
+    const [userId, setUserId] = useState("");
+    const [loading, setLoading] = useState(false);
+    const [userData, setUserData] = useState<{ id: string, email: string } | null>(null);
+    const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+
+    const handleCheckUser = async () => {
+        if (!userId.trim()) return;
+        setLoading(true);
+        try {
+            const session = await fetchAuthSession();
+            const token = session.tokens?.idToken?.toString();
+
+            const res = await fetch(`${apiUrl}/admin/links`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    userIds: [userId.trim().replace(/^USER#/, "")],
+                    shopIds: [],
+                    action: 'validate'
+                }),
+            });
+
+            if (res.ok) {
+                const data = await res.json();
+                if (data.users && data.users.length > 0) {
+                    setUserData(data.users[0]);
+                    setIsConfirmOpen(true);
+                }
+            } else {
+                const errData = await res.json().catch(() => null);
+                alert(t('list.shopCreation.error'));
+            }
+        } catch (e) {
+            alert(t('list.shopCreation.error'));
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleCreateShop = async () => {
+        if (!userData) return;
+        setLoading(true);
+        try {
+            const session = await fetchAuthSession();
+            const token = session.tokens?.idToken?.toString();
+
+            const res = await fetch(`${apiUrl}/shop`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    name: "My Default Shop",
+                    owner_id: userData.id,
+                    gm_ids: []
+                }),
+            });
+
+            if (res.ok) {
+                alert(t('list.shopCreation.success'));
+                setIsConfirmOpen(false);
+                setUserId("");
+                setUserData(null);
+            } else {
+                const errData = await res.json().catch(() => null);
+                alert(t('list.shopCreation.error') + (errData?.message ? ": " + errData.message : ""));
+            }
+        } catch (e) {
+            alert(t('list.shopCreation.error'));
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle>{t('list.shopCreation.title')}</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+                <p className="text-sm text-gray-500">{t('list.shopCreation.description')}</p>
+                <div className="space-y-2">
+                    <Label htmlFor="creationUserId">{t('list.shopCreation.userId')}</Label>
+                    <Input
+                        id="creationUserId"
+                        placeholder="UUID..."
+                        value={userId}
+                        onChange={(e) => setUserId(e.target.value)}
+                        className="font-mono text-sm text-black"
+                    />
+                </div>
+                <Button onClick={handleCheckUser} disabled={loading || !userId.trim()} className="w-full">
+                    {loading ? t('list.shopCreation.validating') : t('list.shopCreation.checkButton')}
+                </Button>
+
+                <Dialog open={isConfirmOpen} onOpenChange={setIsConfirmOpen}>
+                    <DialogContent>
+                        <DialogHeader>
+                            <DialogTitle>{t('list.shopCreation.confirmTitle')}</DialogTitle>
+                            <DialogDescription>
+                                {t('list.shopCreation.confirmMessage', { email: userData?.email || "" })}
+                            </DialogDescription>
+                        </DialogHeader>
+                        <div className="flex gap-2 justify-end mt-4">
+                            <Button variant="outline" onClick={() => setIsConfirmOpen(false)} disabled={loading}>
+                                {t('list.shopCreation.cancel')}
+                            </Button>
+                            <Button onClick={handleCreateShop} disabled={loading}>
+                                {loading ? t('list.shopCreation.executing') : t('list.shopCreation.executeButton')}
+                            </Button>
+                        </div>
+                    </DialogContent>
+                </Dialog>
+            </CardContent>
+        </Card>
     );
 }

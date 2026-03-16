@@ -145,6 +145,13 @@ export class InfraStack extends cdk.Stack {
     }));
     bucket.grantRead(adminListFn);
 
+    // Lambda: Admin Dump (NEW)
+    const adminDumpFn = new nodejs.NodejsFunction(this, 'AdminDumpFn', {
+      entry: path.join(__dirname, '../lambda/admin-dump.ts'),
+      ...commonProps,
+    });
+    table.grantReadData(adminDumpFn);
+
     // Lambda: Shop & Product Mgmt
     const shopMgmtFn = new nodejs.NodejsFunction(this, 'ShopMgmtFn', {
       entry: path.join(__dirname, '../lambda/shop-mgmt.ts'),
@@ -344,8 +351,25 @@ export class InfraStack extends cdk.Stack {
     });
     table.grantReadWriteData(adminUpdateFn);
 
+    // Lambda: Admin Link Manager (NEW)
+    const adminLinkManagerFn = new nodejs.NodejsFunction(this, 'AdminLinkManagerFn', {
+      entry: path.join(__dirname, '../lambda/admin-link-manager.ts'),
+      ...commonProps,
+    });
+    table.grantReadWriteData(adminLinkManagerFn);
+
     // Admin List Route
     qrResource.addMethod('GET', new apigateway.LambdaIntegration(adminListFn), {
+      authorizer: adminAuthorizer,
+    });
+
+    const dumpResource = adminResource.addResource('dump');
+    dumpResource.addMethod('GET', new apigateway.LambdaIntegration(adminDumpFn), {
+      authorizer: adminAuthorizer,
+    });
+
+    const linksResource = adminResource.addResource('links');
+    linksResource.addMethod('POST', new apigateway.LambdaIntegration(adminLinkManagerFn), {
       authorizer: adminAuthorizer,
     });
 
@@ -359,6 +383,28 @@ export class InfraStack extends cdk.Stack {
     const bannedResource = qrResource.addResource('banned');
     bannedResource.addMethod('DELETE', new apigateway.LambdaIntegration(adminDeleteBannedFn), {
       authorizer: adminAuthorizer,
+    });
+
+    // Lambda: Admin Change Owner (NEW)
+    const adminChangeOwnerFn = new nodejs.NodejsFunction(this, 'AdminChangeOwnerFn', {
+      entry: path.join(__dirname, '../lambda/admin-change-owner.ts'),
+      ...commonProps,
+      environment: {
+        ...commonProps.environment,
+        USER_POOL_ID: userPool.userPoolId,
+      }
+    });
+    table.grantReadWriteData(adminChangeOwnerFn);
+    adminChangeOwnerFn.addToRolePolicy(new iam.PolicyStatement({
+      actions: ['cognito-idp:AdminGetUser'],
+      resources: [userPool.userPoolArn]
+    }));
+
+    const adminShopsResource = adminResource.addResource('shops');
+    const adminShopIdResource = adminShopsResource.addResource('{shopId}');
+    const ownerResource = adminShopIdResource.addResource('owner');
+    ownerResource.addMethod('POST', new apigateway.LambdaIntegration(adminChangeOwnerFn), {
+        authorizer: adminAuthorizer,
     });
 
     // Admin QR Detail Routes
