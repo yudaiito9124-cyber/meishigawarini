@@ -1,3 +1,5 @@
+TEIAN.txt
+
 <style>
     /* 1. リセット & 埋め込み環境への干渉防止 */
     .teian-video-root, .teian-video-root * {
