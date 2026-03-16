@@ -180,8 +180,8 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 
         // 1. Create Shop (POST /shop)
         if (method === 'POST' && path.endsWith('/shop') && !shopId) {
-            if (!userId) return { statusCode: 401, headers: corsHeaders, body: 'Unauthorized' };
-            if (!isAdmin) return { statusCode: 401, headers: corsHeaders, body: 'Unauthorized' };
+            if (!userId) return { statusCode: 401, headers: corsHeaders, body: JSON.stringify({ message: 'Unauthorized' }) };
+            if (!isAdmin) return { statusCode: 401, headers: corsHeaders, body: JSON.stringify({ message: 'Unauthorized' }) };
 
             const body = JSON.parse(event.body || '{}');
             const { name, owner_id, gm_ids } = body;

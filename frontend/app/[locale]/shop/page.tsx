@@ -170,7 +170,7 @@ export default function ShopListPage() {
                     )}
                     {isAdmin && (
 
-                        <div className="flex w-full h-full flex-col sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
+                        <div className="flex w-full h-full flex-col sm:flex-row sm:items-center sm:justify-between sm:space-y-0 min-h-40">
                             <Dialog>
                                 <DialogTrigger asChild className="flex w-full h-full">
                                     <Button size="lg" className="text-xs md:text-sm" >{t('createShop')}</Button>
