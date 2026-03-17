@@ -239,7 +239,7 @@ export default function AdminPage() {
                     </Link>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-8">
                     <button
                         onClick={() => setActiveTab("qrcodes")}
                         className={cn(
@@ -251,6 +251,18 @@ export default function AdminPage() {
                     >
                         <QrCode className={cn("w-12 h-12 mb-3", activeTab === "qrcodes" ? "text-mist-900" : "text-mist-400")} />
                         <span className="text-lg font-bold">{t('tabs.qrcodes')}</span>
+                    </button>
+                    <button
+                        onClick={() => setActiveTab("designs")}
+                        className={cn(
+                            "flex flex-col items-center justify-center p-6 rounded-2xl border-2 transition-all duration-200 cursor-pointer shadow-sm hover:shadow-md",
+                            activeTab === "designs"
+                                ? "bg-white border-white text-mist-900 ring-2 ring-mist-700 ring-offset-2 ring-offset-mist-900"
+                                : "bg-mist-800 border-mist-700 text-mist-300 hover:border-mist-600 hover:bg-mist-700/50"
+                        )}
+                    >
+                        <Layers className={cn("w-12 h-12 mb-3", activeTab === "designs" ? "text-mist-900" : "text-mist-400")} />
+                        <span className="text-lg font-bold">{t('tabs.designs')}</span>
                     </button>
                     <button
                         onClick={() => setActiveTab("shops")}
@@ -275,18 +287,6 @@ export default function AdminPage() {
                     >
                         <Wrench className={cn("w-12 h-12 mb-3", activeTab === "tools" ? "text-mist-900" : "text-mist-400")} />
                         <span className="text-lg font-bold">{t('tabs.tools')}</span>
-                    </button>
-                    <button
-                        onClick={() => setActiveTab("designs")}
-                        className={cn(
-                            "flex flex-col items-center justify-center p-6 rounded-2xl border-2 transition-all duration-200 cursor-pointer shadow-sm hover:shadow-md",
-                            activeTab === "designs"
-                                ? "bg-white border-white text-mist-900 ring-2 ring-mist-700 ring-offset-2 ring-offset-mist-900"
-                                : "bg-mist-800 border-mist-700 text-mist-300 hover:border-mist-600 hover:bg-mist-700/50"
-                        )}
-                    >
-                        <Layers className={cn("w-12 h-12 mb-3", activeTab === "designs" ? "text-mist-900" : "text-mist-400")} />
-                        <span className="text-lg font-bold">{t('tabs.designs')}</span>
                     </button>
                 </div>
 
