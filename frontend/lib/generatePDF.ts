@@ -69,7 +69,7 @@ export const paperformats: { [format: string]: any } = {
         rows_gap: 0, // mm
         offset_x: 0, // mm
         offset_y: 0, // mm
-        uraomote: true,
+        uraomote: false,
         comment: "",
         scale: 1,
         dots: true,
@@ -138,8 +138,34 @@ export const cardformats: { [format: string]: any } = {
     },
     // 返礼品用
     "gakuchousenbeiv1": {
-        description: "みらい創造基金返礼品用20260313",
+        description: "役員配布用20260313",
         bgimgf: "/cardimage-f-" + "gakuchousenbeiv1" + ".png",
+        bgimgb: "/cardimage-b-" + "gakuchousenbeiv1" + ".png",
+        width: 84, // 固定
+        height: 52, // 固定
+        qrsize: 30,
+        qrpos: {
+            x: 84 - 30 - 3.2,//  QRがカード右端よりどれくらい右か
+            y: 52 - 30 - 7.5,//  QRがカード下端よりどれくらい下か
+        },
+        pinsize: 20,
+        pinpos: {
+            x: 7.3, // PIN文字列の左右中心がカード左端よりどれくらい右か
+            y: 19.7  // PIN文字列の上端がカード上端よりどれくらい下か
+        },
+        codesize: 5,
+        codepos: {
+            x: 24, // UUID文字列の左右中心がカード左端よりどれくらい右か
+            y: 52 - 5.5 // UUID文字列の上端がカード上端よりどれくらい下か
+        },
+        isfront_qr: true,
+        isfront_pin: false,
+        isfront_code: true,
+    },
+    // 返礼品用
+    "gakuchousenbei-henrei": {
+        description: "みらい創造基金返礼品用20260317",
+        bgimgf: "/cardimage-f-" + "gakuchousenbei-henrei" + ".png",
         bgimgb: "/cardimage-b-" + "gakuchousenbeiv1" + ".png",
         width: 84, // 固定
         height: 52, // 固定

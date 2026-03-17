@@ -24,6 +24,15 @@ const QRScanner = (props: QRScannerProps) => {
     const scannerRegionId = useRef(`html5qr-code-${Math.random().toString(36).substring(7)}`).current;
     const scannerRef = useRef<Html5Qrcode | null>(null);
     const [permissionError, setPermissionError] = useState(false);
+    
+    // Store latest callbacks in refs to avoid stale closures in the mount-only useEffect
+    const successCallbackRef = useRef(props.qrCodeSuccessCallback);
+    const errorCallbackRef = useRef(props.qrCodeErrorCallback);
+
+    useEffect(() => {
+        successCallbackRef.current = props.qrCodeSuccessCallback;
+        errorCallbackRef.current = props.qrCodeErrorCallback;
+    }, [props.qrCodeSuccessCallback, props.qrCodeErrorCallback]);
 
     useEffect(() => {
         // Initialize scanner instance
@@ -47,11 +56,13 @@ const QRScanner = (props: QRScannerProps) => {
                     config,
                     (decodedText: string, decodedResult: any) => {
                         if (isMounted) {
-                            props.qrCodeSuccessCallback(decodedText, decodedResult);
+                            successCallbackRef.current(decodedText, decodedResult);
                         }
                     },
                     (errorMessage: any) => {
-                        // ignore
+                        if (isMounted && errorCallbackRef.current) {
+                            errorCallbackRef.current(errorMessage);
+                        }
                     }
                 );
                 // Only mark as started if we are still mounted

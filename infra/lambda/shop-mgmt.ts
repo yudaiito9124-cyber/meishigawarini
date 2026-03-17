@@ -583,8 +583,8 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             if (!prodCheck.Item) return { statusCode: 404, headers: corsHeaders, body: JSON.stringify({ message: 'Product not found in this shop' }) };
             const product = prodCheck.Item;
 
-            if (qrItem.status !== "UNASSIGNED") {
-                return { statusCode: 409, headers: corsHeaders, body: JSON.stringify({ message: 'QR state is not unassigned' }) };
+            if (qrItem.status !== "UNASSIGNED" && qrItem.status !== "LINKED") {
+                return { statusCode: 409, headers: corsHeaders, body: JSON.stringify({ message: 'QR state is not unassigned, linked' }) };
             }
 
             // Check if QR has a pre-assigned owner
@@ -681,6 +681,9 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 
             if (qrRes.Item.status !== 'LINKED') {
                 return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'QR is not in LINKED state' }) };
+            }            // Check if QR has a pre-assigned owner
+            if (qrRes.Item.owner_id && !await checkUserShopPermission(ddb, TABLE_NAME, shopId, qrRes.Item.owner_id)) {
+                return { statusCode: 403, headers: corsHeaders, body: JSON.stringify({ message: 'This QR code is reserved for another shop owner / manager' }) };
             }
             if (qrRes.Item.shop_id !== shopId) {
                 return { statusCode: 403, headers: corsHeaders, body: JSON.stringify({ message: 'QR does not belong to this shop' }) };
@@ -849,7 +852,8 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 statusCode: 200, headers: corsHeaders, body: JSON.stringify({
                     product_id: qrproductId,
                     product_name: qrproductName,
-                    product_linked: productLinked
+                    product_linked: productLinked,
+                    status: qrstatus
                 })
             };
         }

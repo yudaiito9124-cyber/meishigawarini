@@ -5,7 +5,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { RefreshCw, ArrowRight, HelpCircle, Camera, Settings, ShoppingBasket, Eye, Plus, Trash2, Copy, ImageIcon, Save, Loader2, Pencil, ChevronDown, Download } from 'lucide-react';
+import { RefreshCw, ArrowRight, HelpCircle, Camera, Settings, ShoppingBasket, Eye, Plus, Trash2, Copy, ImageIcon, Save, Loader2, Pencil, ChevronDown, Download, Check } from 'lucide-react';
 import { notFound, useParams } from 'next/navigation';
 import { useRouter } from '@/i18n/routing';
 import { useTranslations } from 'next-intl';
@@ -18,6 +18,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Switch } from '@/components/ui/switch';
 import QRScanner from '@/components/ui/qr-scanner';
 import SandboxedHtml from '@/components/SandboxedHtml';
 import { APP_CONFIG } from '@/lib/config';
@@ -54,6 +55,13 @@ export default function ShopPage() {
     const [debouncedPreviewHtml, setDebouncedPreviewHtml] = useState<string>('');
     const shopDetailRef = useRef<HTMLTextAreaElement>(null);
     const [isLinking, setIsLinking] = useState(false);
+    const [isScanning, setIsScanning] = useState(false);
+    const [scannedUuid, setScannedUuid] = useState('');
+    const [qrStatusDetails, setQrStatusDetails] = useState<any>(null);
+    const [showOptions, setShowOptions] = useState(false);
+    const [isContinuousScan, setIsContinuousScan] = useState(false);
+    const [scannedUuids, setScannedUuids] = useState<{ uuid: string, status?: any, error?: string }[]>([]);
+    const lastScannedTimeRef = useRef<Record<string, number>>({});
 
     const [searchUuid, setSearchUuid] = useState('');
     const [shippingOrderId, setShippingOrderId] = useState<string | null>(null);
@@ -73,6 +81,14 @@ export default function ShopPage() {
     const [isHtmlImageSectionOpen, setIsHtmlImageSectionOpen] = useState(false);
     const [isUploadingHtmlImage, setIsUploadingHtmlImage] = useState(false);
     const [sessionUploadedUrls, setSessionUploadedUrls] = useState<string[]>([]);
+    const [copiedId, setCopiedId] = useState<string | null>(null);
+
+    const handleCopy = (id: string) => {
+        navigator.clipboard.writeText(id).then(() => {
+            setCopiedId(id);
+            setTimeout(() => setCopiedId(null), 2000);
+        });
+    };
 
 
     // Protect Route
@@ -394,40 +410,65 @@ export default function ShopPage() {
         setIsLinking(true);
         const form = e.target as HTMLFormElement;
         const formData = new FormData(form);
-        // const uuid = formData.get('uuid') as string;
-        const uuid = scannedUuid;
         const productId = formData.get('product_id') as string;
         const memo_for_users = formData.get('memo_for_users') as string;
         const memo_for_shop = formData.get('memo_for_shop') as string;
 
+        // Process all non-error UUIDs.
+        const itemsToProcess = scannedUuids.filter(item => !item.error);
+
+        let successCount = 0;
+        let errors: string[] = [];
+
         try {
-            // Atomic Link & Activate
-            const body: any = {
-                qr_id: uuid,
-                product_id: productId,
-                activate_now: true,
-            };
-            if (memo_for_users) body.memo_for_users = memo_for_users;
-            if (memo_for_shop) body.memo_for_shop = memo_for_shop;
+            for (const item of itemsToProcess) {
+                const uuid = item.uuid;
+                const finalProductId = (item.status?.product_linked)
+                    ? item.status.product_id
+                    : productId;
 
-            // console.debug(body)
+                if (!finalProductId) {
+                    errors.push(`${uuid}: ${t('linkQr.selectPlaceholder')}`);
+                    continue;
+                }
 
-            const res = await fetchWithAuth(`/shop/${shopId}/link`, {
-                method: 'POST',
-                body: JSON.stringify(body)
-            });
+                const body: any = {
+                    qr_id: uuid,
+                    product_id: finalProductId,
+                    activate_now: true,
+                };
 
-            if (!res.ok) {
-                const errorData = await res.json().catch(() => ({}));
-                throw new Error(errorData.message || 'Failed to link and activate');
+                if (memo_for_users) body.memo_for_users = memo_for_users;
+                if (memo_for_shop) body.memo_for_shop = memo_for_shop;
+
+                const res = await fetchWithAuth(`/shop/${shopId}/link`, {
+                    method: 'POST',
+                    body: JSON.stringify(body)
+                });
+
+                if (!res.ok) {
+                    const errorData = await res.json().catch(() => ({}));
+                    errors.push(`${uuid}: ${errorData.message || 'Failed to link'}`);
+                } else {
+                    successCount++;
+                }
             }
 
-            alert(t('linkQr.success'));
-            form.reset();
-            setScannedUuid(''); // Reset state driven input
-            setQrStatusDetails(null);
-            setShowOptions(false);
-            fetchShopData();
+            if (errors.length > 0) {
+                alert(`${t('linkQr.success')} (${successCount})\n\n${tc('error')}:\n${errors.join('\n')}`);
+            } else {
+                alert(t('linkQr.success') + ` (${successCount})`);
+            }
+
+            if (successCount > 0) {
+                form.reset();
+                setScannedUuid('');
+                setScannedUuids([]);
+                setIsContinuousScan(false);
+                setQrStatusDetails(null);
+                setShowOptions(false);
+                fetchShopData();
+            }
         } catch (err: any) {
             alert(t('linkQr.error') + ": " + (tb(err.message.replace(/\./g, '_')) || err.message));
         } finally {
@@ -567,10 +608,6 @@ export default function ShopPage() {
         }
     };
 
-    const [isScanning, setIsScanning] = useState(false);
-    const [scannedUuid, setScannedUuid] = useState('');
-    const [qrStatusDetails, setQrStatusDetails] = useState<any>(null);
-    const [showOptions, setShowOptions] = useState(false);
     const [shipOptionOpenId, setShipOptionOpenId] = useState<string | null>(null);
     const [isManualInput, setisManualInput] = useState(false);
     const [manualInput, setManualInput] = useState('');
@@ -580,7 +617,55 @@ export default function ShopPage() {
         if (decodedText.includes('/')) {
             uuid = decodedText.split('/').pop() || decodedText;
         }
-        setScannedUuid('');
+
+        const now = Date.now();
+        const lastScanTime = lastScannedTimeRef.current[uuid] || 0;
+        if (now - lastScanTime < 2000) {
+            return;
+        }
+        lastScannedTimeRef.current[uuid] = now;
+
+        // Skip if already in list (for continuous scan)
+        if (scannedUuids.some(item => item.uuid === uuid)) {
+            return;
+        }
+
+        if (isContinuousScan) {
+            setScannedUuids(prev => [...prev, { uuid }]);
+
+            // Status check for sequential scan
+            try {
+                const res = await fetchWithAuth(`/shop/${shopId}/qrcodecheck`, {
+                    method: 'POST',
+                    body: JSON.stringify({ qr_id: uuid })
+                });
+                const data = await res.json();
+                if (!res.ok) {
+                    const translatedError = data.message ? tb(data.message.replace(/\./g, '_')) : t('linkQr.foreignQrError');
+                    setScannedUuids(prev => prev.map(item =>
+                        item.uuid === uuid ? { ...item, error: translatedError } : item
+                    ));
+                    return;
+                }
+                setScannedUuids(prev => prev.map(item =>
+                    item.uuid === uuid ? { ...item, status: data } : item
+                ));
+            } catch (err: any) {
+                setScannedUuids(prev => prev.map(item =>
+                    item.uuid === uuid ? { ...item, error: err.message || 'Check failed' } : item
+                ));
+            }
+            return;
+        }
+
+        // Single scan mode
+        setScannedUuids([{ uuid }]);
+        setScannedUuid(uuid);
+        setIsScanning(false);
+        checkQrStatus(uuid);
+    };
+
+    const checkQrStatus = async (uuid: string) => {
         setQrStatusDetails(null);
         try {
             const res = await fetchWithAuth(`/shop/${shopId}/qrcodecheck`, {
@@ -589,15 +674,19 @@ export default function ShopPage() {
             });
             if (!res.ok) {
                 const errData = await res.json().catch(() => ({}));
-                alert(t('linkQr.foreignQrError') + (errData.message ? ` (${tb(errData.message.replace(/\./g, '_'))})` : '') + (errData.detail ? ` (${errData.detail})` : ''));
+                const translatedError = errData.message ? tb(errData.message.replace(/\./g, '_')) : t('linkQr.foreignQrError');
+                setScannedUuids([{ uuid, error: translatedError }]);
+                alert(translatedError + (errData.detail ? ` (${errData.detail})` : ''));
                 return;
             }
             const data = await res.json();
             setScannedUuid(uuid);
             setQrStatusDetails(data);
+            setScannedUuids([{ uuid, status: data }]);
         } catch (error: any) {
-            // console.error('Failed to get QR status', error);
-            alert(t('linkQr.foreignQrError') + (error.message ? ` (${tb(error.message.replace(/\./g, '_'))})` : '') + (error.detail ? ` (${error.detail})` : ''));
+            const translatedError = error.message ? tb(error.message.replace(/\./g, '_')) : t('linkQr.foreignQrError');
+            setScannedUuids([{ uuid, error: translatedError }]);
+            alert(translatedError + (error.detail ? ` (${error.detail})` : ''));
         } finally {
             setIsScanning(false);
         }
@@ -863,9 +952,6 @@ export default function ShopPage() {
                 </div>
 
             </div>
-
-
-
             <div className="max-w-7xl mx-auto px-8 py-10 space-y-10">
 
 
@@ -883,7 +969,15 @@ export default function ShopPage() {
                             <form onSubmit={handleLinkQr} className="space-y-4">
                                 {!scannedUuid ? (
                                     <div className="flex flex-col gap-4">
-                                        <Dialog open={isScanning} onOpenChange={(open) => { setIsScanning(open); if (open) setManualInput(''); }}>
+                                        <Dialog open={isScanning} onOpenChange={(open) => {
+                                            setIsScanning(open);
+                                            if (open) {
+                                                setManualInput('');
+                                                setQrStatusDetails(null);
+                                                setScannedUuids([]);
+                                            }
+                                        }}
+                                        >
                                             <DialogTrigger asChild>
                                                 <Button type="button" variant="outline" className="w-full h-auto flex flex-col justify-center items-center gap-4 text-xl py-16 bg-gray-300">
                                                     <div style={{ width: '100px', aspectRatio: '1' }}>
@@ -892,106 +986,240 @@ export default function ShopPage() {
                                                     <span>{t('linkQr.scan')}</span>
                                                 </Button>
                                             </DialogTrigger>
-                                            <DialogContent >
+                                            <DialogContent className="max-h-[94vh] max-w-[95vw] md:max-w-3xl lg:max-w-3xl w-full h-full overflow-y-auto">
                                                 <DialogHeader>
                                                     <DialogTitle>{t('linkQr.scanDialog.title')}</DialogTitle>
                                                     <DialogDescription>{t('linkQr.scanDialog.description')}</DialogDescription>
                                                 </DialogHeader>
-                                                <div className="p-4 min-h-[300px]">
-                                                    <QRScanner
-                                                        qrCodeSuccessCallback={handleScanSuccess}
-                                                        qrbox={250}
-                                                        disableFlip={false}
-                                                    />
-                                                </div>
-
-                                                <DialogFooter>
-                                                    {isManualInput ? (
-                                                        <div className="flex w-full flex-col sm:flex-row gap-3">
-                                                            <Input
-                                                                id="uuid_manual"
-                                                                name="uuid_manual"
-                                                                placeholder={t('linkQr.placeholder')}
-                                                                value={manualInput}
-                                                                onChange={(e) => setManualInput(e.target.value)}
-                                                                className="bg-gray-100"
-                                                            />
-                                                            <Button type="button" variant="default" disabled={!manualInput} onClick={() => handleScanSuccess(manualInput)} className="shrink-0">
-                                                                {t('linkQr.scanDialog.apply')}
-                                                            </Button>
+                                                <div className="p-4 min-h-[300px] flex flex-col gap-y-4">
+                                                    <div className="flex items-center justify-center h-[20px] gap-x-2">
+                                                        <Switch
+                                                            id="continuous-scan"
+                                                            checked={isContinuousScan}
+                                                            onCheckedChange={setIsContinuousScan}
+                                                        />
+                                                        <div className="flex flex-col">
+                                                            <Label htmlFor="continuous-scan" className="text-sm font-bold">{t('linkQr.continuousScan')}</Label>
+                                                            {isContinuousScan && (
+                                                                <span className="text-[10px] text-blue-600 font-bold">{t('linkQr.scannedCount', { count: scannedUuids.length })}</span>
+                                                            )}
                                                         </div>
-                                                    ) : (
-                                                        <div className="flex justify-start">
-                                                            <Button type="button" variant="ghost" size="sm" onClick={() => setisManualInput(true)} className="h-8 text-xs text-gray-500 hover:text-gray-900 px-2 -ml-2 right">
-                                                                {t('linkQr.manualinput')}
-                                                            </Button>
-                                                        </div>
-                                                    )}
+                                                    </div>
 
-                                                    {/* <Button type="button" variant="ghost" onClick={() => setIsScanning(false)}>
+                                                    <div className="w-full aspect-square items-center justify-center h-[400px]">
+
+                                                        <QRScanner
+                                                            qrCodeSuccessCallback={handleScanSuccess}
+                                                            qrbox={250}
+                                                            disableFlip={false}
+
+                                                        />
+                                                    </div>
+                                                    <div className="flex flex-col gap-4">
+                                                        {isContinuousScan && scannedUuids.length > 0 && (
+                                                            <Button
+                                                                type="button"
+                                                                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold"
+                                                                onClick={async () => {
+                                                                    const validItems = scannedUuids.filter(item => !item.error);
+                                                                    if (validItems.length > 0) {
+                                                                        setScannedUuid(validItems.map(item => item.uuid).join('\n'));
+                                                                        setIsScanning(false);
+                                                                    }
+                                                                }}
+                                                            >
+                                                                {t('linkQr.finishScan')} ({scannedUuids.length})
+                                                            </Button>
+                                                        )}
+                                                        {isContinuousScan && scannedUuids.length > 0 && (
+                                                            <div className="mt-2 border rounded-md bg-gray-50 max-h-[80vh] overflow-y-auto">
+                                                                <ul className="text-[10px] font-mono p-2 space-y-1">
+                                                                    {scannedUuids.map((item, i) => (
+                                                                        <li key={item.uuid} className="border-b last:border-0 pb-1 last:pb-0 flex flex-col">
+                                                                            <div className="flex justify-between items-center">
+                                                                                <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                                                                                    <span className="truncate">{i + 1}. {item.uuid}</span>
+                                                                                    <Button
+                                                                                        variant="ghost"
+                                                                                        size="icon"
+                                                                                        className="h-4 w-4 shrink-0"
+                                                                                        onClick={() => handleCopy(item.uuid)}
+                                                                                    >
+                                                                                        {copiedId === item.uuid ? (
+                                                                                            <Check className="h-3 w-3 text-green-500" />
+                                                                                        ) : (
+                                                                                            <Copy className="h-3 w-3" />
+                                                                                        )}
+                                                                                    </Button>
+                                                                                </div>
+                                                                                {item.status ? (
+                                                                                    <span className={`text-[8px] px-1 rounded ${item.status.product_linked ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                                                                                        {item.status.product_linked ? item.status.product_name : 'OK'}
+                                                                                    </span>
+                                                                                ) : item.error ? (
+                                                                                    <span className="text-[8px] px-1 rounded bg-red-100 text-red-700">{item.error}</span>
+                                                                                ) : (
+                                                                                    <span className="animate-pulse">...</span>
+                                                                                )}
+                                                                            </div>
+                                                                        </li>
+                                                                    ))}
+                                                                </ul>
+                                                            </div>
+                                                        )}
+                                                        {isManualInput && !(isContinuousScan && scannedUuids.length > 0) && (
+                                                            <div className="flex w-full flex-col sm:flex-row gap-3">
+                                                                <Input
+                                                                    id="uuid_manual"
+                                                                    name="uuid_manual"
+                                                                    placeholder={t('linkQr.placeholder')}
+                                                                    value={manualInput}
+                                                                    onChange={(e) => setManualInput(e.target.value)}
+                                                                    className="bg-gray-100"
+                                                                />
+                                                                <Button type="button" variant="default" disabled={!manualInput} onClick={() => handleScanSuccess(manualInput)} className="shrink-0">
+                                                                    {t('linkQr.scanDialog.apply')}
+                                                                </Button>
+                                                            </div>
+                                                        )}
+                                                        {!isManualInput && !isContinuousScan && (
+                                                            <div className="flex justify-center">
+                                                                <Button type="button" variant="ghost" size="sm" onClick={() => setisManualInput(true)} className="h-8 text-xs text-gray-500 hover:text-gray-900 px-2 -ml-2 right">
+                                                                    {t('linkQr.manualinput')}
+                                                                </Button>
+                                                            </div>
+                                                        )}
+
+                                                        {/* <Button type="button" variant="ghost" onClick={() => setIsScanning(false)}>
                                                         {t('linkQr.scanDialog.cancel')}
                                                     </Button> */}
+                                                    </div>
+                                                </div>
+
+                                                <DialogFooter className="">
+
                                                 </DialogFooter>
                                             </DialogContent>
                                         </Dialog>
                                     </div>
                                 ) : (
-                                    <div className="space-y-4">
-                                        <div className="flex flex-col sm:flex-row sm:items-center justify-between bg-gray-50 px-3 py-2 rounded-md border gap-2">
-                                            <div className="truncate">
-                                                <span className="text-xs text-gray-500 mr-2">{t('linkQr.uuidLabel')}:</span>
-                                                <span className="font-mono text-sm font-medium">{scannedUuid}</span>
-                                            </div>
-                                            <Button type="button" variant="ghost" size="sm" onClick={() => { setScannedUuid(''); setQrStatusDetails(null); setShowOptions(false); }} className="h-8 px-2 text-gray-500 hover:text-gray-900 w-full sm:w-auto shrink-0">
-                                                {t('linkQr.clear')}
-                                            </Button>
+                                    <div className="space-y-6">
+                                        <div className="space-y-4">
+                                            {/* Linked Section */}
+                                            {scannedUuids.filter(item => item.status?.product_linked).length > 0 && (
+                                                <div className="space-y-2">
+                                                    <Label className="text-sm font-bold text-gray-500 flex items-center gap-2">
+                                                        <div className="w-1 h-4 bg-amber-400 rounded-full" />
+                                                        {t('linkQr.linkedTitle')}
+                                                    </Label>
+                                                    <div className="bg-amber-50/50 rounded-lg border border-amber-100 divide-y divide-amber-100 max-h-[150px] overflow-y-auto">
+                                                        {scannedUuids.filter(item => item.status?.product_linked).map((item) => (
+                                                            <div key={item.uuid} className="p-3 flex justify-between items-center bg-white/40">
+                                                                <div className="flex items-center gap-2">
+                                                                    <span className="font-mono text-xs">{item.uuid}</span>
+                                                                    <Button
+                                                                        variant="ghost"
+                                                                        size="icon"
+                                                                        className="h-4 w-4"
+                                                                        onClick={(e) => { e.stopPropagation(); handleCopy(item.uuid); }}
+                                                                    >
+                                                                        {copiedId === item.uuid ? (
+                                                                            <Check className="h-3 w-3 text-green-500" />
+                                                                        ) : (
+                                                                            <Copy className="h-3 w-3" />
+                                                                        )}
+                                                                    </Button>
+                                                                </div>
+                                                                <span className="text-[10px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-bold">
+                                                                    {item.status.product_name}
+                                                                </span>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* Available Section */}
+                                            {scannedUuids.filter(item => item.status && !item.status.product_linked).length > 0 && (
+                                                <div className="space-y-2">
+                                                    <Label className="text-sm font-bold text-blue-600 flex items-center gap-2">
+                                                        <div className="w-1 h-4 bg-blue-500 rounded-full" />
+                                                        {t('linkQr.availableTitle')}
+                                                    </Label>
+                                                    <div className="bg-blue-50/30 rounded-lg border border-blue-100 divide-y divide-blue-100 max-h-[150px] overflow-y-auto">
+                                                        {scannedUuids.filter(item => item.status && !item.status.product_linked).map((item) => (
+                                                            <div key={item.uuid} className="p-3 bg-white/40 flex items-center gap-2">
+                                                                <span className="font-mono text-xs">{item.uuid}</span>
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="icon"
+                                                                    className="h-4 w-4"
+                                                                    onClick={(e) => { e.stopPropagation(); handleCopy(item.uuid); }}
+                                                                >
+                                                                    {copiedId === item.uuid ? (
+                                                                        <Check className="h-3 w-3 text-green-500" />
+                                                                    ) : (
+                                                                        <Copy className="h-3 w-3" />
+                                                                    )}
+                                                                </Button>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
 
-                                        {(!qrStatusDetails || !qrStatusDetails.product_linked) ? (
-                                            <select
-                                                id="product_id"
-                                                name="product_id"
-                                                className="flex h-12 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                                                required
-                                                defaultValue=""
-                                            >
-                                                <option value="" disabled>{t('linkQr.selectPlaceholder')}</option>
-                                                {products.filter(p => p.status === 'ACTIVE').map(p => (
-                                                    <option key={p.product_id} value={p.product_id}>{p.name}</option>
-                                                ))}
-                                            </select>
-                                        ) : (
-                                            <div className="flex items-center justify-center h-12 border border-emerald-200 rounded-md bg-emerald-50 text-emerald-900 font-bold">
-                                                {qrStatusDetails.product_name}
-                                            </div>
-                                        )}
+                                        {/* Unified Action Area */}
+                                        <div className="space-y-4 pt-4 border-t border-gray-100">
+                                            <div className="space-y-4 bg-gray-50 p-4 rounded-xl border-dashed border-2">
+                                                <select
+                                                    id="product_id"
+                                                    name="product_id"
+                                                    className="flex h-12 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                                    required={scannedUuids.some(item => item.status && !item.status.product_linked)}
+                                                    defaultValue=""
+                                                >
+                                                    <option value="" disabled>{t('linkQr.selectPlaceholder')}</option>
+                                                    {products.filter(p => p.status === 'ACTIVE').map(p => (
+                                                        <option key={p.product_id} value={p.product_id}>{p.name}</option>
+                                                    ))}
+                                                </select>
 
-                                        {showOptions ? (
-                                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                                                <Input
-                                                    id="memo_for_users"
-                                                    name="memo_for_users"
-                                                    placeholder={t('linkQr.memoForUsersPlaceholder')}
-                                                    className="h-10 border-gray-300"
-                                                />
-                                                <Input
-                                                    id="memo_for_shop"
-                                                    name="memo_for_shop"
-                                                    placeholder={t('linkQr.memoForShopPlaceholder')}
-                                                    className="h-10 border-gray-300"
-                                                />
-                                            </div>
-                                        ) : (
-                                            <div className="flex justify-start">
-                                                <Button type="button" variant="ghost" size="sm" onClick={() => setShowOptions(true)} className="h-8 text-xs text-gray-500 hover:text-gray-900 px-2 -ml-2">
-                                                    + {t('linkQr.option')}
+                                                {showOptions ? (
+                                                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                                        <Input
+                                                            id="memo_for_users"
+                                                            name="memo_for_users"
+                                                            placeholder={t('linkQr.memoForUsersPlaceholder')}
+                                                            className="h-10 border-gray-300"
+                                                        />
+                                                        <Input
+                                                            id="memo_for_shop"
+                                                            name="memo_for_shop"
+                                                            placeholder={t('linkQr.memoForShopPlaceholder')}
+                                                            className="h-10 border-gray-300"
+                                                        />
+                                                    </div>
+                                                ) : (
+                                                    <div className="flex justify-start">
+                                                        <Button type="button" variant="ghost" size="sm" onClick={() => setShowOptions(true)} className="h-8 text-xs text-gray-500 hover:text-gray-900 px-2 -ml-2">
+                                                            + {t('linkQr.option')}
+                                                        </Button>
+                                                    </div>
+                                                )}
+
+                                                <Button type="submit" className="w-full font-bold text-lg h-16 shadow-lg shadow-blue-100" disabled={isLinking}>
+                                                    {isLinking ? t('linkQr.processing') : t('linkQr.submit')}
+                                                    <ArrowRight className="ml-2 h-5 w-5" />
                                                 </Button>
                                             </div>
-                                        )}
 
-                                        <Button type="submit" className="w-full font-bold text-lg h-30" disabled={isLinking}>
-                                            {isLinking ? t('linkQr.processing') : t('linkQr.submit')}
-                                        </Button>
+                                            <div className="flex justify-center">
+                                                <Button type="button" variant="ghost" size="sm" onClick={() => { setScannedUuid(''); setScannedUuids([]); setQrStatusDetails(null); setShowOptions(false); lastScannedTimeRef.current = {}; }} className="text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors">
+                                                    {t('linkQr.clear')}
+                                                </Button>
+                                            </div>
+                                        </div>
                                     </div>
                                 )}
                             </form>
@@ -1099,8 +1327,20 @@ export default function ShopPage() {
                                                     <DialogContent className="max-w-md">
                                                         <DialogHeader>
                                                             <DialogTitle>{t('orders.details')}</DialogTitle>
-                                                            <DialogDescription className="font-mono text-xs text-gray-500">
+                                                            <DialogDescription className="font-mono text-xs text-gray-500 flex items-center gap-2">
                                                                 ID: {uuid}
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="icon"
+                                                                    className="h-6 w-6"
+                                                                    onClick={(e) => { e.stopPropagation(); handleCopy(uuid); }}
+                                                                >
+                                                                    {copiedId === uuid ? (
+                                                                        <Check className="h-3 w-3 text-green-500" />
+                                                                    ) : (
+                                                                        <Copy className="h-3 w-3" />
+                                                                    )}
+                                                                </Button>
                                                             </DialogDescription>
                                                         </DialogHeader>
 
@@ -1596,8 +1836,20 @@ export default function ShopPage() {
                                                     <DialogContent className="max-w-md">
                                                         <DialogHeader>
                                                             <DialogTitle>{t('orders.details')}</DialogTitle>
-                                                            <DialogDescription className="font-mono text-xs text-gray-500">
+                                                            <DialogDescription className="font-mono text-xs text-gray-500 flex items-center gap-2">
                                                                 ID: {uuid}
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="icon"
+                                                                    className="h-6 w-6"
+                                                                    onClick={(e) => { e.stopPropagation(); handleCopy(uuid); }}
+                                                                >
+                                                                    {copiedId === uuid ? (
+                                                                        <Check className="h-3 w-3 text-green-500" />
+                                                                    ) : (
+                                                                        <Copy className="h-3 w-3" />
+                                                                    )}
+                                                                </Button>
                                                             </DialogDescription>
                                                         </DialogHeader>
 
