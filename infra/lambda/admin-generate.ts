@@ -34,6 +34,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         const senderInfo = body.sender_info;
         let senderId = body.senderId;
         const activateNow = body.activate_now === true;
+        const cardDesign = body.card_design;
 
 
         // Limit max count for safety
@@ -199,6 +200,9 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             }
             if (productId) {
                 item.product_id = { S: productId };
+            }
+            if (cardDesign) {
+                item.card_design = { S: cardDesign };
             }
             if (activateNow) {
                 const activationDate = new Date();

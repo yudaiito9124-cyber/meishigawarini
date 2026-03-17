@@ -150,7 +150,8 @@ export default function AdminPage() {
                         senderId: senderId || undefined,
                         expiry_date: expiryDate ? new Date(expiryDate).toISOString() : undefined,
                         activate_now: activateNow
-                    } : {})
+                    } : {}),
+                    card_design: cardFormat
                 }),
             });
 
@@ -868,6 +869,14 @@ function QRCodeRow({ item, apiUrl, onGeneratePDF, onRefresh, paperFormat, cardFo
                                 {st(item.status ? item.status.toLowerCase() : 'active')}
                             </span>
                         </div>
+                        
+                        {/* Card Design */}
+                        {item.card_design && (
+                            <div>
+                                <h4 className="text-sm font-semibold text-gray-500">{t('generate.cardFormat')}</h4>
+                                <p className="text-sm font-medium">{item.card_design}</p>
+                            </div>
+                        )}
 
                         {/* Recipient Info */}
                         <div className="grid grid-cols-2 gap-4">
