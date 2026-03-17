@@ -125,12 +125,12 @@ export const cardformats: { [format: string]: any } = {
         pinsize: 20,
         pinpos: {
             x: 10, // PIN文字列の左右中心がカード左端よりどれくらい右か
-            y: 16  // PIN文字列の上端がカード上端よりどれくらい下か
+            y: 13.5  // PIN文字列の上端がカード上端よりどれくらい下か
         },
         codesize: 5,
         codepos: {
             x: 0, // UUID文字列の左右中心がカード左端よりどれくらい右か
-            y: 51.98 - 1 // UUID文字列の上端がカード上端よりどれくらい下か
+            y: 51.98 - 2 // UUID文字列の上端がカード上端よりどれくらい下か
         },
         isfront_qr: true,
         isfront_pin: false,
@@ -171,18 +171,18 @@ export const cardformats: { [format: string]: any } = {
         height: 52, // 固定
         qrsize: 30,
         qrpos: {
-            x: 84 - 30 - 3.2,//  QRがカード右端よりどれくらい右か
-            y: 52 - 30 - 7.5,//  QRがカード下端よりどれくらい下か
+            x: 84 - 30 - 3.2,
+            y: 52 - 30 - 7.5,
         },
         pinsize: 20,
         pinpos: {
-            x: 7.3, // PIN文字列の左右中心がカード左端よりどれくらい右か
-            y: 19.7  // PIN文字列の上端がカード上端よりどれくらい下か
+            x: 7.3,
+            y: 18.1
         },
         codesize: 5,
         codepos: {
-            x: 24, // UUID文字列の左右中心がカード左端よりどれくらい右か
-            y: 52 - 5.5 // UUID文字列の上端がカード上端よりどれくらい下か
+            x: 24,
+            y: 52 - 7
         },
         isfront_qr: true,
         isfront_pin: false,
@@ -191,7 +191,7 @@ export const cardformats: { [format: string]: any } = {
 }
 
 
-export const generatePDF = async (batch: any, paperformat: string, cardformat: string) => {
+export const generatePDF = async (batch: any, paperformat: string, cardformat: string | any) => {
     const codes = batch.codes || [];
     if (codes.length === 0) return;
 
@@ -202,17 +202,46 @@ export const generatePDF = async (batch: any, paperformat: string, cardformat: s
     });
 
     const pf = paperformats[paperformat];
-    const cf = cardformats[cardformat];
+    const cf = typeof cardformat === 'string' ? cardformats[cardformat] : cardformat;
+
+    if (!pf || !cf) {
+        console.error("Invalid format", { paperformat, cardformat });
+        return;
+    }
 
     // Background Image
     const bgImgf = new Image();
     const bgImgb = new Image();
-    bgImgf.src = cf.bgimgf;
-    bgImgb.src = cf.bgimgb;
-    await new Promise((resolve) => {
-        bgImgf.onload = resolve;
-        bgImgb.onload = resolve;
-    });
+    bgImgf.crossOrigin = "anonymous";
+    bgImgb.crossOrigin = "anonymous";
+
+    // Support relative paths for public folder and absolute URLs for S3
+    // Note: Do NOT add cache-busting to S3 signed URLs as it invalidates the signature.
+    const getFinalUrl = (url: string) => {
+        if (!url) return "";
+        if (url.startsWith('http')) return url;
+        return url.startsWith('/') ? url : `/${url}`;
+    };
+
+    bgImgf.src = getFinalUrl(cf.bgimgf);
+    bgImgb.src = getFinalUrl(cf.bgimgb);
+
+    await Promise.all([
+        new Promise((resolve) => {
+            bgImgf.onload = resolve;
+            bgImgf.onerror = (e) => {
+                console.error("Failed to load front background image", e);
+                resolve(null);
+            };
+        }),
+        new Promise((resolve) => {
+            bgImgb.onload = resolve;
+            bgImgb.onerror = (e) => {
+                console.error("Failed to load back background image", e);
+                resolve(null);
+            };
+        })
+    ]);
 
     // paper format
     const pageWidth = pf.pageWidth; // mm
@@ -269,7 +298,13 @@ export const generatePDF = async (batch: any, paperformat: string, cardformat: s
             const { ax, ay } = getFrontPos(j); // anchor point
 
             // Draw Background Image
-            doc.addImage(bgImgf, 'PNG', scaleofx + ax, scaleofy + ay, cardWidth * pf.scale, cardHeight * pf.scale);
+            if (bgImgf.naturalWidth > 0) {
+                try {
+                    doc.addImage(bgImgf, 'PNG', scaleofx + ax, scaleofy + ay, cardWidth * pf.scale, cardHeight * pf.scale);
+                } catch (e) {
+                    console.error("addImage front failed", e);
+                }
+            }
 
             // Draw Corner Dots (Cut marks)
             if (pf.dots) {
@@ -295,6 +330,7 @@ export const generatePDF = async (batch: any, paperformat: string, cardformat: s
                 doc.setFontSize(cf.pinsize * pf.scale);
                 doc.setFont("helvetica", "bold");
                 const pinWidth = doc.getTextWidth(code.pin);
+                const pinHeight = doc.getTextDimensions(code.pin).h;
                 doc.text(code.pin, scaleofx + ax + (cardWidth * pf.scale - pinWidth) / 2 + cf.pinpos.x * pf.scale, scaleofy + ay + cf.pinpos.y * pf.scale);
             }
 
@@ -305,6 +341,7 @@ export const generatePDF = async (batch: any, paperformat: string, cardformat: s
                 doc.setFont("helvetica", "normal");
                 const uuidText = `${code.uuid.substring(18, 34)}...`;
                 const uuidWidth = doc.getTextWidth(uuidText);
+                const uuidHeight = doc.getTextDimensions(uuidText).h;
                 doc.text(uuidText, scaleofx + ax + (cardWidth * pf.scale - uuidWidth) / 2 + cf.codepos.x * pf.scale, scaleofy + ay + cf.codepos.y * pf.scale);
             }
         }
@@ -351,6 +388,7 @@ export const generatePDF = async (batch: any, paperformat: string, cardformat: s
                 doc.setFontSize(cf.pinsize * pf.scale);
                 doc.setFont("helvetica", "bold");
                 const pinWidth = doc.getTextWidth(code.pin);
+                const pinHeight = doc.getTextDimensions(code.pin).h;
                 doc.text(code.pin, scaleofx + ax + (cardWidth * pf.scale - pinWidth) / 2 + (cf.pinpos.x) * pf.scale, scaleofy + ay + cf.pinpos.y * pf.scale);
             }
 
@@ -361,6 +399,7 @@ export const generatePDF = async (batch: any, paperformat: string, cardformat: s
                 doc.setFont("helvetica", "normal");
                 const uuidText = `${code.uuid.substring(18, 34)}...`;
                 const uuidWidth = doc.getTextWidth(uuidText);
+                const uuidHeight = doc.getTextDimensions(uuidText).h;
                 doc.text(uuidText, scaleofx + ax + (cardWidth * pf.scale - uuidWidth) / 2 + (cf.codepos.x) * pf.scale, scaleofy + ay + cf.codepos.y * pf.scale);
             }
         }

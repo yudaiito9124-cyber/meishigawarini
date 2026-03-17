@@ -1,0 +1,87 @@
+{
+  "PK": {
+    "S": "USER#20260317005921iyq-c5e1f7db-10a1-44c9-b0fb-c595f57bf0fa"
+  },
+  "SK": {
+    "S": "SENDER"
+  },
+  "address": {
+    "S": "〒010-8502秋田市手形学園町1番1号"
+  },
+  "card_image_name": {
+    "S": "akita-u.png"
+  },
+  "card_image_url": {
+    "S": "https://infrastack-productimagebucketdce10e3f-qmgx3s9tvlno.s3.ap-northeast-1.amazonaws.com/user/20260317005921iyq-c5e1f7db-10a1-44c9-b0fb-c595f57bf0fa/usercontent/20260317003658lgo-458edcee-d509-4bdb-9a35-0bf4f96ba509.webp"
+  },
+  "company": {
+    "S": "秋田大学"
+  },
+  "department": {
+    "S": "総務企画部広報課"
+  },
+  "detail_html": {
+    "S": "<style>\n    /* 1. スコープ限定CSS：ユニークプレフィックス mirai-letter- */\n    .mirai-letter-root,\n    .mirai-letter-root * {\n        box-sizing: border-box !important;\n        margin: 0;\n        padding: 0;\n    }\n\n    .mirai-letter-wrapper {\n        width: 100%;\n        max-width: 560px;\n        margin: 0 auto;\n        background-color: #f0f7f4; /* 秋田大学のブランドを意識した薄緑 */\n        padding: 30px 15px;\n        font-family: \"Helvetica Neue\", Arial, \"Hiragino Kaku Gothic ProN\", \"Hiragino Sans\", \"Noto Sans JP\", sans-serif;\n    }\n\n    /* 2. カード本体 */\n    .mirai-letter-card {\n        width: 100%;\n        background: #ffffff;\n        border-radius: 0px;\n        overflow: hidden;\n        box-shadow: 0 4px 20px rgba(0, 169, 104, 0.1);\n        border: 1px solid rgba(0, 169, 104, 0.1);\n        height: auto;\n    }\n\n    /* 3. ヘッダー画像 */\n    .mirai-letter-header-img {\n        width: 100%;\n        height: auto;\n        display: block;\n    }\n\n    /* 4. コンテンツエリア */\n    .mirai-letter-body {\n        padding: 35px 25px;\n    }\n\n    .mirai-letter-title {\n        font-size: 20px;\n        color: #00a968;\n        font-weight: 800;\n        margin-bottom: 25px;\n        text-align: center;\n        line-height: 1.4;\n    }\n\n    .mirai-letter-text {\n        font-size: 15px;\n        color: #333333;\n        line-height: 1.8;\n        margin-bottom: 25px;\n    }\n\n    /* 返礼品注目ボックス */\n    .mirai-letter-gift-section {\n        background-color: #f9fbf9;\n        border: 1px solid #e0f2ea;\n        border-radius: 8px;\n        padding: 20px;\n        margin-bottom: 25px;\n        text-align: center;\n    }\n\n    .mirai-letter-gift-name {\n        font-size: 18px;\n        font-weight: 700;\n        color: #2c3e50;\n        margin: 10px 0;\n    }\n\n    /* 重要なお知らせ */\n    .mirai-letter-notice {\n        background: #fff9f0;\n        padding: 15px;\n        border-radius: 8px;\n        margin-bottom: 30px;\n        font-size: 14px;\n        color: #5d4037;\n    }\n\n    .mirai-letter-deadline {\n        font-weight: 700;\n        color: #d32f2f;\n    }\n\n    /* 5. ボタン */\n    .mirai-letter-btn {\n        display: block;\n        width: 100%;\n        padding: 16px;\n        background-color: #00a968;\n        color: #ffffff !important;\n        text-align: center;\n        text-decoration: none;\n        border-radius: 6px;\n        font-weight: 800;\n        font-size: 16px;\n        transition: background-color 0.2s;\n    }\n\n    .mirai-letter-btn:hover {\n        background-color: #008f58;\n    }\n\n    .mirai-letter-footer {\n        text-align: center;\n        font-size: 12px;\n        color: #8da094;\n        margin-top: 25px;\n    }\n</style>\n\n<div class=\"mirai-letter-wrapper mirai-letter-root\">\n    <div class=\"mirai-letter-card\">\n        <img src=\"https://infrastack-productimagebucketdce10e3f-qmgx3s9tvlno.s3.ap-northeast-1.amazonaws.com/user/20260317005921iyq-c5e1f7db-10a1-44c9-b0fb-c595f57bf0fa/usercontent/20260317004903jga-464c26c2-d51c-4ed0-8260-568e87e9aa20.webp\">\n\n        <div class=\"mirai-letter-body\">\n            <h1 class=\"mirai-letter-title\">秋田大学みらい創造基金<br>返礼品についてのご案内</h1>\n            \n            <p class=\"mirai-letter-text\">\n                このたびは、秋田大学へのご寄附を賜り、誠にありがとうございます。\n                ご寄附への感謝の気持ちを込めて、以下の返礼品をご用意いたしました。\n            </p>\n\n            <div class=\"mirai-letter-gift-section\">\n                <p style=\"font-size: 12px; color: #00a968; font-weight: 700;\">【返礼品】</p>\n                <div class=\"mirai-letter-gift-name\">秋田大学オリジナル<br>学長煎餅</div>\n            </div>\n\n            <div class=\"mirai-letter-notice\">\n                お申し込み期限は <span class=\"mirai-letter-deadline\">2026年9月30日</span> となっておりますので、お早めにお手続きくださいますようお願いいたします。\n            </div>\n\n            <p class=\"mirai-letter-text\" style=\"text-align: center; font-size: 14px;\">\n                今後とも、秋田大学へのご支援を賜りますよう、<br>よろしくお願い申し上げます。\n            </p>\n\n            <a href=\"https://www.akita-u.ac.jp/honbu/ed_fund/index.html\" target=\"_blank\" class=\"mirai-letter-btn\">\n                基金の事業内容を見る\n            </a>\n\n            <div class=\"mirai-letter-footer\">国立大学法人 秋田大学</div>\n        </div>\n    </div>\n</div>"
+  },
+  "email": {
+    "S": "kikin@jimu.akita-u.ac.jp"
+  },
+  "HP": {
+    "S": "https://www.akita-u.ac.jp"
+  },
+  "html_image_urls": {
+    "L": [
+      {
+        "S": "https://infrastack-productimagebucketdce10e3f-qmgx3s9tvlno.s3.ap-northeast-1.amazonaws.com/user/20260317005921iyq-c5e1f7db-10a1-44c9-b0fb-c595f57bf0fa/usercontent/20260317004903jga-464c26c2-d51c-4ed0-8260-568e87e9aa20.webp"
+      }
+    ]
+  },
+  "job_title": {
+    "NULL": true
+  },
+  "memo": {
+    "S": "本カードを破損・紛失された場合、または使用期限を過ぎた場合は、返礼品をご提供できかねますので、あらかじめご了承くださいますようお願いいたします。\nなお、返礼品は製造元の米菓匠　鼎庵より直接お届けとなります。"
+  },
+  "name": {
+    "NULL": true
+  },
+  "phone": {
+    "S": "018-889-3266"
+  },
+  "phone_direct": {
+    "NULL": true
+  },
+  "Service_Eight": {
+    "NULL": true
+  },
+  "Service_Linktree": {
+    "NULL": true
+  },
+  "SNS_Facebook": {
+    "S": "https://www.facebook.com/@akitauniv.official/?locale=ja_JP&hr=1&wtsid=rdr_1OPQuFSQ8xxszMHwQ"
+  },
+  "SNS_Instagram": {
+    "S": "https://www.instagram.com/akitauniversity/?locale=ja_JP"
+  },
+  "SNS_LINE": {
+    "NULL": true
+  },
+  "SNS_Threads": {
+    "NULL": true
+  },
+  "SNS_TikTok": {
+    "NULL": true
+  },
+  "SNS_X": {
+    "S": "https://x.com/syudaikouhou"
+  },
+  "SNS_YouTube": {
+    "S": "https://www.youtube.com/channel/UCKJwnXj7NOIiBId1paf3l1w"
+  },
+  "ts_created_at": {
+    "S": "2026-03-17T00:59:23.209Z"
+  },
+  "ts_updated_at": {
+    "S": "2026-03-17T00:59:23.209Z"
+  }
+}

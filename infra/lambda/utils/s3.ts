@@ -143,3 +143,80 @@ export function stripSignaturesInHtml(html: string | undefined, bucketName: stri
         return stripSignature(match) || match;
     });
 }
+
+/**
+ * Deletes all objects under a prefix (folder) in S3.
+ */
+export async function deleteFolderFromS3(bucket: string, prefix: string): Promise<void> {
+    const { ListObjectsV2Command, DeleteObjectsCommand } = await import('@aws-sdk/client-s3');
+    
+    // Ensure prefix ends with /
+    const folderPrefix = prefix.endsWith('/') ? prefix : `${prefix}/`;
+    
+    let isTruncated = true;
+    let continuationToken: string | undefined;
+
+    while (isTruncated) {
+        const listCommand: any = new ListObjectsV2Command({
+            Bucket: bucket,
+            Prefix: folderPrefix,
+            ContinuationToken: continuationToken
+        });
+        
+        const listResponse = (await s3Client.send(listCommand)) as any;
+        if (!listResponse.Contents || listResponse.Contents.length === 0) break;
+
+        const deleteParams = {
+            Bucket: bucket,
+            Delete: {
+                Objects: listResponse.Contents.map((content: any) => ({ Key: content.Key! }))
+            }
+        };
+
+        const deleteCommand = new DeleteObjectsCommand(deleteParams);
+        await s3Client.send(deleteCommand);
+
+        isTruncated = listResponse.IsTruncated || false;
+        continuationToken = listResponse.NextContinuationToken;
+    }
+}
+
+/**
+ * Ensures an S3 image is in the permanent design folder with a standardized name.
+ * If it's in /temp/ or has a different name, it moves it.
+ */
+export async function localizeS3Image(url: string | undefined, bucket: string, designId: string, type: 'front' | 'back' | 'thumbf' | 'thumbb'): Promise<string | undefined> {
+    if (!url || !url.includes(bucket) || !url.includes('.s3.')) {
+        return url;
+    }
+
+    try {
+        const urlObj = new URL(url);
+        const sourceKey = decodeURIComponent(urlObj.pathname.substring(1));
+        const extension = sourceKey.split('.').pop() || 'png';
+        
+        let targetFilename = '';
+        if (type === 'front') targetFilename = `bgimgf.${extension}`;
+        else if (type === 'back') targetFilename = `bgimgb.${extension}`;
+        else if (type === 'thumbf') targetFilename = `thumbf.${extension}`;
+        else if (type === 'thumbb') targetFilename = `thumbb.${extension}`;
+
+        const targetKey = `admin/card-designs/${designId}/${targetFilename}`;
+
+        // If already in target path, do nothing
+        if (sourceKey === targetKey) {
+            return stripSignature(url);
+        }
+
+        // Copy and Delete old
+        await copyS3Object(bucket, sourceKey, targetKey);
+        await deleteFileFromS3(bucket, sourceKey);
+
+        const region = urlObj.hostname.split('.')[2] || 'ap-northeast-1';
+        return `https://${bucket}.s3.${region}.amazonaws.com/${targetKey}`;
+
+    } catch (e) {
+        console.error("Failed to localize S3 image:", url, e);
+        return url;
+    }
+}

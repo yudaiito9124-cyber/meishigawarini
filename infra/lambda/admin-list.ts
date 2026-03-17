@@ -3,12 +3,14 @@ import { APIGatewayProxyHandler } from 'aws-lambda';
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, QueryCommand, ScanCommand, BatchGetCommand } from '@aws-sdk/lib-dynamodb';
 import { CognitoIdentityProviderClient, AdminGetUserCommand } from '@aws-sdk/client-cognito-identity-provider';
+import { signUrlIfS3 } from './utils/s3';
 
 const client = new DynamoDBClient({});
 const ddb = DynamoDBDocumentClient.from(client);
 const cognito = new CognitoIdentityProviderClient({});
 const TABLE_NAME = process.env.TABLE_NAME || '';
 const USER_POOL_ID = process.env.USER_POOL_ID || '';
+const BUCKET_NAME = process.env.BUCKET_NAME || '';
 const INDEX_NAME = 'GSI1';
 
 const corsHeaders = {
@@ -148,9 +150,42 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             }
         }
 
+        // Fetch Card Design Info (PK=CARD_DESIGN#METADATA, SK=design_id)
+        const designIds = [...new Set(items.map((i: any) => i.card_design).filter(Boolean))];
+        const designMap = new Map<string, any>();
+
+        if (designIds.length > 0) {
+            const chunkedDesignIds = [];
+            for (let i = 0; i < designIds.length; i += 100) {
+                chunkedDesignIds.push(designIds.slice(i, i + 100));
+            }
+
+            for (const chunk of chunkedDesignIds) {
+                const keys = chunk.map(id => ({ PK: 'CARD_DESIGN#METADATA', SK: id }));
+                const batchRes = await ddb.send(new BatchGetCommand({
+                    RequestItems: {
+                        [TABLE_NAME]: {
+                            Keys: keys,
+                            ProjectionExpression: 'SK, thumbf, thumbb'
+                        }
+                    }
+                }));
+
+                if (batchRes.Responses && batchRes.Responses[TABLE_NAME]) {
+                    for (const design of batchRes.Responses[TABLE_NAME]) {
+                        // Sign URLs for preview
+                        if (design.thumbf) design.thumbf = await signUrlIfS3(design.thumbf, BUCKET_NAME);
+                        if (design.thumbb) design.thumbb = await signUrlIfS3(design.thumbb, BUCKET_NAME);
+                        designMap.set(design.SK, design);
+                    }
+                }
+            }
+        }
+
         const enrichedItems = items.map((item: any) => {
             const shop = item.shop_id ? shopMap.get(item.shop_id) : null;
             const order = orderMap.get(item.PK);
+            const design = item.card_design ? designMap.get(item.card_design) : null;
 
             return {
                 ...item,
@@ -160,7 +195,9 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 recipient_name: order?.name || undefined,
                 postal_code: order?.zipCode || order?.postal_code || undefined,
                 address: order?.address || undefined,
-                shipping_info: order || undefined // Pass full order object as shipping_info to match shop page structure if needed, or just specific fields
+                shipping_info: order || undefined, // Pass full order object as shipping_info to match shop page structure if needed, or just specific fields
+                thumbf: design?.thumbf,
+                thumbb: design?.thumbb
             };
         });
 

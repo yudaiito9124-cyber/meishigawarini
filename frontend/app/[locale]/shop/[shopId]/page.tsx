@@ -24,6 +24,7 @@ import SandboxedHtml from '@/components/SandboxedHtml';
 import { APP_CONFIG } from '@/lib/config';
 import { generateId } from '@/lib/id';
 import { resizeImage } from "@/lib/image-utils";
+import { cardformats } from '@/lib/generatePDF';
 
 const NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
@@ -1367,6 +1368,37 @@ export default function ShopPage() {
                                                                     }`}>{st(order.status.toLowerCase())}</span>
                                                             </div>
 
+                                                            {/* Card Preview */}
+                                                            {order.card_design && (
+                                                                <div className="space-y-2">
+                                                                    <h4 className="text-sm font-semibold text-gray-500">{t('linkQr.cardDesign')}</h4>
+                                                                    {(order.thumbf || order.thumbb || cardformats[order.card_design]) && (
+                                                                        <div className="grid grid-cols-2 gap-2">
+                                                                            <div className="space-y-1">
+                                                                                <div className="aspect-[84/52] relative rounded shadow-sm overflow-hidden border border-gray-100 bg-white">
+                                                                                    <img 
+                                                                                        src={order.thumbf || cardformats[order.card_design]?.bgimgf} 
+                                                                                        alt="Front" 
+                                                                                        className="w-full h-full object-cover" 
+                                                                                        crossOrigin="anonymous"
+                                                                                    />
+                                                                                </div>
+                                                                            </div>
+                                                                            <div className="space-y-1">
+                                                                                <div className="aspect-[84/52] relative rounded shadow-sm overflow-hidden border border-gray-100 bg-white">
+                                                                                    <img 
+                                                                                        src={order.thumbb || cardformats[order.card_design]?.bgimgb} 
+                                                                                        alt="Back" 
+                                                                                        className="w-full h-full object-cover" 
+                                                                                        crossOrigin="anonymous"
+                                                                                    />
+                                                                                </div>
+                                                                            </div>
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            )}
+
                                                             {/* Recipient Info */}
                                                             <div>
                                                                 <h4 className="text-sm font-semibold text-gray-500">{t('orders.recipient')}</h4>
@@ -1521,8 +1553,11 @@ export default function ShopPage() {
                                     <DialogTrigger asChild>
                                         <Card className="overflow-hidden cursor-pointer hover:ring-2 hover:ring-primary/50 transition-all">
                                             <div className="w-full relative aspect-[16/9]">
-                                                {/* eslint-disable-next-line @next/next/no-img-element */}
-                                                <img src={product.image_url} alt={product.name} className="w-full h-full object-cover" />
+                                                <img
+                                                    src={product.image_url}
+                                                    alt={product.name}
+                                                    className="w-full aspect-video object-contain bg-gray-100"
+                                                />
                                                 <div className="absolute top-2 right-2 flex gap-2">
                                                     <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${product.status === 'ACTIVE' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
                                                         }`}>
@@ -1876,6 +1911,37 @@ export default function ShopPage() {
                                                                                                 'bg-green-100 text-green-800'
                                                                     }`}>{st(order.status.toLowerCase())}</span>
                                                             </div>
+
+                                                            {/* Card Preview */}
+                                                            {order.card_design && (
+                                                                <div className="space-y-2">
+                                                                    <h4 className="text-sm font-semibold text-gray-500">{t('linkQr.cardDesign')}</h4>
+                                                                    {(order.thumbf || order.thumbb || cardformats[order.card_design]) && (
+                                                                        <div className="grid grid-cols-2 gap-2">
+                                                                            <div className="space-y-1">
+                                                                                <div className="aspect-[84/52] relative rounded shadow-sm overflow-hidden border border-gray-100 bg-white">
+                                                                                    <img 
+                                                                                        src={order.thumbf || cardformats[order.card_design]?.bgimgf} 
+                                                                                        alt="Front" 
+                                                                                        className="w-full h-full object-cover" 
+                                                                                        crossOrigin="anonymous"
+                                                                                    />
+                                                                                </div>
+                                                                            </div>
+                                                                            <div className="space-y-1">
+                                                                                <div className="aspect-[84/52] relative rounded shadow-sm overflow-hidden border border-gray-100 bg-white">
+                                                                                    <img 
+                                                                                        src={order.thumbb || cardformats[order.card_design]?.bgimgb} 
+                                                                                        alt="Back" 
+                                                                                        className="w-full h-full object-cover" 
+                                                                                        crossOrigin="anonymous"
+                                                                                    />
+                                                                                </div>
+                                                                            </div>
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            )}
 
                                                             {/* Recipient Info */}
                                                             <div>

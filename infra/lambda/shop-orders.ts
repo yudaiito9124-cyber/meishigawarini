@@ -5,12 +5,14 @@ import { DynamoDBDocumentClient, QueryCommand, BatchGetCommand, UpdateCommand, G
 import { createShippingNotificationEmail } from './templates/email';
 import { sendEmail } from './utils/email-client';
 import { checkShopOwnerOrGM } from './share/shop-auth';
+import { signUrlIfS3 } from './utils/s3';
 
 const client = new DynamoDBClient({});
 // const ses = new SESClient({}); // Removed SES for Resend
 const ddb = DynamoDBDocumentClient.from(client);
 const TABLE_NAME = process.env.TABLE_NAME || '';
 // const SENDER_EMAIL = process.env.SENDER_EMAIL; // Handled in email-client
+const BUCKET_NAME = process.env.BUCKET_NAME || '';
 const INDEX_NAME = 'GSI1';
 
 const corsHeaders = {
@@ -121,16 +123,23 @@ async function handleListShopOrders(shopId: string, queryParams?: any) {
             tracking_number: orderDetail.tracking_number,
             delivery_company: orderDetail.delivery_company,
 
-            ts_created_at: meta.ts_created_at,
-            ts_updated_at: meta.ts_updated_at,
-            ts_linked_at: meta.ts_linked_at,
-            ts_activated_at: meta.ts_activated_at,
-            ts_submitted_at: meta.ts_submitted_at,
-            ts_shipped_at: meta.ts_shipped_at,
-            ts_completed_at: meta.ts_completed_at,
             ts_expired_at: meta.ts_expired_at,
             ts_banned_at: meta.ts_banned_at,
+            card_design: meta.card_design
         };
+
+        // Enrich with Card Design Thumbnails
+        if (order.card_design) {
+            const designRes = await ddb.send(new GetCommand({
+                TableName: TABLE_NAME,
+                Key: { PK: 'CARD_DESIGN#METADATA', SK: order.card_design }
+            }));
+            if (designRes.Item) {
+                const design = designRes.Item;
+                (order as any).thumbf = await signUrlIfS3(design.thumbf, BUCKET_NAME);
+                (order as any).thumbb = await signUrlIfS3(design.thumbb, BUCKET_NAME);
+            }
+        }
 
         return {
             statusCode: 200,
@@ -175,10 +184,41 @@ async function handleListShopOrders(shopId: string, queryParams?: any) {
         }
     }
 
-    return renderOrderItems(allOrderDetails, relevantItems);
+    // 4. Enrich with Card Design Thumbnails
+    const designIds = [...new Set(relevantItems.map((i: any) => i.card_design).filter(Boolean))];
+    const designMap = new Map<string, any>();
+
+    if (designIds.length > 0) {
+        const chunkedDesignIds = [];
+        for (let i = 0; i < designIds.length; i += 100) {
+            chunkedDesignIds.push(designIds.slice(i, i + 100));
+        }
+
+        for (const chunk of chunkedDesignIds) {
+            const keys = chunk.map(id => ({ PK: 'CARD_DESIGN#METADATA', SK: id }));
+            const batchRes = await ddb.send(new BatchGetCommand({
+                RequestItems: {
+                    [TABLE_NAME]: {
+                        Keys: keys,
+                        ProjectionExpression: 'SK, thumbf, thumbb'
+                    }
+                }
+            }));
+
+            if (batchRes.Responses && batchRes.Responses[TABLE_NAME]) {
+                for (const design of batchRes.Responses[TABLE_NAME]) {
+                    if (design.thumbf) design.thumbf = await signUrlIfS3(design.thumbf, BUCKET_NAME);
+                    if (design.thumbb) design.thumbb = await signUrlIfS3(design.thumbb, BUCKET_NAME);
+                    designMap.set(design.SK, design);
+                }
+            }
+        }
+    }
+
+    return renderOrderItems(allOrderDetails, relevantItems, designMap);
 }
 
-function renderOrderItems(allOrderDetails: any[], relevantItems: any[]) {
+function renderOrderItems(allOrderDetails: any[], relevantItems: any[], designMap: Map<string, any>) {
     const orderDetailsMap = new Map();
     allOrderDetails.forEach((item: any) => {
         orderDetailsMap.set(item.PK, item);
@@ -186,6 +226,7 @@ function renderOrderItems(allOrderDetails: any[], relevantItems: any[]) {
 
     const orders = relevantItems.map(meta => {
         const orderDetail = orderDetailsMap.get(meta.PK) || {};
+        const design = meta.card_design ? designMap.get(meta.card_design) : null;
         // if (!orderDetail) return null; // Allow items without order details (e.g. LINKED, ACTIVE)
         return {
             id: meta.PK.replace('QR#', ''),
@@ -212,6 +253,9 @@ function renderOrderItems(allOrderDetails: any[], relevantItems: any[]) {
             ts_completed_at: meta.ts_completed_at,
             ts_expired_at: meta.ts_expired_at,
             ts_banned_at: meta.ts_banned_at,
+            card_design: meta.card_design,
+            thumbf: design?.thumbf,
+            thumbb: design?.thumbb
         };
     });
 

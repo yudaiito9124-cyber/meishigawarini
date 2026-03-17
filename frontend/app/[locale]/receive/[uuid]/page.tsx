@@ -197,6 +197,7 @@ export default function ReceivePage() {
     const [address, setAddress] = useState("");
     const [phone, setPhone] = useState("");
     const [email, setEmail] = useState("");
+    const [email2, setEmail2] = useState("");
     const [preferredDate, setPreferredDate] = useState("");
     const [preferredTime, setPreferredTime] = useState("");
 
@@ -422,10 +423,37 @@ export default function ReceivePage() {
 
     const handleAddressSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+
+        const form = e.currentTarget as HTMLFormElement;
+
+        if (!form.checkValidity()) {
+            form.reportValidity();
+            return;
+        }
+
+        // この辺の処理がないとpatternに設定しているのに素通りします
+        const zipDigits = zipCode.replace(/\D/g, '').length;
+        const phoneDigits = phone.replace(/\D/g, '').length;
+
+        if (zipDigits !== 7) {
+            alert(t('errors.invalidZip'));
+            return;
+        }
+
+        if (phoneDigits < 10 || phoneDigits > 11) {
+            alert(t('errors.invalidPhone'));
+            return;
+        }
+
         if (password !== confirmPassword) {
             alert(t('errors.passwordMismatch'));
             return;
         }
+        if (email !== email2) {
+            alert(t('formStep.email-mismatch-error'));
+            return;
+        }
+
         setLoading(true);
         try {
             await submitAddress(uuid, pin, { name, zipCode, address, phone, email, preferredDate, preferredTime }, password);
@@ -806,6 +834,66 @@ export default function ReceivePage() {
         }
     };
 
+    const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        // 入力された生の文字列
+        let rawValue = e.target.value;
+
+        // 1. まず全角を半角に変換（数字・ハイフン類）
+        let converted = rawValue
+            .replace(/[０-９]/g, (s) => String.fromCharCode(s.charCodeAt(0) - 0xFEE0))
+            .replace(/[ー‐―－]/g, "-");
+
+        // 2. 数字とハイフン以外を「除外」して、有効な文字だけを抽出
+        // これにより、既存の数字を保持しつつ、新しく入った不正な文字だけを弾きます
+        let filtered = converted.replace(/[^0-9-]/g, "");
+
+        // 3. ハイフンの数を制限（最大2つまで）
+        const parts = filtered.split("-");
+        if (parts.length > 3) {
+            // 3つ目以降のハイフンは結合して消す
+            filtered = parts.slice(0, 3).join("-") + parts.slice(3).join("");
+        }
+
+        // 4. 数字の合計文字数を制限（最大11文字まで）
+        const digitsOnly = filtered.replace(/-/g, "");
+        if (digitsOnly.length > 11) {
+            // 11文字を超えた場合は、入力を反映させない（以前の状態をキープ）
+            return;
+        }
+
+        setPhone(filtered);
+    };
+
+    const handleZipCodeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        // 入力された生の文字列
+        let rawValue = e.target.value;
+
+        // 1. まず全角を半角に変換（数字・ハイフン類）
+        let converted = rawValue
+            .replace(/[０-９]/g, (s) => String.fromCharCode(s.charCodeAt(0) - 0xFEE0))
+            .replace(/[ー‐―－]/g, "-");
+
+        // 2. 数字とハイフン以外を「除外」して、有効な文字だけを抽出
+        // これにより、既存の数字を保持しつつ、新しく入った不正な文字だけを弾きます
+        let filtered = converted.replace(/[^0-9-]/g, "");
+
+        // 3. ハイフンの数を制限（最大2つまで）
+        const parts = filtered.split("-");
+        if (parts.length > 2) {
+            // 3つ目以降のハイフンは結合して消す
+            filtered = parts.slice(0, 2).join("-") + parts.slice(3).join("");
+        }
+
+        // 4. 数字の合計文字数を制限（最大11文字まで）
+        const digitsOnly = filtered.replace(/-/g, "");
+        if (digitsOnly.length > 7) {
+            // 11文字を超えた場合は、入力を反映させない（以前の状態をキープ）
+            return;
+        }
+
+        setZipCode(filtered);
+    };
+
     return (
         <div className={cn("min-h-screen w-full bg-gray-50 flex flex-col items-center justify-center py-8 px-4 transition-all duration-1000", step === "COMPLETED" && "bg-olive-300 sepia-[.2] shadow-[inset_0_0_500px_rgba(0,0,0,0.8)]")}>
             {/* COMPLETEしているカードを読み込む際のフェード処理 */}
@@ -977,7 +1065,7 @@ export default function ReceivePage() {
                                 <img
                                     src={gift.product.image_url}
                                     alt="Gift"
-                                    className="w-full max-h-72 object-cover transform transition-transform duration-700 group-hover:scale-105"
+                                    className="w-full object-contain max-h-260 object-cover transform transition-transform duration-700 group-hover:scale-105"
                                 />
                                 {/* Diagonal Corner Ribbon (Top Right) */}
                                 <div className="absolute top-0 right-0 w-24 h-24 overflow-hidden pointer-events-none z-10 animate-reveal reveal-delay-200">
@@ -1133,73 +1221,88 @@ export default function ReceivePage() {
                         )}
 
                         {step === "FORM" && (
-                            <form onSubmit={handleAddressSubmit} className="space-y-6">
-                                <div className="space-y-4 p-8">
-                                    {/* <Label className="font-semibold">{t('formStep.title')}</Label> */}
-                                    <div className="space-y-2">
-                                        <Label htmlFor="name">{t('formStep.name')}</Label>
+                            <form onSubmit={handleAddressSubmit} className="space-y-6 space-y-4 p-8">
+                                {/* <Label className="font-semibold">{t('formStep.title')}</Label> */}
+                                <div className="space-y-2">
+                                    <Label htmlFor="name">{t('formStep.name')}</Label>
+                                    <Input
+                                        id="name"
+                                        required
+                                        value={name}
+                                        onChange={(e) => setName(e.target.value)}
+                                        placeholder={t('formStep.name-placeholder')}
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="zipCode">{t('formStep.zipCode')}</Label>
+                                    <Input
+                                        id="zipCode"
+                                        required
+                                        value={zipCode}
+                                        pattern="^(?=([^0-9]*[0-9]){7}[^0-9]*$)[0-9-]*$"
+                                        onChange={handleZipCodeChange}
+                                        placeholder={t('formStep.zipCode-placeholder')}
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="address">{t('formStep.address')}</Label>
+                                    <Input
+                                        id="address"
+                                        required
+                                        value={address}
+                                        onChange={(e) => setAddress(e.target.value)}
+                                        placeholder={t('formStep.address-placeholder')}
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="phone">{t('formStep.phone')}</Label>
+                                    <Input
+                                        id="phone"
+                                        required
+                                        type="tel"
+                                        value={phone}
+                                        pattern="^(?=([^0-9]*[0-9]){7}[^0-9]*$)[0-9-]*$"
+                                        onChange={handlePhoneChange}
+                                        placeholder={t('formStep.phone-placeholder')}
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="email">{t('formStep.email')}</Label>
+                                    <p className="text-xs text-gray-500">{t('formStep.emailDescription')}</p>
+                                    <Input
+                                        id="email"
+                                        type="email"
+                                        value={email}
+                                        onChange={(e) => setEmail(e.target.value)}
+                                        pattern="^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)*$"
+                                        placeholder={t('formStep.email-placeholder')}
+                                    />
+                                    {email && (
                                         <Input
-                                            id="name"
-                                            required
-                                            value={name}
-                                            onChange={(e) => setName(e.target.value)}
-                                            placeholder={t('formStep.name-placeholder')}
-                                        />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label htmlFor="zipCode">{t('formStep.zipCode')}</Label>
-                                        <Input
-                                            id="zipCode"
-                                            required
-                                            value={zipCode}
-                                            onChange={(e) => setZipCode(e.target.value)}
-                                            placeholder={t('formStep.zipCode-placeholder')}
-                                        />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label htmlFor="address">{t('formStep.address')}</Label>
-                                        <Input
-                                            id="address"
-                                            required
-                                            value={address}
-                                            onChange={(e) => setAddress(e.target.value)}
-                                            placeholder={t('formStep.address-placeholder')}
-                                        />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label htmlFor="phone">{t('formStep.phone')}</Label>
-                                        <Input
-                                            id="phone"
-                                            required
-                                            type="tel"
-                                            value={phone}
-                                            onChange={(e) => setPhone(e.target.value)}
-                                            placeholder={t('formStep.phone-placeholder')}
-                                        />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label htmlFor="email">{t('formStep.email')}</Label>
-                                        <p className="text-xs text-gray-500">{t('formStep.emailDescription')}</p>
-                                        <Input
-                                            id="email"
+                                            id="email2"
                                             type="email"
-                                            value={email}
-                                            onChange={(e) => setEmail(e.target.value)}
-                                            placeholder={t('formStep.email-placeholder')}
+                                            value={email2}
+                                            onPaste={(e) => e.preventDefault()}
+                                            required={!!email}
+                                            onChange={(e) => setEmail2(e.target.value)}
+                                            pattern={email ? email.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') : undefined}
+                                            title={t('formStep.email-mismatch-error')}
+                                            placeholder={t('formStep.email-confirm-placeholder')}
                                         />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label htmlFor="preferredDate">{t('formStep.preferredDate')}</Label>
-                                        <div className="flex gap-2 items-start h-9">
-                                            <div className="flex-1 flex h-full items-center justify-center">
-                                                <Input
-                                                    id="preferredDate"
-                                                    type="date"
-                                                    value={preferredDate}
-                                                    onChange={(e) => setPreferredDate(e.target.value)}
-                                                    className="w-full h-full"
-                                                />
-                                                {/* {preferredDate && (
+                                    )}
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="preferredDate">{t('formStep.preferredDate')}</Label>
+                                    <div className="flex gap-2 items-start h-9">
+                                        <div className="flex-1 flex h-full items-center justify-center">
+                                            <Input
+                                                id="preferredDate"
+                                                type="date"
+                                                value={preferredDate}
+                                                onChange={(e) => setPreferredDate(e.target.value)}
+                                                className="w-full h-full"
+                                            />
+                                            {/* {preferredDate && (
                                                     <p className="text-[10px] text-blue-600 font-bold ml-1 animate-in fade-in slide-in-from-top-1">
                                                         {(() => {
                                                             try {
@@ -1214,39 +1317,39 @@ export default function ReceivePage() {
                                                             })()}
                                                         </p>
                                                     )} */}
-                                            </div>
-                                            <div className="flex h-full items-center justify-center">
+                                        </div>
+                                        <div className="flex h-full items-center justify-center">
 
-                                                <Button
-                                                    type="button"
-                                                    variant="outline"
-                                                    onClick={() => setPreferredDate("")}
-                                                    className="flex whitespace-nowrap h-full items-center justify-center"
-                                                >
-                                                    {t('formStep.noPreference')}
-                                                </Button>
-                                            </div>
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                onClick={() => setPreferredDate("")}
+                                                className="flex whitespace-nowrap h-full items-center justify-center"
+                                            >
+                                                {t('formStep.noPreference')}
+                                            </Button>
                                         </div>
                                     </div>
-                                    <div className="space-y-2">
-                                        <Label htmlFor="preferredTime">{t('formStep.preferredTime')}</Label>
-                                        <select
-                                            id="preferredTime"
-                                            value={preferredTime}
-                                            onChange={(e) => setPreferredTime(e.target.value)}
-                                            className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-                                        >
-                                            <option value="">{t('formStep.noPreference')}</option>
-                                            <option value="timeMorning">{tt('timeMorning')}</option>
-                                            <option value="time1416">{tt('time1416')}</option>
-                                            <option value="time1618">{tt('time1618')}</option>
-                                            <option value="time1820">{tt('time1820')}</option>
-                                            <option value="time1921">{tt('time1921')}</option>
-                                        </select>
-                                    </div>
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="preferredTime">{t('formStep.preferredTime')}</Label>
+                                    <select
+                                        id="preferredTime"
+                                        value={preferredTime}
+                                        onChange={(e) => setPreferredTime(e.target.value)}
+                                        className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                                    >
+                                        <option value="">{t('formStep.noPreference')}</option>
+                                        <option value="timeMorning">{tt('timeMorning')}</option>
+                                        <option value="time1416">{tt('time1416')}</option>
+                                        <option value="time1618">{tt('time1618')}</option>
+                                        <option value="time1820">{tt('time1820')}</option>
+                                        <option value="time1921">{tt('time1921')}</option>
+                                    </select>
+                                </div>
 
-                                    {/* Password Setting Section */}
-                                    {/* <div className="space-y-4 pt-8 mt-16 border-t">
+                                {/* Password Setting Section */}
+                                {/* <div className="space-y-4 pt-8 mt-16 border-t">
                                     <Label className="font-semibold text-blue-800">{t('formStep.passwordTitle')}</Label>
                                     <p className="text-xs text-gray-500">
                                         {t('formStep.passwordDescription')}
@@ -1274,15 +1377,14 @@ export default function ReceivePage() {
                                 </div> */}
 
 
-                                    {/* Password Setting Section (Commented out) */}
+                                {/* Password Setting Section (Commented out) */}
 
 
-                                    <Button type="submit" className="w-full flex flex-col flex-row items-center h-12 mt-14" disabled={loading}>
-                                        <SendHorizontal className="mr-2 h-4 w-4" />
-                                        {loading ? t('formStep.submitting') : t('formStep.submit')}
-                                    </Button>
-                                    <p className="text-xs text-gray-500 text-center">{t('formStep.privacyPolicy')}</p>
-                                </div>
+                                <Button type="submit" className="w-full flex flex-col flex-row items-center h-12 mt-14" disabled={loading}>
+                                    <SendHorizontal className="mr-2 h-4 w-4" />
+                                    {loading ? t('formStep.submitting') : t('formStep.submit')}
+                                </Button>
+                                <p className="text-xs text-gray-500 text-center">{t('formStep.privacyPolicy')}</p>
                             </form>
                         )}
 

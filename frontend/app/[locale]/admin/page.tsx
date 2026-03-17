@@ -17,7 +17,8 @@ import jsPDF from 'jspdf';
 import { generateId } from '@/lib/id';
 import { useTranslations } from 'next-intl';
 import { generatePDF, cardformats, paperformats } from '@/lib/generatePDF';
-import { ExternalLink, Copy, Eye, QrCode, Store, Wrench } from 'lucide-react';
+import { ExternalLink, Copy, Eye, QrCode, Store, Wrench, Layers } from 'lucide-react';
+import CardDesignEditor from "@/components/admin/CardDesignEditor";
 const NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 const NEXT_PUBLIC_APP_URL = process.env.NEXT_PUBLIC_APP_URL || "";
 // const PDF_PAPER_FORMAT = "10S31251"; //"1S31034"
@@ -51,10 +52,39 @@ export default function AdminPage() {
     const [isAuthorized, setIsAuthorized] = useState<boolean | null>(null); // null = loading
     const [paperFormat, setPaperFormat] = useState("10S31251");
     const [cardFormat, setCardFormat] = useState("gakuchousenbeiv1");
+    const [dbCardDesigns, setDbCardDesigns] = useState<any[]>([]);
+    const [reloadDbCardDesigns, setReloadDbCardDesigns] = useState(true);
     const [isGenerating, setIsGenerating] = useState(false);
     const [activeTab, setActiveTab] = useState("qrcodes");
     const router = useRouter();
     const hasCheckedAuth = useRef(false);
+
+    const fetchDbCardDesigns = async () => {
+        try {
+            const session = await fetchAuthSession();
+            const token = session.tokens?.idToken?.toString();
+            const res = await fetch(`${NEXT_PUBLIC_API_URL}/admin/card-designs`, {
+                headers: { "Authorization": `Bearer ${token}` }
+            });
+            if (res.ok) {
+                const data = await res.json();
+                setDbCardDesigns(data.items || []);
+            }
+        } catch (e) {
+            console.error("Failed to fetch designs", e);
+        }
+    };
+
+    useEffect(() => {
+        if (isAuthorized && reloadDbCardDesigns && activeTab === "qrcodes") {
+            fetchDbCardDesigns();
+            setReloadDbCardDesigns(false);
+        }
+        if (isAuthorized && activeTab === "designs") {
+            setReloadDbCardDesigns(true);
+        }
+
+    }, [isAuthorized, activeTab]);
 
     useEffect(() => {
         if (hasCheckedAuth.current) return;
@@ -135,6 +165,16 @@ export default function AdminPage() {
             const session = await fetchAuthSession();
             const token = session.tokens?.idToken?.toString();
 
+            const resolveDesign = (designId?: string) => {
+                const targetId = designId || cardFormat;
+                const dbDesign = dbCardDesigns.find(d => d.design_id === targetId);
+                if (dbDesign) return dbDesign;
+                if (cardformats[targetId]) return targetId;
+                // Fallback to currently selected global design
+                const globalDesign = dbCardDesigns.find(d => d.design_id === cardFormat);
+                return globalDesign || cardFormat;
+            };
+
             const res = await fetch(`${NEXT_PUBLIC_API_URL}/admin/qrcodes/generate`, {
                 method: "POST",
                 headers: {
@@ -172,7 +212,8 @@ export default function AdminPage() {
                 // console.log("Generated Codes:", data.data);
 
                 // Automatically download PDF
-                await generatePDF(newBatch, paperFormat, cardFormat);
+                const design = resolveDesign(cardFormat);
+                await generatePDF(newBatch, paperFormat, design);
             } else {
                 const errData = await res.json().catch(() => null);
                 // console.error(errData);
@@ -234,6 +275,18 @@ export default function AdminPage() {
                     >
                         <Wrench className={cn("w-12 h-12 mb-3", activeTab === "tools" ? "text-mist-900" : "text-mist-400")} />
                         <span className="text-lg font-bold">{t('tabs.tools')}</span>
+                    </button>
+                    <button
+                        onClick={() => setActiveTab("designs")}
+                        className={cn(
+                            "flex flex-col items-center justify-center p-6 rounded-2xl border-2 transition-all duration-200 cursor-pointer shadow-sm hover:shadow-md",
+                            activeTab === "designs"
+                                ? "bg-white border-white text-mist-900 ring-2 ring-mist-700 ring-offset-2 ring-offset-mist-900"
+                                : "bg-mist-800 border-mist-700 text-mist-300 hover:border-mist-600 hover:bg-mist-700/50"
+                        )}
+                    >
+                        <Layers className={cn("w-12 h-12 mb-3", activeTab === "designs" ? "text-mist-900" : "text-mist-400")} />
+                        <span className="text-lg font-bold">{t('tabs.designs')}</span>
                     </button>
                 </div>
 
@@ -373,7 +426,10 @@ export default function AdminPage() {
                                                     onChange={(e) => setCardFormat(e.target.value)}
                                                 >
                                                     {Object.entries(cardformats).map(([key, value]: [string, any]) => (
-                                                        <option key={key} value={key}>{value.description || key}</option>
+                                                        <option key={key} value={key}>{value.description || key} [System]</option>
+                                                    ))}
+                                                    {dbCardDesigns.map((d: any) => (
+                                                        <option key={d.design_id} value={d.design_id}>{d.description} [DB]</option>
                                                     ))}
                                                 </select>
                                             </div>
@@ -384,13 +440,23 @@ export default function AdminPage() {
                                             <div className="grid grid-cols-2 gap-4">
                                                 <div className="space-y-1">
                                                     <div className="aspect-[84/52] relative rounded shadow-lg overflow-hidden border border-gray-700 bg-white">
-                                                        <img src={cardformats[cardFormat]?.bgimgf} alt={t('generate.frontPreview')} className="w-full h-full object-cover" />
+                                                        <img
+                                                            src={dbCardDesigns.find(d => d.design_id === cardFormat)?.bgimgf || cardformats[cardFormat]?.bgimgf}
+                                                            alt={t('generate.frontPreview')}
+                                                            className="w-full h-full object-cover"
+                                                            crossOrigin="anonymous"
+                                                        />
                                                     </div>
                                                     <p className="text-[10px] text-gray-500 text-center uppercase tracking-wider">{t('generate.front')}</p>
                                                 </div>
                                                 <div className="space-y-1">
                                                     <div className="aspect-[84/52] relative rounded shadow-lg overflow-hidden border border-gray-700 bg-white">
-                                                        <img src={cardformats[cardFormat]?.bgimgb} alt={t('generate.backPreview')} className="w-full h-full object-cover" />
+                                                        <img
+                                                            src={dbCardDesigns.find(d => d.design_id === cardFormat)?.bgimgb || cardformats[cardFormat]?.bgimgb}
+                                                            alt={t('generate.backPreview')}
+                                                            className="w-full h-full object-cover"
+                                                            crossOrigin="anonymous"
+                                                        />
                                                     </div>
                                                     <p className="text-[10px] text-gray-500 text-center uppercase tracking-wider">{t('generate.back')}</p>
                                                 </div>
@@ -437,7 +503,18 @@ export default function AdminPage() {
                                                         </div>
                                                         <p className="flex justify-center items-center text-sm bg-green-100 text-green-800 px-3 py-1 rounded-xl">{batch.status}</p>
                                                     </div>
-                                                    <Button className="ml-auto" variant="outline" size="sm" onClick={() => generatePDF(batch, paperFormat, cardFormat)}>{t('batches.downloadPdf')}</Button>
+                                                    <Button className="ml-auto" variant="outline" size="sm" onClick={() => {
+                                                        const resolveDesign = (designId?: string) => {
+                                                            const targetId = designId || cardFormat;
+                                                            const dbDesign = dbCardDesigns.find(d => d.design_id === targetId);
+                                                            if (dbDesign) return dbDesign;
+                                                            if (cardformats[targetId]) return targetId;
+                                                            const globalDesign = dbCardDesigns.find(d => d.design_id === cardFormat);
+                                                            return globalDesign || cardFormat;
+                                                        };
+                                                        const design = resolveDesign(batch.card_design);
+                                                        generatePDF(batch, paperFormat, design);
+                                                    }}>{t('batches.downloadPdf')}</Button>
                                                 </div>
                                                 {/* Display Codes */}
                                                 <div className="mt-2 bg-gray-100 p-2 rounded text-xs font-mono overflow-auto max-h-40">
@@ -467,7 +544,13 @@ export default function AdminPage() {
 
 
                         {/* すべてのQRコード一覧 */}
-                        <QRCodeListSection apiUrl={NEXT_PUBLIC_API_URL} onGeneratePDF={generatePDF} paperFormat={paperFormat} cardFormat={cardFormat} />
+                        <QRCodeListSection
+                            apiUrl={NEXT_PUBLIC_API_URL}
+                            onGeneratePDF={generatePDF}
+                            paperFormat={paperFormat}
+                            cardFormat={cardFormat}
+                            dbCardDesigns={dbCardDesigns}
+                        />
                     </div>
                 )}
 
@@ -491,16 +574,23 @@ export default function AdminPage() {
                     </div>
                 )}
 
+                {activeTab === "designs" && (
+                    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                        <CardDesignEditor apiUrl={NEXT_PUBLIC_API_URL} />
+                    </div>
+                )}
+
             </div>
         </div>
     );
 }
 
-function QRCodeListSection({ apiUrl, onGeneratePDF, paperFormat, cardFormat }: {
+function QRCodeListSection({ apiUrl, onGeneratePDF, paperFormat, cardFormat, dbCardDesigns }: {
     apiUrl: string,
-    onGeneratePDF: (batch: any, paperformat: string, cardformat: string) => Promise<void>,
+    onGeneratePDF: (batch: any, paperformat: string, cardformat: string | any) => Promise<void>,
     paperFormat: string,
-    cardFormat: string
+    cardFormat: string,
+    dbCardDesigns: any[]
 }) {
     const t = useTranslations('AdminPage');
     const tShop = useTranslations('ShopPage');
@@ -742,6 +832,7 @@ function QRCodeListSection({ apiUrl, onGeneratePDF, paperFormat, cardFormat }: {
                                         onRefresh={fetchCodes}
                                         paperFormat={paperFormat}
                                         cardFormat={cardFormat}
+                                        dbCardDesigns={dbCardDesigns}
                                     />
                                 ))
                             )}
@@ -753,13 +844,14 @@ function QRCodeListSection({ apiUrl, onGeneratePDF, paperFormat, cardFormat }: {
     );
 }
 
-function QRCodeRow({ item, apiUrl, onGeneratePDF, onRefresh, paperFormat, cardFormat }: {
+function QRCodeRow({ item, apiUrl, onGeneratePDF, onRefresh, paperFormat, cardFormat, dbCardDesigns }: {
     item: any;
     apiUrl: string;
-    onGeneratePDF: (batch: any, paperformat: string, cardformat: string) => Promise<void>;
+    onGeneratePDF: (batch: any, paperformat: string, cardformat: string | any) => Promise<void>;
     onRefresh: () => void;
     paperFormat: string;
     cardFormat: string;
+    dbCardDesigns: any[];
 }) {
     const t = useTranslations('AdminPage');
     const tShop = useTranslations('ShopPage');
@@ -806,10 +898,19 @@ function QRCodeRow({ item, apiUrl, onGeneratePDF, onRefresh, paperFormat, cardFo
                             className="mr-2 h-6 text-xs"
                             onClick={(e) => {
                                 e.stopPropagation();
+                                const resolveDesign = (designId?: string) => {
+                                    const targetId = designId || cardFormat;
+                                    const dbDesign = dbCardDesigns.find(d => d.design_id === targetId);
+                                    if (dbDesign) return dbDesign;
+                                    if (cardformats[targetId]) return targetId;
+                                    const globalDesign = dbCardDesigns.find(d => d.design_id === cardFormat);
+                                    return globalDesign || cardFormat;
+                                };
+                                const design = resolveDesign(item.card_design);
                                 onGeneratePDF({
                                     id: uuid,
                                     codes: [{ uuid, pin: item.pin }]
-                                }, paperFormat, cardFormat);
+                                }, paperFormat, design);
                             }}
                         >
                             {t('list.ban.pdf')}
@@ -869,12 +970,40 @@ function QRCodeRow({ item, apiUrl, onGeneratePDF, onRefresh, paperFormat, cardFo
                                 {st(item.status ? item.status.toLowerCase() : 'active')}
                             </span>
                         </div>
-                        
+
                         {/* Card Design */}
                         {item.card_design && (
-                            <div>
-                                <h4 className="text-sm font-semibold text-gray-500">{t('generate.cardFormat')}</h4>
-                                <p className="text-sm font-medium">{item.card_design}</p>
+                            <div className="space-y-2">
+                                <div>
+                                    <h4 className="text-sm font-semibold text-gray-500">{t('generate.cardFormat')}</h4>
+                                    <p className="text-sm font-medium">{item.card_design}</p>
+                                </div>
+                                {(item.thumbf || item.thumbb || cardformats[item.card_design]) && (
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <div className="space-y-1">
+                                            <div className="aspect-[84/52] relative rounded shadow-sm overflow-hidden border border-gray-100 bg-white">
+                                                <img
+                                                    src={item.thumbf || cardformats[item.card_design]?.bgimgf}
+                                                    alt="Front"
+                                                    className="w-full h-full object-cover"
+                                                    crossOrigin="anonymous"
+                                                />
+                                            </div>
+                                            <p className="text-[9px] text-gray-400 text-center uppercase tracking-tighter">{t('generate.front')}</p>
+                                        </div>
+                                        <div className="space-y-1">
+                                            <div className="aspect-[84/52] relative rounded shadow-sm overflow-hidden border border-gray-100 bg-white">
+                                                <img
+                                                    src={item.thumbb || cardformats[item.card_design]?.bgimgb}
+                                                    alt="Back"
+                                                    className="w-full h-full object-cover"
+                                                    crossOrigin="anonymous"
+                                                />
+                                            </div>
+                                            <p className="text-[9px] text-gray-400 text-center uppercase tracking-tighter">{t('generate.back')}</p>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         )}
 

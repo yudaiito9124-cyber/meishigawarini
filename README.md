@@ -41,6 +41,7 @@
 
 - **セキュリティ対策の概要**： **[SECURITY_GUIDE.md](./documents/SECURITY_GUIDE.md)** には、このプロジェクトで行われているセキュリティ対策（不正アクセス防止や権限管理など）と、それが実際のコードのどこに書かれているかを解説しています。
 - **メール通知の仕様**： **[EMAIL_NOTIFICATIONS.md](./documents/EMAIL_NOTIFICATIONS.md)** には、送信されるメールの種類、送信タイミング、環境設定などをまとめています。
+- **S3 ストレージの運用・命名規則**： **[S3_STORAGE_GUIDE.md](./documents/S3_STORAGE_GUIDE.md)** には、画像のアップロード、一時フォルダ、自動標準化、および削除ロジックについて解説しています。
 - **ヘルプ・マニュアルの管理**： **[HELP_MANAGEMENT.md](./documents/HELP_MANAGEMENT.md)** には、Markdownを使用したヘルプページの追加・編集方法を解説しています。
 
 

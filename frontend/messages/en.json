@@ -209,6 +209,7 @@
     },
     "linkQr": {
       "title": "Link QR Code",
+      "cardDesign": "Card Design",
       "description": "Connect a physical QR card to a product.",
       "uuidLabel": "QR UUID (Scan or Type)",
       "placeholder": "e.g. 123e4567-...",
@@ -490,7 +491,8 @@
     "tabs": {
       "qrcodes": "QR Codes",
       "shops": "Shop Management",
-      "tools": "Tools"
+      "tools": "Tools",
+      "designs": "Design Settings"
     },
     "AdminNeed2FA": "Admin Required 2FA",
     "generate": {

@@ -25,9 +25,15 @@ export class InfraStack extends cdk.Stack {
       encryption: dynamodb.TableEncryption.AWS_MANAGED,
     });
 
-    const allowedOrigins = process.env.CORS_ALLOWED_ORIGINS
+    const extraOrigins = process.env.CORS_ALLOWED_ORIGINS
       ? process.env.CORS_ALLOWED_ORIGINS.split(',')
-      : ['https://meishigawarini.com', 'http://localhost:3000'];
+      : [];
+    const allowedOrigins = [
+      'https://meishigawarini.com', 
+      'http://localhost:3000', 
+      'http://localhost:3001',
+      ...extraOrigins
+    ];
 
     // S3 Bucket for Product Images
     const bucket = new s3.Bucket(this, 'ProductImageBucket', {
@@ -196,8 +202,13 @@ export class InfraStack extends cdk.Stack {
     const shopOrdersFn = new nodejs.NodejsFunction(this, 'ShopOrdersFn', {
       entry: path.join(__dirname, '../lambda/shop-orders.ts'),
       ...commonProps,
+      environment: {
+        ...commonProps.environment,
+        BUCKET_NAME: bucket.bucketName,
+      }
     });
     table.grantReadWriteData(shopOrdersFn);
+    bucket.grantRead(shopOrdersFn);
 
     // Lambda: Recipient Upload URL (NEW)
     const recipientUploadUrlFn = new nodejs.NodejsFunction(this, 'RecipientUploadUrlFn', {
@@ -405,6 +416,39 @@ export class InfraStack extends cdk.Stack {
     const ownerResource = adminShopIdResource.addResource('owner');
     ownerResource.addMethod('POST', new apigateway.LambdaIntegration(adminChangeOwnerFn), {
         authorizer: adminAuthorizer,
+    });
+
+    // Lambda: Admin Card Designs (NEW)
+    const adminCardDesignsFn = new nodejs.NodejsFunction(this, 'AdminCardDesignsFn', {
+      entry: path.join(__dirname, '../lambda/admin-card-designs.ts'),
+      ...commonProps,
+      environment: {
+        ...commonProps.environment,
+        BUCKET_NAME: bucket.bucketName,
+      }
+    });
+    table.grantReadWriteData(adminCardDesignsFn);
+    bucket.grantReadWrite(adminCardDesignsFn);
+
+    const cardDesignsResource = adminResource.addResource('card-designs');
+    cardDesignsResource.addMethod('GET', new apigateway.LambdaIntegration(adminCardDesignsFn), {
+      authorizer: adminAuthorizer,
+    });
+    cardDesignsResource.addMethod('POST', new apigateway.LambdaIntegration(adminCardDesignsFn), {
+      authorizer: adminAuthorizer,
+    });
+
+    const cardDesignsUploadUrlResource = cardDesignsResource.addResource('upload-url');
+    cardDesignsUploadUrlResource.addMethod('POST', new apigateway.LambdaIntegration(adminCardDesignsFn), {
+      authorizer: adminAuthorizer,
+    });
+
+    const cardDesignIdResource = cardDesignsResource.addResource('{id}');
+    cardDesignIdResource.addMethod('PATCH', new apigateway.LambdaIntegration(adminCardDesignsFn), {
+      authorizer: adminAuthorizer,
+    });
+    cardDesignIdResource.addMethod('DELETE', new apigateway.LambdaIntegration(adminCardDesignsFn), {
+      authorizer: adminAuthorizer,
     });
 
     // Admin QR Detail Routes

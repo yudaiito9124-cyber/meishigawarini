@@ -171,7 +171,34 @@ QRコードのライフサイクルや注文ステータス、商品との紐付
 | `email_preferences` | Map | メール通知の設定情報マップ （言語情報等、例: `{"user@example.com": "ja"}`） |
 | `sender_info` | JSon | プレゼントを渡した人の名刺情報等（`detail_html` を含む）
 | `sender_id` | String | (QR生成時オプション) プレゼントを渡したユーザーのID(receiveの送り主情報入力画面でexportすると保存される使いまわし専用ID、これがあるとreceive画面の送り主情報は編集不可能) |
+### 2.8 Card Design Metadata (カードデザイン)
+カードのデザイン（背景画像、QR・PIN・UUIDの配置等）を保持します。
 
+| 属性名 | 型 | 説明 |
+| --- | --- | --- |
+| `PK` | String | 常に固定値 `CARD_DESIGN#METADATA` |
+| `SK` | String | デザインID (例: `20240317...`) |
+| `design_id` | String | デザインID (SKと同じ値) |
+| `description` | String | デザイン名・説明 |
+| `bgimgf` | String | 表面背景画像URL (S3) |
+| `bgimgb` | String | 裏面背景画像URL (S3) |
+| `thumbf` | String | 表面サムネイル画像URL (WebP, S3) |
+| `thumbb` | String | 裏面サムネイル画像URL (WebP, S3) |
+| `width` | Number | カード幅 (mm, デフォルト 84) |
+| `height` | Number | カード高さ (mm, デフォルト 52) |
+| `qrsize` | Number | QRコードサイズ (mm) |
+| `qrpos` | Map | QR位置 `{x: Number, y: Number}` |
+| `pinsize` | Number | PIN文字サイズ |
+| `pinpos` | Map | PIN位置 `{x: Number, y: Number}` |
+| `codesize` | Number | UUID文字サイズ |
+| `codepos` | Map | UUID位置 `{x: Number, y: Number}` |
+| `isfront_qr` | Boolean | QRを表面に配置するか |
+| `isfront_pin` | Boolean | PINを表面に配置するか |
+| `isfront_code` | Boolean | UUIDを表面に配置するか |
+| `ts_created_at` | String | 作成日時 |
+| `ts_updated_at` | String | 更新日時 |
+
+---
 
 
 ### 2.7 レコードが保持可能な状態 (ステータス) 一覧

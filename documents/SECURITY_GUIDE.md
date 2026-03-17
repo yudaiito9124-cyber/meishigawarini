@@ -44,9 +44,10 @@
 
 *   **仕組み**: 直接S3（ストレージ）にアップロードさせたり、Lambda（サーバー）経由で画像を処理したりすると、悪意のある大容量ファイル（マルウェアなど）を送られてサーバーがパンクするリスクがあります。
     これを防ぐため、**「短時間（5分間）だけ有効な、特定のファイル名しかアップロードできない専用の片道切符（署名付きURL / Pre-signed URL）」** を発行しています。
-*   **場所**: `infra/lambda/shop-mgmt.ts` (Get Upload URL 部分)
-    *   リクエスト元の拡張子（jpg, png等）やMIMEタイプ（image/jpeg等）を厳格にチェック。
-    *   画像ファイル以外のアップロードを許可せず、`getSignedUrl` で300秒だけ有効なURLを生成してフロントエンドに返します。フロント側はこのURLに対してのみ直接画像を安全に配置します。
+*   **場所**: `infra/lambda/shop-mgmt.ts` および `infra/lambda/admin-card-designs.ts`
+    *   リクエスト元の拡張子（jpg, png, webp等）やMIMEタイプを厳格にチェック。
+    *   `getSignedUrl` で300秒だけ有効なPUT用URLを生成。
+    *   **改善点**: アップロード直後の確認用に、署名付きGET URL (`getPresignedViewUrl`) を同時に返却することで、非公開バケットでも即座にプレビューを可能にしています。
 
 ---
 
@@ -66,7 +67,7 @@ AWS上に構築された各プログラム（Lambda関数）は、不要な操�
     これにより、万が一、特定のAPIに脆弱性があり攻撃者に操作されたとしても、被害そのAPIが持つ最小限の権限の範囲に留まります。
 *   **場所**: `infra/lib/infra-stack.ts`
     *   `table.grantReadData(adminListFn)`: 一覧表示APIには読み取り権限しか与えていないため、絶対にデータを削除できません。
-    *   `bucket.grantPut(shopMgmtFn)`: 画像をアップロードするAPIにだけS3への書き込み権限を与えています。
+    *   `bucket.grantReadWrite(adminCardDesignsFn)`: カードデザイン管理APIには、一時ファイルから本番への移動や不要ファイルの削除を行うため、読み書き（移動・削除を含む）権限を与えています。
 
 ---
 
