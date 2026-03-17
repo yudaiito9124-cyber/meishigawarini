@@ -331,7 +331,9 @@ export const generatePDF = async (batch: any, paperformat: string, cardformat: s
                 doc.setFont("helvetica", "bold");
                 const pinWidth = doc.getTextWidth(code.pin);
                 const pinHeight = doc.getTextDimensions(code.pin).h;
-                doc.text(code.pin, scaleofx + ax + (cardWidth * pf.scale - pinWidth) / 2 + cf.pinpos.x * pf.scale, scaleofy + ay + cf.pinpos.y * pf.scale);
+                doc.text(code.pin, scaleofx + ax + (cardWidth * pf.scale - pinWidth) / 2 + cf.pinpos.x * pf.scale, scaleofy + ay + cf.pinpos.y * pf.scale, {
+                    baseline: 'middle'  // 垂直方向の中央揃え
+                });
             }
 
             // Draw UUID head
@@ -342,7 +344,9 @@ export const generatePDF = async (batch: any, paperformat: string, cardformat: s
                 const uuidText = `${code.uuid.substring(18, 34)}...`;
                 const uuidWidth = doc.getTextWidth(uuidText);
                 const uuidHeight = doc.getTextDimensions(uuidText).h;
-                doc.text(uuidText, scaleofx + ax + (cardWidth * pf.scale - uuidWidth) / 2 + cf.codepos.x * pf.scale, scaleofy + ay + cf.codepos.y * pf.scale);
+                doc.text(uuidText, scaleofx + ax + (cardWidth * pf.scale - uuidWidth) / 2 + cf.codepos.x * pf.scale, scaleofy + ay + cf.codepos.y * pf.scale, {
+                    baseline: 'middle'  // 垂直方向の中央揃え
+                });
             }
         }
         if (pf.dotsedge) {
@@ -389,7 +393,9 @@ export const generatePDF = async (batch: any, paperformat: string, cardformat: s
                 doc.setFont("helvetica", "bold");
                 const pinWidth = doc.getTextWidth(code.pin);
                 const pinHeight = doc.getTextDimensions(code.pin).h;
-                doc.text(code.pin, scaleofx + ax + (cardWidth * pf.scale - pinWidth) / 2 + (cf.pinpos.x) * pf.scale, scaleofy + ay + cf.pinpos.y * pf.scale);
+                doc.text(code.pin, scaleofx + ax + (cardWidth * pf.scale - pinWidth) / 2 + (cf.pinpos.x) * pf.scale, scaleofy + ay + cf.pinpos.y * pf.scale, {
+                    baseline: 'middle'  // 垂直方向の中央揃え
+                });
             }
 
             // Draw UUID head
@@ -400,7 +406,9 @@ export const generatePDF = async (batch: any, paperformat: string, cardformat: s
                 const uuidText = `${code.uuid.substring(18, 34)}...`;
                 const uuidWidth = doc.getTextWidth(uuidText);
                 const uuidHeight = doc.getTextDimensions(uuidText).h;
-                doc.text(uuidText, scaleofx + ax + (cardWidth * pf.scale - uuidWidth) / 2 + (cf.codepos.x) * pf.scale, scaleofy + ay + cf.codepos.y * pf.scale);
+                doc.text(uuidText, scaleofx + ax + (cardWidth * pf.scale - uuidWidth) / 2 + (cf.codepos.x) * pf.scale, scaleofy + ay + cf.codepos.y * pf.scale, {
+                    baseline: 'middle'  // 垂直方向の中央揃え
+                });
             }
         }
         if (pf.dotsedge) {
