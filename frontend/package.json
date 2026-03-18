@@ -4,6 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "dev:stg": "node scripts/switch-env.js stg && next dev",
+    "dev:prod": "node scripts/switch-env.js prod && next dev",
     "build": "next build",
     "start": "next start",
     "lint": "eslint"

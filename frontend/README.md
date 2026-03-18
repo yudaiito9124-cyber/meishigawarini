@@ -5,14 +5,14 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 First, run the development server:
 
 ```bash
-npm run dev
+npm run dev       # Use current .env.local
 # or
-yarn dev
+npm run dev:stg   # Switch to Staging and run dev
 # or
-pnpm dev
-# or
-bun dev
+npm run dev:prod  # Switch to Production and run dev
 ```
+
+*Note: `dev:stg` and `dev:prod` will automatically copy `.env.staging` or `.env.production` to `.env.local` before starting the server.*
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 

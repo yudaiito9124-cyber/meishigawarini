@@ -3,13 +3,14 @@ import * as cdk from 'aws-cdk-lib';
 import * as path from 'path';
 
 // Load environment variables from .env file
-require('dotenv').config({ path: path.join(__dirname, '../.env') });
-
 import { InfraStack } from '../lib/infra-stack';
 
 const app = new cdk.App();
 
 const stage = app.node.tryGetContext('stage') || 'prod';
+const envPath = path.join(__dirname, `../.env.${stage}`);
+require('dotenv').config({ path: envPath });
+
 const stackId = stage === 'prod' ? 'InfraStack' : `InfraStack-${stage}`;
 
 new InfraStack(app, stackId, {

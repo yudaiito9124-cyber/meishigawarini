@@ -108,11 +108,17 @@
     cd infra
     npx cdk deploy -c stage=stg
     ```
-    *※これにより、本番とは別のデータベースやAPIが作成されます。*
+    *※これにより、`infra/.env.stg` の設定が読み込まれ、本番とは別のデータベースやAPIが作成されます。*
 
 ### フロントエンドのテスト環境確認
 1.  **環境変数の準備**: `frontend/.env.staging` に、Staging用のAPI URL等を設定します。
-2.  **ローカルでの確認**: プロ生（`npm run dev`）の際に環境変数を読み替えるか、Amplifyのブランチデプロイ機能を利用して確認します。
+2.  **ローカルでの確認**: 以下のコマンドで接続先を切り替えて起動できます。
+    ```bash
+    cd frontend
+    npm run dev:stg   # Staging環境へ接続
+    npm run dev:prod  # 本格的な本番環境（または元々の設定）へ接続
+    ```
+    *※このコマンドを実行すると、`.env.staging` または `.env.production` の内容が `.env.local` に自動的にコピーされます。*
 
 ---
 
