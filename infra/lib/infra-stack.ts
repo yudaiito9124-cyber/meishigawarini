@@ -12,16 +12,25 @@ import * as iam from 'aws-cdk-lib/aws-iam';
 
 const DEFAULT_VALID_DAYS = process.env.DEFAULT_VALID_DAYS || '1';
 
+export interface InfraStackProps extends cdk.StackProps {
+  stage: string;
+}
+
 export class InfraStack extends cdk.Stack {
-  constructor(scope: Construct, id: string, props?: cdk.StackProps) {
+  constructor(scope: Construct, id: string, props: InfraStackProps) {
     super(scope, id, props);
 
+    const stage = props.stage;
+
+    const suffix = stage === 'prod' ? '' : `-${stage}`;
+
     // DynamoDB Table
-    const table = new dynamodb.Table(this, 'MeishiGawariniTableV2', {
+    const table = new dynamodb.Table(this, `MeishiGawariniTableV2${suffix}`, {
+      tableName: `MeishiGawariniTableV2${suffix}`,
       partitionKey: { name: 'PK', type: dynamodb.AttributeType.STRING },
       sortKey: { name: 'SK', type: dynamodb.AttributeType.STRING },
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
-      removalPolicy: cdk.RemovalPolicy.DESTROY,
+      removalPolicy: stage === 'prod' ? cdk.RemovalPolicy.RETAIN : cdk.RemovalPolicy.DESTROY,
       encryption: dynamodb.TableEncryption.AWS_MANAGED,
     });
 
@@ -36,7 +45,9 @@ export class InfraStack extends cdk.Stack {
     ];
 
     // S3 Bucket for Product Images
-    const bucket = new s3.Bucket(this, 'ProductImageBucket', {
+    const bucketId = `ProductImageBucket${suffix}`;
+    const bucket = new s3.Bucket(this, bucketId, {
+      bucketName: stage === 'prod' ? undefined : `meishigawarini-product-images-${stage}`,
       removalPolicy: cdk.RemovalPolicy.DESTROY,
       autoDeleteObjects: true,
       cors: [
@@ -51,7 +62,8 @@ export class InfraStack extends cdk.Stack {
     });
 
     // Cognito User Pool
-    const userPool = new cognito.UserPool(this, 'MeishiGawariniUserPool', {
+    const userPoolId = `MeishiGawariniUserPool${suffix}`;
+    const userPool = new cognito.UserPool(this, userPoolId, {
       selfSignUpEnabled: true,
       signInAliases: { email: true },
       autoVerify: { email: true },
@@ -229,8 +241,9 @@ export class InfraStack extends cdk.Stack {
 
 
     // API Gateway
-    const api = new apigateway.RestApi(this, 'MeishiGawariniApi', {
-      restApiName: 'MeishiGawarini Service',
+    const apiId = `MeishiGawariniApi${suffix}`;
+    const api = new apigateway.RestApi(this, apiId, {
+      restApiName: `MeishiGawarini Service${suffix}`,
       defaultCorsPreflightOptions: {
         allowOrigins: allowedOrigins,
         allowMethods: apigateway.Cors.ALL_METHODS,
