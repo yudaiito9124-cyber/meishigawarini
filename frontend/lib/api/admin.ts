@@ -93,7 +93,7 @@ export const adminApi = {
     },
 
     /** デザイン画像のアップロードURL取得 */
-    async getUploadUrl(data: { filename: string; contentType: string }) {
+    async getUploadUrl(data: { filename: string; contentType: string; design_id: string }) {
         return this.fetch("/admin/card-designs/upload-url", {
             method: "POST",
             body: JSON.stringify(data),
@@ -103,15 +103,15 @@ export const adminApi = {
     // --- ショップ・オーナー管理 ---
 
     /** ショップオーナーの変更 */
-    async changeShopOwner(shopId: string, data: { owner_uuid: string }) {
-        return this.fetch(`/admin/shops/${shopId}/owner`, {
+    async changeShopOwner(shopId: string, newUserId: string, action: "validate" | "execute") {
+        return this.fetch(`/admin/owner-change`, {
             method: "POST",
-            body: JSON.stringify(data),
+            body: JSON.stringify({ shopId, newUserId, action }),
         });
     },
 
     /** マネージャーの紐づけ */
-    async linkManager(data: { shopId: string; manager_uuid: string }) {
+    async linkManager(data: { shopIds: string[]; userIds: string[]; action: "validate" | "execute" }) {
         return this.fetch("/admin/links", {
             method: "POST",
             body: JSON.stringify(data),

@@ -147,6 +147,13 @@ export default function LoginPage() {
             {isLoggedIn && (
                 <div className="fixed top-4 right-4 z-50 flex items-center gap-2">
                     {isAdmin && (
+                        <Link href="/help/admin">
+                            <Button variant="secondary" className="shadow-md cursor-pointer border border-gray-200">
+                                {t('helpAdminPage')}
+                            </Button>
+                        </Link>
+                    )}
+                    {isAdmin && (
                         <Link href="/admin">
                             <Button variant="destructive" className="shadow-md cursor-pointer border border-red-900">
                                 {t('qrAdminPage')}

@@ -1139,13 +1139,10 @@ function ManagerLinkingSection({ apiUrl }: { apiUrl: string }) {
 
         setLoading(true);
         try {
-            const data = await adminApi.fetch("/admin/links", {
-                method: "POST",
-                body: JSON.stringify({
-                    userIds: uids,
-                    shopIds: sids,
-                    action: 'validate'
-                }),
+            const data = await adminApi.linkManager({
+                userIds: uids,
+                shopIds: sids,
+                action: 'validate'
             });
             setValidationData(data);
             setIsConfirmOpen(true);
@@ -1167,13 +1164,10 @@ function ManagerLinkingSection({ apiUrl }: { apiUrl: string }) {
 
         setLoading(true);
         try {
-            await adminApi.fetch("/admin/links", {
-                method: "POST",
-                body: JSON.stringify({
-                    userIds: uids,
-                    shopIds: sids,
-                    action: 'execute'
-                }),
+            await adminApi.linkManager({
+                userIds: uids,
+                shopIds: sids,
+                action: 'execute'
             });
             alert(t('list.managerLinking.success'));
             setIsConfirmOpen(false);
@@ -1281,10 +1275,7 @@ function ShopOwnerChangeSection({ apiUrl }: { apiUrl: string }) {
         if (!shopId.trim() || !newUserId.trim()) return;
         setLoading(true);
         try {
-            const data = await adminApi.changeShopOwner(shopId.trim().replace(/^SHOP#/, ""), {
-                owner_uuid: newUserId.trim().replace(/^USER#/, ""),
-                action: 'validate'
-            } as any);
+            const data = await adminApi.changeShopOwner(shopId.trim(), newUserId.trim(), 'validate');
             setValidationData(data);
             setIsConfirmOpen(true);
         } catch (e: any) {
@@ -1302,10 +1293,7 @@ function ShopOwnerChangeSection({ apiUrl }: { apiUrl: string }) {
         if (!shopId.trim() || !newUserId.trim()) return;
         setLoading(true);
         try {
-            await adminApi.changeShopOwner(shopId.trim().replace(/^SHOP#/, ""), {
-                owner_uuid: newUserId.trim().replace(/^USER#/, ""),
-                action: 'execute'
-            } as any);
+            await adminApi.changeShopOwner(shopId.trim(), newUserId.trim(), 'execute');
             alert(t('list.ownerChange.success'));
             setIsConfirmOpen(false);
             setShopId("");
@@ -1394,13 +1382,10 @@ function AdminShopCreationSection({ apiUrl }: { apiUrl: string }) {
         if (!userId.trim()) return;
         setLoading(true);
         try {
-            const data = await adminApi.fetch("/admin/links", {
-                method: "POST",
-                body: JSON.stringify({
-                    userIds: [userId.trim().replace(/^USER#/, "")],
-                    shopIds: [],
-                    action: 'validate'
-                }),
+            const data = await adminApi.linkManager({
+                userIds: [userId.trim().replace(/^USER#/, "")],
+                shopIds: [],
+                action: 'validate'
             });
             if (data.users && data.users.length > 0) {
                 setUserData(data.users[0]);

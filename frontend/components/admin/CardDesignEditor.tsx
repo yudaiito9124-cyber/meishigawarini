@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils";
 import { useTranslations } from 'next-intl';
 import { generateId } from "@/lib/id";
 import { resizeImage } from "@/lib/image-utils";
+import { adminApi } from "@/lib/api/admin";
 
 interface CardDesign {
     design_id: string;
@@ -157,39 +158,21 @@ export default function CardDesignEditor({ apiUrl }: { apiUrl: string }) {
             const thumbType = type === 'bgimgf' ? 'thumbf' : 'thumbb';
 
             // 1. Prepare Main Image
-            const mainRes = await fetch(`${apiUrl}/admin/card-designs/upload-url`, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    "Authorization": `Bearer ${token}`
-                },
-                body: JSON.stringify({
-                    filename: file.name,
-                    contentType: file.type,
-                    design_id: editingDesign.design_id
-                })
+            const { uploadUrl: mainUploadUrl, publicUrl: mainPublicUrl } = await adminApi.getUploadUrl({
+                filename: file.name,
+                contentType: file.type,
+                design_id: editingDesign.design_id
             });
-            if (!mainRes.ok) throw new Error("Failed to get main upload URL");
-            const { uploadUrl: mainUploadUrl, publicUrl: mainPublicUrl } = await mainRes.json();
 
             // 2. Generate and Prepare Thumbnail (400px WebP)
             const thumbBlob = await resizeImage(file, 400);
             const thumbFile = new File([thumbBlob], `thumb_${file.name.split('.')[0]}.webp`, { type: "image/webp" });
-
-            const thumbRes = await fetch(`${apiUrl}/admin/card-designs/upload-url`, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    "Authorization": `Bearer ${token}`
-                },
-                body: JSON.stringify({
-                    filename: thumbFile.name,
-                    contentType: "image/webp",
-                    design_id: editingDesign.design_id
-                })
+ 
+            const { uploadUrl: thumbUploadUrl, publicUrl: thumbPublicUrl } = await adminApi.getUploadUrl({
+                filename: thumbFile.name,
+                contentType: "image/webp",
+                design_id: editingDesign.design_id
             });
-            if (!thumbRes.ok) throw new Error("Failed to get thumb upload URL");
-            const { uploadUrl: thumbUploadUrl, publicUrl: thumbPublicUrl } = await thumbRes.json();
 
             // 3. Upload both to S3
             await Promise.all([

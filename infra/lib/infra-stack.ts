@@ -29,8 +29,8 @@ export class InfraStack extends cdk.Stack {
       ? process.env.CORS_ALLOWED_ORIGINS.split(',')
       : [];
     const allowedOrigins = [
-      'https://meishigawarini.com', 
-      'http://localhost:3000', 
+      'https://meishigawarini.com',
+      'http://localhost:3000',
       'http://localhost:3001',
       ...extraOrigins
     ];
@@ -411,11 +411,9 @@ export class InfraStack extends cdk.Stack {
       resources: [userPool.userPoolArn]
     }));
 
-    const adminShopsResource = adminResource.addResource('shops');
-    const adminShopIdResource = adminShopsResource.addResource('{shopId}');
-    const ownerResource = adminShopIdResource.addResource('owner');
-    ownerResource.addMethod('POST', new apigateway.LambdaIntegration(adminChangeOwnerFn), {
-        authorizer: adminAuthorizer,
+    adminResource.addResource('owner-change').addMethod('POST',
+      new apigateway.LambdaIntegration(adminChangeOwnerFn), {
+      authorizer: adminAuthorizer,
     });
 
     // Lambda: Admin Card Designs (NEW)

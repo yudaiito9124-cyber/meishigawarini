@@ -76,7 +76,8 @@
     "shopAdminPage": "Shop Admin",
     "qrAdminPage": "QR Generation / Admin",
     "AdminNeed2FA": "Admin Required 2FA",
-    "logout": "Logout"
+    "logout": "Logout",
+    "helpAdminPage": "Admin Help (Initial Setup)"
   },
   "RegisterPage": {
     "title": "Create Account",
@@ -223,7 +224,7 @@
       "selectPlaceholder": "Select a product...",
       "option": "Options (as needed)",
       "memoForUsersLabel": "Message from shop (visible to purchasers and recipients)",
-    "memoForUsersPlaceholder": "You can enter a message...",
+      "memoForUsersPlaceholder": "You can enter a message...",
       "memoForShopLabel": "Memo (visible only to shop)",
       "memoForShopPlaceholder": "You can enter a memo...",
       "submit": "Link & Activate",
@@ -488,6 +489,7 @@
   "AdminPage": {
     "title": "Admin Dashboard",
     "qrAdminLoginPage": "Admin Login Page",
+    "helpButton": "Help",
     "tabs": {
       "qrcodes": "QR Codes",
       "shops": "Shop Management",

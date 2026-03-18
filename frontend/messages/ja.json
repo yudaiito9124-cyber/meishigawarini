@@ -76,7 +76,8 @@
     "shopAdminPage": "ショップ管理者画面",
     "qrAdminPage": "システム管理者画面",
     "AdminNeed2FA": "管理者は2段階認証が必要です",
-    "logout": "ログアウト"
+    "logout": "ログアウト",
+    "helpAdminPage": "管理者ヘルプ(初期設定)"
   },
   "RegisterPage": {
     "title": "アカウント作成",
@@ -494,6 +495,7 @@
   "AdminPage": {
     "title": "管理ダッシュボード",
     "qrAdminLoginPage": "ログイン画面",
+    "helpButton": "ヘルプ",
     "tabs": {
       "qrcodes": "QRコード",
       "shops": "ショップ管理",
