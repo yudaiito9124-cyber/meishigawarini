@@ -1376,20 +1376,20 @@ export default function ShopPage() {
                                                                         <div className="grid grid-cols-2 gap-2">
                                                                             <div className="space-y-1">
                                                                                 <div className="aspect-[84/52] relative rounded shadow-sm overflow-hidden border border-gray-100 bg-white">
-                                                                                    <img 
-                                                                                        src={order.thumbf || cardformats[order.card_design]?.bgimgf} 
-                                                                                        alt="Front" 
-                                                                                        className="w-full h-full object-cover" 
+                                                                                    <img
+                                                                                        src={order.thumbf || cardformats[order.card_design]?.bgimgf}
+                                                                                        alt="Front"
+                                                                                        className="w-full h-full object-cover"
                                                                                         crossOrigin="anonymous"
                                                                                     />
                                                                                 </div>
                                                                             </div>
                                                                             <div className="space-y-1">
                                                                                 <div className="aspect-[84/52] relative rounded shadow-sm overflow-hidden border border-gray-100 bg-white">
-                                                                                    <img 
-                                                                                        src={order.thumbb || cardformats[order.card_design]?.bgimgb} 
-                                                                                        alt="Back" 
-                                                                                        className="w-full h-full object-cover" 
+                                                                                    <img
+                                                                                        src={order.thumbb || cardformats[order.card_design]?.bgimgb}
+                                                                                        alt="Back"
+                                                                                        className="w-full h-full object-cover"
                                                                                         crossOrigin="anonymous"
                                                                                     />
                                                                                 </div>
@@ -1920,20 +1920,20 @@ export default function ShopPage() {
                                                                         <div className="grid grid-cols-2 gap-2">
                                                                             <div className="space-y-1">
                                                                                 <div className="aspect-[84/52] relative rounded shadow-sm overflow-hidden border border-gray-100 bg-white">
-                                                                                    <img 
-                                                                                        src={order.thumbf || cardformats[order.card_design]?.bgimgf} 
-                                                                                        alt="Front" 
-                                                                                        className="w-full h-full object-cover" 
+                                                                                    <img
+                                                                                        src={order.thumbf || cardformats[order.card_design]?.bgimgf}
+                                                                                        alt="Front"
+                                                                                        className="w-full h-full object-cover"
                                                                                         crossOrigin="anonymous"
                                                                                     />
                                                                                 </div>
                                                                             </div>
                                                                             <div className="space-y-1">
                                                                                 <div className="aspect-[84/52] relative rounded shadow-sm overflow-hidden border border-gray-100 bg-white">
-                                                                                    <img 
-                                                                                        src={order.thumbb || cardformats[order.card_design]?.bgimgb} 
-                                                                                        alt="Back" 
-                                                                                        className="w-full h-full object-cover" 
+                                                                                    <img
+                                                                                        src={order.thumbb || cardformats[order.card_design]?.bgimgb}
+                                                                                        alt="Back"
+                                                                                        className="w-full h-full object-cover"
                                                                                         crossOrigin="anonymous"
                                                                                     />
                                                                                 </div>

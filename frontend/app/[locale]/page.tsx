@@ -403,7 +403,7 @@ export default function HomePage() {
       {/* ━━━ Hero ━━━ */}
       < section className="flex flex-col items-center justify-center min-h-screen text-center px-6 pt-20 " >
         <p className="text-xs text-gray-400 uppercase tracking-[0.2em] mb-7 font-medium">
-          Digital Gift Service
+          Asset Transfer Token Card
         </p>
 
         {/*  center 揃えでも視覚重心が左にズレて見える。
