@@ -273,7 +273,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                             productName,
                             qr_id,
                             shopId,
-                            timestamp: new Date(now).toLocaleString()
+                            timestamp: shipping_info.client_timestamp || new Date(now).toLocaleString()
                         },
                         lang: 'ja' // Shop notifications are JA for now
                     });

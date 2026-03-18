@@ -83,10 +83,3 @@ export async function sendLocalizedEmail(options: SendLocalizedEmailParams) {
         text: bodyText
     });
 }
-
-// Deprecated: Old functions for backward compatibility (optional, but good to keep during migration)
-export const createMessageNotificationEmail = (params: any) => {
-    // This is now handled by sendLocalizedEmail
-    console.warn("createMessageNotificationEmail is deprecated. Use sendLocalizedEmail instead.");
-    return { subject: "", bodyText: "" };
-};

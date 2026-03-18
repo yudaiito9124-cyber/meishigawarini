@@ -456,7 +456,10 @@ export default function ReceivePage() {
 
         setLoading(true);
         try {
-            // await submitAddress(uuid, pin, { name, zipCode, address, phone, email, preferredDate, preferredTime }, password);
+            await submitAddress(uuid, pin, { 
+                name, zipCode, address, phone, email, preferredDate, preferredTime,
+                client_timestamp: new Date().toLocaleString()
+            }, password);
             setStep("SUCCESS");
         } catch (error: any) {
             // console.error("Submission error:", error);
