@@ -74,7 +74,7 @@
     "signInWithBiometric": "顔認証・指紋認証でログイン",
     "back": "戻る",
     "shopAdminPage": "ショップ管理者画面",
-    "qrAdminPage": "QR生成・管理者画面",
+    "qrAdminPage": "システム管理者画面",
     "AdminNeed2FA": "管理者は2段階認証が必要です",
     "logout": "ログアウト"
   },
@@ -106,7 +106,7 @@
     "subtitle": "管理するショップを選択するか、新しいショップを作成してください。",
     "userId": "ユーザーID: {id}",
     "logout": "ログアウト",
-    "qrAdminLoginPage": "管理者ログイン画面",
+    "qrAdminLoginPage": "ログイン画面",
     "createShop": "ショップ新規作成",
     "gm": "管理者",
     "owner": "オーナー",
@@ -493,7 +493,7 @@
   },
   "AdminPage": {
     "title": "管理ダッシュボード",
-    "qrAdminLoginPage": "管理者ログイン画面",
+    "qrAdminLoginPage": "ログイン画面",
     "tabs": {
       "qrcodes": "QRコード",
       "shops": "ショップ管理",

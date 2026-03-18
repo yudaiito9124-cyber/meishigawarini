@@ -2,7 +2,7 @@
 import { APIGatewayProxyHandler } from 'aws-lambda';
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, GetCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
-import { createMessageNotificationEmail } from './templates/email';
+import { sendLocalizedEmail } from './templates/email';
 import { sendEmail } from './utils/email-client';
 import { isLocked, getRateLimitUpdate, getResetRateLimitUpdate } from './utils/rate-limit';
 import { signUrlIfS3, stripSignature, signUrlsInHtml, deleteFileByUrl, copyS3Object, stripSignaturesInHtml } from './utils/s3';
@@ -437,18 +437,16 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                     const sendPromises = recipients.map(emailTo => {
                         const langLength = (preferences[emailTo] === 'en') ? 'en' : 'ja';
 
-                        const { subject, bodyText } = createMessageNotificationEmail({
-                            username,
-                            message,
-                            uuid,
-                            pin,
-                            lang: langLength
-                        });
-
-                        return sendEmail({
+                        return sendLocalizedEmail({
+                            type: 'MESSAGE_NOTIFICATION',
                             to: [emailTo],
-                            subject: subject,
-                            text: bodyText
+                            params: {
+                                username,
+                                message: message || '',
+                                uuid,
+                                pin
+                            },
+                            lang: langLength as 'ja' | 'en'
                         });
                     });
 

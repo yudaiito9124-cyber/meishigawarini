@@ -4,7 +4,8 @@ import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, TransactWriteCommand, GetCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
 import { CognitoIdentityProviderClient, AdminGetUserCommand } from '@aws-sdk/client-cognito-identity-provider';
 import { sendEmail } from './utils/email-client';
-import { isLocked, getRateLimitUpdate } from './utils/rate-limit';
+import { sendLocalizedEmail } from './templates/email';
+import { isLocked, getRateLimitUpdate, getResetRateLimitUpdate } from './utils/rate-limit';
 
 const client = new DynamoDBClient({});
 const cognito = new CognitoIdentityProviderClient({});
@@ -202,27 +203,14 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 }));
 
                 // 4. Send Confirmation Email to Recipient
-                const subject = (lang === 'ja') ? '【名刺がわりに】住所登録完亁E�Eお知らせ' : '【Meishigawarini】Address Registration Completed';
-                const bodyText = (lang === 'ja') ? `
-住所の登録が完亁E��ました、E
-啁E��の発送まで今しばらくお征E��ください、E
-
-荷物の状態�EこちめE
-${process.env.NEXT_PUBLIC_APP_URL}/receive/${qr_id}
-PIN: ${pin_code}
-`.trim() : `
-Address registration completed.
-Please wait for the item to be shipped.
-
-Check here:
-${process.env.NEXT_PUBLIC_APP_URL}/receive/${qr_id}
-PIN: ${pin_code}
-`.trim();
-
-                await sendEmail({
-                    to: [email],
-                    subject: subject,
-                    text: bodyText
+                await sendLocalizedEmail({
+                    type: 'ADDRESS_REGISTRATION_CONFIRMATION',
+                    to: email,
+                    params: {
+                        uuid: qr_id,
+                        pin: pin_code
+                    },
+                    lang: lang as 'ja' | 'en'
                 });
 
             } catch (e) {
@@ -250,8 +238,8 @@ PIN: ${pin_code}
                 ]);
 
                 let shopEmail = shopRes.Item?.email;
-                const shopName = shopRes.Item?.name || '不�EなショチE�E';
-                const productName = productRes.Item?.name || '不�Eな啁E��';
+                const shopName = shopRes.Item?.name || '不明なショップ';
+                const productName = productRes.Item?.name || '不明な商品';
 
                 // Fallback: If email is missing, try to get from Cognito
                 if (!shopEmail && shopRes.Item?.owner_id) {
@@ -277,28 +265,17 @@ PIN: ${pin_code}
                 }
 
                 if (shopEmail) {
-                    const subject = '【名刺がわりに】お届け先住所が登録されました';
-                    const jstNow = new Date(now).toLocaleString();
-
-                    const bodyText = `
-ショチE�Eオーナ�E槁E
-
-あなた�EショチE�E、E{shopName}」�E啁E��にお届け先住所が登録されました、E
-
-啁E��吁E ${productName}
-注文ID: ${qr_id}
-登録日晁E ${jstNow}
-
-管琁E��面から注斁E��細を確認し、発送準備を進めてください、E
-
-管琁E��面:
-${process.env.NEXT_PUBLIC_APP_URL}/shop/${shopId}
-`.trim();
-
-                    await sendEmail({
-                        to: [shopEmail],
-                        subject: subject,
-                        text: bodyText
+                    await sendLocalizedEmail({
+                        type: 'ADDRESS_REGISTRATION_NOTIFICATION',
+                        to: shopEmail,
+                        params: {
+                            shopName,
+                            productName,
+                            qr_id,
+                            shopId,
+                            timestamp: new Date(now).toLocaleString()
+                        },
+                        lang: 'ja' // Shop notifications are JA for now
                     });
                     console.log(`Notification email sent to shop owner: ${shopEmail}`);
                 } else {

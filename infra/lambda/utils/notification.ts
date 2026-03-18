@@ -2,7 +2,7 @@
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, GetCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
 import { sendEmail } from './email-client';
-import { createMessageNotificationEmail } from '../templates/email';
+import { sendLocalizedEmail } from '../templates/email';
 import { generateId } from './id';
 
 const client = new DynamoDBClient({});
@@ -80,26 +80,20 @@ export async function sendSystemNotification(qr_id: string, message: string, pin
                 const sendPromises = recipients.map(email => {
                     const lang = (preferences[email] === 'en') ? 'en' : 'ja';
 
-                    // Adjust message based on language if it's the specific DeliveryCompleted system message
-                    // However, the caller passes the message. The caller previously passed "Bilingual message".
-                    // Ideally, the caller should pass a key or we interpret it here?
-                    // Or, simply, if the message is "DeliveryCompleted", we select the right text?
-                    // The current implementation in recipient-completed.ts passes "DeliveryCompleted".
-                    // So we can map it here.
-
                     let displayMessage = message;
-                    const { subject, bodyText } = createMessageNotificationEmail({
-                        username: SYSTEM_USERNAME, // We might want to localize this too? "System" vs "システム通知"
-                        message: displayMessage,
-                        uuid: qr_id,
-                        pin,
-                        lang
-                    });
+                    if (message === 'DeliveryCompleted') {
+                        displayMessage = (lang === 'ja') ? 'ギフトの受け取りが完了しました。' : 'Delivery Completed.';
+                    }
 
-                    return sendEmail({
-                        to: [email],
-                        subject: subject,
-                        text: bodyText
+                    return sendLocalizedEmail({
+                        type: 'SYSTEM_NOTIFICATION',
+                        to: email,
+                        params: {
+                            message: displayMessage,
+                            uuid: qr_id,
+                            pin
+                        },
+                        lang
                     });
                 });
 

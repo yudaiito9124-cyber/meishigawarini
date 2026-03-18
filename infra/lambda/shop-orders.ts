@@ -2,7 +2,7 @@
 import { APIGatewayProxyHandler } from 'aws-lambda';
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, QueryCommand, BatchGetCommand, UpdateCommand, GetCommand } from '@aws-sdk/lib-dynamodb';
-import { createShippingNotificationEmail } from './templates/email';
+import { sendLocalizedEmail } from './templates/email';
 import { sendEmail } from './utils/email-client';
 import { checkShopOwnerOrGM } from './share/shop-auth';
 import { signUrlIfS3 } from './utils/s3';
@@ -378,8 +378,15 @@ async function handleUpdateOrder(event: any) {
         if (email && pin) {
             try {
                 const lang = 'ja';
-                const { subject, bodyText } = createShippingNotificationEmail({ uuid: qrId, pin, lang });
-                await sendEmail({ to: [email], subject: subject, text: bodyText });
+                await sendLocalizedEmail({
+                    type: 'SHIPPING_NOTIFICATION',
+                    to: email,
+                    params: {
+                        uuid: qrId,
+                        pin
+                    },
+                    lang
+                });
             } catch (e) {
                 console.error('Failed to send shipping notification email', e);
             }

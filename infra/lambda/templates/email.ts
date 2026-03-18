@@ -1,107 +1,92 @@
+import { sendEmail } from '../utils/email-client';
+import jaSubjects from './locales/ja.json';
+import enSubjects from './locales/en.json';
 
-export const createMessageNotificationEmail = (params: {
-    username: string;
-    message: string;
-    uuid: string;
-    pin: string;
-    lang?: 'ja' | 'en';
-}) => {
-    const { username, message, uuid, pin, lang = 'ja' } = params;
-    // Use provided URL, or env, or fallback
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL;
+// Import bodies
+import * as jaMessageNotification from './locales/ja/MESSAGE_NOTIFICATION';
+import * as enMessageNotification from './locales/en/MESSAGE_NOTIFICATION';
+import * as jaSystemNotification from './locales/ja/SYSTEM_NOTIFICATION';
+import * as enSystemNotification from './locales/en/SYSTEM_NOTIFICATION';
+import * as jaShippingNotification from './locales/ja/SHIPPING_NOTIFICATION';
+import * as enShippingNotification from './locales/en/SHIPPING_NOTIFICATION';
+import * as jaAddressConfirmation from './locales/ja/ADDRESS_REGISTRATION_CONFIRMATION';
+import * as enAddressConfirmation from './locales/en/ADDRESS_REGISTRATION_CONFIRMATION';
+import * as jaAddressNotification from './locales/ja/ADDRESS_REGISTRATION_NOTIFICATION';
+import * as enAddressNotification from './locales/en/ADDRESS_REGISTRATION_NOTIFICATION';
 
-    let systemmessage = message;
-    if (username === 'System') {
-        if (lang === "ja") {
-            systemmessage = message.replace('DeliveryCompleted', 'ギフトの受け取りが完了しました。');
-        }
-        else {
-            systemmessage = message.replace('DeliveryCompleted', 'Delivery Completed.');
-        }
-    }
+export type EmailType =
+    | 'MESSAGE_NOTIFICATION'
+    | 'SYSTEM_NOTIFICATION'
+    | 'SHIPPING_NOTIFICATION'
+    | 'ADDRESS_REGISTRATION_CONFIRMATION'
+    | 'ADDRESS_REGISTRATION_NOTIFICATION';
 
-    let subject = '';
-    let bodyText = '';
-
-    if (lang === 'en') {
-        subject = (username === 'System') ? '【Meishigawarini】System Notification' : `【Meishigawarini】New Message`;
-        bodyText = (username === 'System') ? `
-${systemmessage}
-----------------------------------
-Check here:
-${baseUrl}/receive/${uuid}
-PIN: ${pin}
-`.trim()
-            :
-            `
-You have a new message from ${username}.
-----------------------------------
-${message}
-----------------------------------
-
-Check here:
-${baseUrl}/receive/${uuid}
-PIN: ${pin}
-`.trim();
-    } else {
-        subject = (username === 'System') ? '【名刺がわりに】システム通知' : `【名刺がわりに】新着メッセージ`;
-        bodyText = (username === 'System') ? `
-${systemmessage}
-----------------------------------
-確認はこちら:
-${baseUrl}/receive/${uuid}
-PIN: ${pin}
-`.trim()
-            :
-            `
-${username} さんからメッセージが届きました。
-----------------------------------
-${message}
-----------------------------------
-
-確認はこちら:
-${baseUrl}/receive/${uuid}
-PIN: ${pin}
-`.trim();
-    }
-
-    return { subject, bodyText };
+const subjects: Record<string, any> = {
+    ja: jaSubjects,
+    en: enSubjects
 };
 
-export const createShippingNotificationEmail = (params: {
-    uuid: string;
-    pin: string;
+const bodies: Record<string, Record<string, string>> = {
+    ja: {
+        MESSAGE_NOTIFICATION: jaMessageNotification.body,
+        SYSTEM_NOTIFICATION: jaSystemNotification.body,
+        SHIPPING_NOTIFICATION: jaShippingNotification.body,
+        ADDRESS_REGISTRATION_CONFIRMATION: jaAddressConfirmation.body,
+        ADDRESS_REGISTRATION_NOTIFICATION: jaAddressNotification.body
+    },
+    en: {
+        MESSAGE_NOTIFICATION: enMessageNotification.body,
+        SYSTEM_NOTIFICATION: enSystemNotification.body,
+        SHIPPING_NOTIFICATION: enShippingNotification.body,
+        ADDRESS_REGISTRATION_CONFIRMATION: enAddressConfirmation.body,
+        ADDRESS_REGISTRATION_NOTIFICATION: enAddressNotification.body
+    }
+};
+
+/**
+ * Replaces placeholders like {{variable}} with actual values.
+ */
+function replacePlaceholders(template: string, params: Record<string, string>): string {
+    return template.replace(/\{\{(\w+)\}\}/g, (match, key) => {
+        return params[key] !== undefined ? params[key] : match;
+    });
+}
+
+interface SendLocalizedEmailParams {
+    type: EmailType;
+    to: string | string[];
+    params: Record<string, string>;
     lang?: 'ja' | 'en';
-}) => {
-    const { uuid, pin, lang = 'ja' } = params;
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL;
+}
 
-    let subject = '';
-    let bodyText = '';
+/**
+ * Unified function to send localized emails based on type and params.
+ */
+export async function sendLocalizedEmail(options: SendLocalizedEmailParams) {
+    const { type, to, params, lang = 'ja' } = options;
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://meishigawarini.com';
 
-    if (lang === 'en') {
-        subject = '【Meishigawarini】Shipping Notification';
-        bodyText = `
-Your item has been shipped.
-Please wait for it to arrive.
+    const subjectTemplate = subjects[lang][type];
+    const bodyTemplate = bodies[lang][type];
 
-Check status here:
-${baseUrl}/receive/${uuid}
-PIN: ${pin}
-`.trim();
-    } else {
-        subject = '【名刺がわりに】発送完了のお知らせ';
-        bodyText = `
-商品の発送が完了しました。
-到着まで今しばらくお待ちください。
-
-また、受取り後は、「受け取り完了ボタン」の押下にご協力ください。
-
-追跡番号の確認・受け取り完了の報告はこちら:
-${baseUrl}/receive/${uuid}
-PIN: ${pin}
-`.trim();
+    if (!subjectTemplate || !bodyTemplate) {
+        throw new Error(`Email template not found for type: ${type} and lang: ${lang}`);
     }
 
-    return { subject, bodyText };
+    const allParams = { ...params, baseUrl };
+    const subject = replacePlaceholders(subjectTemplate, allParams);
+    const bodyText = replacePlaceholders(bodyTemplate, allParams);
+
+    return await sendEmail({
+        to,
+        subject,
+        text: bodyText
+    });
+}
+
+// Deprecated: Old functions for backward compatibility (optional, but good to keep during migration)
+export const createMessageNotificationEmail = (params: any) => {
+    // This is now handled by sendLocalizedEmail
+    console.warn("createMessageNotificationEmail is deprecated. Use sendLocalizedEmail instead.");
+    return { subject: "", bodyText: "" };
 };

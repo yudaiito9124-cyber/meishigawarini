@@ -287,10 +287,18 @@ export default function LoginPage() {
                         </form>
                     )}
                     {isAdmin && (
-                        <p className="text-sm text-gray-500 text-center">
-                            Your roles: <br />
-                            {userInfo}
-                        </p>
+                        <>
+                            <p className="text-sm text-gray-500 text-center">
+                                Your roles : <br />
+                                {userInfo}
+                            </p>
+                            <p className="text-sm text-gray-500 text-left mt-2">
+                                Roles?
+                                <br />
+                                - Administrators: システム管理者画面<br />
+                                - GrobalAdmins: システム管理者画面 + 全ショップ管理権限
+                            </p>
+                        </>
                     )}
                 </CardContent>
                 <CardFooter className="flex-col gap-4">
