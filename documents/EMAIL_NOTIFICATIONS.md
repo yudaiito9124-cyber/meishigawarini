@@ -63,11 +63,37 @@ AWS Cognitoから直接送信される、アカウントセキュリティに関
 *   **AWS Cognito**: AWSのマネージドサービスとして直接送信。
 
 ### テンプレート管理
-*   **場所**: `infra/lambda/templates/email.ts`
-*   **多言語対応**: 受け取り側の設定またはブラウザのロケールに合わせて、日本語（JA）または英語（EN）が自動的に選択されます。
+*   **場所**: `infra/lambda/templates/locales/{ja|en}/` (本文), `infra/lambda/templates/locales/{ja|en}.json` (件名)
+*   **多言語対応**: 送信先ごとの `email_preferences` または `locale` パラメータに基づいて、日本語（ja）または英語（en）が選択されます。
 
-### 環境変数
+### メーリングリストと通知設定
+チャット掲示板に関連する通知は、`notification_emails` に登録されている全員に送信されます。
+- **自動登録**: 注文者が住所登録を行った際、入力したメールアドレスが自動的に `notification_emails` に追加されます。
+- **手動登録**: チャット画面の「通知購読」フォームから追加可能です。
+- **言語設定**: 登録時のブラウザ言語（ja/en）が `email_preferences` に保存され、個別に言語が切り替わります。
+
+### ショップオーナーへの通知（フォールバック）
+ショップオーナーへの通知（1-2. 新規注文発生）において、ショップ設定にメールアドレスがない場合は、AWS Cognitoからオーナーのユーザー属性（email）を取得して送信を試みます。
+
+---
+
+## 3. テンプレート・プレースホルダ
+
+各メール本文で使用されている変数（`{{variable}}`）の一覧です。
+
+| テンプレートID | 用途 | 使用可能な変数 |
+| :--- | :--- | :--- |
+| `MESSAGE_NOTIFICATION` | 新着メッセージ | `username`, `message`, `uuid`, `pin`, `baseUrl` |
+| `SYSTEM_NOTIFICATION` | システム通知 | `message`, `uuid`, `pin`, `baseUrl` |
+| `SHIPPING_NOTIFICATION` | 発送完了 | `uuid`, `pin`, `baseUrl` |
+| `ADDRESS_REGISTRATION_CONFIRMATION` | 住所登録完了（注文者） | `uuid`, `pin`, `baseUrl` |
+| `ADDRESS_REGISTRATION_NOTIFICATION` | 住所登録発生（オーナー） | `shopName`, `productName`, `qr_id`, `shopId`, `timestamp`, `baseUrl` |
+
+---
+
+## 4. 環境変数
 送信元アドレスなどの設定は、以下の環境変数で管理されています。
 - `SENDER_EMAIL`: メールの送信元（From）アドレス
 - `RESEND_API_KEY`: ResendのAPIキー
-- `NEXT_PUBLIC_APP_URL`: メール内のリンクに使用するサイトのベースURL
+- `NEXT_PUBLIC_APP_URL`: メール内のリンクに使用するサイトのベースURL（未設定時は `https://meishigawarini.com` がデフォルト）
+- `USER_POOL_ID`: ショップオーナーのメールアドレス取得に使用（Cognito）

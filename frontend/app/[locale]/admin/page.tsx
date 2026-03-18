@@ -17,7 +17,7 @@ import jsPDF from 'jspdf';
 import { generateId } from '@/lib/id';
 import { useTranslations } from 'next-intl';
 import { generatePDF, cardformats, paperformats } from '@/lib/generatePDF';
-import { ExternalLink, Copy, Eye, QrCode, Store, Wrench, Layers } from 'lucide-react';
+import { ExternalLink, Copy, Eye, QrCode, Store, Wrench, Layers, HelpCircle, Home } from 'lucide-react';
 import CardDesignEditor from "@/components/admin/CardDesignEditor";
 const NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 const NEXT_PUBLIC_APP_URL = process.env.NEXT_PUBLIC_APP_URL || "";
@@ -36,6 +36,8 @@ import { cn } from "@/lib/utils";
 import { Link, useRouter } from '@/i18n/routing';
 import { Textarea } from "@/components/ui/textarea";
 
+import { adminApi } from "@/lib/api/admin";
+
 export default function AdminPage() {
     const t = useTranslations('AdminPage');
     const tb = useTranslations('Backend');
@@ -49,7 +51,6 @@ export default function AdminPage() {
     const [activateNow, setActivateNow] = useState(false);
     const [useMetadataOptions, setUseMetadataOptions] = useState(false);
     const [generatedBatches, setGeneratedBatches] = useState<any[]>([]);
-    const [isAuthorized, setIsAuthorized] = useState<boolean | null>(null); // null = loading
     const [paperFormat, setPaperFormat] = useState("10S31251");
     const [cardFormat, setCardFormat] = useState("gakuchousenbeiv1");
     const [dbCardDesigns, setDbCardDesigns] = useState<any[]>([]);
@@ -57,114 +58,37 @@ export default function AdminPage() {
     const [isGenerating, setIsGenerating] = useState(false);
     const [activeTab, setActiveTab] = useState("qrcodes");
     const router = useRouter();
-    const hasCheckedAuth = useRef(false);
 
     const fetchDbCardDesigns = async () => {
         try {
-            const session = await fetchAuthSession();
-            const token = session.tokens?.idToken?.toString();
-            const res = await fetch(`${NEXT_PUBLIC_API_URL}/admin/card-designs`, {
-                headers: { "Authorization": `Bearer ${token}` }
-            });
-            if (res.ok) {
-                const data = await res.json();
-                setDbCardDesigns(data.items || []);
-            }
+            const data = await adminApi.listCardDesigns();
+            setDbCardDesigns(data.items || []);
         } catch (e) {
             console.error("Failed to fetch designs", e);
         }
     };
 
     useEffect(() => {
-        if (isAuthorized && reloadDbCardDesigns && activeTab === "qrcodes") {
+        if (reloadDbCardDesigns && activeTab === "qrcodes") {
             fetchDbCardDesigns();
             setReloadDbCardDesigns(false);
         }
-        if (isAuthorized && activeTab === "designs") {
+        if (activeTab === "designs") {
             setReloadDbCardDesigns(true);
         }
+    }, [activeTab, reloadDbCardDesigns]);
 
-    }, [isAuthorized, activeTab]);
-
-    useEffect(() => {
-        if (hasCheckedAuth.current) return;
-        hasCheckedAuth.current = true;
-
-        const checkAuth = async () => {
-            let isAdmin = false;
-            try {
-                let session = await fetchAuthSession();
-                let payload = session.tokens?.idToken?.payload || {};
-                let groups = (payload['cognito:groups'] as string[]) || [];
-                isAdmin = groups.includes('Administrators') || groups.includes('GlobalAdmins');
-
-                // 1. まず管理者グループに属しているかフロントで簡易チェック
-                if (!isAdmin) {
-                    setIsAuthorized(false);
-                    return notFound();
-                }
-
-                // console.log("Admin access verification in progress...");
-                let amr = (payload['amr'] as string[]) || [];
-                // amrが空の場合、一度だけ強制リフレッシュを試みる（最新の認証情報を取得するため）
-                if (amr.length === 0) {
-                    session = await fetchAuthSession({ forceRefresh: true });
-                    payload = session.tokens?.idToken?.payload || {};
-                    amr = (payload['amr'] as string[]) || [];
-                }
-
-                const token = session.tokens?.idToken?.toString();
-
-                // 3. 実際にAPIを叩いてAuthorizerでの検証を確認 (amrがなくてもAuthorizerがCognitoを直接チェックする)
-                const res = await fetch(`${NEXT_PUBLIC_API_URL}/admin`, {
-                    headers: { "Authorization": `Bearer ${token}` }
-                });
-
-                if (res.status === 404 || res.status === 403) {
-                    // console.error("Access denied by backend authorizer.");
-                    setIsAuthorized(false);
-                    return;
-                }
-
-                if (res.ok) {
-                    setIsAuthorized(true);
-                } else {
-                    setIsAuthorized(false);
-                    alert(t("AdminNeed2FA"))
-                    router.push("/mfa-setup")
-                    return;
-                }
-            } catch (e) {
-                if (isAdmin && e instanceof Error && e.message === "Failed to fetch") {
-                    alert(t("AdminNeed2FA"))
-                    router.push("/mfa-setup")
-                    return;
-                }
-                // console.error("Auth check failed", e);
-                setIsAuthorized(false);
-            }
-        };
-        checkAuth();
-    }, []);
+    //Note: Authentication check is now handled by AdminLayout
 
 
 
-    // notFound();
-    if (isAuthorized === null) {
-        return null; // 判定が終わるまでページの中身を一切レンダリングさせない
-    }
 
-    if (isAuthorized === false) {
-        notFound();
-        return null;
-    }
+
+
 
     const handleGenerate = async () => {
         setIsGenerating(true);
         try {
-            const session = await fetchAuthSession();
-            const token = session.tokens?.idToken?.toString();
-
             const resolveDesign = (designId?: string) => {
                 const targetId = designId || cardFormat;
                 const dbDesign = dbCardDesigns.find(d => d.design_id === targetId);
@@ -175,56 +99,42 @@ export default function AdminPage() {
                 return globalDesign || cardFormat;
             };
 
-            const res = await fetch(`${NEXT_PUBLIC_API_URL}/admin/qrcodes/generate`, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    "Authorization": `Bearer ${token}`
-                },
-                body: JSON.stringify({
-                    count,
-                    ...(useMetadataOptions ? {
-                        shopId: shopId || undefined,
-                        productId: productId || undefined,
-                        owner_uuid: ownerUuid || undefined,
-                        senderId: senderId || undefined,
-                        expiry_date: expiryDate ? new Date(expiryDate).toISOString() : undefined,
-                        activate_now: activateNow
-                    } : {}),
-                    card_design: cardFormat
-                }),
+            const data = await adminApi.generateQRCodes({
+                count,
+                ...(useMetadataOptions ? {
+                    shopId: shopId || undefined,
+                    productId: productId || undefined,
+                    owner_uuid: ownerUuid || undefined,
+                    senderId: senderId || undefined,
+                    expiry_date: expiryDate ? new Date(expiryDate).toISOString() : undefined,
+                    activate_now: activateNow
+                } : {}),
+                card_design: cardFormat
             });
 
-            if (res.ok) {
-                const data = await res.json();
-                const batchid = `batch-${data.batch_id}`;
-                const now = new Date();
+            const batchid = `batch-${data.batch_id}`;
+            const now = new Date();
 
-                const newBatch = {
-                    id: batchid,
-                    count: data.count,
-                    date: now.toLocaleString(),
-                    status: t('batches.status.ready'),
-                    codes: data.data // Store the codes
-                };
-                setGeneratedBatches([newBatch, ...generatedBatches]);
-                // In a real app, we would process 'data.data' (UUIDs/PINs) to generate PDF/CSV 
-                // console.log("Generated Codes:", data.data);
+            const newBatch = {
+                id: batchid,
+                count: data.count,
+                date: now.toLocaleString(),
+                status: t('batches.status.ready'),
+                codes: data.data // Store the codes
+            };
+            setGeneratedBatches([newBatch, ...generatedBatches]);
 
-                // Automatically download PDF
-                const design = resolveDesign(cardFormat);
-                await generatePDF(newBatch, paperFormat, design);
-            } else {
-                const errData = await res.json().catch(() => null);
-                // console.error(errData);
-                alert((tb(errData?.message?.replace(/\./g, '_')) || errData?.message) || t('batches.alerts.failed') + (errData?.detail?.toString() || ''));
-            }
-        } catch (e) {
-            alert(t('batches.alerts.error') + JSON.stringify(e));
+            // Automatically download PDF
+            const design = resolveDesign(cardFormat);
+            await generatePDF(newBatch, paperFormat, design);
+        } catch (e: any) {
+            const errData = e;
+            alert((tb(errData?.message?.replace(/\./g, '_')) || errData?.message) || t('batches.alerts.failed') + (errData?.detail?.toString() || ''));
         } finally {
             setIsGenerating(false);
         }
     };
+
 
 
     return (
@@ -232,12 +142,21 @@ export default function AdminPage() {
             <div className="max-w-7xl mx-auto space-y-6">
                 <div className="flex justify-between items-center flex-wrap gap-4">
                     <h1 className="text-2xl font-bold text-white">{t('title')}</h1>
-                    <Link href="/login">
-                        <Button variant="destructive" className="shadow-md cursor-pointer border border-red-900">
-                            {t('qrAdminLoginPage')}
-                        </Button>
-                    </Link>
+                    <div className="flex items-center gap-2">
+                        <Link href="/admin/help/overview">
+                            <Button variant="outline" className="bg-mist-800 border-mist-700 text-mist-300 hover:bg-mist-700 hover:text-white transition-all duration-300">
+                                <HelpCircle className="w-4 h-4 mr-2" />
+                                {t('helpButton') || "Help"}
+                            </Button>
+                        </Link>
+                        <Link href="/login">
+                            <Button variant="destructive" className="shadow-md cursor-pointer border border-red-900">
+                                {t('qrAdminLoginPage')}
+                            </Button>
+                        </Link>
+                    </div>
                 </div>
+
 
                 <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-8">
                     <button
@@ -679,28 +598,10 @@ function QRCodeListSection({ apiUrl, onGeneratePDF, paperFormat, cardFormat, dbC
         setLoading(true);
         try {
             const currentStatus = targetStatus ?? status;
-            const session = await fetchAuthSession();
-            const token = session.tokens?.idToken?.toString();
-
-            // Include query param if status is SEARCH
-            let url = `${apiUrl}/admin/qrcodes?status=${currentStatus}`;
-            if (currentStatus === 'SEARCH' && keyword) {
-                url += `&keyword=${encodeURIComponent(keyword)}`;
-            }
-
-            const res = await fetch(url, {
-                headers: {
-                    "Authorization": `Bearer ${token}`
-                }
-            });
-            if (res.ok) {
-                const data = await res.json();
-                setCodes(data.items || []);
-            } else {
-                // console.error("Failed to fetch codes");
-            }
+            const data = await adminApi.listQRCodes(currentStatus, keyword);
+            setCodes(data.items || []);
         } catch (error) {
-            // console.error(error);
+            console.error(error);
         } finally {
             setLoading(false);
         }
@@ -712,29 +613,16 @@ function QRCodeListSection({ apiUrl, onGeneratePDF, paperFormat, cardFormat, dbC
 
         setLoading(true);
         try {
-            const session = await fetchAuthSession();
-            const token = session.tokens?.idToken?.toString();
-
-            const res = await fetch(`${apiUrl}/admin/qrcodes/banned`, {
-                method: 'DELETE',
-                headers: {
-                    "Authorization": `Bearer ${token}`
-                }
-            });
-            if (res.ok) {
-                const data = await res.json();
-                alert(t('list.deleteBanned.success', { count: data.count }));
-                fetchCodes(); // Refresh list
-            } else {
-                alert(t('list.deleteBanned.failed'));
-            }
+            const data = await adminApi.deleteAllBanned();
+            alert(t('list.deleteBanned.success', { count: data.count }));
+            fetchCodes(); // Refresh list
         } catch (e) {
-            // console.error(e);
-            alert(t('list.deleteBanned.error'));
+            alert(t('list.deleteBanned.failed'));
         } finally {
             setLoading(false);
         }
     };
+
 
     return (
         <Card className="w-full">
@@ -1149,27 +1037,15 @@ function BanButton({ uuid, apiUrl, onSuccess }: { uuid: string, apiUrl: string, 
         if (!confirm(t('list.ban.confirm'))) return;
         setLoading(true);
         try {
-            const session = await fetchAuthSession();
-            const token = session.tokens?.idToken?.toString();
-
-            const res = await fetch(`${apiUrl}/admin/qrcodes/${uuid}/ban`, {
-                method: 'POST',
-                headers: {
-                    "Authorization": `Bearer ${token}`
-                }
-            });
-            if (res.ok) {
-                onSuccess();
-            } else {
-                alert(t('list.ban.failed'));
-            }
+            await adminApi.banQRCode(uuid, { reason: "Admin UI", status: "BANNED" });
+            onSuccess();
         } catch (e) {
-            // console.error(e);
-            alert(t('list.ban.error'));
+            alert(t('list.ban.failed'));
         } finally {
             setLoading(false);
         }
     };
+
 
     return (
         <Button variant="destructive" size="sm" onClick={(e) => { e.stopPropagation(); handleBan(); }} disabled={loading} className="h-6 text-xs bg-red-600 hover:bg-red-700">
@@ -1188,31 +1064,19 @@ function DataDumpSection({ apiUrl }: { apiUrl: string }) {
     const handleDump = async () => {
         if (!userId && !shopId) return;
         setLoading(true);
-        try {
-            const session = await fetchAuthSession();
-            const token = session.tokens?.idToken?.toString();
-
-            let url = `${apiUrl}/admin/dump?`;
+        try { // TODO
+            let url = ``;
             if (userId) url += `userId=${encodeURIComponent(userId)}&`;
             if (shopId) url += `shopId=${encodeURIComponent(shopId)}`;
-
-            const res = await fetch(url, {
-                headers: {
-                    "Authorization": `Bearer ${token}`
-                }
-            });
-            if (res.ok) {
-                const result = await res.json();
-                setData(result.items);
-            } else {
-                alert(t('list.dump.error'));
-            }
+            const result = await adminApi.dumpData(url); // Simple heuristic for now
+            setData(result.items);
         } catch (e) {
             alert(t('list.dump.error'));
         } finally {
             setLoading(false);
         }
     };
+
 
     return (
         <Card className="flex flex-col w-full">
@@ -1275,36 +1139,23 @@ function ManagerLinkingSection({ apiUrl }: { apiUrl: string }) {
 
         setLoading(true);
         try {
-            const session = await fetchAuthSession();
-            const token = session.tokens?.idToken?.toString();
-
-            const res = await fetch(`${apiUrl}/admin/links`, {
+            const data = await adminApi.fetch("/admin/links", {
                 method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    "Authorization": `Bearer ${token}`
-                },
                 body: JSON.stringify({
                     userIds: uids,
                     shopIds: sids,
                     action: 'validate'
                 }),
             });
-
-            if (res.ok) {
-                const data = await res.json();
-                setValidationData(data);
-                setIsConfirmOpen(true);
+            setValidationData(data);
+            setIsConfirmOpen(true);
+        } catch (e: any) {
+            const errData = e;
+            if (errData?.missingIdsFormatted) {
+                alert(t('list.managerLinking.errorMissingIds', { ids: errData.missingIdsFormatted }));
             } else {
-                const errData = await res.json().catch(() => null);
-                if (errData?.missingIdsFormatted) {
-                    alert(t('list.managerLinking.errorMissingIds', { ids: errData.missingIdsFormatted }));
-                } else {
-                    alert(t('list.managerLinking.error'));
-                }
+                alert(t('list.managerLinking.error'));
             }
-        } catch (e) {
-            alert(t('list.managerLinking.error'));
         } finally {
             setLoading(false);
         }
@@ -1316,37 +1167,26 @@ function ManagerLinkingSection({ apiUrl }: { apiUrl: string }) {
 
         setLoading(true);
         try {
-            const session = await fetchAuthSession();
-            const token = session.tokens?.idToken?.toString();
-
-            const res = await fetch(`${apiUrl}/admin/links`, {
+            await adminApi.fetch("/admin/links", {
                 method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    "Authorization": `Bearer ${token}`
-                },
                 body: JSON.stringify({
                     userIds: uids,
                     shopIds: sids,
                     action: 'execute'
                 }),
             });
-
-            if (res.ok) {
-                alert(t('list.managerLinking.success'));
-                setIsConfirmOpen(false);
-                setUserIdsStr("");
-                setShopIdsStr("");
-                setValidationData(null);
-            } else {
-                alert(t('list.managerLinking.error'));
-            }
+            alert(t('list.managerLinking.success'));
+            setIsConfirmOpen(false);
+            setUserIdsStr("");
+            setShopIdsStr("");
+            setValidationData(null);
         } catch (e) {
             alert(t('list.managerLinking.error'));
         } finally {
             setLoading(false);
         }
     };
+
 
     return (
         <Card>
@@ -1441,35 +1281,18 @@ function ShopOwnerChangeSection({ apiUrl }: { apiUrl: string }) {
         if (!shopId.trim() || !newUserId.trim()) return;
         setLoading(true);
         try {
-            const session = await fetchAuthSession();
-            const token = session.tokens?.idToken?.toString();
-
-            const res = await fetch(`${apiUrl}/admin/shops/${shopId.trim().replace(/^SHOP#/, "")}/owner`, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    "Authorization": `Bearer ${token}`
-                },
-                body: JSON.stringify({
-                    shopId: shopId.trim().replace(/^SHOP#/, ""),
-                    newUserId: newUserId.trim().replace(/^USER#/, ""),
-                    action: 'validate'
-                }),
-            });
-
-            if (res.ok) {
-                const data = await res.json();
-                setValidationData(data);
-                setIsConfirmOpen(true);
-            } else {
-                const errData = await res.json().catch(() => null);
-                let msg = t('list.ownerChange.error');
-                if (errData?.message) msg += ": " + errData.message;
-                if (errData?.error) msg += " (" + errData.error + ")";
-                alert(msg);
-            }
-        } catch (e) {
-            alert(t('list.ownerChange.error'));
+            const data = await adminApi.changeShopOwner(shopId.trim().replace(/^SHOP#/, ""), {
+                owner_uuid: newUserId.trim().replace(/^USER#/, ""),
+                action: 'validate'
+            } as any);
+            setValidationData(data);
+            setIsConfirmOpen(true);
+        } catch (e: any) {
+            const errData = e;
+            let msg = t('list.ownerChange.error');
+            if (errData?.message) msg += ": " + errData.message;
+            if (errData?.error) msg += " (" + errData.error + ")";
+            alert(msg);
         } finally {
             setLoading(false);
         }
@@ -1479,41 +1302,26 @@ function ShopOwnerChangeSection({ apiUrl }: { apiUrl: string }) {
         if (!shopId.trim() || !newUserId.trim()) return;
         setLoading(true);
         try {
-            const session = await fetchAuthSession();
-            const token = session.tokens?.idToken?.toString();
-
-            const res = await fetch(`${apiUrl}/admin/shops/${shopId.trim().replace(/^SHOP#/, "")}/owner`, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    "Authorization": `Bearer ${token}`
-                },
-                body: JSON.stringify({
-                    shopId: shopId.trim().replace(/^SHOP#/, ""),
-                    newUserId: newUserId.trim().replace(/^USER#/, ""),
-                    action: 'execute'
-                }),
-            });
-
-            if (res.ok) {
-                alert(t('list.ownerChange.success'));
-                setIsConfirmOpen(false);
-                setShopId("");
-                setNewUserId("");
-                setValidationData(null);
-            } else {
-                const errData = await res.json().catch(() => null);
-                let msg = t('list.ownerChange.error');
-                if (errData?.message) msg += ": " + errData.message;
-                if (errData?.error) msg += " (" + errData.error + ")";
-                alert(msg);
-            }
-        } catch (e) {
-            alert(t('list.ownerChange.error'));
+            await adminApi.changeShopOwner(shopId.trim().replace(/^SHOP#/, ""), {
+                owner_uuid: newUserId.trim().replace(/^USER#/, ""),
+                action: 'execute'
+            } as any);
+            alert(t('list.ownerChange.success'));
+            setIsConfirmOpen(false);
+            setShopId("");
+            setNewUserId("");
+            setValidationData(null);
+        } catch (e: any) {
+            const errData = e;
+            let msg = t('list.ownerChange.error');
+            if (errData?.message) msg += ": " + errData.message;
+            if (errData?.error) msg += " (" + errData.error + ")";
+            alert(msg);
         } finally {
             setLoading(false);
         }
     };
+
 
     return (
         <Card>
@@ -1586,31 +1394,17 @@ function AdminShopCreationSection({ apiUrl }: { apiUrl: string }) {
         if (!userId.trim()) return;
         setLoading(true);
         try {
-            const session = await fetchAuthSession();
-            const token = session.tokens?.idToken?.toString();
-
-            const res = await fetch(`${apiUrl}/admin/links`, {
+            const data = await adminApi.fetch("/admin/links", {
                 method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    "Authorization": `Bearer ${token}`
-                },
                 body: JSON.stringify({
                     userIds: [userId.trim().replace(/^USER#/, "")],
                     shopIds: [],
                     action: 'validate'
                 }),
             });
-
-            if (res.ok) {
-                const data = await res.json();
-                if (data.users && data.users.length > 0) {
-                    setUserData(data.users[0]);
-                    setIsConfirmOpen(true);
-                }
-            } else {
-                const errData = await res.json().catch(() => null);
-                alert(t('list.shopCreation.error'));
+            if (data.users && data.users.length > 0) {
+                setUserData(data.users[0]);
+                setIsConfirmOpen(true);
             }
         } catch (e) {
             alert(t('list.shopCreation.error'));
@@ -1619,41 +1413,31 @@ function AdminShopCreationSection({ apiUrl }: { apiUrl: string }) {
         }
     };
 
+
     const handleCreateShop = async () => {
         if (!userData) return;
         setLoading(true);
         try {
-            const session = await fetchAuthSession();
-            const token = session.tokens?.idToken?.toString();
-
-            const res = await fetch(`${apiUrl}/shop`, {
+            await adminApi.fetch("/shop", {
                 method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    "Authorization": `Bearer ${token}`
-                },
                 body: JSON.stringify({
                     name: "My Default Shop",
                     owner_id: userData.id,
                     gm_ids: []
                 }),
             });
-
-            if (res.ok) {
-                alert(t('list.shopCreation.success'));
-                setIsConfirmOpen(false);
-                setUserId("");
-                setUserData(null);
-            } else {
-                const errData = await res.json().catch(() => null);
-                alert(t('list.shopCreation.error') + (errData?.message ? ": " + errData.message : ""));
-            }
-        } catch (e) {
-            alert(t('list.shopCreation.error'));
+            alert(t('list.shopCreation.success'));
+            setIsConfirmOpen(false);
+            setUserId("");
+            setUserData(null);
+        } catch (e: any) {
+            const errData = e;
+            alert(t('list.shopCreation.error') + (errData?.message ? ": " + errData.message : ""));
         } finally {
             setLoading(false);
         }
     };
+
 
     return (
         <Card>
