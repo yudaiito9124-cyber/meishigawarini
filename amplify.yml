@@ -8,9 +8,9 @@ applications:
             - nvm use 22 # Node.js v22を使用
             - npm ci
             - printenv | grep -e NEXT_PUBLIC_ > .env
-      build:
-        commands:
-          - npm run build
+        build:
+          commands:
+            - npm run build
       artifacts:
         baseDirectory: .next
         files:
