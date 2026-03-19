@@ -94,7 +94,7 @@ APIの設計上、攻撃者にバックエンドの仕組みを推測させな�
 
 ## 8. 管理者専用のMFA強制 (Lambda Authorizer)
 
-管理APIは、Cognitoの通常認証に加えて、独自のLambda Authorizer (`infra/lambda/admin-authorizer.ts`) による二重チェックを行います。
+管理APIは、Cognitoの通常認証に加えて、独自のLambda Authorizer (`infra/lambda/adminAuthorizer.ts`) による二重チェックを行います。
 
 *   **仕組み**:
     1.  JWTトークンを検証し、正規のCognitoユーザーであることを確認します。

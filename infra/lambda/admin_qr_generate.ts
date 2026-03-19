@@ -1,3 +1,13 @@
+/**
+ * 概要: 新規QRコードとPINをバッチで一括生成する。
+ * 詳細: 指定された件数のQRコードを生成し、オプションに応じた属性（ショップID、商品ID、有効期限、デザイン等）を設定してDynamoDBに登録する。
+ * エンドポイント: POST /admin/qr/generate
+ * リクエストボディ:
+ *  - count: 生成件数 (最大100)
+ *  - card_design: カードデザインID (必須)
+ *  - shopId, productId, expiry_date, owner_uuid, sender_info, senderId: 各種属性（オプション）
+ *  - activate_now: trueの場合、即座に有効状態で生成
+ */
 import { APIGatewayProxyHandler } from 'aws-lambda';
 import { DynamoDBClient, BatchWriteItemCommand } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, GetCommand, QueryCommand } from '@aws-sdk/lib-dynamodb';
@@ -14,27 +24,28 @@ const BUCKET_NAME = process.env.BUCKET_NAME || '';
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'Content-Type,Authorization',
-    'Access-Control-Allow-Methods': 'POST'
+    'Access-Control-Allow-Methods': 'POST,OPTIONS'
 };
 
 export const handler: APIGatewayProxyHandler = async (event) => {
-
     try {
-        // Only allow POST
+        if (event.httpMethod === 'OPTIONS') {
+            return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ message: 'OK' }) };
+        }
         if (event.httpMethod !== 'POST') {
             return { statusCode: 405, headers: corsHeaders, body: JSON.stringify({ message: 'Method Not Allowed' }) };
         }
 
         const body = JSON.parse(event.body || '{}');
-        const count = body.count || 1;
-        const shopId = body.shopId;
-        const productId = body.productId;
-        const expiryDate = body.expiry_date;
-        const ownerUuid = body.owner_uuid;
-        const senderInfo = body.sender_info;
-        let senderId = body.senderId;
-        const activateNow = body.activate_now === true;
-        const cardDesign = body.card_design;
+        const count = body.count || 1; //required
+        const shopId = body.shopId;  //optional
+        const productId = body.productId;  //optional
+        const expiryDate = body.expiry_date;  //optional
+        const ownerUuid = body.owner_uuid;  //optional
+        const senderInfo = body.sender_info;  //optional
+        let senderId = body.senderId;  //optional
+        const activateNow = body.activate_now === true;  //optional
+        const cardDesign = body.card_design;  //required
 
 
         // Limit max count for safety
@@ -45,6 +56,9 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         // Validate owner_uuid if provided
         let user_shop_ids: string[] = [];
         if (ownerUuid) {
+            // オーナー指定がある場合、ユーザー情報の存在と権限を確認
+            // - 検索条件: PK = USER#{ownerUuid}, SK = "SHOP"
+            // - 取得カラム: owner_shop_ids, gm_shop_ids
             const userRes = await ddbDocClient.send(new GetCommand({
                 TableName: TABLE_NAME,
                 Key: { PK: `USER#${ownerUuid}`, SK: 'SHOP' }
@@ -61,6 +75,9 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         // If productID is also provided, verify ownership
         let product_shopids = [];
         if (productId) {
+            // 商品指定がある場合、その商品の情報を取得（所属ショップ確認用）
+            // - 検索条件: GSI2_PK = PRODUCT#{productId}
+            // - 取得カラム: PK (所属ショップのID)
             const prodRes = await ddbDocClient.send(new QueryCommand({
                 TableName: TABLE_NAME,
                 IndexName: 'GSI2',
@@ -78,6 +95,9 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 
         if (shopId) {
             // Verify if the shop exists
+            // ショップ指定がある場合、ショップ情報の存在を確認
+            // - 検索条件: PK = SHOP#{shopId}, SK = "METADATA"
+            // - 取得カラム: 項目の全属性
             const shopRes = await ddbDocClient.send(new GetCommand({
                 TableName: TABLE_NAME,
                 Key: {
@@ -123,6 +143,9 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         let validDays = 180; // Default
         if (activateNow) {
             // Fetch product to get valid_days
+            // 即時有効化する場合、商品の詳細設定（有効期間等）を取得
+            // - 検索条件: PK = SHOP#{shopId}, SK = PRODUCT#{productId}
+            // - 取得カラム: valid_days (有効日数)
             const prodRes = await ddbDocClient.send(new GetCommand({
                 TableName: TABLE_NAME,
                 Key: { PK: `SHOP#${shopId}`, SK: `PRODUCT#${productId}` }
@@ -137,6 +160,9 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         if (senderId) {
             senderId = senderId.replace(/^USER#/, "");
             // Load sender info from ID (Format: USER#[uuid])
+            // 送り主IDの情報を取得
+            // - 検索条件: PK = USER#{senderId}, SK = "SENDER"
+            // - 取得カラム: 項目の全ての属性 (名称、ロゴ等)
             const senderRes = await ddbDocClient.send(new GetCommand({
                 TableName: TABLE_NAME,
                 Key: { PK: `USER#${senderId}`, SK: 'SENDER' }
@@ -253,6 +279,8 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         // DynamoDB BatchWriteItem has a limit of 25 items per request
         for (let i = 0; i < items.length; i += 25) {
             const chunk = items.slice(i, i + 25);
+            // 生成したQRコードデータを一括登録 (25件ずつのバッチ実行)
+            // - 登録内容: 各種ステータス、生成されたUUID/PIN、有効期限、関連ID等
             await client.send(new BatchWriteItemCommand({
                 RequestItems: {
                     [TABLE_NAME]: chunk

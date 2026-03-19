@@ -1,3 +1,12 @@
+/**
+ * 概要: ユーザーをショップの「ゼネラルマネージャー（GM）」として紐付ける。
+ * 詳細: ユーザーとショップの存在を確認し、双方向の参照関係（ユーザー側には`gm_shop_ids`、ショップ側には`gm_ids`）を更新して権限を付与する。
+ * エンドポイント: POST /admin/links
+ * リクエストボディ:
+ *  - shopIds: 紐付け対象のショップID配列
+ *  - userIds: 紐付け対象のユーザーID配列
+ *  - action: "validate" (ID存在確認のみ) | "execute" (紐付け実行)
+ */
 
 import { APIGatewayProxyHandler } from 'aws-lambda';
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
@@ -16,15 +25,10 @@ const corsHeaders = {
 export const handler: APIGatewayProxyHandler = async (event) => {
     try {
         if (event.httpMethod === 'OPTIONS') {
-            return { statusCode: 200, headers: corsHeaders, body: '' };
+            return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ message: 'OK' }) };
         }
-
         if (event.httpMethod !== 'POST') {
-            return {
-                statusCode: 405,
-                headers: corsHeaders,
-                body: JSON.stringify({ message: 'Method Not Allowed' })
-            };
+            return { statusCode: 405, headers: corsHeaders, body: JSON.stringify({ message: 'Method Not Allowed' }) };
         }
 
         const body = JSON.parse(event.body || '{}');
@@ -45,6 +49,9 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 
             // Validate Users
             for (const userId of userIds) {
+                // ユーザー情報の存在確認
+                // - 検索条件: PK = USER#{userId}, SK = "SHOP"
+                // - 取得カラム: email
                 const res = await ddb.send(new GetCommand({
                     TableName: TABLE_NAME,
                     Key: { PK: `USER#${userId}`, SK: 'SHOP' }
@@ -58,14 +65,17 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 
             // Validate Shops
             for (const shopId of shopIds) {
+                // ショップ情報の存在確認
+                // - 検索条件: PK = SHOP#{shopId}, SK = "METADATA"
+                // - 取得カラム: name, owner_id, email (オーナーのアドレス)
                 const res = await ddb.send(new GetCommand({
                     TableName: TABLE_NAME,
                     Key: { PK: `SHOP#${shopId}`, SK: 'METADATA' }
                 }));
                 if (res.Item) {
-                    shopMetadataList.push({ 
-                        id: shopId, 
-                        name: res.Item.name, 
+                    shopMetadataList.push({
+                        id: shopId,
+                        name: res.Item.name,
                         owner_id: res.Item.owner_id,
                         email: res.Item.email // Owner contact email
                     });
@@ -78,8 +88,8 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 return {
                     statusCode: 400,
                     headers: corsHeaders,
-                    body: JSON.stringify({ 
-                        message: 'Some IDs not found', 
+                    body: JSON.stringify({
+                        message: 'Some IDs not found',
                         missingIds,
                         missingIdsFormatted: missingIds.join(', ')
                     })
@@ -89,9 +99,9 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             return {
                 statusCode: 200,
                 headers: corsHeaders,
-                body: JSON.stringify({ 
-                    users: userMetadataList, 
-                    shops: shopMetadataList 
+                body: JSON.stringify({
+                    users: userMetadataList,
+                    shops: shopMetadataList
                 })
             };
         }
@@ -102,6 +112,9 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             // 1. Update Users
             for (const userId of userIds) {
                 // Fetch current user to check owner_shop_ids
+                // 権限更新のため現在のユーザー状態を取得
+                // - 検索条件: PK = USER#{userId}, SK = "SHOP"
+                // - 取得カラム: owner_shop_ids, gm_shop_ids
                 const userRes = await ddb.send(new GetCommand({
                     TableName: TABLE_NAME,
                     Key: { PK: `USER#${userId}`, SK: 'SHOP' }
@@ -111,10 +124,10 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 
                 const ownerShopIds = userRes.Item.owner_shop_ids || [];
                 const currentGmShopIds = userRes.Item.gm_shop_ids || [];
-                
+
                 // Filter out shopIds that the user is already owner of
                 const shopIdsToLink = shopIds.filter(id => !ownerShopIds.includes(id));
-                
+
                 if (shopIdsToLink.length > 0) {
                     // Filter out already linked gm shop ids for list_append (to avoid duplicates if already partially linked)
                     // Note: contains check in ConditionExpression is safer for single updates, 
@@ -124,6 +137,11 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                     const finalShopIdsToLink = shopIdsToLink.filter(id => !currentGmShopIds.includes(id));
 
                     if (finalShopIdsToLink.length > 0) {
+                        // ユーザーのGMショップリストにショップIDを追加
+                        // - 検索条件: PK = USER#{userId}, SK = "SHOP"
+                        // - 更新カラム:
+                        //   - gm_shop_ids: リクエストで指定されたショップIDリストを末尾に追加 (list_append)
+                        //   - ts_updated_at: 現在時刻
                         await ddb.send(new UpdateCommand({
                             TableName: TABLE_NAME,
                             Key: { PK: `USER#${userId}`, SK: 'SHOP' },
@@ -139,6 +157,10 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 
                 // Ensure GENERAL_MANAGER role
                 try {
+                    // ユーザーに GENERAL_MANAGER ロールを付与
+                    // - 検索条件: PK = USER#{userId}, SK = "SHOP"
+                    // - 更新カラム: roles (リストに "GENERAL_MANAGER" を追加)
+                    // - 実行条件: 既にロールを持っていない場合のみ実行 (重複防止)
                     await ddb.send(new UpdateCommand({
                         TableName: TABLE_NAME,
                         Key: { PK: `USER#${userId}`, SK: 'SHOP' },
@@ -160,6 +182,9 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 
             // 2. Update Shops
             for (const shopId of shopIds) {
+                // 権限更新のため現在のショップ情報を取得
+                // - 検索条件: PK = SHOP#{shopId}, SK = "METADATA"
+                // - 取得カラム: owner_id, gm_ids
                 const shopRes = await ddb.send(new GetCommand({
                     TableName: TABLE_NAME,
                     Key: { PK: `SHOP#${shopId}`, SK: 'METADATA' }
@@ -176,6 +201,9 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 const finalUserIdsToLink = userIdsToLink.filter(id => !currentGmIds.includes(id));
 
                 if (finalUserIdsToLink.length > 0) {
+                    // ショップのGMリストにユーザーIDを追加
+                    // - 検索条件: PK = SHOP#{shopId}, SK = "METADATA"
+                    // - 更新カラム: gm_ids (ユーザーIDリストを末尾に追加)
                     await ddb.send(new UpdateCommand({
                         TableName: TABLE_NAME,
                         Key: { PK: `SHOP#${shopId}`, SK: 'METADATA' },

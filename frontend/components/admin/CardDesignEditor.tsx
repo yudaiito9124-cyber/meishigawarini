@@ -46,15 +46,8 @@ export default function CardDesignEditor({ apiUrl }: { apiUrl: string }) {
     const fetchDesigns = async () => {
         setLoading(true);
         try {
-            const session = await fetchAuthSession();
-            const token = session.tokens?.idToken?.toString();
-            const res = await fetch(`${apiUrl}/admin/card-designs`, {
-                headers: { "Authorization": `Bearer ${token}` }
-            });
-            if (res.ok) {
-                const data = await res.json();
-                setDesigns(data.items || []);
-            }
+            const data = await adminApi.admin_carddesigns_list({});
+            setDesigns(data.items || []);
         } catch (e) {
             console.error("Failed to fetch designs", e);
         } finally {
@@ -99,29 +92,16 @@ export default function CardDesignEditor({ apiUrl }: { apiUrl: string }) {
             const isNew = !designs.find(d => (d.SK || d.design_id) === (editingDesign.SK || editingDesign.design_id));
 
             const designIdentifier = editingDesign.SK || editingDesign.design_id;
-            const url = isNew
-                ? `${apiUrl}/admin/card-designs`
-                : `${apiUrl}/admin/card-designs/${designIdentifier}`;
-            const method = isNew ? "POST" : "PATCH";
 
-            const res = await fetch(url, {
-                method,
-                headers: {
-                    "Content-Type": "application/json",
-                    "Authorization": `Bearer ${token}`
-                },
-                body: JSON.stringify(editingDesign)
-            });
-
-            if (res.ok) {
-                alert("Saved successfully");
-                setEditingDesign(null);
-                fetchDesigns();
+            if (isNew) {
+                await adminApi.admin_carddesigns_create({ design_id: designIdentifier, design: editingDesign });
             } else {
-                const errorData = await res.json().catch(() => ({ message: "Unknown error" }));
-                alert(`Failed to save: ${errorData.message}`);
-                console.error("Save failed:", errorData);
+                await adminApi.admin_carddesigns_update({ design_id: designIdentifier, design: editingDesign });
             }
+
+            alert("Saved successfully");
+            setEditingDesign(null);
+            fetchDesigns();
         } catch (e) {
             console.error(e);
             alert("Error saving");
@@ -133,15 +113,8 @@ export default function CardDesignEditor({ apiUrl }: { apiUrl: string }) {
     const handleDelete = async (id: string) => {
         if (!confirm("Are you sure?")) return;
         try {
-            const session = await fetchAuthSession();
-            const token = session.tokens?.idToken?.toString();
-            const res = await fetch(`${apiUrl}/admin/card-designs/${id}`, {
-                method: "DELETE",
-                headers: { "Authorization": `Bearer ${token}` }
-            });
-            if (res.ok) {
-                fetchDesigns();
-            }
+            await adminApi.admin_carddesigns_delete({ design_id: id });
+            fetchDesigns();
         } catch (e) {
             console.error(e);
         }
@@ -158,7 +131,7 @@ export default function CardDesignEditor({ apiUrl }: { apiUrl: string }) {
             const thumbType = type === 'bgimgf' ? 'thumbf' : 'thumbb';
 
             // 1. Prepare Main Image
-            const { uploadUrl: mainUploadUrl, publicUrl: mainPublicUrl } = await adminApi.getUploadUrl({
+            const { uploadUrl: mainUploadUrl, publicUrl: mainPublicUrl } = await adminApi.admin_carddesigns_uploadurl({
                 filename: file.name,
                 contentType: file.type,
                 design_id: editingDesign.design_id
@@ -167,8 +140,8 @@ export default function CardDesignEditor({ apiUrl }: { apiUrl: string }) {
             // 2. Generate and Prepare Thumbnail (400px WebP)
             const thumbBlob = await resizeImage(file, 400);
             const thumbFile = new File([thumbBlob], `thumb_${file.name.split('.')[0]}.webp`, { type: "image/webp" });
- 
-            const { uploadUrl: thumbUploadUrl, publicUrl: thumbPublicUrl } = await adminApi.getUploadUrl({
+
+            const { uploadUrl: thumbUploadUrl, publicUrl: thumbPublicUrl } = await adminApi.admin_carddesigns_uploadurl({
                 filename: thumbFile.name,
                 contentType: "image/webp",
                 design_id: editingDesign.design_id

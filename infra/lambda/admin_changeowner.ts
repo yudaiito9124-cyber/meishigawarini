@@ -1,3 +1,12 @@
+/**
+ * 概要: ショップのオーナー権限を別のユーザーに移譲する。
+ * 詳細: オーナー変更の検証（バリデーション）と、DynamoDBトランザクションを用いたアトミックな権限更新（旧オーナーからの剥奪と新オーナーへの付与）を実行する。
+ * エンドポイント: POST /admin/changeowner
+ * リクエストボディ:
+ *  - shopId: 対象ショップのUUID
+ *  - newUserId: 新オーナーのユーザーUUID
+ *  - action: "validate" (確認のみ) | "execute" (実行)
+ */
 
 import { APIGatewayProxyHandler } from 'aws-lambda';
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
@@ -20,9 +29,8 @@ const corsHeaders = {
 export const handler: APIGatewayProxyHandler = async (event) => {
     try {
         if (event.httpMethod === 'OPTIONS') {
-            return { statusCode: 200, headers: corsHeaders, body: '' };
+            return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ message: 'OK' }) };
         }
-
         if (event.httpMethod !== 'POST') {
             return { statusCode: 405, headers: corsHeaders, body: JSON.stringify({ message: 'Method Not Allowed' }) };
         }
@@ -42,11 +50,14 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         const cleanNewUserId = newUserId.replace(/^USER#/, '');
 
         if (action === 'validate') {
-            // 1. Fetch Shop Metadata
+            // ショップのメタデータを取得
+            // - 検索条件: PK = SHOP#{shopId}, SK = "METADATA"
+            // - 取得カラム: owner_id (現在のオーナーID), name (ショップ名) 等の全属性
             const shopRes = await ddb.send(new GetCommand({
                 TableName: TABLE_NAME,
                 Key: { PK: `SHOP#${cleanShopId}`, SK: 'METADATA' }
             }));
+            // End: Fetch Shop Metadata
 
             if (!shopRes.Item) {
                 return { statusCode: 404, headers: corsHeaders, body: JSON.stringify({ message: 'Shop not found' }) };
@@ -68,6 +79,9 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             }
 
             // 3. Fetch New User Info (from DB first, then Cognito)
+            // 新しいオーナー候補のユーザー情報を取得
+            // - 検索条件: PK = USER#{userId}, SK = "SHOP"
+            // - 取得カラム: email (存在する場合)
             const newUserRes = await ddb.send(new GetCommand({
                 TableName: TABLE_NAME,
                 Key: { PK: `USER#${cleanNewUserId}`, SK: 'SHOP' }
@@ -103,12 +117,15 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             const now = new Date().toISOString();
 
             // 1. Fetch current data for atomic update logic
+            // トランザクション実行前の最新状態を確認するため、ショップのメタデータを再取得
+            // - 検索条件: PK = SHOP#{shopId}, SK = "METADATA"
+            // - 取得カラム: owner_id, gm_ids
             const shopRes = await ddb.send(new GetCommand({
                 TableName: TABLE_NAME,
                 Key: { PK: `SHOP#${cleanShopId}`, SK: 'METADATA' }
             }));
             if (!shopRes.Item) return { statusCode: 404, headers: corsHeaders, body: JSON.stringify({ message: 'Shop not found' }) };
-            
+
             const oldOwnerId = shopRes.Item.owner_id;
             const currentGmIds = shopRes.Item.gm_ids || [];
             const updatedGmIds = currentGmIds.filter((id: string) => id !== cleanNewUserId);
@@ -121,7 +138,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 TableName: TABLE_NAME,
                 Key: { PK: `USER#${cleanNewUserId}`, SK: 'SHOP' }
             }));
-            
+
             // New user might not exist in our table yet, but we need their email for the shop record
             let newUserEmail = newUserRes.Item?.email;
             if (!newUserEmail) {
@@ -136,6 +153,9 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Could not resolve new user email' }) };
             }
 
+            // 旧オーナーのユーザー情報を取得
+            // - 検索条件: PK = USER#{oldOwnerId}, SK = "SHOP"
+            // - 取得カラム: owner_shop_ids, roles
             const oldUserRes = await ddb.send(new GetCommand({
                 TableName: TABLE_NAME,
                 Key: { PK: `USER#${oldOwnerId}`, SK: 'SHOP' }
@@ -143,7 +163,14 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 
             // Prepare Transaction
             const transactItems: any[] = [
-                // 1. Update Shop
+                // 1. ショップのメタデータを更新
+                // - 検索条件: PK = SHOP#{shopId}, SK = "METADATA"
+                // - 更新カラム: 
+                //   - owner_id: 新オーナーのUUID
+                //   - GSI2_PK: 新オーナーに紐付けるためのインデックスキー
+                //   - email: 新オーナーのメールアドレス
+                //   - gm_ids: 新オーナーがGMだった場合、リストから除外
+                //   - ts_updated_at: 現在時刻
                 {
                     Update: {
                         TableName: TABLE_NAME,
@@ -164,7 +191,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             if (oldUserRes.Item) {
                 const currentOwnerShops = oldUserRes.Item.owner_shop_ids || [];
                 const updatedOwnerShops = currentOwnerShops.filter((id: string) => id !== cleanShopId);
-                
+
                 let updateExpr = 'SET owner_shop_ids = :new_list, ts_updated_at = :now';
                 const attrValues: any = {
                     ':new_list': updatedOwnerShops,
@@ -181,6 +208,12 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                     attrNames['#roles'] = 'roles';
                 }
 
+                // 2. 旧オーナーのユーザー項目を更新（権限剥奪）
+                // - 検索条件: PK = USER#{oldOwnerId}, SK = "SHOP"
+                // - 更新カラム:
+                //   - owner_shop_ids: 当該ショップを除外したリスト
+                //   - roles: 他に所有ショップがない場合、SHOP_MANAGERロールを削除
+                //   - ts_updated_at: 現在時刻
                 transactItems.push({
                     Update: {
                         TableName: TABLE_NAME,
@@ -195,17 +228,24 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             // 3. Update New Owner
             const newUserOwnerShops = newUserRes.Item?.owner_shop_ids || [];
             const newUserGmShops = newUserRes.Item?.gm_shop_ids || [];
-            
+
             // Add to owner_shop_ids if not already there
             const updatedNewUserOwnerShops = Array.from(new Set([...newUserOwnerShops, cleanShopId]));
             // Remove from gm_shop_ids if present
             const updatedNewUserGmShops = newUserGmShops.filter((id: string) => id !== cleanShopId);
-            
+
             const roles = newUserRes.Item?.roles || [];
             const updatedNewUserRoles = Array.from(new Set([...roles, 'SHOP_MANAGER']));
 
             if (newUserRes.Item) {
                 // Update existing user
+                // 3. 新オーナーのユーザー項目を更新（権限付与）
+                // - 検索条件: PK = USER#{newUserId}, SK = "SHOP"
+                // - 更新カラム:
+                //   - owner_shop_ids: 当該ショップを追加したリスト
+                //   - gm_shop_ids: ショップがGMリストにある場合、除外
+                //   - roles: SHOP_MANAGERロールを確実に追加
+                //   - ts_updated_at: 現在時刻
                 transactItems.push({
                     Update: {
                         TableName: TABLE_NAME,
@@ -222,6 +262,9 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 });
             } else {
                 // Create new user record
+                // 3. 新オーナーのユーザー項目が未存在の場合、新規作成（権限付与）
+                // - PK: USER#{newUserId}, SK: "SHOP"
+                // - 作成カラム: email, roles: ["SHOP_MANAGER"], owner_shop_ids: [shopId], ts_created_at, ts_updated_at
                 transactItems.push({
                     Put: {
                         TableName: TABLE_NAME,
@@ -239,6 +282,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 });
             }
 
+            // これまでの更新・作成リクエストを１つのアトミックなトランザクションとして実行
             await ddb.send(new TransactWriteCommand({
                 TransactItems: transactItems
             }));
@@ -257,8 +301,8 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         return {
             statusCode: 500,
             headers: corsHeaders,
-            body: JSON.stringify({ 
-                message: `Internal Server Error: ${error.message || 'Unknown error'}`, 
+            body: JSON.stringify({
+                message: `Internal Server Error: ${error.message || 'Unknown error'}`,
                 error: String(error),
                 stack: error.stack,
                 code: error.code,

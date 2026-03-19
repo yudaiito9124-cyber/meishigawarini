@@ -60,10 +60,10 @@ export default function AdminPage() {
 
     const fetchDbCardDesigns = async () => {
         try {
-            const data = await adminApi.listCardDesigns();
+            const data = await adminApi.admin_carddesigns_list({});
             setDbCardDesigns(data.items || []);
         } catch (e) {
-            console.error("Failed to fetch designs", e);
+            // console.error("Failed to fetch designs", e);
         }
     };
 
@@ -98,7 +98,7 @@ export default function AdminPage() {
                 return globalDesign || cardFormat;
             };
 
-            const data = await adminApi.generateQRCodes({
+            const data = await adminApi.admin_qr_generate({
                 count,
                 ...(useMetadataOptions ? {
                     shopId: shopId || undefined,
@@ -597,7 +597,7 @@ function QRCodeListSection({ apiUrl, onGeneratePDF, paperFormat, cardFormat, dbC
         setLoading(true);
         try {
             const currentStatus = targetStatus ?? status;
-            const data = await adminApi.listQRCodes(currentStatus, keyword);
+            const data = await adminApi.admin_qr_list({ status: currentStatus, keyword });
             setCodes(data.items || []);
         } catch (error) {
             console.error(error);
@@ -612,7 +612,7 @@ function QRCodeListSection({ apiUrl, onGeneratePDF, paperFormat, cardFormat, dbC
 
         setLoading(true);
         try {
-            const data = await adminApi.deleteAllBanned();
+            const data = await adminApi.admin_qr_deleteban({});
             alert(t('list.deleteBanned.success', { count: data.count }));
             fetchCodes(); // Refresh list
         } catch (e) {
@@ -1036,7 +1036,7 @@ function BanButton({ uuid, apiUrl, onSuccess }: { uuid: string, apiUrl: string, 
         if (!confirm(t('list.ban.confirm'))) return;
         setLoading(true);
         try {
-            await adminApi.banQRCode(uuid, { reason: "Admin UI", status: "BANNED" });
+            await adminApi.admin_qr_ban({ uuid, reason: "Admin UI" });
             onSuccess();
         } catch (e) {
             alert(t('list.ban.failed'));
@@ -1063,11 +1063,13 @@ function DataDumpSection({ apiUrl }: { apiUrl: string }) {
     const handleDump = async () => {
         if (!userId && !shopId) return;
         setLoading(true);
-        try { // TODO
-            let url = ``;
-            if (userId) url += `userId=${encodeURIComponent(userId)}&`;
-            if (shopId) url += `shopId=${encodeURIComponent(shopId)}`;
-            const result = await adminApi.dumpData(url); // Simple heuristic for now
+        try {
+            const pks: string[] = [];
+            if (userId) pks.push(`USER#${userId}`);
+            if (shopId) pks.push(`SHOP#${shopId}`);
+            const result = await adminApi.admin_dump({
+                pks
+            });
             setData(result.items);
         } catch (e) {
             alert(t('list.dump.error'));
@@ -1138,7 +1140,7 @@ function ManagerLinkingSection({ apiUrl }: { apiUrl: string }) {
 
         setLoading(true);
         try {
-            const data = await adminApi.linkManager({
+            const data = await adminApi.admin_links({
                 userIds: uids,
                 shopIds: sids,
                 action: 'validate'
@@ -1163,7 +1165,7 @@ function ManagerLinkingSection({ apiUrl }: { apiUrl: string }) {
 
         setLoading(true);
         try {
-            await adminApi.linkManager({
+            await adminApi.admin_links({
                 userIds: uids,
                 shopIds: sids,
                 action: 'execute'
@@ -1274,7 +1276,7 @@ function ShopOwnerChangeSection({ apiUrl }: { apiUrl: string }) {
         if (!shopId.trim() || !newUserId.trim()) return;
         setLoading(true);
         try { // error section
-            const data = await adminApi.changeShopOwner({
+            const data = await adminApi.admin_changeowner({
                 shopId: shopId.trim().replace(/^SHOP#/, ""),
                 newUserId: newUserId.trim().replace(/^USER#/, ""),
                 action: 'validate'
@@ -1296,7 +1298,7 @@ function ShopOwnerChangeSection({ apiUrl }: { apiUrl: string }) {
         if (!shopId.trim() || !newUserId.trim()) return;
         setLoading(true);
         try {
-            await adminApi.changeShopOwner({
+            await adminApi.admin_changeowner({
                 shopId: shopId.trim().replace(/^SHOP#/, ""),
                 newUserId: newUserId.trim().replace(/^USER#/, ""),
                 action: 'execute'
@@ -1389,7 +1391,7 @@ function AdminShopCreationSection({ apiUrl }: { apiUrl: string }) {
         if (!userId.trim()) return;
         setLoading(true);
         try {
-            const data = await adminApi.linkManager({
+            const data = await adminApi.admin_links({
                 userIds: [userId.trim().replace(/^USER#/, "")],
                 shopIds: [],
                 action: 'validate'

@@ -31,7 +31,7 @@
 *   **ユーザーグループ**:
     *   **`Administrators`**: QRコード生成・システム管理ダッシュボード (`/admin`) にアクセスできる管理者グループ。
     *   **`GlobalAdmins`**: Administratorsの権限に追加して，すべてのショップの管理画面を閲覧・編集可能なすべての権限を持つ最上位管理者グループ。
-*   **MFA強制**: 上記グループに属するユーザーは、Lambda Authorizer (`infra/lambda/admin-authorizer.ts`) によってTOTP（認証アプリ）によるMFA完了が必須チェックされます。MFA未設定のまま管理APIを叩くことはできません。
+*   **MFA強制**: 上記グループに属するユーザーは、Lambda Authorizer (`infra/lambda/adminAuthorizer.ts`) によってTOTP（認証アプリ）によるMFA完了が必須チェックされます。MFA未設定のまま管理APIを叩くことはできません。
 *   **コード上の場所**: `infra/lib/infra-stack.ts` の `new cognito.UserPool(...)` で構築されています。Cognito User Pool のティアは **Essentials** を使用しています。
 
 ### 📦 **S3** (ファイルストレージ)

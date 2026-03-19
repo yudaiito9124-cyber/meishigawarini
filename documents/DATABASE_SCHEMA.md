@@ -134,6 +134,7 @@ QRコードのライフサイクルや注文ステータス、商品との紐付
 | `ts_completed_at` | String | 取引が完了した日時 （ISO 8601形式のUTC日時文字列） |
 | `ts_expired_at` | String | 有効期限日時 （有効化日時に商品のvalid_daysを加算した日時） |
 | `ts_updated_at` | String | レコードの最終変更日時 （ISO 8601形式のUTC日時文字列） |
+| `ban_reason` | String | 無効化(BAN)理由 （任意の文字列） |
 | `GSI1_PK` | String | `QR#{status}` （ステータスごとの一覧取得用、例: `QR#ACTIVE`） |
 | `GSI1_SK` | String | 作成日時等のソートキー （ISO 8601形式のUTC日時文字列） |
 | `GSI2_PK` | String | `SHOP#{shopId}` （担当ショップが持つQR一覧取得用） |

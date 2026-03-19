@@ -6,7 +6,7 @@ const NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || "";
  * 管理者用 API クライアント
  * 管理者機能を一箇所に集約し、安全なトークン管理と一貫したヘッダー設定を提供します。
  */
-export const adminApi = {
+export const adminApiBase = {
     /**
      * 基本となる fetch ラッパー
      */
@@ -37,96 +37,68 @@ export const adminApi = {
         return res.json();
     },
 
-    // --- QRコード関連 ---
-
-    /** QRコードバッチ生成 */
-    async generateQRCodes(data: { count: number; card_design?: string;[key: string]: any }) {
-        return this.fetch("/admin/qrcodes/generate", {
-            method: "POST",
-            body: JSON.stringify(data),
-        });
+    async fetch_post(path: string, data: any) {
+        return this.fetch(path, { method: "POST", body: JSON.stringify(data) });
     },
 
-    /** QRコード一覧取得 */
-    async listQRCodes(status: string, keyword?: string) {
-        let url = `/admin/qrcodes?status=${status}`;
-        if (status === 'SEARCH' && keyword) {
-            url += `&keyword=${encodeURIComponent(keyword)}`;
-        }
-        return this.fetch(url);
-    },
-
-    /** BAN済みQRコードの全削除 */
-    async deleteAllBanned() {
-        return this.fetch("/admin/qrcodes/banned", {
-            method: "DELETE",
-        });
-    },
-    /** QRコードのBAN処理 */
-    async banQRCode(uuid: string, data: { reason: string; status: string }) {
-        return this.fetch(`/admin/qrcodes/${uuid}/ban`, {
-            method: "POST",
-            body: JSON.stringify(data),
-        });
-    },
-
-    // --- カードデザイン関連 ---
-
-    /** デザイン一覧取得 */
-    async listCardDesigns() {
-        return this.fetch("/admin/card-designs");
-    },
-
-    /** デザインの保存/更新 */
-    async saveCardDesign(data: any, id?: string) {
-        return this.fetch(id ? `/admin/card-designs/${id}` : "/admin/card-designs", {
-            method: id ? "PATCH" : "POST",
-            body: JSON.stringify(data),
-        });
-    },
-
-    /** デザインの削除 */
-    async deleteCardDesign(id: string) {
-        return this.fetch(`/admin/card-designs/${id}`, {
-            method: "DELETE",
-        });
-    },
-
-    /** デザイン画像のアップロードURL取得 */
-    async getUploadUrl(data: { filename: string; contentType: string; design_id: string }) {
-        return this.fetch("/admin/card-designs/upload-url", {
-            method: "POST",
-            body: JSON.stringify(data),
-        });
-    },
-
-    // --- ショップ・オーナー管理 ---
-
-    /** ショップオーナーの変更 */
-    async changeShopOwner(data: { shopId: string, newUserId: string, action: "validate" | "execute" }) {
-        return this.fetch(`/admin/owner-change`, {
-            method: "POST",
-            body: JSON.stringify(data),
-        });
-    },
-
-    /** マネージャーの紐づけ */
-    async linkManager(data: { shopIds: string[]; userIds: string[]; action: "validate" | "execute" }) {
-        return this.fetch("/admin/links", {
-            method: "POST",
-            body: JSON.stringify(data),
-        });
-    },
-
-    // --- その他 ---
-
-    /** データダンプ取得 */
-    async dumpData(url: string) {
-        return this.fetch(`/admin/dump?${url}`);
-    },
-
-    /** 疎通確認 (Authorizerチェック) */
-    async checkAuth() {
+    /** 権限確認 */
+    async check() {
         return this.fetch("/admin");
-    }
+    },
 };
+
+// プロキシベースの API クライアント生成
+function createAdminApi<T extends Record<string, any>>(base: typeof adminApiBase) {
+    return new Proxy(base, {
+        get(target, prop: string) {
+            if (prop in target) return (target as any)[prop];
+            const path = (prop as string).replace(/_/g, "/");
+            return (data: any) => (target as any).fetch_post(path, data);
+        }
+    }) as typeof adminApiBase & { [K in keyof T]: (data: T[K]) => Promise<any> }
+}
+
+// 外部公開用のインスタンス
+export const adminApi = createAdminApi<AdminApiSchema>(adminApiBase);
+
+
+
+////////////////////////////////////////////////////////////////////////////////////////
+// lambda関数を変更したら以下の型定義を更新してください
+////////////////////////////////////////////////////////////////////////////////////////
+/**
+ * 管理者用 API の型定義
+ * キー名がそのまま API パス（/admin/キー名）として使用されます。
+ * _ は / に置換されます
+ */
+type AdminApiSchema = {
+    // 管理
+    admin_dump: { pks: string[] }; //PKとIDでレコードを取得
+    admin_links: { shopIds: string[]; userIds: string[]; action: "validate" | "execute" }; //ショップと別の管理者をリンク
+    admin_changeowner: { shopId: string, newUserId: string, action: "validate" | "execute" }; // ショップのオーナー変更
+    // QRコード
+    admin_qr_ban: { uuid: string; reason?: string }; //QRコードをBAN / 解除
+    admin_qr_deleteban: { target?: string }; //BANされたQRコードを削除 (指定がない場合は全件)
+    admin_qr_generate: { 
+        count: number; 
+        shopId?: string; 
+        productId?: string; 
+        expiry_date?: string; 
+        owner_uuid?: string; 
+        sender_info?: { [key: string]: any }; 
+        senderId?: string; 
+        activate_now?: boolean; 
+        card_design: string 
+    }; //QRコードを生成
+    admin_qr_list: { status: string, keyword?: string }; //QRコードのリストを取得
+    // カードデザイン
+    admin_carddesigns_list: {}; //カードデザインのリストを取得
+    admin_carddesigns_create: { design_id: string; design: { [key: string]: any } }; //カードデザインを作成
+    admin_carddesigns_update: { design_id: string; design: { [key: string]: any } }; //カードデザインを更新
+    admin_carddesigns_delete: { design_id: string }; //カードデザインを削除
+    admin_carddesigns_uploadurl: { filename: string; contentType: string; design_id: string }; //カードデザインのアップロードURLを取得
+};
+
+
+
+// {@link /documents/ADMIN_API_REFERENCE.md}

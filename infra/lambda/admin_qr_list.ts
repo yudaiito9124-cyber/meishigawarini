@@ -1,3 +1,11 @@
+/**
+ * 概要: 管理者用QRコード一覧の取得および検索を行う。
+ * 詳細: ステータス別のフィルタリングやUUID/PINによるQRコードの検索を行い、そのQRコードに関連するショップ情報や配送先住所、デザイン情報などの紐付け（Enrichment）を行って返す。
+ * エンドポイント: POST /admin/qr/list
+ * リクエストボディ:
+ *  - status: [任意のQRコードのstatus] | "SEARCH"
+ *  - keyword: 検索キーワード (statusがSEARCHの場合に使用)
+ */
 
 import { APIGatewayProxyHandler } from 'aws-lambda';
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
@@ -16,22 +24,21 @@ const INDEX_NAME = 'GSI1';
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'Content-Type,Authorization',
-    'Access-Control-Allow-Methods': 'GET'
+    'Access-Control-Allow-Methods': 'POST,OPTIONS'
 };
 
 export const handler: APIGatewayProxyHandler = async (event) => {
-
     try {
-        if (event.httpMethod !== 'GET') {
-            return {
-                statusCode: 405,
-                headers: corsHeaders,
-                body: JSON.stringify({ message: 'Method Not Allowed' })
-            };
+        if (event.httpMethod === 'OPTIONS') {
+            return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ message: 'OK' }) };
+        }
+        if (event.httpMethod !== 'POST') {
+            return { statusCode: 405, headers: corsHeaders, body: JSON.stringify({ message: 'Method Not Allowed' }) };
         }
 
-        const status = event.queryStringParameters?.status || 'UNASSIGNED';
-        const keyword = event.queryStringParameters?.keyword || '';
+        const body = JSON.parse(event.body || '{}');
+        const status = body.status || 'UNASSIGNED';
+        const keyword = body.keyword || '';
 
         let result;
 
@@ -42,6 +49,12 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             // UUIDs are lowercase, so let's search lowercased keyword against PK
             // PIN is numeric string, acceptable to search as is (lowercase doesn't change digits)
 
+            // キーワード（UUIDの一部またはPIN）に一致するQRコードを全件スキャン
+            // - フィルタ条件:
+            //   - PK がキーワードを含む OR PIN がキーワードを含む
+            //   - PK が "QR#" で始まる
+            //   - SK が "METADATA" である
+            // - 取得カラム: 一致した項目の全属性
             result = await ddb.send(new ScanCommand({
                 TableName: TABLE_NAME,
                 FilterExpression: '(contains(PK, :kw) OR contains(pin, :kw)) AND begins_with(PK, :prefix) AND SK = :sk',
@@ -52,6 +65,10 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 }
             }));
         } else {
+            // 特定ステータスのQRコードをインデックスから最新順に取得
+            // - 検索条件: GSI1_PK = QR#{status}
+            // - 取得カラム: ステータス別の全QR属性
+            // - ソート: 作成日時の降順 (ScanIndexForward: false)
             result = await ddb.send(new QueryCommand({
                 TableName: TABLE_NAME,
                 IndexName: INDEX_NAME,
@@ -81,6 +98,9 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             for (const chunk of chunkedShopIds) {
                 const keys = chunk.map(id => ({ PK: `SHOP#${id}`, SK: 'METADATA' }));
 
+                // 一覧に含まれるショップ詳細を一括取得
+                // - 検索条件: PK = SHOP#{id}, SK = "METADATA"
+                // - 取得カラム: PK, name, email, owner_id
                 const batchRes = await ddb.send(new BatchGetCommand({
                     RequestItems: {
                         [TABLE_NAME]: {
@@ -134,6 +154,9 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             }
 
             for (const chunk of chunkedOrderKeys) {
+                // QRコードに紐付く配送先・注文情報を一括取得
+                // - 検索条件: PK = QR#{uuid}, SK = "ORDER"
+                // - 取得カラム: 項目の全属性
                 const batchRes = await ddb.send(new BatchGetCommand({
                     RequestItems: {
                         [TABLE_NAME]: {
@@ -162,6 +185,9 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 
             for (const chunk of chunkedDesignIds) {
                 const keys = chunk.map(id => ({ PK: 'CARD_DESIGN#METADATA', SK: id }));
+                // 使用されているカードデザインの情報を一括取得
+                // - 検索条件: PK = "CARD_DESIGN#METADATA", SK = designId
+                // - 取得カラム: SK, thumbf, thumbb (サムネイル情報)
                 const batchRes = await ddb.send(new BatchGetCommand({
                     RequestItems: {
                         [TABLE_NAME]: {
