@@ -40,6 +40,7 @@
 - `lampath` を使用して新しいLambda関数を定義。
 - `grantTablePermissions` 等で必要なリソースへのアクセス権を付与。
 - `adminResource.addResource(...)` を使用してAPI GatewayのパスとLambdaを紐付ける。
+- `POST` メソッドのみを使用する。
 
 ### Step 3: フロントエンド型定義の更新
 `frontend/lib/api/admin.ts` 内の `AdminApiSchema` に、新しいメソッド名とリクエストパラメータの型を追加します。

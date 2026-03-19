@@ -281,6 +281,8 @@
       "description": "ショップの名前や紹介文を設定します。",
       "downloadPrompt": "AI生成用プロンプトをダウンロード",
       "updatePreview": "プレビュー更新",
+      "ownerEmail": "オーナーのメールアドレス",
+      "managerEmails": "管理者のメールアドレス",
       "name": "ショップ名",
       "detailHtml": "ショップ紹介(HTML)",
       "detailHtmlPlaceholder": "HTML(CSS)形式で入力してください。書き方がわからない場合は生成AI用のプロンプトファイルも用意しております。右上のボタンからダウンロードし、参考にするホームページのURLや作成したいイメージとともに生成AIに渡してください。",
@@ -550,6 +552,8 @@
       "loading": "読み込み中...",
       "deleteAllBanned": "BAN済みを全て削除",
       "exportCsv": "CSV出力",
+      "compactView": "コンパクト表示",
+      "normalView": "通常表示",
       "status": {
         "unassigned": "未割り当て",
         "linked": "連携済み",
@@ -573,11 +577,18 @@
       },
       "ban": {
         "button": "BAN",
-        "confirm": "本当にこのQRコードをBANしますか？この操作で即座に無効化されます。一度BANされたQRコードは元に戻せません。",
+        "confirm": "本当にこのQRコードをBANしますか？この操作で即座に無効化されます。",
         "success": "BANしました",
         "failed": "BANに失敗しました",
         "error": "エラーが発生しました",
-        "pdf": "PDF"
+        "pdf": "PDF",
+        "reasonPlaceholder": "BANの理由を入力してください"
+      },
+      "restore": {
+        "button": "元に戻す",
+        "confirm": "このQRコードの利用停止を解除して元に戻しますか？",
+        "success": "復元しました",
+        "failed": "復元に失敗しました"
       },
       "deleteBanned": {
         "confirm": "本当に全てのBAN済みコードを削除しますか？この操作は元に戻せません。",
@@ -678,6 +689,7 @@
   },
   "Backend": {
     "Unauthorized": "認証されていません。",
+    "Failed to fetch": "通信エラーが発生しました。インターネット接続を確認してください（CORS等）。",
     "No changes provided": "変更内容がありません。",
     "Shop updated": "ショップ情報を更新しました。",
     "Missing name": "ショップ名を入力してください。",
@@ -797,6 +809,7 @@
       "verifyFailed": "コードが正しくないか、期限が切れています。",
       "notLoggedIn": "この操作にはログインが必要です。",
       "biometricFailed": "生体認証の登録に失敗しました。デバイスが非対応か、キャンセルされました。"
-    }
+    },
+    "helpAdminPage": "管理者ヘルプ(初期設定)"
   }
 }

@@ -2,14 +2,14 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { setUpTOTP, verifyTOTPSetup, updateMFAPreference, fetchAuthSession, signOut, getCurrentUser } from 'aws-amplify/auth';
-import { useRouter } from '@/i18n/routing';
+import { Link, useRouter } from '@/i18n/routing';
 import { useTranslations } from 'next-intl';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import QRCode from 'qrcode';
-import { CheckCircle2, AlertCircle, Fingerprint } from "lucide-react";
+import { CheckCircle2, AlertCircle, Fingerprint, HelpCircle } from "lucide-react";
 
 export default function MFASetupPage() {
     const t = useTranslations('MFASetupPage');
@@ -150,36 +150,44 @@ export default function MFASetupPage() {
     }
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-gray-100 p-4">
-            <Card className="w-full max-w-md">
-                <CardHeader>
-                    <CardTitle className="text-center text-2xl font-bold">{t('title')}</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-8">
-                    {/* 方法1: 認証アプリ */}
-                    <div className="space-y-4 bg-gray-50 p-4 rounded-xl">
-                        <Label className="text-base font-bold">{t('step1')}</Label>
-                        <div className="flex justify-center p-2 bg-white border rounded">
-                            {qrCodeUrl ? <img src={qrCodeUrl} alt="QR Code" className="w-40 h-40" /> : <div className="h-40 flex items-center">Loading...</div>}
+        <div className="min-h-screen w-full flex items-center justify-center bg-gray-100 p-4 flex-col">
+            <div className="min-h-screen flex items-center justify-center bg-gray-100 p-4">
+                <Card className="w-full max-w-md relative">
+                    <CardHeader>
+                        <div className="absolute -top-5 -right-6 z-10">
+                            <Link href="/help/admin">
+                                <Button variant="secondary" className="flex flex-wrap justify-end shadow-md cursor-pointer border border-gray-200 rotate-12 transition-transform hover:scale-105 active:scale-95">
+                                    <HelpCircle className="w-4 h-4 mr-1" /> {t('helpAdminPage')}
+                                </Button>
+                            </Link>
                         </div>
-                        <Label className="text-base font-bold">{t('step2')}</Label>
-                        <form onSubmit={handleVerifyToken} className="space-y-4">
-                            <div className="space-y-2">
-                                <Input
-                                    type="text"
-                                    placeholder="000000"
-                                    value={code}
-                                    onChange={(e) => setCode(e.target.value)}
-                                    className="text-center text-2xl tracking-[0.3em] font-mono h-12"
-                                    maxLength={6}
-                                    required
-                                />
+                        <CardTitle className="text-center text-2xl font-bold">{t('title')}</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-8">
+                        {/* 方法1: 認証アプリ */}
+                        <div className="space-y-4 bg-gray-50 p-4 rounded-xl">
+                            <Label className="text-base font-bold">{t('step1')}</Label>
+                            <div className="flex justify-center p-2 bg-white border rounded">
+                                {qrCodeUrl ? <img src={qrCodeUrl} alt="QR Code" className="w-40 h-40" /> : <div className="h-40 flex items-center">Loading...</div>}
                             </div>
-                            <Button type="submit" className="w-full font-bold" disabled={loading}>{t('totpSubmit')}</Button>
-                        </form>
-                    </div>
+                            <Label className="text-base font-bold">{t('step2')}</Label>
+                            <form onSubmit={handleVerifyToken} className="space-y-4">
+                                <div className="space-y-2">
+                                    <Input
+                                        type="text"
+                                        placeholder="000000"
+                                        value={code}
+                                        onChange={(e) => setCode(e.target.value)}
+                                        className="text-center text-2xl tracking-[0.3em] font-mono h-12"
+                                        maxLength={6}
+                                        required
+                                    />
+                                </div>
+                                <Button type="submit" className="w-full font-bold" disabled={loading}>{t('totpSubmit')}</Button>
+                            </form>
+                        </div>
 
-                    {/* 生体認証は一旦コメントアウト
+                        {/* 生体認証は一旦コメントアウト
                     <div className="relative">
                         <div className="absolute inset-0 flex items-center"><span className="w-full border-t"></span></div>
                         <div className="relative flex justify-center text-xs"><span className="px-2 bg-gray-100 text-gray-500 uppercase">OR</span></div>
@@ -203,17 +211,18 @@ export default function MFASetupPage() {
                     </div>
                     */}
 
-                    {error && (
-                        <div className="p-3 bg-red-50 border border-red-200 rounded text-red-700 text-xs flex items-center gap-2">
-                            <AlertCircle className="h-4 w-4 shrink-0" />
-                            {error.startsWith('errors.') ? t(error) : error}
-                        </div>
-                    )}
-                </CardContent>
-                <CardFooter>
-                    <Button variant="ghost" onClick={() => router.back()} className="w-full text-gray-400">{t('back')}</Button>
-                </CardFooter>
-            </Card>
+                        {error && (
+                            <div className="p-3 bg-red-50 border border-red-200 rounded text-red-700 text-xs flex items-center gap-2">
+                                <AlertCircle className="h-4 w-4 shrink-0" />
+                                {error.startsWith('errors.') ? t(error) : error}
+                            </div>
+                        )}
+                    </CardContent>
+                    <CardFooter>
+                        <Button variant="ghost" onClick={() => router.back()} className="w-full text-gray-400">{t('back')}</Button>
+                    </CardFooter>
+                </Card>
+            </div>
         </div>
     );
 }

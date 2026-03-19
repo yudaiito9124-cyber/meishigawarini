@@ -9,7 +9,7 @@ import { RefreshCw, ArrowRight, HelpCircle, Camera, Settings, ShoppingBasket, Ey
 import { notFound, useParams } from 'next/navigation';
 import { useRouter } from '@/i18n/routing';
 import { useTranslations } from 'next-intl';
-import { getCurrentUser, signOut } from 'aws-amplify/auth';
+import { fetchAuthSession, getCurrentUser, signOut } from 'aws-amplify/auth';
 import { fetchWithAuth } from '@/app/utils/api-client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -83,6 +83,21 @@ export default function ShopPage() {
     const [isUploadingHtmlImage, setIsUploadingHtmlImage] = useState(false);
     const [sessionUploadedUrls, setSessionUploadedUrls] = useState<string[]>([]);
     const [copiedId, setCopiedId] = useState<string | null>(null);
+    const [isAdmin, setIsAdmin] = useState(false);
+    const [adminEmails, setAdminEmails] = useState<{ owner_email: string, manager_emails: string[] } | null>(null);
+
+    const checkAdminAuth = async () => {
+        try {
+            const session = await fetchAuthSession();
+            if (session.tokens) {
+                const groups = (session.tokens.idToken?.payload['cognito:groups'] as string[]) || [];
+                const isAdmin = groups.includes('Administrators') || groups.includes('GlobalAdmins');
+                setIsAdmin(isAdmin);
+            }
+        } catch (e) {
+            // Not logged in
+        }
+    };
 
     const handleCopy = (id: string) => {
         navigator.clipboard.writeText(id).then(() => {
@@ -95,6 +110,7 @@ export default function ShopPage() {
     // Protect Route
     useEffect(() => {
         checkAuth();
+        checkAdminAuth();
         fetchShops();
     }, []);
 
@@ -228,6 +244,20 @@ export default function ShopPage() {
         }
     };
 
+    const fetchAdminEmails = async () => {
+        try {
+            const res = await fetchWithAuth(`/shop/${shopId}/admins`, {
+                method: 'POST'
+            });
+            if (res.ok) {
+                const data = await res.json();
+                setAdminEmails(data);
+            }
+        } catch (e) {
+            // console.error('Failed to fetch admin emails', e);
+        }
+    };
+
     useEffect(() => {
         if (isImportDialogOpen) {
             fetchImportShops();
@@ -266,6 +296,9 @@ export default function ShopPage() {
                 // console.error('Failed to cleanup temporary images', e);
             }
             setSessionUploadedUrls([]);
+        }
+        if (open) {
+            fetchAdminEmails();
         }
         setIsSettingsOpen(open);
         setIsSettingShowHTML(false)
@@ -721,6 +754,23 @@ export default function ShopPage() {
                                     <DialogDescription>{t('shopSettings.description')}</DialogDescription>
                                 </DialogHeader>
                                 <form onSubmit={handleUpdateShop} className="space-y-4 py-4">
+                                    <div className="space-y-4 py-2 border-b pb-4">
+                                        <div className="space-y-1">
+                                            <Label className="text-xs text-gray-500">{t('shopSettings.ownerEmail')}</Label>
+                                            <div className="text-sm font-medium">{adminEmails?.owner_email || '---'}</div>
+                                        </div>
+                                        {adminEmails?.manager_emails && adminEmails.manager_emails.length > 0 && (
+                                            <div className="space-y-1">
+                                                <Label className="text-xs text-gray-500">{t('shopSettings.managerEmails')}</Label>
+                                                <div className="flex flex-wrap gap-2 text-sm font-medium">
+                                                    {adminEmails.manager_emails.map((email, idx) => (
+                                                        <div key={idx} className="bg-gray-100 px-2 py-0.5 rounded text-xs">{email}</div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+
                                     <div className="space-y-2">
                                         <Label htmlFor="shop_name">{t('shopSettings.name')}</Label>
                                         <Input id="shop_name" name="shop_name" defaultValue={shop?.name} required />
@@ -938,7 +988,7 @@ export default function ShopPage() {
                             <DialogFooter>
                             </DialogFooter>
                         </Dialog>
-                        {!singleShopOwner && <Button variant="secondary" className="shadow-md cursor-pointer border border-gray-200" onClick={handleShops}>{t('movetoshops')}</Button>}
+                        {!singleShopOwner || isAdmin && <Button variant="secondary" className="shadow-md cursor-pointer border border-gray-200" onClick={handleShops}>{t('movetoshops')}</Button>}
                         <Button
                             variant="ghost"
                             className="hover:bg-red-50 hover:text-red-600 cursor-pointer"

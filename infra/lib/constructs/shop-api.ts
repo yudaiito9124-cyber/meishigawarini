@@ -154,6 +154,13 @@ export class ShopApi extends Construct {
       authorizationType: apigateway.AuthorizationType.COGNITO
     });
 
+    const shopAdminsResource = shopIdResource.addResource('admins');
+    // shop/{shopId}/admins POST #GetShopAdmins
+    shopAdminsResource.addMethod('POST', new apigateway.LambdaIntegration(shopMgmtFn), {
+      authorizer,
+      authorizationType: apigateway.AuthorizationType.COGNITO
+    });
+
     const shopOrdersResource = shopIdResource.addResource('orders');
     // shop/{shopId}/orders GET #ListShopOrders
     shopOrdersResource.addMethod('GET', new apigateway.LambdaIntegration(shopOrdersFn), {

@@ -281,6 +281,8 @@
       "description": "Configure your shop's name and HTML description.",
       "downloadPrompt": "Download AI Prompt",
       "updatePreview": "Update Preview",
+      "ownerEmail": "Owner Email",
+      "managerEmails": "Manager Emails",
       "name": "Shop Name",
       "detailHtml": "Shop Description (HTML)",
       "detailHtmlPlaceholder": "Enter description in HTML format...",
@@ -791,6 +793,7 @@
       "verifyFailed": "Incorrect or expired code.",
       "notLoggedIn": "You must be logged in to perform this action.",
       "biometricFailed": "Biometric registration failed. Device not supported or cancelled."
-    }
+    },
+    "helpAdminPage": "Admin Help (Initial Setup)"
   }
 }

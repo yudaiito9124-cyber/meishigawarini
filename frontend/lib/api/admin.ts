@@ -24,7 +24,7 @@ export const adminApiBase = {
             "Content-Type": options.body ? "application/json" : (options.headers as any)?.["Content-Type"] || undefined,
         };
 
-        const res = await fetch(`${NEXT_PUBLIC_API_URL}${path}`, {
+        const res = await fetch(`${NEXT_PUBLIC_API_URL}${path.startsWith('/') ? '' : '/'}${path}`, {
             ...options,
             headers,
         });
@@ -52,7 +52,7 @@ function createAdminApi<T extends Record<string, any>>(base: typeof adminApiBase
     return new Proxy(base, {
         get(target, prop: string) {
             if (prop in target) return (target as any)[prop];
-            const path = (prop as string).replace(/_/g, "/");
+            const path = "/" + (prop as string).replace(/_/g, "/");
             return (data: any) => (target as any).fetch_post(path, data);
         }
     }) as typeof adminApiBase & { [K in keyof T]: (data: T[K]) => Promise<any> }
@@ -79,16 +79,16 @@ type AdminApiSchema = {
     // QRコード
     admin_qr_ban: { uuid: string; reason?: string }; //QRコードをBAN / 解除
     admin_qr_deleteban: { target?: string }; //BANされたQRコードを削除 (指定がない場合は全件)
-    admin_qr_generate: { 
-        count: number; 
-        shopId?: string; 
-        productId?: string; 
-        expiry_date?: string; 
-        owner_uuid?: string; 
-        sender_info?: { [key: string]: any }; 
-        senderId?: string; 
-        activate_now?: boolean; 
-        card_design: string 
+    admin_qr_generate: {
+        count: number;
+        shopId?: string;
+        productId?: string;
+        expiry_date?: string;
+        owner_uuid?: string;
+        sender_info?: { [key: string]: any };
+        senderId?: string;
+        activate_now?: boolean;
+        card_design: string
     }; //QRコードを生成
     admin_qr_list: { status: string, keyword?: string }; //QRコードのリストを取得
     // カードデザイン

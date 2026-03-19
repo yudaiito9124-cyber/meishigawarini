@@ -24,14 +24,14 @@ const production = {
   jsxs: prod.jsxs,
   components: {
     h1: ({ children }: any) => (
-      <h1 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl text-center mb-4">
+      <h1 className="text-3xl font-bold tracking-tight sm:text-4xl text-center mb-4">
         {children}
       </h1>
     ),
     h2: ({ children, className }: any) => {
       if (className === 'card-title') {
         return (
-          <h2 className="text-2xl font-bold tracking-tight text-foreground group-hover:text-primary transition-colors mb-2 mt-0">
+          <h2 className="text-2xl font-bold tracking-tight group-hover:text-primary transition-colors mb-2 mt-0">
             {children}
           </h2>
         );
@@ -63,24 +63,24 @@ const production = {
           </h3>
         );
       }
-      return <h3 className="text-xl font-semibold mb-4 border-b-0 text-foreground mt-8">{children}</h3>;
+      return <h3 className="text-xl font-semibold mb-4 border-b-0 mt-8">{children}</h3>;
     },
     h4: ({ children }: any) => (
-      <h4 className="text-lg font-bold mb-4 mt-6 text-foreground border-b pb-2">
+      <h4 className="text-lg font-bold mb-4 mt-6 border-b pb-2">
         {children}
       </h4>
     ),
     h5: ({ children }: any) => (
-      <h5 className="text-lg font-semibold mb-2 mt-4 text-foreground/80">
+      <h5 className="text-lg font-semibold mb-2 mt-4 opacity-80">
         {children}
       </h5>
     ),
     p: ({ children, className }: any) => {
       if (className === 'lead') {
-        return <p className="mt-4 text-lg text-muted-foreground text-center mb-10">{children}</p>;
+        return <p className="mt-4 text-lg opacity-80 text-center mb-10">{children}</p>;
       }
       return (
-        <p className="mb-4 text-muted-foreground leading-relaxed">
+        <p className="mb-4 opacity-90 leading-relaxed">
           {children}
         </p>
       );
@@ -170,24 +170,24 @@ const production = {
         return <div className={className}>{children}</div>;
     },
     ul: ({ children }: any) => (
-      <ul className="list-disc list-inside mb-4 space-y-1 text-muted-foreground">
+      <ul className="list-disc list-inside mb-4 space-y-1 opacity-90">
         {children}
       </ul>
     ),
     ol: ({ children }: any) => (
-      <ol className="list-decimal list-inside mb-4 space-y-1 text-muted-foreground">
+      <ol className="list-decimal list-inside mb-4 space-y-1 opacity-90">
         {children}
       </ol>
     ),
   },
 };
 
-export async function MarkdownRenderer({ content }: { content: string }) {
+export async function MarkdownRenderer({ content, className }: { content: string; className?: string }) {
   const file = await remark()
     .use(remarkParse)
     .use(remarkRehype, { allowDangerousHtml: true })
     .use(rehypeReact, production as any)
     .process(content);
 
-  return <>{file.result}</>;
+  return <div className={className}>{file.result}</div>;
 }

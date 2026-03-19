@@ -8,6 +8,7 @@ import { useState, useEffect, useRef } from "react";
 import { fetchAuthSession } from 'aws-amplify/auth';
 import { notFound, useRouter } from "next/navigation";
 import { useTranslations } from 'next-intl';
+import { Loader2 } from 'lucide-react';
 
 export default function AdminLayout({
     children,
@@ -84,7 +85,7 @@ export default function AdminLayout({
         return (
             <div className="min-h-screen bg-mist-900 flex items-center justify-center text-white">
                 <div className="flex flex-col items-center gap-4">
-                    <span className="animate-spin text-4xl">⏳</span>
+                    <Loader2 className="w-10 h-10 animate-spin text-white opacity-80" />
                     <p className="text-sm font-medium opacity-70">Verifying Admin Access...</p>
                 </div>
             </div>

@@ -14,6 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/componen
 import { Label } from "@/components/ui/label";
 import { cn } from '@/lib/utils';
 import { fetchWithAuth } from '@/app/utils/api-client';
+import { HelpCircle, Crown, Store } from 'lucide-react';
 
 export default function LoginPage() {
     const t = useTranslations('LoginPage');
@@ -145,39 +146,44 @@ export default function LoginPage() {
     return (
         <div className={cn("min-h-screen flex items-center justify-center bg-gray-100 p-4", isAdmin && "bg-mist-900")}>
             {isLoggedIn && (
-                <div className="fixed top-4 right-4 z-50 flex items-center gap-2">
+                <div className="fixed top-0 p-4 z-50 flex w-full items-center gap-2 flex-wrap justify-between">
                     {isAdmin && (
-                        <Link href="/help/admin">
-                            <Button variant="secondary" className="shadow-md cursor-pointer border border-gray-200">
-                                {t('helpAdminPage')}
-                            </Button>
-                        </Link>
+                        <div className="flex gap-2 flex-col items-start">
+                            <Link href="/help/admin">
+                                <Button variant="ghost" className="shadow-md cursor-pointer text-white h-10 flex items-center gap-1.5 px-3 w-40">
+                                    <HelpCircle className="size-5" />
+                                    <span className="text-xs font-bold">{t('helpAdminPage')}</span>
+                                </Button>
+                            </Link>
+                            <Link href="/admin">
+                                <Button variant="destructive" className="shadow-md cursor-pointer border border-red-900 h-40 w-40 flex flex-col items-center justify-center p-2 hover:bg-red-700 transition-colors">
+                                    <Crown className="size-18 drop-shadow-md stroke-[2]" />
+                                    <div className='font-bold text-lg leading-tight text-center mt-1'>{t('qrAdminPage')}</div>
+                                </Button>
+                            </Link>
+                        </div>
                     )}
-                    {isAdmin && (
-                        <Link href="/admin">
-                            <Button variant="destructive" className="shadow-md cursor-pointer border border-red-900">
-                                {t('qrAdminPage')}
-                            </Button>
-                        </Link>
-                    )}
-                    {!singleShopOwner && (
-                        <Link href="/shop">
-                            <Button variant="secondary" className="shadow-md cursor-pointer border border-gray-200">
-                                {t('shopAdminPage')}
-                            </Button>
-                        </Link>
-                    )}
-                    <Button
-                        variant="ghost"
-                        className="hover:bg-red-50 hover:text-red-600 cursor-pointer text-white"
-                        onClick={async () => {
-                            await signOut();
-                            setIsLoggedIn(false);
-                            setIsAdmin(false);
-                        }}
-                    >
-                        {t('logout')}
-                    </Button>
+                    <div className="flex gap-2 flex-col items-start">
+                        <Button
+                            variant="ghost"
+                            className="hover:bg-red-50 hover:text-red-600 cursor-pointer text-white justify-end w-40 justify-center"
+                            onClick={async () => {
+                                await signOut();
+                                setIsLoggedIn(false);
+                                setIsAdmin(false);
+                            }}
+                        >
+                            {t('logout')}
+                        </Button>
+                        {!singleShopOwner && (
+                            <Link href="/shop">
+                                <Button variant="secondary" className="shadow-md cursor-pointer border border-gray-200 flex flex-col items-center gap-2 font-bold h-10 px-4 w-40 h-40">
+                                    <Store className="size-18 drop-shadow-md stroke-[1.5]" />
+                                    <div className='font-bold text-lg leading-tight text-center mt-1'>{t('shopAdminPage')}</div>
+                                </Button>
+                            </Link>
+                        )}
+                    </div>
                 </div>
             )}
             <Card className="w-full max-w-md">
@@ -298,12 +304,6 @@ export default function LoginPage() {
                             <p className="text-sm text-gray-500 text-center">
                                 Your roles : <br />
                                 {userInfo}
-                            </p>
-                            <p className="text-sm text-gray-500 text-left mt-2">
-                                Roles?
-                                <br />
-                                - Administrators: システム管理者画面<br />
-                                - GrobalAdmins: システム管理者画面 + 全ショップ管理権限
                             </p>
                         </>
                     )}

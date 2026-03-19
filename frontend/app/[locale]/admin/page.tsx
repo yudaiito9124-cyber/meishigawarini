@@ -16,7 +16,7 @@ import { APP_CONFIG } from "@/lib/config";
 import { generateId } from '@/lib/id';
 import { useTranslations } from 'next-intl';
 import { generatePDF, cardformats, paperformats } from '@/lib/generatePDF';
-import { ExternalLink, Copy, Eye, QrCode, Store, Wrench, Layers, HelpCircle, Home } from 'lucide-react';
+import { ExternalLink, Copy, Eye, QrCode, Store, Wrench, Layers, HelpCircle, Home, Trash2, RotateCcw, Loader2 } from 'lucide-react';
 import CardDesignEditor from "@/components/admin/CardDesignEditor";
 const NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 const NEXT_PUBLIC_APP_URL = process.env.NEXT_PUBLIC_APP_URL || "";
@@ -26,6 +26,7 @@ import {
     Dialog,
     DialogContent,
     DialogDescription,
+    DialogFooter,
     DialogHeader,
     DialogTitle,
     DialogTrigger,
@@ -138,7 +139,7 @@ export default function AdminPage() {
 
     return (
         <div className="min-h-screen bg-mist-900 p-8 text-white"> {/* bg-[#383838] */}
-            <div className="max-w-7xl mx-auto space-y-6">
+            <div className="max-w-[98vw] 2xl:max-w-[1600px] mx-auto space-y-6">
                 <div className="flex justify-between items-center flex-wrap gap-4">
                     <h1 className="text-2xl font-bold text-white">{t('title')}</h1>
                     <div className="flex items-center gap-2">
@@ -355,7 +356,7 @@ export default function AdminPage() {
 
                                         {/* Card Preview */}
                                         <div className="">
-                                            <div className="grid grid-cols-2 gap-4">
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                                 <div className="space-y-1">
                                                     <div className="aspect-[84/52] relative rounded shadow-lg overflow-hidden border border-gray-700 bg-white">
                                                         <img
@@ -390,7 +391,7 @@ export default function AdminPage() {
                                         >
                                             {isGenerating ? (
                                                 <>
-                                                    <span className="animate-spin mr-2">⏳</span>
+                                                    <Loader2 className="w-4 h-4 animate-spin mr-2" />
                                                     {t('generate.button')}...
                                                 </>
                                             ) : (
@@ -445,9 +446,9 @@ export default function AdminPage() {
                                                         </thead>
                                                         <tbody>
                                                             {batch.codes?.map((code: any) => (
-                                                                <tr key={code.uuid}>
-                                                                    <td className="pr-4 select-all">{code.uuid}</td>
-                                                                    <td className="select-all">{code.pin}</td>
+                                                                <tr key={code.uuid} className="border-b border-gray-200 last:border-0">
+                                                                    <td className="pr-4 py-0.5 select-all text-[10px]">{code.uuid}</td>
+                                                                    <td className="py-0.5 select-all text-[10px]">{code.pin}</td>
                                                                 </tr>
                                                             ))}
                                                         </tbody>
@@ -519,8 +520,10 @@ function QRCodeListSection({ apiUrl, onGeneratePDF, paperFormat, cardFormat, dbC
     const [keyword, setKeyword] = useState("");
     const [codes, setCodes] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
+    const [isDenseAuto, setIsDenseAuto] = useState(false);
+    const [isDenseManual, setIsDenseManual] = useState<boolean | null>(null);
 
-
+    const isDense = isDenseManual !== null ? isDenseManual : (codes.length > 30);
 
     const handleExportCSV = () => {
         if (codes.length === 0) return;
@@ -627,13 +630,16 @@ function QRCodeListSection({ apiUrl, onGeneratePDF, paperFormat, cardFormat, dbC
         <Card className="w-full">
             <CardHeader>
                 <CardTitle className="flex justify-between items-center">
-                    <span>{t('list.title')}</span>
-                    <div className="flex gap-2">
-                        {status === 'BANNED' && (
+                    <span className="min-w-[100px]">{t('list.title')}</span>
+                    <div className="flex gap-2 flex-wrap justify-end">
+                        {/* {status === 'BANNED' && ( // すべてのBAN済みのコードを削除するコード　一旦コメントアウト
                             <Button variant="destructive" size="sm" onClick={handleDeleteAllBanned} disabled={loading}>
                                 {t('list.deleteAllBanned')}
                             </Button>
-                        )}
+                        )} */}
+                        <Button variant="outline" size="sm" onClick={() => setIsDenseManual(prev => prev === null ? !isDense : !prev)}>
+                            {isDense ? t('list.normalView') : t('list.compactView')}
+                        </Button>
                         <Button variant="outline" size="sm" onClick={handleExportCSV} disabled={loading || codes.length === 0}>
                             {t('list.exportCsv')}
                         </Button>
@@ -694,12 +700,11 @@ function QRCodeListSection({ apiUrl, onGeneratePDF, paperFormat, cardFormat, dbC
                     </p>
                     <Table wrapperClassName="max-h-[70vh] overflow-auto">
                         <TableHeader className="sticky top-0 bg-white z-10 shadow-sm">
-                            <TableRow>
-                                <TableHead>{t('list.table.uuid')}</TableHead>
-                                <TableHead>{t('list.table.pin')}</TableHead>
-                                <TableHead>{t('list.table.status')}</TableHead>
-                                <TableHead>{t('list.table.createdAt')}</TableHead>
-                                <TableHead>{t('list.table.actions')}</TableHead>
+                            <TableRow className={isDense ? "h-6" : "h-10"}>
+                                <TableHead className={cn("py-1", isDense ? "h-6 px-2 text-[10px]" : "h-8 px-4")}>{t('list.table.createdAt')}</TableHead>
+                                <TableHead className={cn("py-1", isDense ? "h-6 px-2 text-[10px]" : "h-8 px-4")}>{t('list.table.status')}</TableHead>
+                                <TableHead className={cn("py-1 hidden sm:table-cell", isDense ? "h-6 px-2 text-[10px]" : "h-8 px-4")}>{t('list.table.pin')}</TableHead>
+                                <TableHead className={cn("py-1 min-w-[200px]", isDense ? "h-6 px-2 text-[10px]" : "h-8 px-4")}>{t('list.table.uuid')}</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -720,6 +725,7 @@ function QRCodeListSection({ apiUrl, onGeneratePDF, paperFormat, cardFormat, dbC
                                         paperFormat={paperFormat}
                                         cardFormat={cardFormat}
                                         dbCardDesigns={dbCardDesigns}
+                                        isDense={isDense}
                                     />
                                 ))
                             )}
@@ -731,14 +737,15 @@ function QRCodeListSection({ apiUrl, onGeneratePDF, paperFormat, cardFormat, dbC
     );
 }
 
-function QRCodeRow({ item, apiUrl, onGeneratePDF, onRefresh, paperFormat, cardFormat, dbCardDesigns }: {
+function QRCodeRow({ item, apiUrl, onGeneratePDF, onRefresh, paperFormat, cardFormat, dbCardDesigns, isDense }: {
     item: any;
     apiUrl: string;
     onGeneratePDF: (batch: any, paperformat: string, cardformat: string | any) => Promise<void>;
-    onRefresh: () => void;
+    onRefresh: (targetStatus?: string) => Promise<void>;
     paperFormat: string;
     cardFormat: string;
     dbCardDesigns: any[];
+    isDense: boolean;
 }) {
     const t = useTranslations('AdminPage');
     const tShop = useTranslations('ShopPage');
@@ -763,64 +770,36 @@ function QRCodeRow({ item, apiUrl, onGeneratePDF, onRefresh, paperFormat, cardFo
     return (
         <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-                <TableRow className="cursor-pointer hover:bg-gray-100">
-                    <TableCell className="font-mono text-xs select-all">
-                        {uuid}
+                <TableRow className={cn("cursor-pointer hover:bg-gray-100", isDense ? "h-6" : "h-10")}>
+                    <TableCell className={cn("text-gray-500 py-0", isDense ? "text-[10px] px-2" : "text-[14px] px-4")}>
+                        {item.ts_updated_at ? new Date(item.ts_updated_at).toLocaleString() : '-'}
                     </TableCell>
-                    <TableCell className="font-mono text-xs select-all">
-                        {item.pin}
-                    </TableCell>
-                    <TableCell>
-                        <span className={`px-2 py-1 rounded text-xs ${statusColor}`}>
+                    <TableCell className="py-0 px-2">
+                        <span className={cn("px-2 py-0 rounded", isDense ? "text-[10px]" : "text-[13px]", statusColor)}>
                             {st(item.status ? item.status.toLowerCase() : 'active')}
                         </span>
                     </TableCell>
-                    <TableCell className="text-xs text-gray-500">
-                        {item.ts_updated_at ? new Date(item.ts_updated_at).toLocaleString() : '-'}
+                    <TableCell className={cn("font-mono select-all py-0 hidden sm:table-cell", isDense ? "text-[10px] px-2" : "text-xs px-4")}>
+                        {item.pin}
                     </TableCell>
-                    <TableCell onClick={(e) => e.stopPropagation()}>
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            className="mr-2 h-6 text-xs"
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                const resolveDesign = (designId?: string) => {
-                                    const targetId = designId || cardFormat;
-                                    const dbDesign = dbCardDesigns.find(d => d.design_id === targetId);
-                                    if (dbDesign) return dbDesign;
-                                    if (cardformats[targetId]) return targetId;
-                                    const globalDesign = dbCardDesigns.find(d => d.design_id === cardFormat);
-                                    return globalDesign || cardFormat;
-                                };
-                                const design = resolveDesign(item.card_design);
-                                onGeneratePDF({
-                                    id: uuid,
-                                    codes: [{ uuid, pin: item.pin }]
-                                }, paperFormat, design);
-                            }}
-                        >
-                            {t('list.ban.pdf')}
-                        </Button>
-                        {item.status !== 'BANNED' && (
-                            <BanButton uuid={uuid} apiUrl={apiUrl} onSuccess={onRefresh} />
-                        )}
+                    <TableCell className={cn("font-mono select-all py-0 min-w-[200px]", isDense ? "text-[10px] px-2" : "text-xs px-4")}>
+                        {uuid}
                     </TableCell>
                 </TableRow>
             </DialogTrigger>
-            <DialogContent className="max-w-md">
-                <DialogHeader>
+            <DialogContent className="max-w-[80vw] sm:max-w-[70vw] lg:max-w-5xl overflow-hidden flex flex-col h-full max-h-[85vh] min-h-[400px] p-0">
+                <DialogHeader className="shrink-0 border-b p-6">
                     <DialogTitle>{tShop('orders.details')}</DialogTitle>
                     <DialogDescription asChild>
-                        <div className="font-mono text-sm text-gray-500 w-full flex flex-col gap-0 text-left mt-4">
+                        <div className="font-mono text-sm text-gray-500 w-full flex flex-col gap-0 text-left mt-4 text-center sm:text-left">
                             <div className="flex items-center gap-2">
                                 ID: {uuid}
-                                <Copy className="cursor-pointer w-4 h-4" onClick={() => navigator.clipboard.writeText(uuid)} />
-                                <ExternalLink className="cursor-pointer w-4 h-4" onClick={() => window.open(`${NEXT_PUBLIC_APP_URL}/receive/${uuid}`, '_blank')} />
+                                <Copy className="cursor-pointer w-4 h-4 shrink-0" onClick={() => navigator.clipboard.writeText(uuid)} />
+                                <ExternalLink className="cursor-pointer w-4 h-4 shrink-0" onClick={() => window.open(`${NEXT_PUBLIC_APP_URL}/receive/${uuid}`, '_blank')} />
                             </div>
                             <div className="flex items-center gap-2">
                                 PIN: {item.pin}
-                                <Copy className="cursor-pointer w-4 h-4" onClick={() => navigator.clipboard.writeText(item.pin)} />
+                                <Copy className="cursor-pointer w-4 h-4 shrink-0" onClick={() => navigator.clipboard.writeText(item.pin)} />
                             </div>
                         </div>
                     </DialogDescription>
@@ -828,12 +807,8 @@ function QRCodeRow({ item, apiUrl, onGeneratePDF, onRefresh, paperFormat, cardFo
 
                 {/* ダイアログが開いている間だけ中身をレンダリング */}
                 {open && (
-                    <div className="space-y-4 py-4 max-h-[70vh] overflow-y-auto">
-                        {/* Product Info */}
-                        <div>
-                            <h4 className="text-sm font-semibold text-gray-500">{tShop('orders.productName')}</h4>
-                            <p className="font-medium">{item.product_name || item.product_id || '-'}</p>
-                        </div>
+                    <div className="flex-1 overflow-y-auto space-y-6 p-6">
+
 
                         {/* Shop Info */}
                         <div>
@@ -843,10 +818,22 @@ function QRCodeRow({ item, apiUrl, onGeneratePDF, onRefresh, paperFormat, cardFo
                                 <span className="font-medium">{item.shop_name || '-'}</span>
 
                                 <span className="text-gray-400 text-xs">{t('shopInfo.id')}</span>
-                                <span className="font-mono text-xs text-gray-600">{item.shop_id || '-'}</span>
+                                <div className="flex items-center gap-1 overflow-hidden">
+                                    <span className="font-mono text-xs text-gray-600 truncate">{item.shop_id || '-'}</span>
+                                    {item.shop_id && (
+                                        <>
+                                            <Copy className="cursor-pointer w-3 h-3 text-mist-500 hover:text-mist-900 shrink-0" onClick={() => navigator.clipboard.writeText(item.shop_id)} />
+                                            <Link href={`/shop/${item.shop_id}`}>
+                                                <ExternalLink className="w-3 h-3 text-mist-500 hover:text-mist-900 cursor-pointer shrink-0" />
+                                            </Link>
+                                        </>
+                                    )}
+                                </div>
 
                                 <span className="text-gray-400 text-xs">{t('shopInfo.contact')}</span>
                                 <span className="text-gray-600 break-all">{item.shop_email || '-'}</span>
+                                <span className="text-gray-400 text-xs">{tShop('orders.productName')}</span>
+                                <span className="text-gray-600 break-all">{item.product_name || item.product_id || '-'}</span>
                             </div>
                         </div>
 
@@ -1023,31 +1010,171 @@ function QRCodeRow({ item, apiUrl, onGeneratePDF, onRefresh, paperFormat, cardFo
                         </div>
                     </div>
                 )}
+                <DialogFooter className="flex flex-col sm:flex-row sm:justify-between gap-2 border-t p-6 shrink-0 bg-gray-50/50">
+                    <Button
+                        variant="outline"
+                        size="default"
+                        className="flex-1 sm:flex-none h-10"
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            const resolveDesign = (designId?: string) => {
+                                const targetId = item.card_design || cardFormat;
+                                const dbDesign = dbCardDesigns.find(d => d.design_id === targetId);
+                                if (dbDesign) return dbDesign;
+                                if (cardformats[targetId]) return targetId;
+                                const globalDesign = dbCardDesigns.find(d => d.design_id === cardFormat);
+                                return globalDesign || cardFormat;
+                            };
+                            const design = resolveDesign(item.card_design);
+                            onGeneratePDF({
+                                id: uuid,
+                                codes: [{ uuid, pin: item.pin }]
+                            }, paperFormat, design);
+                        }}
+                    >
+                        <QrCode className="mr-2 h-4 w-4" />
+                        {t('list.ban.pdf')}
+                    </Button>
+                    {item.status !== 'BANNED' ? (
+                        <div className="flex-1 sm:flex-none">
+                            <BanButton
+                                uuid={uuid}
+                                apiUrl={apiUrl}
+                                isBanned={false}
+                                size="default"
+                                className="w-full sm:w-auto h-10"
+                                onSuccess={() => {
+                                    setOpen(false);
+                                    onRefresh();
+                                }}
+                            />
+                        </div>
+                    ) : (
+                        <div className="flex flex-wrap gap-2 flex-1 sm:flex-none">
+                            <BanButton
+                                uuid={uuid}
+                                apiUrl={apiUrl}
+                                isBanned={true}
+                                size="default"
+                                className="flex-1 sm:flex-none h-10"
+                                onSuccess={() => {
+                                    setOpen(false);
+                                    onRefresh();
+                                }}
+                            />
+                            <Button
+                                variant="destructive"
+                                size="default"
+                                className="flex-1 sm:flex-none h-10 bg-red-600 hover:bg-red-700"
+                                onClick={async (e) => {
+                                    e.stopPropagation();
+                                    if (!confirm(t('list.deleteBanned.confirm'))) return;
+                                    try {
+                                        await adminApi.admin_qr_deleteban({ target: uuid });
+                                        alert(t('list.deleteBanned.success', { count: 1 }));
+                                        setOpen(false);
+                                        onRefresh();
+                                    } catch (err) {
+                                        alert(t('list.deleteBanned.failed'));
+                                    }
+                                }}
+                            >
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                {tShop('product.delete')}
+                            </Button>
+                        </div>
+                    )}
+                </DialogFooter>
             </DialogContent>
         </Dialog>
     );
 }
 
-function BanButton({ uuid, apiUrl, onSuccess }: { uuid: string, apiUrl: string, onSuccess: () => void }) {
+function BanButton({ uuid, apiUrl, onSuccess, size = "sm", className, isBanned = false }: {
+    uuid: string,
+    apiUrl: string,
+    onSuccess: () => void,
+    size?: "default" | "sm" | "lg" | "icon",
+    className?: string,
+    isBanned?: boolean
+}) {
     const t = useTranslations('AdminPage');
     const [loading, setLoading] = useState(false);
+    const [showReasonInput, setShowReasonInput] = useState(false);
+    const [reason, setReason] = useState("");
 
-    const handleBan = async () => {
-        if (!confirm(t('list.ban.confirm'))) return;
+    const handleAction = async (comment?: string) => {
+        if (!isBanned && !comment) {
+            setShowReasonInput(true);
+            return;
+        }
+
+        if (isBanned) {
+            if (!confirm(t('list.restore.confirm'))) return;
+        } else {
+            // Confirm with reason
+            if (!confirm(t('list.ban.confirm'))) return;
+        }
+
         setLoading(true);
         try {
-            await adminApi.admin_qr_ban({ uuid, reason: "Admin UI" });
+            const params: any = { uuid };
+            if (comment) params.reason = comment;
+            await adminApi.admin_qr_ban(params);
             onSuccess();
         } catch (e) {
-            alert(t('list.ban.failed'));
+            alert(isBanned ? t('list.restore.failed') : t('list.ban.failed'));
         } finally {
             setLoading(false);
+            setShowReasonInput(false);
         }
     };
 
 
+    if (isBanned) {
+        return (
+            <Button
+                variant="outline"
+                size={size}
+                onClick={(e) => { e.stopPropagation(); handleAction(); }}
+                disabled={loading}
+                className={cn("border-emerald-600 text-emerald-600 hover:bg-emerald-50", className)}
+            >
+                <RotateCcw className="mr-2 h-4 w-4" />
+                {loading ? '...' : t('list.restore.button')}
+            </Button>
+        );
+    }
+
+    if (showReasonInput) {
+        return (
+            <div className="flex gap-2 w-full sm:w-auto">
+                <Input
+                    value={reason}
+                    onChange={(e) => setReason(e.target.value)}
+                    placeholder={t('list.ban.reasonPlaceholder')}
+                    className="h-10 text-sm flex-1 sm:w-64"
+                    autoFocus
+                    onClick={(e) => e.stopPropagation()}
+                />
+                <Button variant="destructive" onClick={(e) => { e.stopPropagation(); handleAction(reason); }} disabled={loading} className="h-10">
+                    {loading ? '...' : t('list.ban.button')}
+                </Button>
+                <Button variant="ghost" onClick={(e) => { e.stopPropagation(); setShowReasonInput(false); }} disabled={loading} className="h-10">
+                    ✕
+                </Button>
+            </div>
+        );
+    }
+
     return (
-        <Button variant="destructive" size="sm" onClick={(e) => { e.stopPropagation(); handleBan(); }} disabled={loading} className="h-6 text-xs bg-red-600 hover:bg-red-700">
+        <Button
+            variant="destructive"
+            size={size}
+            onClick={(e) => { e.stopPropagation(); setShowReasonInput(true); }}
+            disabled={loading}
+            className={cn("bg-red-600 hover:bg-red-700 font-bold", className, size === "sm" ? "h-6 text-xs" : "")}
+        >
             {loading ? '...' : t('list.ban.button')}
         </Button>
     );

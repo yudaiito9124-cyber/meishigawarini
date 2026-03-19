@@ -66,14 +66,14 @@ export default async function AdminHelpPage({ params }: Props) {
         </div>
 
         {/* Content Section */}
-        <div className="bg-mist-800/30 border border-white/5 rounded-3xl p-8 sm:p-12 backdrop-blur-xl shadow-2xl overflow-hidden">
+        <div className="bg-mist-200/10 border border-white/5 rounded-3xl p-8 sm:p-12 backdrop-blur-xl shadow-2xl overflow-hidden">
           <div className="mb-8 border-b border-white/10 pb-6">
             <h2 className="text-4xl font-extrabold tracking-tight bg-gradient-to-r from-white to-white/60 bg-clip-text text-transparent">
               {data.title || slug[slug.length - 1]}
             </h2>
           </div>
-          
-          <div className="prose prose-invert max-w-none">
+
+          <div className="prose prose-invert max-w-none ">
             <MarkdownRenderer content={content} />
           </div>
         </div>

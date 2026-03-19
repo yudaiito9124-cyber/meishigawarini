@@ -732,6 +732,48 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ message: 'QR Activated successfully' }) };
         }
 
+        // 6.5 Get Shop Admins (POST /shop/{shopId}/admins)
+        if (method === 'POST' && path.endsWith('/admins')) {
+            const ownerId = shopMetadata.owner_id;
+            const gmIds = shopMetadata.gm_ids || [];
+            const allAdminIds = Array.from(new Set([ownerId, ...gmIds]));
+
+            if (allAdminIds.length === 0) {
+                return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ owner_email: '', manager_emails: [] }) };
+            }
+
+            const userKeys = allAdminIds.map(id => ({
+                PK: `USER#${id}`,
+                SK: 'SHOP'
+            }));
+
+            const res = await ddb.send(new BatchGetCommand({
+                RequestItems: {
+                    [TABLE_NAME]: {
+                        Keys: userKeys,
+                        ProjectionExpression: 'PK, email'
+                    }
+                }
+            }));
+
+            const userMap = new Map();
+            (res.Responses?.[TABLE_NAME] || []).forEach(item => {
+                userMap.set(item.PK.replace('USER#', ''), item.email);
+            });
+
+            const ownerEmail = userMap.get(ownerId) || '';
+            const managerEmails = gmIds.map((id: string) => userMap.get(id)).filter(Boolean);
+
+            return {
+                statusCode: 200,
+                headers: corsHeaders,
+                body: JSON.stringify({
+                    owner_email: ownerEmail,
+                    manager_emails: managerEmails
+                })
+            };
+        }
+
         // 7. Update Product Status
         if (method === 'PATCH' && path.includes('/products/')) {
 
