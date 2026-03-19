@@ -7,17 +7,18 @@ import type { NextRequest } from 'next/server';
 import createMiddleware from 'next-intl/middleware';
 import { routing } from './i18n/routing';
 
+const NEXT_PUBLIC_APP_URL_ORIGIN = process.env.NEXT_PUBLIC_APP_URL_ORIGIN || "amplifyapp.com";
+const NEXT_PUBLIC_APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://meishigawarini.com";
 const handleI18nRouting = createMiddleware(routing);
 
 export function middleware(request: NextRequest) {
     const host = request.headers.get('host');
-    const newDomain = 'meishigawarini.com';
 
     // 1. ドメインリダイレクト判定 (i18n処理の前に実行)
     // 旧ドメイン（amplifyapp.com）からのアクセスの場合は、新ドメインへ301転送
-    if (host && host.includes('amplifyapp.com')) {
+    if (host && host.includes(NEXT_PUBLIC_APP_URL_ORIGIN)) {
         const url = request.nextUrl.clone();
-        url.host = newDomain;
+        url.host = NEXT_PUBLIC_APP_URL;
         url.protocol = 'https';
         url.port = ""
         return NextResponse.redirect(url, 301);
