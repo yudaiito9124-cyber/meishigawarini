@@ -1,12 +1,13 @@
 import { APIGatewayProxyHandler } from 'aws-lambda';
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
-import { DynamoDBDocumentClient, PutCommand, QueryCommand, GetCommand, UpdateCommand, DeleteCommand, BatchGetCommand } from '@aws-sdk/lib-dynamodb';
+import { DynamoDBDocumentClient, PutCommand, QueryCommand, GetCommand, UpdateCommand, DeleteCommand, BatchGetCommand, ScanCommand } from '@aws-sdk/lib-dynamodb';
 import { S3Client, PutObjectCommand, CopyObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import * as crypto from 'crypto';
 import { generateId } from './utils/id';
 import { signUrlIfS3, stripSignature, signUrlsInHtml, deleteFileByUrl, stripSignaturesInHtml } from './utils/s3';
 import { checkShopOwnerOrGM, checkUserShopPermission } from './share/shop-auth';
+import { parseGroups, isSystemAdmin, isGlobalAdmin } from './utils/auth';
 
 const client = new DynamoDBClient({});
 const ddb = DynamoDBDocumentClient.from(client);
@@ -32,9 +33,8 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         // Get User ID from Cognito
         const claims = event.requestContext?.authorizer?.claims;
         const userId = claims?.sub; // 'sub' is the unique user ID in Cognito
-        const userGroups = (claims?.['cognito:groups'] as string[]) || [];
-
-        // 認証済みか確認
+        const userGroups = parseGroups(claims?.['cognito:groups']);
+        const isAdmin = isSystemAdmin(userGroups);
         if (!userId) return { statusCode: 401, headers: corsHeaders, body: JSON.stringify({ message: 'Unauthorized' }) };
         //////////// ここから下は 認証済みの場合のみアクセス可能
 
@@ -124,13 +124,11 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             roles = ['SHOP_MANAGER'];
             owner_shop_ids = [newShopId];
             gm_shop_ids = [];
-        }
-        else {
+        } else {
             roles = userRes?.Item?.roles;
             owner_shop_ids = userRes?.Item?.owner_shop_ids || [];
             gm_shop_ids = userRes?.Item?.gm_shop_ids || [];
         }
-        let isAdmin = userGroups.includes('Administrators') || userGroups.includes('GlobalAdmins');
 
 
         // List My Shops (GET /shop)
@@ -400,14 +398,27 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 
         // 3. My Shop list for Import Product (GET /shop/{shopId}/products/import)
         if (method === 'GET' && path.endsWith('/products/import')) {
-            const res = await ddb.send(new QueryCommand({
-                TableName: TABLE_NAME,
-                IndexName: 'GSI2',
-                KeyConditionExpression: 'GSI2_PK = :uid',
-                ExpressionAttributeValues: {
-                    ':uid': `USER#${userId}`
-                }
-            }));
+            let res;
+            if (isGlobalAdmin(userGroups)) {
+                // GlobalAdmin can import from any shop
+                res = await ddb.send(new ScanCommand({
+                    TableName: TABLE_NAME,
+                    FilterExpression: 'SK = :sk',
+                    ExpressionAttributeValues: {
+                        ':sk': 'METADATA'
+                    }
+                }));
+            } else {
+                res = await ddb.send(new QueryCommand({
+                    TableName: TABLE_NAME,
+                    IndexName: 'GSI2',
+                    KeyConditionExpression: 'GSI2_PK = :uid',
+                    ExpressionAttributeValues: {
+                        ':uid': `USER#${userId}`
+                    }
+                }));
+            }
+            
             const shops = (res.Items || []).map(s => ({
                 id: s.PK.replace('SHOP#', ''),
                 name: s.name

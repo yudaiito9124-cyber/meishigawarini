@@ -1,15 +1,17 @@
+import { parseGroups, isSystemAdmin } from '../utils/auth';
+
 /**
- * ユーザーが Administrators グループに属しているか検証する
+ * ユーザーが 管理者グループ（Administrators または GlobalAdmins）に属しているか検証する
  * @param event Lambdaのeventオブジェクト
  * @returns { isAdmin: boolean, errorResponse?: APIGatewayProxyResult }
  */
 export function verifyAdmin(event: any) {
     // API Gateway (Cognito Authorizer) から渡されるグループ情報を取得
-    const groups = event.requestContext?.authorizer?.claims['cognito:groups'] || [];
+    const groupsField = event.requestContext?.authorizer?.claims?.['cognito:groups'];
+    const groups = parseGroups(groupsField);
 
-    // CDKで作成した 'Administrators' グループ名と一致させる
-    if (!groups.includes('Administrators')) {
-        console.log("Unauthorized access attempt. Group 'Administrators' not found in:", groups);
+    if (!isSystemAdmin(groups)) {
+        console.log("Unauthorized access attempt. Admin group not found in:", groups);
 
         return {
             isAdmin: false,

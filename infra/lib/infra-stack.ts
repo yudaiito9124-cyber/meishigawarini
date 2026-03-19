@@ -270,6 +270,7 @@ export class InfraStack extends cdk.Stack {
     const apiId = `MeishiGawariniApi${suffix}`;
     const api = new apigateway.RestApi(this, apiId, {
       restApiName: `MeishiGawarini Service${suffix}`,
+      description: `Backend API for MeishiGawarini (Deployment ID: ${Date.now()})`, // Forces stage redeployment
       defaultCorsPreflightOptions: {
         allowOrigins: allowedOrigins,
         allowMethods: apigateway.Cors.ALL_METHODS,
@@ -334,6 +335,26 @@ export class InfraStack extends cdk.Stack {
       templates: {
         'application/json': '{"message": "Internal Server Error"}'
       }
+    } as any);
+
+    // --- その他 全ての4XX系エラーへのCORS許可 ---
+    api.addGatewayResponse('Default4XXResponse', {
+      type: apigateway.ResponseType.DEFAULT_4XX,
+      responseParameters: {
+        'gatewayresponse.header.Access-Control-Allow-Origin': "'*'",
+        'gatewayresponse.header.Access-Control-Allow-Headers': "'*'",
+        'gatewayresponse.header.Access-Control-Allow-Methods': "'GET,POST,PUT,DELETE,OPTIONS,PATCH'",
+      },
+    } as any);
+
+    // --- その他 全ての5XX系エラーへのCORS許可 ---
+    api.addGatewayResponse('Default5XXResponse', {
+      type: apigateway.ResponseType.DEFAULT_5XX,
+      responseParameters: {
+        'gatewayresponse.header.Access-Control-Allow-Origin': "'*'",
+        'gatewayresponse.header.Access-Control-Allow-Headers': "'*'",
+        'gatewayresponse.header.Access-Control-Allow-Methods': "'GET,POST,PUT,DELETE,OPTIONS,PATCH'",
+      },
     } as any);
 
 

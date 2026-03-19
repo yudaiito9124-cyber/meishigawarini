@@ -1,5 +1,7 @@
 import { DynamoDBDocumentClient, GetCommand } from '@aws-sdk/lib-dynamodb';
 
+import { parseGroups } from '../utils/auth';
+
 /**
  * ユーザーがショップのオーナーまたはGMであるか確認する (Lambdaイベントが直接ない場合用)
  */
@@ -40,7 +42,9 @@ export async function checkShopOwnerOrGM(ddb: DynamoDBDocumentClient, tableName:
 
     if (event) {
         const claims = event.requestContext?.authorizer?.claims;
-        const userGroups = (claims?.['cognito:groups'] as string[]) || [];
+        const groupsField = claims?.['cognito:groups'];
+        const userGroups = parseGroups(groupsField);
+        
         // GlobalAdmins グループに属している場合は、オーナーチェックをスキップしてメタデータを返す
         const isGlobalAdmin = userGroups.includes('GlobalAdmins');
 

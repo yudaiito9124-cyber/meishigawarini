@@ -15,9 +15,19 @@ const verifier = CognitoJwtVerifier.create({
 const cognito = new CognitoIdentityProviderClient({});
 
 export const handler = async (event: APIGatewayTokenAuthorizerEvent): Promise<APIGatewayAuthorizerResult> => {
-  const token = event.authorizationToken.replace('Bearer ', '');
-
   try {
+    const authorizationToken = event.authorizationToken;
+    if (!authorizationToken) {
+      console.log('No authorization token provided');
+      return generatePolicy('user', 'Deny', event.methodArn);
+    }
+
+    const token = authorizationToken.replace('Bearer ', '');
+    if (!token || token === 'undefined' || token === 'null') {
+      console.log('Invalid token format or value:', token);
+      return generatePolicy('user', 'Deny', event.methodArn);
+    }
+
     // 1. JWTの検証
     const payload = await verifier.verify(token);
 

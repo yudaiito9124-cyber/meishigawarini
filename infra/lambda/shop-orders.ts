@@ -6,6 +6,7 @@ import { sendLocalizedEmail } from './templates/email';
 import { sendEmail } from './utils/email-client';
 import { checkShopOwnerOrGM } from './share/shop-auth';
 import { signUrlIfS3 } from './utils/s3';
+import { parseGroups } from './utils/auth';
 
 const client = new DynamoDBClient({});
 // const ses = new SESClient({}); // Removed SES for Resend
@@ -28,7 +29,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 
         const claims = event.requestContext?.authorizer?.claims;
         const userId = claims?.sub;
-        const userGroups = (claims?.['cognito:groups'] as string[]) || [];
+        const userGroups = parseGroups(claims?.['cognito:groups']);
         const shopId = event.pathParameters?.shopId;
 
         if (!userId || !shopId) {

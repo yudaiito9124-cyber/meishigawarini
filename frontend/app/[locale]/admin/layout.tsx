@@ -24,17 +24,29 @@ export default function AdminLayout({
         hasCheckedAuth.current = true;
 
         const checkAuth = async () => {
+            let session;
             try {
-                let session = await fetchAuthSession();
-                let payload = session.tokens?.idToken?.payload || {};
-                let groups = (payload['cognito:groups'] as string[]) || [];
-                const isAdmin = groups.includes('Administrators') || groups.includes('GlobalAdmins');
+                session = await fetchAuthSession();
+            } catch (e) {
+                console.error("Admin Auth Check Error:", e);
+                setIsAuthorized(false);
+                return;
+            }
 
-                if (!isAdmin) {
-                    setIsAuthorized(false);
-                    return;
-                }
+            let payload = session.tokens?.idToken?.payload || {};
+            let groups = (payload['cognito:groups'] as string[]) || [];
+            const isAdmin = groups.includes('Administrators') || groups.includes('GlobalAdmins');
 
+            if (!isAdmin) {
+                setIsAuthorized(false);
+                return;
+            }
+
+
+            // 管理者の権限はあるが２段階認証については不明
+            let pushtomfasetup = true;
+            let apiSuccess = false;
+            try {
                 let amr = (payload['amr'] as string[]) || [];
                 if (amr.length === 0) {
                     session = await fetchAuthSession({ forceRefresh: true });
@@ -42,29 +54,26 @@ export default function AdminLayout({
                     amr = (payload['amr'] as string[]) || [];
                 }
 
-                // APIを用いたサーバーサイドでの最終確認 (有効なトークンか、MFA等のポリシーを満たしているか)
                 const NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || "";
                 const token = session.tokens?.idToken?.toString();
-                
+
                 const res = await fetch(`${NEXT_PUBLIC_API_URL}/admin`, {
                     headers: { "Authorization": `Bearer ${token}` }
                 });
 
-                if (res.status === 404 || res.status === 403) {
-                    setIsAuthorized(false);
-                    return;
-                }
-
                 if (res.ok) {
-                    setIsAuthorized(true);
-                } else {
-                    setIsAuthorized(false);
-                    alert(t("AdminNeed2FA"));
-                    router.push("/mfa-setup");
+                    apiSuccess = true;
+                    pushtomfasetup = false;
                 }
             } catch (e) {
-                console.error("Admin Auth Check Error:", e);
-                setIsAuthorized(false);
+            } finally {
+                if (pushtomfasetup) {
+                    alert(t("AdminNeed2FA"));
+                    router.push("/mfa-setup");
+                    // リダイレクト中なので、isAuthorizedをfalseにしない（loading画面のまま維持）
+                } else {
+                    setIsAuthorized(apiSuccess);
+                }
             }
         };
 
