@@ -24,7 +24,7 @@ import SandboxedHtml from '@/components/SandboxedHtml';
 import { APP_CONFIG } from '@/lib/config';
 import { generateId } from '@/lib/id';
 import { resizeImage } from "@/lib/image-utils";
-import { cardformats } from '@/lib/generatePDF';
+import { cardformats } from '@/lib/pdf-formats';
 
 const NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
