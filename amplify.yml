@@ -5,6 +5,7 @@ applications:
       phases: # ビルドの各フェーズの設定
         preBuild:
           commands:
+            - nvm use 24
             # package-lock.jsonに基づいて依存パッケージをクリーンインストール
             - npm ci
             # 環境変数から NEXT_PUBLIC_ で始まるものを抽出し、.envファイルとして書き出す（Next.jsで環境変数を読み込むため）
