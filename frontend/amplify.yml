@@ -1,0 +1,19 @@
+version: 1
+frontend:
+  phases:
+    preBuild:
+      commands:
+        # 最新のNode.js (LTS v22) を使用
+        - nvm use 22
+        - npm ci
+        - printenv | grep -e NEXT_PUBLIC_ > .env
+    build:
+      commands:
+        - npm run build
+  artifacts:
+    baseDirectory: .next
+    files:
+      - '**/*'
+  cache:
+    paths:
+      - node_modules/**/*
