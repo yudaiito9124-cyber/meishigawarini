@@ -19,6 +19,7 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  serverExternalPackages: ['jspdf'],
 };
 
 export default withNextIntl(nextConfig);
