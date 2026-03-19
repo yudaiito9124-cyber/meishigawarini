@@ -15,7 +15,7 @@ import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, Tabl
 import { APP_CONFIG } from "@/lib/config";
 import { generateId } from '@/lib/id';
 import { useTranslations } from 'next-intl';
-import { generatePDF } from '@/lib/generatePDF';
+// import { generatePDF } from '@/lib/generatePDF'; // Removed for SSR compatibility
 import { cardformats, paperformats } from '@/lib/pdf-formats';
 import { ExternalLink, Copy, Eye, QrCode, Store, Wrench, Layers, HelpCircle, Home } from 'lucide-react';
 import CardDesignEditor from "@/components/admin/CardDesignEditor";
@@ -125,8 +125,9 @@ export default function AdminPage() {
             setGeneratedBatches([newBatch, ...generatedBatches]);
 
             // Automatically download PDF
+            const { generatePDF: gpdf } = await import('@/lib/generatePDF');
             const design = resolveDesign(cardFormat);
-            await generatePDF(newBatch, paperFormat, design);
+            await gpdf(newBatch, paperFormat, design);
         } catch (e: any) {
             const errData = e;
             alert((tb(errData?.message?.replace(/\./g, '_')) || errData?.message) || t('batches.alerts.failed') + (errData?.detail?.toString() || ''));
@@ -422,7 +423,7 @@ export default function AdminPage() {
                                                         </div>
                                                         <p className="flex justify-center items-center text-sm bg-green-100 text-green-800 px-3 py-1 rounded-xl">{batch.status}</p>
                                                     </div>
-                                                    <Button className="ml-auto" variant="outline" size="sm" onClick={() => {
+                                                    <Button className="ml-auto" variant="outline" size="sm" onClick={async () => {
                                                         const resolveDesign = (designId?: string) => {
                                                             const targetId = designId || cardFormat;
                                                             const dbDesign = dbCardDesigns.find(d => d.design_id === targetId);
@@ -432,7 +433,8 @@ export default function AdminPage() {
                                                             return globalDesign || cardFormat;
                                                         };
                                                         const design = resolveDesign(batch.card_design);
-                                                        generatePDF(batch, paperFormat, design);
+                                                        const { generatePDF: gpdf } = await import('@/lib/generatePDF');
+                                                        await gpdf(batch, paperFormat, design);
                                                     }}>{t('batches.downloadPdf')}</Button>
                                                 </div>
                                                 {/* Display Codes */}
@@ -465,7 +467,6 @@ export default function AdminPage() {
                         {/* すべてのQRコード一覧 */}
                         <QRCodeListSection
                             apiUrl={NEXT_PUBLIC_API_URL}
-                            onGeneratePDF={generatePDF}
                             paperFormat={paperFormat}
                             cardFormat={cardFormat}
                             dbCardDesigns={dbCardDesigns}
@@ -503,10 +504,8 @@ export default function AdminPage() {
         </div>
     );
 }
-
-function QRCodeListSection({ apiUrl, onGeneratePDF, paperFormat, cardFormat, dbCardDesigns }: {
+function QRCodeListSection({ apiUrl, paperFormat, cardFormat, dbCardDesigns }: {
     apiUrl: string,
-    onGeneratePDF: (batch: any, paperformat: string, cardformat: string | any) => Promise<void>,
     paperFormat: string,
     cardFormat: string,
     dbCardDesigns: any[]
@@ -716,7 +715,6 @@ function QRCodeListSection({ apiUrl, onGeneratePDF, paperFormat, cardFormat, dbC
                                         key={item.PK}
                                         item={item}
                                         apiUrl={apiUrl}
-                                        onGeneratePDF={onGeneratePDF}
                                         onRefresh={fetchCodes}
                                         paperFormat={paperFormat}
                                         cardFormat={cardFormat}
@@ -732,10 +730,9 @@ function QRCodeListSection({ apiUrl, onGeneratePDF, paperFormat, cardFormat, dbC
     );
 }
 
-function QRCodeRow({ item, apiUrl, onGeneratePDF, onRefresh, paperFormat, cardFormat, dbCardDesigns }: {
+function QRCodeRow({ item, apiUrl, onRefresh, paperFormat, cardFormat, dbCardDesigns }: {
     item: any;
     apiUrl: string;
-    onGeneratePDF: (batch: any, paperformat: string, cardformat: string | any) => Promise<void>;
     onRefresh: () => void;
     paperFormat: string;
     cardFormat: string;
@@ -784,7 +781,7 @@ function QRCodeRow({ item, apiUrl, onGeneratePDF, onRefresh, paperFormat, cardFo
                             variant="outline"
                             size="sm"
                             className="mr-2 h-6 text-xs"
-                            onClick={(e) => {
+                            onClick={async (e) => {
                                 e.stopPropagation();
                                 const resolveDesign = (designId?: string) => {
                                     const targetId = designId || cardFormat;
@@ -794,11 +791,12 @@ function QRCodeRow({ item, apiUrl, onGeneratePDF, onRefresh, paperFormat, cardFo
                                     const globalDesign = dbCardDesigns.find(d => d.design_id === cardFormat);
                                     return globalDesign || cardFormat;
                                 };
-                                const design = resolveDesign(item.card_design);
-                                onGeneratePDF({
-                                    id: uuid,
-                                    codes: [{ uuid, pin: item.pin }]
-                                }, paperFormat, design);
+                                        const design = resolveDesign(item.card_design);
+                                        const { generatePDF: gpdf } = await import('@/lib/generatePDF');
+                                        await gpdf({
+                                            id: uuid,
+                                            codes: [{ uuid, pin: item.pin }]
+                                        }, paperFormat, design);
                             }}
                         >
                             {t('list.ban.pdf')}
