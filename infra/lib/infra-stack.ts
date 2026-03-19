@@ -25,20 +25,26 @@ export class InfraStack extends cdk.Stack {
     const suffix = stage === 'prod' ? '' : `-${stage}`;
 
     // DynamoDB Table
-    const table = new dynamodb.Table(this, `MeishiGawariniTableV2${suffix}`, {
-      tableName: `MeishiGawariniTableV2${suffix}`,
-      partitionKey: { name: 'PK', type: dynamodb.AttributeType.STRING },
-      sortKey: { name: 'SK', type: dynamodb.AttributeType.STRING },
-      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
-      removalPolicy: stage === 'prod' ? cdk.RemovalPolicy.RETAIN : cdk.RemovalPolicy.DESTROY,
-      encryption: dynamodb.TableEncryption.AWS_MANAGED,
-    });
+    let table: dynamodb.ITable;
+    if (stage === 'prod') {
+      table = dynamodb.Table.fromTableName(this, 'MeishiGawariniTableV2-Original', 'InfraStack-MeishiGawariniTableV218E81B62-17GD6BQFOY8ZG');
+    } else {
+      const tableId = `MeishiGawariniTableV2${suffix}`;
+      table = new dynamodb.Table(this, tableId, {
+        partitionKey: { name: 'PK', type: dynamodb.AttributeType.STRING },
+        sortKey: { name: 'SK', type: dynamodb.AttributeType.STRING },
+        billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+        removalPolicy: cdk.RemovalPolicy.DESTROY,
+        encryption: dynamodb.TableEncryption.AWS_MANAGED,
+      });
+    }
 
     const extraOrigins = process.env.CORS_ALLOWED_ORIGINS
       ? process.env.CORS_ALLOWED_ORIGINS.split(',')
       : [];
     const allowedOrigins = [
       'https://meishigawarini.com',
+      'https://stg.dh74sua11za2r.amplifyapp.com', // Staging
       'http://localhost:3000',
       'http://localhost:3001',
       ...extraOrigins
@@ -47,9 +53,8 @@ export class InfraStack extends cdk.Stack {
     // S3 Bucket for Product Images
     const bucketId = `ProductImageBucket${suffix}`;
     const bucket = new s3.Bucket(this, bucketId, {
-      bucketName: stage === 'prod' ? undefined : `meishigawarini-product-images-${stage}`,
-      removalPolicy: cdk.RemovalPolicy.DESTROY,
-      autoDeleteObjects: true,
+      removalPolicy: stage === 'prod' ? cdk.RemovalPolicy.RETAIN : cdk.RemovalPolicy.DESTROY,
+      autoDeleteObjects: stage === 'prod' ? false : true,
       cors: [
         {
           allowedMethods: [s3.HttpMethods.GET, s3.HttpMethods.PUT, s3.HttpMethods.HEAD],
@@ -123,28 +128,49 @@ export class InfraStack extends cdk.Stack {
       }
     };
 
-    // GSI for Status Listing
-    table.addGlobalSecondaryIndex({
-      indexName: 'GSI1',
-      partitionKey: { name: 'GSI1_PK', type: dynamodb.AttributeType.STRING },
-      sortKey: { name: 'GSI1_SK', type: dynamodb.AttributeType.STRING },
-      projectionType: dynamodb.ProjectionType.ALL,
-    });
+    // GSIs are already on the original production table. 
+    // We only add them to the newly created tables (Staging etc.)
+    if (table instanceof dynamodb.Table) {
+      // GSI for Status Listing
+      table.addGlobalSecondaryIndex({
+        indexName: 'GSI1',
+        partitionKey: { name: 'GSI1_PK', type: dynamodb.AttributeType.STRING },
+        sortKey: { name: 'GSI1_SK', type: dynamodb.AttributeType.STRING },
+        projectionType: dynamodb.ProjectionType.ALL,
+      });
 
-    // GSI2 for Reverse Lookups (ShopIndex + OwnerIndex)
-    table.addGlobalSecondaryIndex({
-      indexName: 'GSI2',
-      partitionKey: { name: 'GSI2_PK', type: dynamodb.AttributeType.STRING },
-      sortKey: { name: 'GSI2_SK', type: dynamodb.AttributeType.STRING },
-      projectionType: dynamodb.ProjectionType.ALL,
-    });
+      // GSI2 for Reverse Lookups (ShopIndex + OwnerIndex)
+      table.addGlobalSecondaryIndex({
+        indexName: 'GSI2',
+        partitionKey: { name: 'GSI2_PK', type: dynamodb.AttributeType.STRING },
+        sortKey: { name: 'GSI2_SK', type: dynamodb.AttributeType.STRING },
+        projectionType: dynamodb.ProjectionType.ALL,
+      });
+    }
+
+    // Helper to grant permissions including GSIs for imported table
+    const grantTablePermissions = (fn: lambda.IFunction, write: boolean = false) => {
+      if (write) {
+        table.grantReadWriteData(fn);
+      } else {
+        table.grantReadData(fn);
+      }
+      // If table is an imported table (it doesn't have addGlobalSecondaryIndex)
+      // or even if it's new, we need to ensure index permissions for Query operations.
+      fn.addToRolePolicy(new iam.PolicyStatement({
+        actions: write 
+          ? ['dynamodb:Query', 'dynamodb:Scan', 'dynamodb:BatchGetItem', 'dynamodb:GetItem', 'dynamodb:PutItem', 'dynamodb:UpdateItem', 'dynamodb:DeleteItem']
+          : ['dynamodb:Query', 'dynamodb:Scan', 'dynamodb:BatchGetItem', 'dynamodb:GetItem'],
+        resources: [`${table.tableArn}/index/*`]
+      }));
+    };
 
     // Lambda: Admin Generate
     const adminGenerateFn = new nodejs.NodejsFunction(this, 'AdminGenerateFn', {
       entry: path.join(__dirname, '../lambda/admin-generate.ts'),
       ...commonProps,
     });
-    table.grantReadWriteData(adminGenerateFn);
+    grantTablePermissions(adminGenerateFn, true);
 
     // Lambda: Admin List
     const adminListFn = new nodejs.NodejsFunction(this, 'AdminListFn', {
@@ -156,7 +182,7 @@ export class InfraStack extends cdk.Stack {
         BUCKET_NAME: bucket.bucketName,
       }
     });
-    table.grantReadData(adminListFn);
+    grantTablePermissions(adminListFn);
     adminListFn.addToRolePolicy(new iam.PolicyStatement({
       actions: ['cognito-idp:AdminGetUser'],
       resources: [userPool.userPoolArn]
@@ -168,7 +194,7 @@ export class InfraStack extends cdk.Stack {
       entry: path.join(__dirname, '../lambda/admin-dump.ts'),
       ...commonProps,
     });
-    table.grantReadData(adminDumpFn);
+    grantTablePermissions(adminDumpFn);
 
     // Lambda: Shop & Product Mgmt
     const shopMgmtFn = new nodejs.NodejsFunction(this, 'ShopMgmtFn', {
@@ -182,7 +208,7 @@ export class InfraStack extends cdk.Stack {
         externalModules: ['@aws-sdk/client-dynamodb', '@aws-sdk/lib-dynamodb', '@aws-sdk/client-s3', '@aws-sdk/s3-request-presigner'],
       }
     });
-    table.grantReadWriteData(shopMgmtFn);
+    grantTablePermissions(shopMgmtFn, true);
     bucket.grantPut(shopMgmtFn);
     bucket.grantRead(shopMgmtFn);
     bucket.grantDelete(shopMgmtFn);
@@ -197,7 +223,7 @@ export class InfraStack extends cdk.Stack {
         USER_POOL_ID: userPool.userPoolId,
       }
     });
-    table.grantReadWriteData(recipientSubmitFn);
+    grantTablePermissions(recipientSubmitFn, true);
     recipientSubmitFn.addToRolePolicy(new iam.PolicyStatement({
       actions: ['cognito-idp:AdminGetUser'],
       resources: [userPool.userPoolArn]
@@ -208,7 +234,7 @@ export class InfraStack extends cdk.Stack {
       entry: path.join(__dirname, '../lambda/recipient-completed.ts'),
       ...commonProps,
     });
-    table.grantReadWriteData(recipientCompletedFn);
+    grantTablePermissions(recipientCompletedFn, true);
 
     // Lambda: Shop Orders (NEW)
     const shopOrdersFn = new nodejs.NodejsFunction(this, 'ShopOrdersFn', {
@@ -219,7 +245,7 @@ export class InfraStack extends cdk.Stack {
         BUCKET_NAME: bucket.bucketName,
       }
     });
-    table.grantReadWriteData(shopOrdersFn);
+    grantTablePermissions(shopOrdersFn, true);
     bucket.grantRead(shopOrdersFn);
 
     // Lambda: Recipient Upload URL (NEW)
@@ -234,7 +260,7 @@ export class InfraStack extends cdk.Stack {
         externalModules: ['@aws-sdk/client-dynamodb', '@aws-sdk/lib-dynamodb', '@aws-sdk/client-s3', '@aws-sdk/s3-request-presigner'],
       }
     });
-    table.grantReadData(recipientUploadUrlFn);
+    grantTablePermissions(recipientUploadUrlFn);
     bucket.grantPut(recipientUploadUrlFn);
     bucket.grantRead(recipientUploadUrlFn);
 
@@ -373,14 +399,14 @@ export class InfraStack extends cdk.Stack {
       entry: path.join(__dirname, '../lambda/admin-update.ts'),
       ...commonProps,
     });
-    table.grantReadWriteData(adminUpdateFn);
+    grantTablePermissions(adminUpdateFn, true);
 
     // Lambda: Admin Link Manager (NEW)
     const adminLinkManagerFn = new nodejs.NodejsFunction(this, 'AdminLinkManagerFn', {
       entry: path.join(__dirname, '../lambda/admin-link-manager.ts'),
       ...commonProps,
     });
-    table.grantReadWriteData(adminLinkManagerFn);
+    grantTablePermissions(adminLinkManagerFn, true);
 
     // Admin List Route
     qrResource.addMethod('GET', new apigateway.LambdaIntegration(adminListFn), {
@@ -402,7 +428,7 @@ export class InfraStack extends cdk.Stack {
       entry: path.join(__dirname, '../lambda/admin-delete-banned.ts'),
       ...commonProps,
     });
-    table.grantReadWriteData(adminDeleteBannedFn);
+    grantTablePermissions(adminDeleteBannedFn, true);
 
     const bannedResource = qrResource.addResource('banned');
     bannedResource.addMethod('DELETE', new apigateway.LambdaIntegration(adminDeleteBannedFn), {
@@ -418,7 +444,7 @@ export class InfraStack extends cdk.Stack {
         USER_POOL_ID: userPool.userPoolId,
       }
     });
-    table.grantReadWriteData(adminChangeOwnerFn);
+    grantTablePermissions(adminChangeOwnerFn, true);
     adminChangeOwnerFn.addToRolePolicy(new iam.PolicyStatement({
       actions: ['cognito-idp:AdminGetUser'],
       resources: [userPool.userPoolArn]
@@ -438,7 +464,7 @@ export class InfraStack extends cdk.Stack {
         BUCKET_NAME: bucket.bucketName,
       }
     });
-    table.grantReadWriteData(adminCardDesignsFn);
+    grantTablePermissions(adminCardDesignsFn, true);
     bucket.grantReadWrite(adminCardDesignsFn);
 
     const cardDesignsResource = adminResource.addResource('card-designs');
@@ -601,7 +627,7 @@ export class InfraStack extends cdk.Stack {
         BUCKET_NAME: bucket.bucketName,
       }
     });
-    table.grantReadWriteData(recipientVerifyPinFn);
+    grantTablePermissions(recipientVerifyPinFn, true);
     bucket.grantRead(recipientVerifyPinFn);
     // Allow Lambda to fetch user attributes (email) from Cognito
     recipientVerifyPinFn.addToRolePolicy(new iam.PolicyStatement({
@@ -627,7 +653,7 @@ export class InfraStack extends cdk.Stack {
         BUCKET_NAME: bucket.bucketName,
       }
     });
-    table.grantReadWriteData(recipientChatFn);
+    grantTablePermissions(recipientChatFn, true);
     bucket.grantRead(recipientChatFn);
     bucket.grantPut(recipientChatFn);
     bucket.grantDelete(recipientChatFn);
