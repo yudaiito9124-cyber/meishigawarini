@@ -1,5 +1,5 @@
 
-import jsPDF from 'jspdf';
+// import jsPDF from 'jspdf'; // Removed for SSR compatibility
 import { APP_CONFIG } from "@/lib/config";
 const NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 const NEXT_PUBLIC_APP_URL = process.env.NEXT_PUBLIC_APP_URL || "";
@@ -192,6 +192,9 @@ export const cardformats: { [format: string]: any } = {
 
 
 export const generatePDF = async (batch: any, paperformat: string, cardformat: string | any) => {
+    // Dynamically import jsPDF only when this function is called (on the client)
+    const { default: jsPDF } = await import('jspdf');
+
     const codes = batch.codes || [];
     if (codes.length === 0) return;
 
