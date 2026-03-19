@@ -8,6 +8,7 @@ import * as apigateway from 'aws-cdk-lib/aws-apigateway';
 import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as path from 'path';
+import * as cr from 'aws-cdk-lib/custom-resources';
 
 export interface AdminApiProps {
   table: dynamodb.ITable;
@@ -30,17 +31,39 @@ export class AdminApi extends Construct {
     // ユーザグループ(権限として取り扱い)
 
     // システム管理者画面等へのアクセス権 (/admin 以下へのアクセス権)
-    new cognito.CfnUserPoolGroup(this, 'AdministratorsGroup', {
-      userPoolId: userPool.userPoolId,
-      groupName: 'Administrators',
-      description: 'System administrators with access to the admin dashboard',
+    new cr.AwsCustomResource(this, 'AdministratorsGroup', {
+      onCreate: {
+        service: 'CognitoIdentityServiceProvider',
+        action: 'createGroup',
+        parameters: {
+          UserPoolId: userPool.userPoolId,
+          GroupName: 'Administrators',
+          Description: 'System administrators with access to the admin dashboard',
+        },
+        physicalResourceId: cr.PhysicalResourceId.of('Administrators'),
+        ignoreErrorCodesMatching: 'GroupExistsException',
+      },
+      policy: cr.AwsCustomResourcePolicy.fromSdkCalls({
+        resources: [userPool.userPoolArn],
+      }),
     });
 
     // システム管理者画面等へのアクセス権 (/admin 以下へのアクセス権) & 全ユーザのショップ管理画面へのアクセス
-    new cognito.CfnUserPoolGroup(this, 'GlobalAdminsGroup', {
-      userPoolId: userPool.userPoolId,
-      groupName: 'GlobalAdmins',
-      description: 'Global administrators with cross-shop access and admin dashboard access',
+    new cr.AwsCustomResource(this, 'GlobalAdminsGroup', {
+      onCreate: {
+        service: 'CognitoIdentityServiceProvider',
+        action: 'createGroup',
+        parameters: {
+          UserPoolId: userPool.userPoolId,
+          GroupName: 'GlobalAdmins',
+          Description: 'Global administrators with cross-shop access and admin dashboard access',
+        },
+        physicalResourceId: cr.PhysicalResourceId.of('GlobalAdmins'),
+        ignoreErrorCodesMatching: 'GroupExistsException',
+      },
+      policy: cr.AwsCustomResourcePolicy.fromSdkCalls({
+        resources: [userPool.userPoolArn],
+      }),
     });
 
 
