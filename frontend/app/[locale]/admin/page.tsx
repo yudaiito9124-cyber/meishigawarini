@@ -1274,8 +1274,12 @@ function ShopOwnerChangeSection({ apiUrl }: { apiUrl: string }) {
     const handleValidate = async () => {
         if (!shopId.trim() || !newUserId.trim()) return;
         setLoading(true);
-        try {
-            const data = await adminApi.changeShopOwner(shopId.trim(), newUserId.trim(), 'validate');
+        try { // error section
+            const data = await adminApi.changeShopOwner({
+                shopId: shopId.trim().replace(/^SHOP#/, ""),
+                newUserId: newUserId.trim().replace(/^USER#/, ""),
+                action: 'validate'
+            });
             setValidationData(data);
             setIsConfirmOpen(true);
         } catch (e: any) {
@@ -1293,7 +1297,11 @@ function ShopOwnerChangeSection({ apiUrl }: { apiUrl: string }) {
         if (!shopId.trim() || !newUserId.trim()) return;
         setLoading(true);
         try {
-            await adminApi.changeShopOwner(shopId.trim(), newUserId.trim(), 'execute');
+            await adminApi.changeShopOwner({
+                shopId: shopId.trim().replace(/^SHOP#/, ""),
+                newUserId: newUserId.trim().replace(/^USER#/, ""),
+                action: 'execute'
+            });
             alert(t('list.ownerChange.success'));
             setIsConfirmOpen(false);
             setShopId("");

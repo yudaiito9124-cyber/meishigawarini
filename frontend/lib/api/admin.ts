@@ -103,10 +103,10 @@ export const adminApi = {
     // --- ショップ・オーナー管理 ---
 
     /** ショップオーナーの変更 */
-    async changeShopOwner(shopId: string, newUserId: string, action: "validate" | "execute") {
+    async changeShopOwner(data: { shopId: string, newUserId: string, action: "validate" | "execute" }) {
         return this.fetch(`/admin/owner-change`, {
             method: "POST",
-            body: JSON.stringify({ shopId, newUserId, action }),
+            body: JSON.stringify(data),
         });
     },
 

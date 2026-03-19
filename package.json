@@ -1,0 +1,7 @@
+{
+    "name": "meishigawarini-root",
+    "private": true,
+    "workspaces": [
+        "frontend"
+    ]
+}
