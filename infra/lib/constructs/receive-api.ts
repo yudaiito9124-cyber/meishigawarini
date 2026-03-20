@@ -1,0 +1,120 @@
+import * as cdk from 'aws-cdk-lib';
+import { Construct } from 'constructs';
+import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
+import * as cognito from 'aws-cdk-lib/aws-cognito';
+import * as lambda from 'aws-cdk-lib/aws-lambda';
+import * as nodejs from 'aws-cdk-lib/aws-lambda-nodejs';
+import * as apigateway from 'aws-cdk-lib/aws-apigateway';
+import * as s3 from 'aws-cdk-lib/aws-s3';
+import * as iam from 'aws-cdk-lib/aws-iam';
+import * as path from 'path';
+
+export interface ReceiveApiProps {
+  table: dynamodb.ITable;
+  bucket: s3.IBucket;
+  userPool: cognito.IUserPool;
+  api: apigateway.RestApi;
+  commonProps: any;
+  grantTablePermissions: (fn: lambda.IFunction, write?: boolean) => void;
+}
+
+export class ReceiveApi extends Construct {
+  constructor(scope: Construct, id: string, props: ReceiveApiProps) {
+    super(scope, id);
+
+    const { table, bucket, userPool, api, commonProps, grantTablePermissions } = props;
+
+    // Helper for lambda paths
+    const lampath = (name: string) => path.join(__dirname, `../../lambda/${name}.ts`);
+
+    // --- Receive Authorizer (Custom Lambda Authorizer) ---
+    const receive_authorizer_fn = new nodejs.NodejsFunction(this, 'receive_authorizer_fn', {
+      entry: lampath('receiveAuthorizer'),
+      environment: {
+        TABLE_NAME: table.tableName,
+      },
+    });
+    grantTablePermissions(receive_authorizer_fn, true);
+
+    const authorizer = new apigateway.RequestAuthorizer(this, 'receive_authorizer', {
+      handler: receive_authorizer_fn,
+      identitySources: [
+        apigateway.IdentitySource.header('X-QR-UUID'),
+        apigateway.IdentitySource.header('X-QR-PIN'),
+      ],
+      resultsCacheTtl: cdk.Duration.minutes(5),
+    });
+
+    // --- Lambda Definitions ---
+    const fnProps = {
+      ...commonProps,
+      environment: {
+        ...commonProps.environment,
+        TABLE_NAME: table.tableName,
+        BUCKET_NAME: bucket.bucketName,
+      },
+      bundling: {
+        externalModules: ['@aws-sdk/client-dynamodb', '@aws-sdk/lib-dynamodb', '@aws-sdk/client-s3', '@aws-sdk/s3-request-presigner'],
+      }
+    };
+
+    const receive_verify = new nodejs.NodejsFunction(this, 'receive_verify', { 
+      entry: lampath('receive_verify'), 
+      ...fnProps,
+      environment: {
+        ...fnProps.environment,
+        USER_POOL_ID: userPool.userPoolId,
+      }
+    });
+
+    const receive_submit = new nodejs.NodejsFunction(this, 'receive_submit', { 
+      entry: lampath('receive_submit'), 
+      ...fnProps,
+      environment: {
+        ...fnProps.environment,
+        SENDER_EMAIL: process.env.SENDER_EMAIL || '',
+        USER_POOL_ID: userPool.userPoolId,
+      }
+    });
+
+    const receive_completed = new nodejs.NodejsFunction(this, 'receive_completed', { entry: lampath('receive_completed'), ...fnProps });
+    const receive_chat = new nodejs.NodejsFunction(this, 'receive_chat', { entry: lampath('receive_chat'), ...fnProps });
+    const receive_subscription = new nodejs.NodejsFunction(this, 'receive_subscription', { entry: lampath('receive_subscription'), ...fnProps });
+    const receive_sender = new nodejs.NodejsFunction(this, 'receive_sender', { entry: lampath('receive_sender'), ...fnProps });
+    const receive_upload_url = new nodejs.NodejsFunction(this, 'receive_upload_url', { entry: lampath('receive_upload_url'), ...fnProps });
+
+    // Grant Permissions
+    const allLambdas = [receive_verify, receive_submit, receive_completed, receive_chat, receive_subscription, receive_sender, receive_upload_url];
+    allLambdas.forEach(fn => {
+        grantTablePermissions(fn, true);
+        bucket.grantRead(fn);
+        bucket.grantPut(fn);
+        bucket.grantDelete(fn);
+        fn.addToRolePolicy(new iam.PolicyStatement({
+          actions: ['cognito-idp:AdminGetUser'],
+          resources: [userPool.userPoolArn]
+        }));
+    });
+
+    // --- Routes ---
+    const receiveRes = api.root.addResource('receive');
+    const routeOptions = { authorizer, authorizationType: apigateway.AuthorizationType.CUSTOM };
+
+    receiveRes.addResource('verify').addMethod('POST', new apigateway.LambdaIntegration(receive_verify));
+    receiveRes.addResource('submit').addMethod('POST', new apigateway.LambdaIntegration(receive_submit), routeOptions);
+    receiveRes.addResource('completed').addMethod('POST', new apigateway.LambdaIntegration(receive_completed), routeOptions);
+    
+    const chatRes = receiveRes.addResource('chat');
+    chatRes.addResource('get').addMethod('POST', new apigateway.LambdaIntegration(receive_chat), routeOptions);
+    chatRes.addResource('send').addMethod('POST', new apigateway.LambdaIntegration(receive_chat), routeOptions);
+
+    receiveRes.addResource('subscription').addMethod('POST', new apigateway.LambdaIntegration(receive_subscription), routeOptions);
+    
+    const senderRes = receiveRes.addResource('sender');
+    senderRes.addResource('update').addMethod('POST', new apigateway.LambdaIntegration(receive_sender), routeOptions);
+    senderRes.addResource('load').addMethod('POST', new apigateway.LambdaIntegration(receive_sender), routeOptions);
+    senderRes.addResource('save').addMethod('POST', new apigateway.LambdaIntegration(receive_sender), routeOptions);
+
+    receiveRes.addResource('uploadurl').addResource('get').addMethod('POST', new apigateway.LambdaIntegration(receive_upload_url), routeOptions);
+  }
+}

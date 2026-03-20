@@ -10,7 +10,7 @@ import { notFound, useParams } from 'next/navigation';
 import { useRouter } from '@/i18n/routing';
 import { useTranslations } from 'next-intl';
 import { fetchAuthSession, getCurrentUser, signOut } from 'aws-amplify/auth';
-import { fetchWithAuth } from '@/app/utils/api-client';
+import { shopApi } from '@/lib/api/shop';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -126,15 +126,12 @@ export default function ShopPage() {
 
     const fetchShops = async () => {
         try {
-            const res = await fetchWithAuth('/shop');
-            if (res.ok) {
-                const data = await res.json();
-                const shopList = data.shops || [];
+            const data = await shopApi.shop_list({});
+            const shopList = data.shops || [];
 
-                // Auto-redirect if SHOP_MANAGER and has exactly one shop
-                if (shopList.length > 1) {
-                    setSingleShopOwner(false);
-                }
+            // Auto-redirect if SHOP_MANAGER and has exactly one shop
+            if (shopList.length > 1) {
+                setSingleShopOwner(false);
             }
         } catch (e) {
             // console.error(e);
@@ -157,9 +154,7 @@ export default function ShopPage() {
 
         const fetchShop = async () => {
             try {
-                const res = await fetchWithAuth(`/shop/${shopId}`);
-                if (!res.ok) throw new Error('Failed to fetch shop');
-                const data = await res.json();
+                const data = await shopApi.shop_details_get({ shopId: shopId as string });
                 setShop(data);
                 if (data.detail_html) {
                     setDebouncedPreviewHtml(data.detail_html);
@@ -168,7 +163,7 @@ export default function ShopPage() {
                     setHtmlImageUrls(data.html_image_urls);
                 }
             } catch (err: any) {
-                if (err.statusCode === 401) {
+                if (err.status === 401 || err.status === 404) {
                     router.push('/login');
                     throw err;
                 }
@@ -181,11 +176,8 @@ export default function ShopPage() {
 
         const fetchProducts = async () => {
             try {
-                const res = await fetchWithAuth(`/shop/${shopId}/products`);
-                if (res.ok) {
-                    const data = await res.json();
-                    setProducts(data.products || data.items || []);
-                }
+                const data = await shopApi.shop_products_list({ shopId: shopId as string });
+                setProducts(data.products || data.items || []);
             } catch (e) {
                 // console.error(e);
             } finally {
@@ -195,11 +187,8 @@ export default function ShopPage() {
 
         const fetchQRCodes = async () => {
             try {
-                const res = await fetchWithAuth(`/shop/${shopId}/qrcodes`);
-                if (res.ok) {
-                    const data = await res.json();
-                    setQrCodes(data.items || []);
-                }
+                const data = await shopApi.shop_qr_list({ shopId: shopId as string });
+                setQrCodes(data.items || []);
             } catch (e) {
                 // console.error(e);
             }
@@ -207,11 +196,8 @@ export default function ShopPage() {
 
         const fetchOrders = async () => {
             try {
-                const res = await fetchWithAuth(`/shop/${shopId}/orders`);
-                if (res.ok) {
-                    const data = await res.json();
-                    setOrders(data.orders || data.items || []); // robust check
-                }
+                const data = await shopApi.shop_orders_list({ shopId: shopId as string });
+                setOrders(data.orders || data.items || []); // robust check
             } catch (e) {
                 // console.error(e);
             } finally {
@@ -233,12 +219,9 @@ export default function ShopPage() {
 
     const fetchImportShops = async () => {
         try {
-            const res = await fetchWithAuth(`/shop/${shopId}/products/import`);
-            if (res.ok) {
-                const data = await res.json();
-                // Filter out the current shop
-                setImportShops((data.shops || []).filter((s: any) => s.id !== shopId));
-            }
+            const data = await shopApi.shop_products_import_list({ shopId: shopId as string });
+            // Filter out the current shop
+            setImportShops((data.shops || []).filter((s: any) => s.id !== shopId));
         } catch (error) {
             // console.error('Failed to fetch import shops', error);
         }
@@ -246,13 +229,8 @@ export default function ShopPage() {
 
     const fetchAdminEmails = async () => {
         try {
-            const res = await fetchWithAuth(`/shop/${shopId}/admins`, {
-                method: 'POST'
-            });
-            if (res.ok) {
-                const data = await res.json();
-                setAdminEmails(data);
-            }
+            const data = await shopApi.shop_admins({ shopId: shopId as string });
+            setAdminEmails(data);
         } catch (e) {
             // console.error('Failed to fetch admin emails', e);
         }
@@ -288,10 +266,7 @@ export default function ShopPage() {
         if (!open && sessionUploadedUrls.length > 0) {
             // Closed without save - Cleanup temporary uploads
             try {
-                await fetchWithAuth(`/shop/${shopId}/delete-images`, {
-                    method: 'POST',
-                    body: JSON.stringify({ urls: sessionUploadedUrls })
-                });
+                await shopApi.shop_delete_images({ shopId: shopId!, urls: sessionUploadedUrls });
             } catch (e) {
                 // console.error('Failed to cleanup temporary images', e);
             }
@@ -320,17 +295,12 @@ export default function ShopPage() {
             }
 
             // 1. Get Presigned URL
-            const res = await fetchWithAuth(`/shop/${shopId}/products/upload-url`, {
-                method: 'POST',
-                body: JSON.stringify({
-                    filename: `${generateId()}.webp`,
-                    contentType: 'image/webp',
-                    folder: 'shopcontent'
-                })
+            const { uploadUrl, publicUrl } = await shopApi.shop_products_uploadurl({
+                shopId: shopId!,
+                filename: `${generateId()}.webp`,
+                contentType: 'image/webp',
+                folder: 'shopcontent'
             });
-
-            if (!res.ok) throw new Error('Failed to get upload URL');
-            const { uploadUrl, publicUrl } = await res.json();
 
             // 2. Upload to S3
             const uploadRes = await fetch(uploadUrl, {
@@ -386,15 +356,11 @@ export default function ShopPage() {
                 const resizedFile = new File([resizedBlob], filename, { type: file.type });
 
                 // Get Presigned URL
-                const uploadRes = await fetchWithAuth(`/shop/${shopId}/products/upload-url`, {
-                    method: 'POST',
-                    body: JSON.stringify({
-                        filename: `${generateId()}.webp`,
-                        contentType: 'image/webp'
-                    })
+                const { uploadUrl, publicUrl } = await shopApi.shop_products_uploadurl({
+                    shopId: shopId!,
+                    filename: `${generateId()}.webp`,
+                    contentType: 'image/webp'
                 });
-                if (!uploadRes.ok) throw new Error('Failed to get upload URL');
-                const { uploadUrl, publicUrl } = await uploadRes.json();
 
                 // Upload to S3 (No Auth Header for S3 direct upload)
                 const s3Res = await fetch(uploadUrl, {
@@ -410,26 +376,18 @@ export default function ShopPage() {
             }
 
             // 2. Create Product
-            const res = await fetchWithAuth(`/shop/${shopId}/products`, {
-                method: 'POST',
-                body: JSON.stringify({
-                    name: formData.get('name'),
-                    description: formData.get('description'),
-                    // detail_html: formData.get('detail_html'),
-                    price: Number(formData.get('price')),
-                    valid_days: formData.get('valid_days'),
-                    image_url: imageUrl,
-                    status: 'ACTIVE'
-                })
+            await shopApi.shop_products_create({
+                shopId: shopId!,
+                name: formData.get('name') as string,
+                description: formData.get('description') as string,
+                price: Number(formData.get('price')),
+                valid_days: Number(formData.get('valid_days')),
+                image_url: imageUrl,
             });
 
-            if (res.ok) {
-                alert(t('addProduct.success'));
-                form.reset();
-                fetchShopData(); // Refresh
-            } else {
-                alert(t('addProduct.failed'));
-            }
+            alert(t('addProduct.success'));
+            form.reset();
+            fetchShopData(); // Refresh
         } catch (err) {
             // console.error(err);
             alert(t('addProduct.error'));
@@ -475,16 +433,18 @@ export default function ShopPage() {
                 if (memo_for_users) body.memo_for_users = memo_for_users;
                 if (memo_for_shop) body.memo_for_shop = memo_for_shop;
 
-                const res = await fetchWithAuth(`/shop/${shopId}/link`, {
-                    method: 'POST',
-                    body: JSON.stringify(body)
-                });
-
-                if (!res.ok) {
-                    const errorData = await res.json().catch(() => ({}));
-                    errors.push(`${uuid}: ${errorData.message || 'Failed to link'}`);
-                } else {
+                try {
+                    await shopApi.shop_qr_link({
+                        shopId: shopId as string,
+                        qr_id: uuid,
+                        product_id: finalProductId,
+                        activate_now: true,
+                        memo_for_users,
+                        memo_for_shop
+                    });
                     successCount++;
+                } catch (err: any) {
+                    errors.push(`${uuid}: ${err.message || 'Failed to link'}`);
                 }
             }
 
@@ -515,14 +475,10 @@ export default function ShopPage() {
         setDeletingProductId(productId);
 
         try {
-            const res = await fetchWithAuth(`/shop/${shopId}/products/${productId}`, {
-                method: 'DELETE'
+            await shopApi.shop_products_delete({
+                shopId: shopId!,
+                product_id: productId
             });
-
-            if (!res.ok) {
-                const data = await res.json();
-                throw new Error(data.message || 'Failed to delete');
-            }
             fetchShopData();
         } catch (err: any) {
             alert((tb(err.message.replace(/\./g, '_')) || err.message) + (err.relatedQRs ? "\n" + err.relatedQRs.join(", ") : ""));
@@ -535,11 +491,12 @@ export default function ShopPage() {
         const newStatus = currentStatus === 'ACTIVE' ? 'STOPPED' : 'ACTIVE';
         setTogglingProductId(productId);
         try {
-            const res = await fetchWithAuth(`/shop/${shopId}/products/${productId}`, {
-                method: 'PATCH',
-                body: JSON.stringify({ status: newStatus })
+            await shopApi.shop_products_update({
+                shopId: shopId!,
+                product_id: productId,
+                status: newStatus
             });
-            if (res.ok) fetchShopData();
+            if (true) fetchShopData();
         } catch (e) { // console.error(e); 
         } finally {
             setTogglingProductId(null);
@@ -555,16 +512,15 @@ export default function ShopPage() {
             if (memoForUsers !== undefined) body.memo_for_users = memoForUsers;
             if (memoForShop !== undefined) body.memo_for_shop = memoForShop;
 
-            const res = await fetchWithAuth(`/shop/${shopId}/orders/${qrId}`, {
-                method: 'PATCH',
-                body: JSON.stringify(body)
+            await shopApi.shop_orders_update({
+                shopId: shopId!,
+                qr_id: qrId,
+                delivery_company: deliveryCompany,
+                tracking_number: trackingNumber,
+                memo_for_users: memoForUsers,
+                memo_for_shop: memoForShop
             });
-            if (res.ok) {
-                fetchShopData();
-            } else {
-                const errData = await res.json().catch(() => ({}));
-                alert(t('orders.updateFailed') + ': ' + (tb(errData.message.replace(/\./g, '_')) || errData.message || errData.error || tc('unknownError')));
-            }
+            fetchShopData();
         } catch (e: any) {
             // console.error(e);
             alert(t('orders.updateError') + ': ' + (tb(e.message.replace(/\./g, '_')) || e.message || String(e)));
@@ -581,14 +537,12 @@ export default function ShopPage() {
 
         setIsImporting(true);
         try {
-            const res = await fetchWithAuth(`/shop/${shopId}/products/import`, {
-                method: 'POST',
-                body: JSON.stringify({ importShopId: selectedImportShopId.replace('SHOP#', '') })
+            const data = await shopApi.shop_products_import_execute({
+                shopId: shopId!,
+                importShopId: selectedImportShopId.replace('SHOP#', '')
             });
 
-            const data = await res.json();
-
-            if (res.ok) {
+            if (true) {
                 alert(`${tb(data.message.replace(/\./g, '_')) || data.message} (${data.imported} items)`);
                 setIsImportDialogOpen(false);
                 setSelectedImportShopId('');
@@ -611,26 +565,21 @@ export default function ShopPage() {
         setIsSettingUploading(true);
 
         try {
-            const res = await fetchWithAuth(`/shop/${shopId}`, {
-                method: 'PATCH',
-                body: JSON.stringify({
-                    name: formData.get('shop_name'),
-                    detail_html: formData.get('shop_detail_html'),
-                    html_image_urls: htmlImageUrls,
-                    deleted_html_image_urls: htmlImageUrlsToDelete
-                })
+            await shopApi.shop_details_update({
+                shopId: shopId!,
+                name: (formData.get('shop_name') as string),
+                detail_html: (formData.get('shop_detail_html') as string),
+                html_image_urls: htmlImageUrls,
+                deleted_html_image_urls: htmlImageUrlsToDelete
             });
-            if (res.ok) {
-                alert(t('shopSettings.success'));
-                setSessionUploadedUrls([]); // Clear tracking on success
-                fetchShopData();
-                setIsSettingsOpen(false);
-            } else {
-                alert(t('shopSettings.failed'));
-            }
-        } catch (err) {
+
+            alert(t('shopSettings.success'));
+            setSessionUploadedUrls([]); // Clear tracking on success
+            fetchShopData();
+            setIsSettingsOpen(false);
+        } catch (err: any) {
             // console.error(err);
-            alert(t('shopSettings.error'));
+            alert(t('shopSettings.error') + ': ' + (tb(err.message?.replace(/\./g, '_')) || err.message || String(err)));
         } finally {
             setIsSettingUploading(false);
         }
@@ -645,6 +594,25 @@ export default function ShopPage() {
     const [shipOptionOpenId, setShipOptionOpenId] = useState<string | null>(null);
     const [isManualInput, setisManualInput] = useState(false);
     const [manualInput, setManualInput] = useState('');
+
+    const checkQrStatus = async (uuid: string) => {
+        setQrStatusDetails(null);
+        try {
+            const data = await shopApi.shop_qrcodecheck({ 
+                shopId: shopId as string,
+                qr_id: uuid 
+            });
+            setScannedUuid(uuid);
+            setQrStatusDetails(data);
+            setScannedUuids([{ uuid, status: data }]);
+        } catch (error: any) {
+            const translatedError = error.message ? tb(error.message.replace(/\./g, '_')) : t('linkQr.foreignQrError');
+            setScannedUuids([{ uuid, error: translatedError }]);
+            alert(translatedError + (error.detail ? ` (${error.detail})` : ''));
+        } finally {
+            setIsScanning(false);
+        }
+    };
 
     const handleScanSuccess = async (decodedText: string) => {
         let uuid = decodedText;
@@ -669,24 +637,17 @@ export default function ShopPage() {
 
             // Status check for sequential scan
             try {
-                const res = await fetchWithAuth(`/shop/${shopId}/qrcodecheck`, {
-                    method: 'POST',
-                    body: JSON.stringify({ qr_id: uuid })
+                const data = await shopApi.shop_qrcodecheck({ 
+                    shopId: shopId as string,
+                    qr_id: uuid 
                 });
-                const data = await res.json();
-                if (!res.ok) {
-                    const translatedError = data.message ? tb(data.message.replace(/\./g, '_')) : t('linkQr.foreignQrError');
-                    setScannedUuids(prev => prev.map(item =>
-                        item.uuid === uuid ? { ...item, error: translatedError } : item
-                    ));
-                    return;
-                }
                 setScannedUuids(prev => prev.map(item =>
                     item.uuid === uuid ? { ...item, status: data } : item
                 ));
             } catch (err: any) {
+                const translatedError = err.message ? tb(err.message.replace(/\./g, '_')) : t('linkQr.foreignQrError');
                 setScannedUuids(prev => prev.map(item =>
-                    item.uuid === uuid ? { ...item, error: err.message || 'Check failed' } : item
+                    item.uuid === uuid ? { ...item, error: translatedError } : item
                 ));
             }
             return;
@@ -699,32 +660,7 @@ export default function ShopPage() {
         checkQrStatus(uuid);
     };
 
-    const checkQrStatus = async (uuid: string) => {
-        setQrStatusDetails(null);
-        try {
-            const res = await fetchWithAuth(`/shop/${shopId}/qrcodecheck`, {
-                method: 'POST',
-                body: JSON.stringify({ qr_id: uuid })
-            });
-            if (!res.ok) {
-                const errData = await res.json().catch(() => ({}));
-                const translatedError = errData.message ? tb(errData.message.replace(/\./g, '_')) : t('linkQr.foreignQrError');
-                setScannedUuids([{ uuid, error: translatedError }]);
-                alert(translatedError + (errData.detail ? ` (${errData.detail})` : ''));
-                return;
-            }
-            const data = await res.json();
-            setScannedUuid(uuid);
-            setQrStatusDetails(data);
-            setScannedUuids([{ uuid, status: data }]);
-        } catch (error: any) {
-            const translatedError = error.message ? tb(error.message.replace(/\./g, '_')) : t('linkQr.foreignQrError');
-            setScannedUuids([{ uuid, error: translatedError }]);
-            alert(translatedError + (error.detail ? ` (${error.detail})` : ''));
-        } finally {
-            setIsScanning(false);
-        }
-    };
+
 
     if (error) return <div className="p-8 text-red-500">Error: {error}</div>;
 

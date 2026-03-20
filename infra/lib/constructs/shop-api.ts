@@ -42,151 +42,80 @@ export class ShopApi extends Construct {
       resultsCacheTtl: cdk.Duration.minutes(5),
     });
 
-    // Lambda: Shop & Product Mgmt
-    const shopMgmtFn = new nodejs.NodejsFunction(this, 'ShopMgmtFn', {
-      entry: path.join(__dirname, '../../lambda/shop-mgmt.ts'),
-      handler: 'handler',
+    // Lambda Definitions
+    const fnProps = {
+      ...commonProps,
       environment: {
+        ...commonProps.environment,
         TABLE_NAME: table.tableName,
         BUCKET_NAME: bucket.bucketName,
       },
       bundling: {
         externalModules: ['@aws-sdk/client-dynamodb', '@aws-sdk/lib-dynamodb', '@aws-sdk/client-s3', '@aws-sdk/s3-request-presigner'],
       }
-    });
-    grantTablePermissions(shopMgmtFn, true);
-    bucket.grantPut(shopMgmtFn);
-    bucket.grantRead(shopMgmtFn);
-    bucket.grantDelete(shopMgmtFn);
+    };
 
-    // Lambda: Shop Orders
-    const shopOrdersFn = new nodejs.NodejsFunction(this, 'ShopOrdersFn', {
-      entry: path.join(__dirname, '../../lambda/shop-orders.ts'),
-      ...commonProps,
-      environment: {
-        ...commonProps.environment,
-        BUCKET_NAME: bucket.bucketName,
-      }
+    const shop_create = new nodejs.NodejsFunction(this, 'shop_create', { entry: lampath('shop_create'), ...fnProps });
+    const shop_list = new nodejs.NodejsFunction(this, 'shop_list', { entry: lampath('shop_list'), ...fnProps });
+    const shop_details = new nodejs.NodejsFunction(this, 'shop_details', { entry: lampath('shop_details'), ...fnProps });
+    const shop_products = new nodejs.NodejsFunction(this, 'shop_products', { entry: lampath('shop_products'), ...fnProps });
+    const shop_products_import = new nodejs.NodejsFunction(this, 'shop_products_import', { entry: lampath('shop_products_import'), ...fnProps });
+    const shop_products_uploadurl = new nodejs.NodejsFunction(this, 'shop_products_uploadurl', { entry: lampath('shop_products_uploadurl'), ...fnProps });
+    const shop_qr = new nodejs.NodejsFunction(this, 'shop_qr', { entry: lampath('shop_qr'), ...fnProps });
+    const shop_admins = new nodejs.NodejsFunction(this, 'shop_admins', { entry: lampath('shop_admins'), ...fnProps });
+    const shop_delete_images = new nodejs.NodejsFunction(this, 'shop_delete_images', { entry: lampath('shop_delete_images'), ...fnProps });
+    const shop_orders = new nodejs.NodejsFunction(this, 'shop_orders', { entry: lampath('shop_orders'), ...fnProps });
+
+    // Grant Permissions
+    const allShopLambdas = [
+        shop_create, shop_list, shop_details, shop_products, shop_products_import, 
+        shop_products_uploadurl, shop_qr, shop_admins, shop_delete_images, shop_orders
+    ];
+    allShopLambdas.forEach(fn => {
+        grantTablePermissions(fn, true);
+        bucket.grantPut(fn);
+        bucket.grantRead(fn);
+        bucket.grantDelete(fn);
     });
-    grantTablePermissions(shopOrdersFn, true);
-    bucket.grantRead(shopOrdersFn);
 
     // Shop Routes
     const shopResource = api.root.addResource('shop'); 
+    const routeOptions = { authorizer, authorizationType: apigateway.AuthorizationType.CUSTOM };
+
+    // Action-based POST Routes (Standard)
+    shopResource.addResource('create').addMethod('POST', new apigateway.LambdaIntegration(shop_create), routeOptions);
+    shopResource.addResource('list').addMethod('POST', new apigateway.LambdaIntegration(shop_list), routeOptions);
+    shopResource.addResource('details').addMethod('POST', new apigateway.LambdaIntegration(shop_details), routeOptions);
+    shopResource.addResource('admins').addMethod('POST', new apigateway.LambdaIntegration(shop_admins), routeOptions);
+    shopResource.addResource('delete').addResource('images').addMethod('POST', new apigateway.LambdaIntegration(shop_delete_images), routeOptions);
+
+
+    // /shop/products
+    const productsResource = shopResource.addResource('products'); 
+    productsResource.addResource('list').addMethod('POST', new apigateway.LambdaIntegration(shop_products), routeOptions);
+    productsResource.addResource('create').addMethod('POST', new apigateway.LambdaIntegration(shop_products), routeOptions);
+    productsResource.addResource('update').addMethod('POST', new apigateway.LambdaIntegration(shop_products), routeOptions);
+    productsResource.addResource('delete').addMethod('POST', new apigateway.LambdaIntegration(shop_products), routeOptions);
     
-    // shop POST #CreateShop
-    shopResource.addMethod('POST', new apigateway.LambdaIntegration(shopMgmtFn), {
-      authorizer,
-      authorizationType: apigateway.AuthorizationType.CUSTOM
-    });
-    // shop GET #ListShops
-    shopResource.addMethod('GET', new apigateway.LambdaIntegration(shopMgmtFn), {
-      authorizer,
-      authorizationType: apigateway.AuthorizationType.CUSTOM
-    });
+    const importRes = productsResource.addResource('import');
+    importRes.addResource('list').addMethod('POST', new apigateway.LambdaIntegration(shop_products_import), routeOptions);
+    importRes.addResource('execute').addMethod('POST', new apigateway.LambdaIntegration(shop_products_import), routeOptions);
+    productsResource.addResource('uploadurl').addMethod('POST', new apigateway.LambdaIntegration(shop_products_uploadurl), routeOptions);
 
-    const shopIdResource = shopResource.addResource('{shopId}'); 
-    // shop/{shopId} GET #GetShop
-    shopIdResource.addMethod('GET', new apigateway.LambdaIntegration(shopMgmtFn), {
-      authorizer,
-      authorizationType: apigateway.AuthorizationType.CUSTOM
-    });
-    // shop/{shopId} PATCH #UpdateShop
-    shopIdResource.addMethod('PATCH', new apigateway.LambdaIntegration(shopMgmtFn), {
-      authorizer,
-      authorizationType: apigateway.AuthorizationType.CUSTOM
-    });
+    // /shop/qr
+    const qrResource = shopResource.addResource('qr');
+    qrResource.addResource('list').addMethod('POST', new apigateway.LambdaIntegration(shop_qr), routeOptions);
+    qrResource.addResource('link').addMethod('POST', new apigateway.LambdaIntegration(shop_qr), routeOptions);
+    qrResource.addResource('unlink').addMethod('POST', new apigateway.LambdaIntegration(shop_qr), routeOptions);
+    qrResource.addResource('activate').addMethod('POST', new apigateway.LambdaIntegration(shop_qr), routeOptions);
+    qrResource.addResource('deactivate').addMethod('POST', new apigateway.LambdaIntegration(shop_qr), routeOptions);
+    
+    shopResource.addResource('qrcodecheck').addMethod('POST', new apigateway.LambdaIntegration(shop_qr), routeOptions);
 
-    const productsResource = shopIdResource.addResource('products'); 
-    // shop/{shopId}/products POST #CreateProducts
-    productsResource.addMethod('POST', new apigateway.LambdaIntegration(shopMgmtFn), {
-      authorizer,
-      authorizationType: apigateway.AuthorizationType.CUSTOM
-    });
-    // shop/{shopId}/products GET #ListProducts
-    productsResource.addMethod('GET', new apigateway.LambdaIntegration(shopMgmtFn), {
-      authorizer,
-      authorizationType: apigateway.AuthorizationType.CUSTOM
-    });
+    // /shop/orders
+    const ordersResource = shopResource.addResource('orders');
+    ordersResource.addResource('list').addMethod('POST', new apigateway.LambdaIntegration(shop_orders), routeOptions);
+    ordersResource.addResource('update').addMethod('POST', new apigateway.LambdaIntegration(shop_orders), routeOptions);
 
-    const importProductsResource = productsResource.addResource('import'); 
-    // shop/{shopId}/products/import GET #ListImportableShops
-    importProductsResource.addMethod('GET', new apigateway.LambdaIntegration(shopMgmtFn), {
-      authorizer,
-      authorizationType: apigateway.AuthorizationType.CUSTOM
-    });
-    // shop/{shopId}/products/import POST #ImportProducts
-    importProductsResource.addMethod('POST', new apigateway.LambdaIntegration(shopMgmtFn), {
-      authorizer,
-      authorizationType: apigateway.AuthorizationType.CUSTOM
-    });
-
-    const uploadUrlResource = productsResource.addResource('upload-url'); 
-    // shop/{shopId}/products/upload-url POST #GetUploadUrl
-    uploadUrlResource.addMethod('POST', new apigateway.LambdaIntegration(shopMgmtFn), {
-      authorizer,
-      authorizationType: apigateway.AuthorizationType.CUSTOM
-    });
-
-    const productIdResource = productsResource.addResource('{productId}'); 
-    // shop/{shopId}/products/{productId} PATCH #UpdateProductStatus
-    productIdResource.addMethod('PATCH', new apigateway.LambdaIntegration(shopMgmtFn), {
-      authorizer,
-      authorizationType: apigateway.AuthorizationType.CUSTOM
-    });
-    // shop/{shopId}/products/{productId} DELETE #DeleteProduct
-    productIdResource.addMethod('DELETE', new apigateway.LambdaIntegration(shopMgmtFn), {
-      authorizer,
-      authorizationType: apigateway.AuthorizationType.CUSTOM
-    });
-
-    const linkResource = shopIdResource.addResource('link');
-    // shop/{shopId}/link POST #LinkQR
-    linkResource.addMethod('POST', new apigateway.LambdaIntegration(shopMgmtFn), {
-      authorizer,
-      authorizationType: apigateway.AuthorizationType.CUSTOM
-    });
-
-    const shopActivateResource = shopIdResource.addResource('activate');
-    // shop/{shopId}/activate POST #ActivateQR
-    shopActivateResource.addMethod('POST', new apigateway.LambdaIntegration(shopMgmtFn), {
-      authorizer,
-      authorizationType: apigateway.AuthorizationType.CUSTOM
-    });
-
-    const shopQrsResource = shopIdResource.addResource('qrcodes');
-    // shop/{shopId}/qrcodes GET #ListQRs
-    shopQrsResource.addMethod('GET', new apigateway.LambdaIntegration(shopMgmtFn), {
-      authorizer,
-      authorizationType: apigateway.AuthorizationType.CUSTOM
-    });
-
-    const shopQrResource = shopIdResource.addResource('qrcodecheck');
-    // shop/{shopId}/qrcodecheck POST #CheckQR
-    shopQrResource.addMethod('POST', new apigateway.LambdaIntegration(shopMgmtFn), {
-      authorizer,
-      authorizationType: apigateway.AuthorizationType.CUSTOM
-    });
-
-    const shopAdminsResource = shopIdResource.addResource('admins');
-    // shop/{shopId}/admins POST #GetShopAdmins
-    shopAdminsResource.addMethod('POST', new apigateway.LambdaIntegration(shopMgmtFn), {
-      authorizer,
-      authorizationType: apigateway.AuthorizationType.CUSTOM
-    });
-
-    const shopOrdersResource = shopIdResource.addResource('orders');
-    // shop/{shopId}/orders GET #ListShopOrders
-    shopOrdersResource.addMethod('GET', new apigateway.LambdaIntegration(shopOrdersFn), {
-      authorizer,
-      authorizationType: apigateway.AuthorizationType.CUSTOM
-    });
-
-    const shopOrderResource = shopOrdersResource.addResource('{qrId}');
-    // shop/{shopId}/orders/{qrId} PATCH #ShipOrder
-    shopOrderResource.addMethod('PATCH', new apigateway.LambdaIntegration(shopOrdersFn), {
-      authorizer,
-      authorizationType: apigateway.AuthorizationType.CUSTOM
-    });
   }
 }

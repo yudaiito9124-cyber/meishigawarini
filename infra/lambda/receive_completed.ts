@@ -1,4 +1,11 @@
-
+/**
+ * 概要: ギフト受取完了の報告
+ * 詳細: ユーザーがギフトを受け取ったことを報告し、ステータスを COMPLETED (完了) に変更します。
+ * エンドポイント: POST /receive/completed
+ * リクエストボディ:
+ *  - qr_id: ギフト（QR）のUUID (必須)
+ *  - pin_code: 4桁のPINコード (必須)
+ */
 import { APIGatewayProxyHandler } from 'aws-lambda';
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, TransactWriteCommand, GetCommand } from '@aws-sdk/lib-dynamodb';
@@ -27,8 +34,11 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Missing required fields' }) };
         }
 
-
-        // 1. Verify QR and PIN
+        // 【DB操作: GetItem】
+        // - 目的: 指定されたQRコードの状態確認。すでに発送済み(SHIPPED)であるか、PINが一致しているかを検証
+        // - テーブル: TABLE_NAME
+        // - リクエストキー: { PK: `QR#${qr_id}`, SK: 'METADATA' }
+        // - 取得カラム: ALL (status, pin 等)
         const getRes = await ddb.send(new GetCommand({
             TableName: TABLE_NAME,
             Key: { PK: `QR#${qr_id}`, SK: 'METADATA' }
@@ -46,7 +56,11 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             return { statusCode: 403, headers: corsHeaders, body: JSON.stringify({ message: 'Invalid PIN' }) };
         }
 
-        // 2. Transact Write: Update Status to COMPLETED
+        // 【DB操作: TransactWriteItems】
+        // - 目的: 商品受領に伴い、QRコードのステータスを「完了(COMPLETED)」へアトミックに移行
+        // - テーブル: TABLE_NAME
+        // - 処理: { PK: `QR#${qr_id}`, SK: 'METADATA' } の status, GSI1_PK, ts_completed_at を更新
+        // - 条件: 別のプロセスによって status が SHIPPED 以外に書き換えられていないこと
         await ddb.send(new TransactWriteCommand({
             TransactItems: [
                 {
@@ -54,7 +68,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                         TableName: TABLE_NAME,
                         Key: { PK: `QR#${qr_id}`, SK: 'METADATA' },
                         UpdateExpression: 'SET #status = :completed, GSI1_PK = :gsi_pk, ts_completed_at = :now, ts_updated_at = :now',
-                        ConditionExpression: '#status = :shipped', // Double check race condition
+                        ConditionExpression: '#status = :shipped',
                         ExpressionAttributeNames: { '#status': 'status' },
                         ExpressionAttributeValues: {
                             ':completed': 'COMPLETED',
@@ -67,29 +81,22 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             ]
         }));
 
-        // Fire and forget notification (or await if we want to ensure it sends)
-        // Since lambda might freeze, better to await or use EventBridge. simple await for now.
-        // await sendCompletionNotification(qr_id, pin_code);
-        await sendSystemNotification(qr_id, 'DeliveryCompleted', pin_code);
+        // 通知送信 (ショップ管理者に受取完了を知らせる)
+        try {
+            await sendSystemNotification(qr_id, 'DeliveryCompleted', pin_code);
+        } catch (e) {
+            console.error('Notification failed', e);
+        }
 
         return {
             statusCode: 200,
             headers: corsHeaders,
-            body: JSON.stringify({
-                message: 'Gift received successfully',
-                order_id: `ORDER#${qr_id}`
-            })
+            body: JSON.stringify({ message: 'Gift received successfully', order_id: `ORDER#${qr_id}` })
         };
 
     } catch (error: any) {
         console.error(error);
-        if (error.name === 'TransactionCanceledException') {
-            return { statusCode: 409, headers: corsHeaders, body: JSON.stringify({ message: 'Transaction failed (possibly already received)' }) };
-        }
-        return {
-            statusCode: 500,
-            headers: corsHeaders,
-            body: JSON.stringify({ message: 'Internal Server Error' })
-        };
+        if (error.name === 'TransactionCanceledException') return { statusCode: 409, headers: corsHeaders, body: JSON.stringify({ message: 'Already completed' }) };
+        return { statusCode: 500, headers: corsHeaders, body: JSON.stringify({ message: 'Internal Server Error' }) };
     }
 };

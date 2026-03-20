@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { cn } from '@/lib/utils';
-import { fetchWithAuth } from '@/app/utils/api-client';
+import { shopApi } from '@/lib/api/shop';
 import { HelpCircle, Crown, Store } from 'lucide-react';
 
 export default function LoginPage() {
@@ -63,25 +63,20 @@ export default function LoginPage() {
     const redirectShopPage = async () => {
         setLoading(true);
         try {
-            const res = await fetchWithAuth('/shop');
-            if (res.ok) {
-                const data = await res.json();
-                const shopList = data.shops || [];
+            const data = await shopApi.shop_list({});
+            const shops = data.shops || [];
 
-                // Auto-redirect if SHOP_MANAGER and has exactly one shop
-                if (shopList.length === 1) {
-                    setSingleShopOwner(true);
-                    const shopId = shopList[0].id;
-                    router.push(`/shop/${shopId}`);
-                    console.log("replace")
-                    return;
-                }
-                setSingleShopOwner(false);
-                router.push('/shop');
-                console.log("replace2")
-            } else {
-                // console.error('Failed to fetch shop');
+            // Auto-redirect if SHOP_MANAGER and has exactly one shop
+            if (shops.length === 1) {
+                setSingleShopOwner(true);
+                const shopId = shops[0].id;
+                router.push(`/shop/${shopId}`);
+                console.log("replace")
+                return;
             }
+            setSingleShopOwner(false);
+            router.push('/shop');
+            console.log("replace2")
         } catch (e) {
             // console.error(e);
         } finally {

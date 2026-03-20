@@ -9,7 +9,7 @@ import { Link, useRouter } from '@/i18n/routing';
 import { useTranslations } from 'next-intl';
 import { fetchAuthSession, getCurrentUser, signOut } from 'aws-amplify/auth';
 import { Badge } from "lucide-react";
-import { fetchWithAuth } from '@/app/utils/api-client';
+import { shopApi } from '@/lib/api/shop';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -66,28 +66,23 @@ export default function ShopListPage() {
     const fetchShops = async (currentIsAdmin?: boolean) => {
         setLoading(true);
         try {
-            const res = await fetchWithAuth('/shop');
-            if (res.ok) {
-                const data = await res.json();
-                const shopList = data.shops || [];
-                const roles = data.roles || [];
-                const owner_shop_ids = data.owner_shop_ids || [];
-                const gm_shop_ids = data.gm_shop_ids || [];
-                setShops(shopList);
-                setRoles(roles);
-                setOwnerShopIds(owner_shop_ids);
-                setGmShopIds(gm_shop_ids);
+            const data = await shopApi.shop_list({});
+            const shopList = data.shops || [];
+            const roles = data.roles || [];
+            const owner_shop_ids = data.owner_shop_ids || [];
+            const gm_shop_ids = data.gm_shop_ids || [];
+            setShops(shopList);
+            setRoles(roles);
+            setOwnerShopIds(owner_shop_ids);
+            setGmShopIds(gm_shop_ids);
 
-                // Use currentIsAdmin if passed (for initial load), otherwise use state
-                const checkAdmin = currentIsAdmin !== undefined ? currentIsAdmin : isAdmin;
+            // Use currentIsAdmin if passed (for initial load), otherwise use state
+            const checkAdmin = currentIsAdmin !== undefined ? currentIsAdmin : isAdmin;
 
-                // Auto-redirect if SHOP_MANAGER and has exactly one shop
-                if (shopList.length === 1 && !checkAdmin) {
-                    const shopId = shopList[0].id;
-                    router.replace(`/shop/${shopId}`);
-                }
-            } else {
-                // console.error('Failed to fetch shop');
+            // Auto-redirect if SHOP_MANAGER and has exactly one shop
+            if (shopList.length === 1 && !checkAdmin) {
+                const shopId = shopList[0].id;
+                router.replace(`/shop/${shopId}`);
             }
         } catch (e) {
             // console.error(e);
@@ -100,24 +95,17 @@ export default function ShopListPage() {
         e.preventDefault();
         setCreating(true);
         try {
-            const res = await fetchWithAuth('/shop', {
-                method: 'POST',
-                body: JSON.stringify({ name: createName.trim(), owner_id: createOwnerId.trim(), gm_ids: createGmId.split(';').map(id => id.trim()) })
+            const data = await shopApi.shop_create({ 
+                name: createName.trim(), 
+                owner_id: createOwnerId.trim(), 
+                gm_ids: createGmId ? createGmId.split(';').map(id => id.trim()).filter(Boolean) : undefined
             });
-
-            if (res.ok) {
-                const data = await res.json();
-                // Redirect to the new shop
-                router.push(`/shop/${data.shop_id}`);
-            } else {
-                const errData = await res.json().catch(() => null);
-                const errorMessage = (errData?.message && tb(errData.message)) || errData?.message || 'Failed to create shop';
-                console.error('Create Shop Failed:', errData);
-                alert(errorMessage);
-            }
-        } catch (e) {
+            // Redirect to the new shop
+            router.push(`/shop/${data.shop_id}`);
+        } catch (e: any) {
             console.error(e);
-            alert('Error creating shop');
+            const errorMessage = (e.message && tb(e.message)) || e.message || 'Error creating shop';
+            alert(errorMessage);
         } finally {
             setCreating(false);
         }

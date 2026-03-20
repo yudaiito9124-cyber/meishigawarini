@@ -20,98 +20,13 @@ import { cn } from "@/lib/utils";
 import confetti from "canvas-confetti";
 import { resizeImage } from "@/lib/image-utils";
 import { generateId } from "@/lib/id";
+import { receiveApi } from "@/lib/api/receive";
 
 
 const NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 const GIFT_REVEAL_DELAY_MS = 750;
 
-// Verify PIN and Fetch Gift Details
-const verifyGiftPin = async (uuid: string, pin: string, password?: string) => {
-    const res = await fetch(`${NEXT_PUBLIC_API_URL}/recipient/qrcodes/verify`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ uuid, pin, password }),
-    });
 
-    if (!res.ok) {
-        if (res.status === 404 || res.status === 403) {
-            throw new Error("Invalid PIN, Password, or Gift not found");
-        }
-        throw new Error("Failed to verify PIN");
-    }
-    return res.json();
-};
-
-// Submit Address
-const submitAddress = async (uuid: string, pin: string, addressData: any, password?: string) => {
-    const res = await fetch(`${NEXT_PUBLIC_API_URL}/recipient/submit`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-            qr_id: uuid,
-            pin_code: pin,
-            shipping_info: addressData,
-            password
-        }),
-    });
-
-    if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.message || "Failed to submit address");
-    }
-    return res.json();
-};
-
-// Receive Gift
-const receiveGift = async (uuid: string, pin: string) => {
-    const res = await fetch(`${NEXT_PUBLIC_API_URL}/recipient/completed`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-            qr_id: uuid,
-            pin_code: pin,
-        }),
-    });
-
-    if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.message || "Failed to receive gift");
-    }
-    return res.json();
-};
-
-// Fetch Chat Messages
-const fetchChatMessages = async (uuid: string, pin: string) => {
-    const res = await fetch(`${NEXT_PUBLIC_API_URL}/recipient/qrcodes/${uuid}/chat?pin=${pin}`);
-    if (!res.ok) throw new Error("Failed to fetch messages");
-    return res.json();
-};
-
-// Post Chat Message
-const postChatMessage = async (uuid: string, pin: string, username: string, message: string, fileData?: any) => {
-    const res = await fetch(`${NEXT_PUBLIC_API_URL}/recipient/qrcodes/${uuid}/chat`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-            pin,
-            username,
-            message,
-            ...(fileData || {})
-        }),
-    });
-    if (!res.ok) throw new Error("Failed to post message");
-    return res.json();
-};
-
-// Get Upload URL
-const getChatUploadUrl = async (uuid: string, pin: string, filename: string, contentType: string, fileSize: number) => {
-    const res = await fetch(`${NEXT_PUBLIC_API_URL}/recipient/qrcodes/${uuid}/upload-url?pin=${pin}&filename=${encodeURIComponent(filename)}&contentType=${encodeURIComponent(contentType)}&fileSize=${fileSize}`);
-    if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.message || "Failed to get upload URL");
-    }
-    return res.json();
-};
 
 
 // Linkify Helper
@@ -188,6 +103,7 @@ export default function ReceivePage() {
     const tb = useTranslations('Backend');
     const params = useParams();
     const uuid = params?.uuid as string;
+    const locale = params?.locale as string;
 
     const [loading, setLoading] = useState(false);
     const [gift, setGift] = useState<any>(null);
@@ -277,20 +193,7 @@ export default function ReceivePage() {
 
         if (!silent) setSenderInfoLoading(true);
         try {
-            const res = await fetch(`${NEXT_PUBLIC_API_URL}/recipient/qrcodes/${uuid}/chat`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    pin,
-                    type: 'load_from_id',
-                    id: importId
-                }),
-            });
-            if (!res.ok) {
-                const errData = await res.json();
-                throw new Error(errData.message || "Failed to load info");
-            }
-            const data = await res.json();
+            const data = await receiveApi.receive_sender_load(uuid, pin, { id: importId });
             data.sender_id = importId;
             if (data.sender_info) {
                 // Sanitize: Convert null values to empty strings
@@ -337,7 +240,7 @@ export default function ReceivePage() {
         setError(null);
 
         try {
-            const data = await verifyGiftPin(uuid, pin);
+            const data = await receiveApi.verify(uuid, pin);
 
             // Start expansion animation after successful verification
             setIsExpanding(true);
@@ -384,7 +287,7 @@ export default function ReceivePage() {
         e.preventDefault();
         setLoading(true);
         try {
-            const data = await verifyGiftPin(uuid, pin, unlockPassword);
+            const data = await receiveApi.verify(uuid, pin, unlockPassword);
 
             if (data.is_authorized) {
                 // Start expansion animation after successful verification
@@ -454,12 +357,16 @@ export default function ReceivePage() {
             return;
         }
 
-        setLoading(true);
         try {
-            await submitAddress(uuid, pin, { 
-                name, zipCode, address, phone, email, preferredDate, preferredTime,
-                client_timestamp: new Date().toLocaleString()
-            }, password);
+            const isSubscribed = !!notificationEmail; // Check if notificationEmail is set
+            await receiveApi.receive_submit(uuid, pin, { 
+                name, 
+                address, 
+                zipCode, 
+                email: isSubscribed ? email : undefined,
+                client_timestamp: new Date().toISOString(),
+                password
+            });
             setStep("SUCCESS");
         } catch (error: any) {
             // console.error("Submission error:", error);
@@ -473,7 +380,7 @@ export default function ReceivePage() {
         e.preventDefault();
         setLoading(true);
         try {
-            await receiveGift(uuid, pin);
+            await receiveApi.receive_completed(uuid, pin, {});
             setStep("COMPLETED");
         } catch (error: any) {
             // console.error("Receive error:", error);
@@ -486,7 +393,7 @@ export default function ReceivePage() {
     // Load messages and sender info when step is not PIN (i.e. logged in)
     const loadMessages = useCallback(async () => {
         try {
-            const data = await fetchChatMessages(uuid, pin);
+            const data = await receiveApi.receive_chat_get(uuid, pin, {});
             setMessages(data.messages || []);
             setTotalSizeInfo(data.total_size_bytes || 0);
 
@@ -525,6 +432,8 @@ export default function ReceivePage() {
         }
     }, [step, hasLoadedChat, pin, loadMessages]);
 
+
+
     const handleChatSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if ((!chatMessage && !selectedFile) || !chatName) return;
@@ -545,13 +454,10 @@ export default function ReceivePage() {
                     }
                 }
 
-                const { uploadUrl, publicUrl } = await getChatUploadUrl(
-                    uuid,
-                    pin,
-                    `${generateId()}.webp`,
-                    'image/webp',
-                    uploadFile.size
-                );
+                const { uploadUrl, fileUrl } = await receiveApi.receive_uploadurl_get(uuid, pin, {
+                    filename: selectedFile.name,
+                    contentType: 'image/webp'
+                });
 
                 const uploadRes = await fetch(uploadUrl, {
                     method: "PUT",
@@ -562,14 +468,18 @@ export default function ReceivePage() {
                 if (!uploadRes.ok) throw new Error("S3 Upload failed");
 
                 fileData = {
-                    file_url: publicUrl,
+                    file_url: fileUrl,
                     file_name: selectedFile.name,
                     file_type: selectedFile.type,
                     file_size: uploadFile.size
                 };
             }
 
-            await postChatMessage(uuid, pin, chatName, chatMessage, fileData);
+            await receiveApi.receive_chat_send(uuid, pin, {
+                username: chatName,
+                message: chatMessage,
+                ...(fileData || {})
+            });
             setChatMessage("");
             setSelectedFile(null);
             await loadMessages();
@@ -597,14 +507,8 @@ export default function ReceivePage() {
                 delete updatedSenderInfo.sender_id;
             }
 
-            await fetch(`${NEXT_PUBLIC_API_URL}/recipient/qrcodes/${uuid}/chat`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    pin,
-                    type: 'update_sender_info',
-                    sender_info: updatedSenderInfo
-                }),
+            await receiveApi.receive_sender_update(uuid, pin, {
+                sender_info: updatedSenderInfo
             });
 
             await loadMessages();
@@ -619,18 +523,10 @@ export default function ReceivePage() {
     const handleSaveAsNewUser = async () => {
         setSenderInfoLoading(true);
         try {
-            const res = await fetch(`${NEXT_PUBLIC_API_URL}/recipient/qrcodes/${uuid}/chat`, {
-                method: 'POST',
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    type: 'save_as_new_user',
-                    pin,
-                    sender_info: senderForm,
-                    id: senderInfo?.sender_id
-                })
+            const data = await receiveApi.receive_sender_save(uuid, pin, {
+                sender_info: senderForm,
+                id: senderInfo?.sender_id
             });
-            if (!res.ok) throw new Error("Failed to save data");
-            const data = await res.json();
 
             // Update local state to reflect the ID so subsequent saves update the same record
             if (data.userid) {
@@ -658,9 +554,7 @@ export default function ReceivePage() {
                 }
             }
 
-            const res = await fetch(`${NEXT_PUBLIC_API_URL}/recipient/qrcodes/${uuid}/upload-url?pin=${pin}&filename=${encodeURIComponent(generateId() + '.webp')}&contentType=image%2Fwebp&fileSize=${uploadFile.size}&folder=sendercontent`);
-            if (!res.ok) throw new Error('Failed to get upload URL');
-            const { uploadUrl, publicUrl } = await res.json();
+            const { uploadUrl, fileUrl } = await receiveApi.receive_uploadurl_get(uuid, pin, { filename: file.name, contentType: 'image/webp' });
 
             const s3Res = await fetch(uploadUrl, {
                 method: 'PUT',
@@ -669,21 +563,15 @@ export default function ReceivePage() {
             });
             if (!s3Res.ok) throw new Error('Failed to upload to S3');
 
-            const strippedUrl = publicUrl.split('?')[0];
-            const newUrlsForState = [...htmlImageUrls, publicUrl]; // Use signed URL for immediate preview
+            const strippedUrl = fileUrl.split('?')[0];
+            const newUrlsForState = [...htmlImageUrls, fileUrl]; // Use signed URL for immediate preview
             const newUrlsForBackend = [...(senderForm.html_image_urls || []), strippedUrl];
 
             setHtmlImageUrls(newUrlsForState);
 
             const newSenderInfo = { ...senderForm, html_image_urls: newUrlsForBackend };
-            await fetch(`${NEXT_PUBLIC_API_URL}/recipient/qrcodes/${uuid}/chat`, {
-                method: 'POST',
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    type: 'update_sender_info',
-                    pin,
-                    sender_info: newSenderInfo
-                })
+            await receiveApi.receive_sender_update(uuid, pin, {
+                sender_info: newSenderInfo
             });
             // Update local senderInfo with clean URLs for next save, but UI uses htmlImageUrls for display
             setSenderInfo(newSenderInfo);
@@ -708,14 +596,8 @@ export default function ReceivePage() {
                 ts_updated_at: new Date().toISOString()
             };
 
-            await fetch(`${NEXT_PUBLIC_API_URL}/recipient/qrcodes/${uuid}/chat`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    pin,
-                    type: 'update_sender_info',
-                    sender_info: updatedSenderInfo
-                }),
+            await receiveApi.receive_sender_update(uuid, pin, {
+                sender_info: updatedSenderInfo
             });
 
             await loadMessages();
@@ -738,12 +620,10 @@ export default function ReceivePage() {
                 }
             }
 
-            const { uploadUrl, publicUrl } = await getChatUploadUrl(
+            const { uploadUrl, fileUrl } = await receiveApi.receive_uploadurl_get(
                 uuid,
                 pin,
-                `${generateId()}.webp`,
-                'image/webp',
-                uploadFile.size
+                { filename: file.name, contentType: 'image/webp' }
             );
 
             const uploadRes = await fetch(uploadUrl, {
@@ -756,19 +636,13 @@ export default function ReceivePage() {
 
             const newSenderInfo = {
                 ...senderForm,
-                card_image_url: publicUrl,
+                card_image_url: fileUrl,
                 card_image_name: file.name,
                 ts_updated_at: new Date().toISOString()
             };
 
-            await fetch(`${NEXT_PUBLIC_API_URL}/recipient/qrcodes/${uuid}/chat`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    pin,
-                    type: 'update_sender_info',
-                    sender_info: newSenderInfo
-                }),
+            await receiveApi.receive_sender_update(uuid, pin, {
+                sender_info: newSenderInfo
             });
 
             await loadMessages();
@@ -818,20 +692,14 @@ export default function ReceivePage() {
 
         setSubscribing(true);
         try {
-            await fetch(`${NEXT_PUBLIC_API_URL}/recipient/qrcodes/${uuid}/chat`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    pin,
-                    type: 'subscribe',
-                    email: notificationEmail,
-                    locale: params.locale // Send current language
-                }),
+            await receiveApi.receive_subscription(uuid, pin, {
+                email: notificationEmail,
+                locale
             });
             alert(t('chat.subscribeSuccess'));
             setNotificationEmail("");
         } catch (e: any) {
-            alert(t('chat.subscribeFailed'));
+            alert(t('chat.subscribeFailed') + (tb(e.message.replace(/\./g, '_')) || e.message));
         } finally {
             setSubscribing(false);
         }
@@ -1705,7 +1573,7 @@ export default function ReceivePage() {
                                                                                         const next = htmlImageUrls.filter((_, i) => i !== idx);
                                                                                         setHtmlImageUrls(next);
                                                                                         const newSenderInfo = { ...senderForm, html_image_urls: next };
-                                                                                        fetch(`${NEXT_PUBLIC_API_URL}/recipient/qrcodes/${uuid}/chat`, {
+                                                                                        fetch(`${NEXT_PUBLIC_API_URL}/receive/chat`, {
                                                                                             method: 'POST',
                                                                                             headers: { "Content-Type": "application/json" },
                                                                                             body: JSON.stringify({
