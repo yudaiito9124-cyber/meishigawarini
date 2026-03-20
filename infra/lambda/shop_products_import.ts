@@ -33,13 +33,13 @@ export const handler: APIGatewayProxyHandler = async (event) => {
     try {
         if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers: corsHeaders, body: '' };
 
-        const claims = event.requestContext?.authorizer?.claims;
-        const userId = claims?.sub;
-        const userGroups = parseGroups(claims?.['cognito:groups']);
+        const authorizer = event.requestContext?.authorizer;
+        const userId = authorizer?.principalId;
+        const isGlobalAdminFlag = authorizer?.isGlobalAdmin === 'true';
         if (!userId) return { statusCode: 401, headers: corsHeaders, body: JSON.stringify({ message: 'Unauthorized' }) };
 
         const body = JSON.parse(event.body || '{}');
-        const { shop_id } = body;
+        const { shopId } = body;
 
         // Determine action from path or body
         let action = body.action;
@@ -47,19 +47,19 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         if (resPath.endsWith('/list')) action = 'list_shops';
         else if (resPath.endsWith('/execute')) action = 'execute_import';
 
-        if (!shop_id) return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Missing shop_id' }) };
+        if (!shopId) return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Missing shopId' }) };
         if (!action || !['list_shops', 'execute_import'].includes(action)) {
             return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Invalid action' }) };
         }
 
-        const shopMetadata = await checkShopOwnerOrGM(ddb, TABLE_NAME, shop_id, userId, event);
+        const shopMetadata = await checkShopOwnerOrGM(ddb, TABLE_NAME, shopId, userId, event);
         if (shopMetadata === false) {
             return { statusCode: 401, headers: corsHeaders, body: JSON.stringify({ message: 'Unauthorized' }) };
         }
 
         if (action === 'list_shops') {
             let res;
-            if (isGlobalAdmin(userGroups)) {
+            if (isGlobalAdminFlag) {
                 // 【DB操作: Scan】
                 // - 目的: グローバル管理者の場合、システム内の全ショップのメタデータを取得しインポート元候補とする
                 // - テーブル: TABLE_NAME
@@ -133,7 +133,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                         const sourceKey = decodeURIComponent(urlObj.pathname.substring(1));
                         const ext = sourceKey.split('.').pop() || 'jpg';
                         const newFilename = `${generateId()}.${ext}`;
-                        const newKey = `shop/${shop_id}/products/${newFilename}`;
+                        const newKey = `shop/${shopId}/products/${newFilename}`;
 
                         // S3バケット間で画像コピー
                         await s3.send(new CopyObjectCommand({
@@ -148,17 +148,17 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 }
 
                 const copyItem = { ...prod };
-                copyItem.PK = `SHOP#${shop_id}`;
+                copyItem.PK = `SHOP#${shopId}`;
                 copyItem.image_url = newImageUrl;
                 if (prod.detail_html) copyItem.detail_html = prod.detail_html;
                 if (copyItem.GSI2_SK && copyItem.GSI2_SK.startsWith('SHOP#')) {
-                    copyItem.GSI2_SK = `SHOP#${shop_id}`;
+                    copyItem.GSI2_SK = `SHOP#${shopId}`;
                 }
 
                 // 【DB操作: PutItem (ループ実行)】
                 // - 目的: インポートでコピーした商品レコードを自分のショップ下に新規保存
                 // - テーブル: TABLE_NAME
-                // - リクエストキー: { PK: `SHOP#${shop_id}`, SK: `PRODUCT#${元のプロダクトID}` }
+                // - リクエストキー: { PK: `SHOP#${shopId}`, SK: `PRODUCT#${元のプロダクトID}` }
                 // - 登録カラム: インポート元の全カラムを継承（画像URLやPK/GSI2_SKなど自ショップ向けに書き換え済みの状態）
                 // 操作: PutItem
                 await ddb.send(new PutCommand({

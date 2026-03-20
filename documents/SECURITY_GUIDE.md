@@ -8,9 +8,9 @@
 管理画面やショップ画面の裏側のAPIは、誰でも叩けないように保護されています。
 
 ### ① API全体のアクセス制限
-*   **仕組み**: AWS Cognitoによる認証機能（Authorizer）をAPI Gatewayに設定しており、ログインしていないリクエストはAPI到達前にAWS側で弾かれます。
-*   **場所**: `infra/lib/infra-stack.ts`
-    *   API全体の定義時に `authorizer` を紐づけ、保護するパス（`/shop` や `/admin` など）を指定しています。
+*   **仕組み**: API Gatewayに設定された **Custom Lambda Authorizer** により、リクエストごとに認証・認可を行っています。ログインしていないリクエストや不正なQRキーを持つリクエストは、API到達前にAWS側で遮断されます。
+*   **場所**: `infra/lib/constructs/` (`shop-api.ts`, `receive-api.ts`, `admin-api.ts`)
+    *   `/shop` では `ShopAuthorizer` (Cognitoトークン検証)、`/receive` では `ReceiveAuthorizer` (UUID/PIN検証) を使用して保護しています。
 
 ### ② 管理者(Admin)権限の厳格なチェック
 *   **仕組み**: ログインしているだけでなく、「管理グループ（Administrators）」に入っているユーザーしか絶対にアクセスできないようにしています。
@@ -20,8 +20,8 @@
 
 ### ③ データ所有権のチェック (Tenant Isolation)
 *   **仕組み**: ショップオーナーが「他のショップのデータ」を勝手に書き換えたり盗み見たりできないように、APIアクセス時に必ず「このショップの作成者と、今APIを叩いているユーザーが一致するか」を確認します。
-*   **場所**: `infra/lambda/shop-mgmt.ts`
-    *   `verifyShopOwner` 関数でDBから対象ショップを取得し、`owner_id` が CognitoのユーザーID(`userId`) と一致しない場合は `403 Forbidden` で処理を遮断します。
+*   **場所**: `infra/lambda/share/shop-auth.ts`
+    *   `checkShopOwnerOrGM` 関数でDBから対象ショップを取得し、`owner_id` (または `gm_ids`) が CognitoのユーザーID(`userId`) と一致しない場合は `401 Unauthorized` または `403 Forbidden` で処理を遮断します。
 
 ---
 
@@ -33,7 +33,7 @@
 *   **場所**: 
     1.  `infra/lambda/utils/rate-limit.ts`
         *   `isLocked` 関数で「現在ロックされている時間か」を計算し、`getRateLimitUpdate` で「失敗回数をカウントアップし、5回に達したら現在時刻の30分後を `locked_until` にセットする」DB更新用のコマンドを作成しています。
-    2.  `infra/lambda/recipient-submit.ts` など（受取人向けAPI）
+    2.  `infra/lambda/receive_submit.ts` など（受取人向けAPI）
         *   リクエストが来た一番初めに `isLocked` を呼び出し、ロック中なら即座に `403 Forbidden` を返してPINの判定すら行いません。
 
 ---
@@ -44,7 +44,7 @@
 
 *   **仕組み**: 直接S3（ストレージ）にアップロードさせたり、Lambda（サーバー）経由で画像を処理したりすると、悪意のある大容量ファイル（マルウェアなど）を送られてサーバーがパンクするリスクがあります。
     これを防ぐため、**「短時間（5分間）だけ有効な、特定のファイル名しかアップロードできない専用の片道切符（署名付きURL / Pre-signed URL）」** を発行しています。
-*   **場所**: `infra/lambda/shop-mgmt.ts` および `infra/lambda/admin-card-designs.ts`
+*   **場所**: `infra/lambda/shop_products_uploadurl.ts` および `infra/lambda/admin_card_designs.ts`
     *   リクエスト元の拡張子（jpg, png, webp等）やMIMEタイプを厳格にチェック。
     *   `getSignedUrl` で300秒だけ有効なPUT用URLを生成。
     *   **改善点**: アップロード直後の確認用に、署名付きGET URL (`getPresignedViewUrl`) を同時に返却することで、非公開バケットでも即座にプレビューを可能にしています。
@@ -54,7 +54,7 @@
 ## 4. トランザクション処理 (データの整合性担保)
 
 *   **仕組み**: 受取人が住所を入力し「QRコードを【使用済】にする」処理と「住所情報を【注文データ】として保存する」処理は、**絶対にセットで同時に行われなければなりません。** もし片方だけが失敗すると、「住所は届いたのにQRは未使用のまま使い回せる」等の致命的なバグになります。これを防ぐため、DynamoDBの「トランザクション（TransactWriteCommand）」を使用しています。
-*   **場所**: `infra/lambda/recipient-submit.ts`
+*   **場所**: `infra/lambda/receive_submit.ts`
     *   `TransactItems` の中で、QRステータスの `Update` と、オーダーの `Put` を配列で内包し、どちらかに少しでもイレギュラーがあれば通信全体をロールバック（無かったこと）にする堅牢な保護を行っています。さらに `ConditionExpression: '#status = :active'` を指定し、同時に複数回「送信」ボタンを押されるようなレースコンディション（二重登録）もデータベースレベルで完全に弾いています。
 
 ---

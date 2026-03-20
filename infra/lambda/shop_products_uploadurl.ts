@@ -32,21 +32,22 @@ export const handler: APIGatewayProxyHandler = async (event) => {
     try {
         if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers: corsHeaders, body: '' };
 
-        const claims = event.requestContext?.authorizer?.claims;
-        const userId = claims?.sub;
+        const authorizer = event.requestContext?.authorizer;
+        const userId = authorizer?.principalId;
+        const claims = authorizer;
         if (!userId) return { statusCode: 401, headers: corsHeaders, body: JSON.stringify({ message: 'Unauthorized' }) };
 
         const body = JSON.parse(event.body || '{}');
-        const { shop_id, filename, contentType, folder } = body;
+        const { shopId, filename, contentType, folder } = body;
 
-        if (!shop_id) return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Missing shop_id' }) };
+        if (!shopId) return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Missing shopId' }) };
         
         // 【DB操作: 内部モジュールによる GetItem・BatchGetItem】
         // - 目的: 実行ユーザーが対象ショップのオーナーまたはGMであるかの権限を検証
         // - テーブル: TABLE_NAME
-        // - リクエストキー: { PK: `SHOP#${shop_id}`, SK: 'METADATA' } および { PK: `USER#${userId}`, SK: 'SHOP' }
-        // - 取得カラム: ショップのメタデータ一式、およびユーザーの権限リストmand が実行される PK = SHOP#{shop_id})
-        const shopMetadata = await checkShopOwnerOrGM(ddb, TABLE_NAME, shop_id, userId, event);
+        // - リクエストキー: { PK: `SHOP#${shopId}`, SK: 'METADATA' } および { PK: `USER#${userId}`, SK: 'SHOP' }
+        // - 取得カラム: ショップのメタデータ一式、およびユーザーの権限リストmand が実行される PK = SHOP#{shopId})
+        const shopMetadata = await checkShopOwnerOrGM(ddb, TABLE_NAME, shopId, userId, event);
         if (shopMetadata === false) {
             return { statusCode: 401, headers: corsHeaders, body: JSON.stringify({ message: 'Unauthorized' }) };
         }
@@ -64,9 +65,9 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Invalid file extension. Only images are allowed.' }) };
         }
 
-        let key = `shop/${shop_id}/products/${filename}`;
+        let key = `shop/${shopId}/products/${filename}`;
         if (folder === 'shopcontent') {
-            key = `shop/${shop_id}/shopcontent/${filename}`;
+            key = `shop/${shopId}/shopcontent/${filename}`;
         }
         
         // S3 PutObject用コマンド生成および署名付きURL発行

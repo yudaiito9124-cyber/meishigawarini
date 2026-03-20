@@ -32,12 +32,13 @@ export const handler: APIGatewayProxyHandler = async (event) => {
     try {
         if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers: corsHeaders, body: '' };
 
-        const claims = event.requestContext?.authorizer?.claims;
-        const userId = claims?.sub;
+        const authorizer = event.requestContext?.authorizer;
+        const userId = authorizer?.principalId;
+        const claims = authorizer;
         if (!userId) return { statusCode: 401, headers: corsHeaders, body: JSON.stringify({ message: 'Unauthorized' }) };
 
         const body = JSON.parse(event.body || '{}');
-        const { shop_id, name, detail_html, html_image_urls, deleted_html_image_urls } = body;
+        const { shopId, name, detail_html, html_image_urls, deleted_html_image_urls } = body;
 
         // Determine action from path or body
         let action = body.action;
@@ -45,17 +46,17 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         if (resPath.endsWith('/get')) action = 'get';
         else if (resPath.endsWith('/update')) action = 'update';
 
-        if (!shop_id) return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Missing shop_id' }) };
+        if (!shopId) return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Missing shopId' }) };
         if (!action || !['get', 'update'].includes(action)) {
-            return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Invalid action' }) };
+            return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Invalid action: ' + action + ' for ' + resPath }) };
         }
 
         // 【DB操作: 内部モジュールによる GetItem・BatchGetItem】
         // - 目的: 実行ユーザーが対象ショップのオーナーまたはGMであるかの権限検証と、ショップメタデータの取得
         // - テーブル: TABLE_NAME
-        // - リクエストキー: { PK: `SHOP#${shop_id}`, SK: 'METADATA' } および { PK: `USER#${userId}`, SK: 'SHOP' }
+        // - リクエストキー: { PK: `SHOP#${shopId}`, SK: 'METADATA' } および { PK: `USER#${userId}`, SK: 'SHOP' }
         // - 取得カラム: ショップのメタデータ一式、およびユーザーの権限リスト
-        let shopMetadata: any = await checkShopOwnerOrGM(ddb, TABLE_NAME, shop_id, userId, event);
+        let shopMetadata: any = await checkShopOwnerOrGM(ddb, TABLE_NAME, shopId, userId, event);
         if (shopMetadata === false) {
             return { statusCode: 401, headers: corsHeaders, body: JSON.stringify({ message: 'Unauthorized' }) };
         }
@@ -118,11 +119,11 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             // 【DB操作: UpdateItem】
             // - 目的: ショップの基本情報(メタデータ)の部分更新
             // - テーブル: TABLE_NAME
-            // - リクエストキー: { PK: `SHOP#${shop_id}`, SK: 'METADATA' }
+            // - リクエストキー: { PK: `SHOP#${shopId}`, SK: 'METADATA' }
             // - 更新カラム: name, detail_html, html_image_urls からリクエストで指定されたもののみ
             await ddb.send(new UpdateCommand({
                 TableName: TABLE_NAME,
-                Key: { PK: `SHOP#${shop_id}`, SK: 'METADATA' },
+                Key: { PK: `SHOP#${shopId}`, SK: 'METADATA' },
                 UpdateExpression: `SET ${updateExprParts.join(', ')}`,
                 ExpressionAttributeNames: Object.keys(attrNames).length > 0 ? attrNames : undefined,
                 ExpressionAttributeValues: attrValues

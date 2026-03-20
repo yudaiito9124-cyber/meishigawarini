@@ -37,12 +37,13 @@ export const handler: APIGatewayProxyHandler = async (event) => {
     try {
         if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers: corsHeaders, body: '' };
 
-        const claims = event.requestContext?.authorizer?.claims;
-        const userId = claims?.sub;
+        const authorizer = event.requestContext?.authorizer;
+        const userId = authorizer?.principalId;
+        const claims = authorizer;
         if (!userId) return { statusCode: 401, headers: corsHeaders, body: JSON.stringify({ message: 'Unauthorized' }) };
 
         const body = JSON.parse(event.body || '{}');
-        const { shop_id } = body;
+        const { shopId } = body;
         
         // Determine action from path or body
         let action = body.action;
@@ -50,14 +51,14 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         if (res.endsWith('/list')) action = 'list';
         else if (res.endsWith('/link')) action = 'link';
         else if (res.endsWith('/activate')) action = 'activate';
-        else if (res.includes('/qrcodecheck')) action = 'check';
+        else if (res.includes('/qrcode-check')) action = 'check';
 
-        if (!shop_id) return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Missing shop_id' }) };
+        if (!shopId) return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Missing shopId' }) };
         if (!action || !['list', 'link', 'activate', 'check'].includes(action)) {
             return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Invalid action. Received: ' + action + ' for ' + res }) };
         }
 
-        const shopMetadata = await checkShopOwnerOrGM(ddb, TABLE_NAME, shop_id, userId, event);
+        const shopMetadata = await checkShopOwnerOrGM(ddb, TABLE_NAME, shopId, userId, event);
         if (shopMetadata === false) {
             return { statusCode: 401, headers: corsHeaders, body: JSON.stringify({ message: 'Unauthorized' }) };
         }
@@ -75,7 +76,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             if (!qrRes.Item) return { statusCode: 404, headers: corsHeaders, body: JSON.stringify({ message: 'QR not found', detail: `QRcode:${qr_id}` }) };
 
             const qrItem = qrRes.Item;
-            if (qrItem.shop_id && qrItem.shop_id !== shop_id) {
+            if (qrItem.shop_id && qrItem.shop_id !== shopId) {
                 return { statusCode: 403, headers: corsHeaders, body: JSON.stringify({ message: 'QR does not belong to this shop', detail: `QRcode:${qr_id}, shop:${qrItem.shop_id}` }) };
             }
             if (qrItem.status !== 'UNASSIGNED' && qrItem.status !== 'LINKED') {
@@ -88,10 +89,10 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 // 【DB操作: GetItem】
                 // - 目的: QRコードに紐付いている商品情報の取得、および販売停止(STOPPED)状態でないかの確認
                 // - テーブル: TABLE_NAME
-                // - リクエストキー: { PK: `SHOP#${shop_id}`, SK: `PRODUCT#${qrItem.product_id}` }
+                // - リクエストキー: { PK: `SHOP#${shopId}`, SK: `PRODUCT#${qrItem.product_id}` }
                 // - 取得カラム: ALL(name 等)
                 const productRes = await ddb.send(new GetCommand({
-                    TableName: TABLE_NAME, Key: { PK: `SHOP#${shop_id}`, SK: `PRODUCT#${qrItem.product_id}` }
+                    TableName: TABLE_NAME, Key: { PK: `SHOP#${shopId}`, SK: `PRODUCT#${qrItem.product_id}` }
                 }));
                 if (!productRes.Item) return { statusCode: 404, headers: corsHeaders, body: JSON.stringify({ message: 'Product not found', detail: `QRcode:${qr_id}, product:${qrItem.product_id}` }) };
                 if (productRes.Item.status === 'STOPPED') {
@@ -108,11 +109,11 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             // - 目的: 当該ショップに紐付く全てのQRコード情報の一覧取得
             // - テーブル: TABLE_NAME
             // - インデックス: GSI2
-            // - 検索条件: GSI2_PK = `SHOP#${shop_id}`
+            // - 検索条件: GSI2_PK = `SHOP#${shopId}`
             // - 取得カラム: ALL
             const res = await ddb.send(new QueryCommand({
                 TableName: TABLE_NAME, IndexName: 'GSI2',
-                KeyConditionExpression: 'GSI2_PK = :sid', ExpressionAttributeValues: { ':sid': `SHOP#${shop_id}` }
+                KeyConditionExpression: 'GSI2_PK = :sid', ExpressionAttributeValues: { ':sid': `SHOP#${shopId}` }
             }));
 
             const now = new Date();
@@ -155,13 +156,13 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             if (!qr_id || !product_id) return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Missing qr_id or product_id' }) };
 
             // 【DB操作: GetItem (2回並行)】
-            // - 目的: リンク対象となるQRコードおよび商品の両方が存在し、かつ正しい状態であるかの事前チェック
+            // - 目的: リンク対象となる QRコードおよび商品の両方が存在し、かつ正しい状態であるかの事前チェック
             // - テーブル: TABLE_NAME
-            // - リクエストキー: { PK: `QR#${qr_id}`, SK: 'METADATA' } および { PK: `SHOP#${shop_id}`, SK: `PRODUCT#${product_id}` }
+            // - リクエストキー: { PK: `QR#${qr_id}`, SK: 'METADATA' } および { PK: `SHOP#${shopId}`, SK: `PRODUCT#${product_id}` }
             // - 取得カラム: ALL
             const [qrCheck, prodCheck] = await Promise.all([
                 ddb.send(new GetCommand({ TableName: TABLE_NAME, Key: { PK: `QR#${qr_id}`, SK: 'METADATA' } })),
-                ddb.send(new GetCommand({ TableName: TABLE_NAME, Key: { PK: `SHOP#${shop_id}`, SK: `PRODUCT#${product_id}` } }))
+                ddb.send(new GetCommand({ TableName: TABLE_NAME, Key: { PK: `SHOP#${shopId}`, SK: `PRODUCT#${product_id}` } }))
             ]);
             
             if (!qrCheck.Item) return { statusCode: 404, headers: corsHeaders, body: JSON.stringify({ message: 'QR not found' }) };
@@ -171,8 +172,8 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             const product = prodCheck.Item;
 
             if (qrItem.status !== "UNASSIGNED" && qrItem.status !== "LINKED") return { statusCode: 409, headers: corsHeaders, body: JSON.stringify({ message: 'QR state is not unassigned, linked' }) };
-            if (qrItem.owner_id && !await checkUserShopPermission(ddb, TABLE_NAME, shop_id, qrItem.owner_id)) return { statusCode: 403, headers: corsHeaders, body: JSON.stringify({ message: 'This QR code is reserved for another shop owner / manager' }) };
-            if (qrItem.shop_id && qrItem.shop_id !== shop_id) return { statusCode: 403, headers: corsHeaders, body: JSON.stringify({ message: 'QR does not belong to this shop' }) };
+            if (qrItem.owner_id && !await checkUserShopPermission(ddb, TABLE_NAME, shopId, qrItem.owner_id)) return { statusCode: 403, headers: corsHeaders, body: JSON.stringify({ message: 'This QR code is reserved for another shop owner / manager' }) };
+            if (qrItem.shop_id && qrItem.shop_id !== shopId) return { statusCode: 403, headers: corsHeaders, body: JSON.stringify({ message: 'QR does not belong to this shop' }) };
             if (qrItem.product_id && qrItem.product_id !== product_id) return { statusCode: 409, headers: corsHeaders, body: JSON.stringify({ message: 'QR is already reserved for another product' }) };
             if (product.status !== 'ACTIVE') return { statusCode: 409, headers: corsHeaders, body: JSON.stringify({ message: 'Product is not active' }) };
 
@@ -188,8 +189,8 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 
             let updateExpr = 'SET #status = :status, shop_id = :sid, product_id = :pid, GSI1_PK = :gsi_pk, GSI2_PK = :gsi2_pk, GSI2_SK = :now, ts_linked_at = :now, ts_updated_at = :now';
             const attrValues: any = {
-                ':status': status, ':linked': 'LINKED', ':sid': shop_id, ':pid': product_id,
-                ':gsi_pk': `QR#${status}`, ':gsi2_pk': `SHOP#${shop_id}`, ':now': new Date().toISOString(), ':unassigned': 'UNASSIGNED'
+                ':status': status, ':linked': 'LINKED', ':sid': shopId, ':pid': product_id,
+                ':gsi_pk': `QR#${status}`, ':gsi2_pk': `SHOP#${shopId}`, ':now': new Date().toISOString(), ':unassigned': 'UNASSIGNED'
             };
 
             if (memo_for_users !== undefined) { updateExpr += ', memo_for_users = :mu'; attrValues[':mu'] = memo_for_users; }
@@ -224,17 +225,17 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             const qrRes = await ddb.send(new GetCommand({ TableName: TABLE_NAME, Key: { PK: `QR#${qr_id}`, SK: 'METADATA' } }));
             if (!qrRes.Item) return { statusCode: 404, headers: corsHeaders, body: JSON.stringify({ message: 'QR not found' }) };
             if (qrRes.Item.status !== 'LINKED') return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'QR is not in LINKED state' }) };
-            if (qrRes.Item.owner_id && !await checkUserShopPermission(ddb, TABLE_NAME, shop_id, qrRes.Item.owner_id)) return { statusCode: 403, headers: corsHeaders, body: JSON.stringify({ message: 'This QR code is reserved for another shop owner / manager' }) };
-            if (qrRes.Item.shop_id !== shop_id) return { statusCode: 403, headers: corsHeaders, body: JSON.stringify({ message: 'QR does not belong to this shop' }) };
+            if (qrRes.Item.owner_id && !await checkUserShopPermission(ddb, TABLE_NAME, shopId, qrRes.Item.owner_id)) return { statusCode: 403, headers: corsHeaders, body: JSON.stringify({ message: 'This QR code is reserved for another shop owner / manager' }) };
+            if (qrRes.Item.shop_id !== shopId) return { statusCode: 403, headers: corsHeaders, body: JSON.stringify({ message: 'QR does not belong to this shop' }) };
 
             const productId = qrRes.Item.product_id;
             
             // 【DB操作: GetItem】
             // - 目的: QRに紐付いている商品の詳細(特に有効期間 valid_days)を取得し、有効化時の期限日時を計算する
             // - テーブル: TABLE_NAME
-            // - リクエストキー: { PK: `SHOP#${shop_id}`, SK: `PRODUCT#${productId}` }
+            // - リクエストキー: { PK: `SHOP#${shopId}`, SK: `PRODUCT#${productId}` }
             // - 取得カラム: ALL(valid_daysを利用)
-            const prodRes = await ddb.send(new GetCommand({ TableName: TABLE_NAME, Key: { PK: `SHOP#${shop_id}`, SK: `PRODUCT#${productId}` } }));
+            const prodRes = await ddb.send(new GetCommand({ TableName: TABLE_NAME, Key: { PK: `SHOP#${shopId}`, SK: `PRODUCT#${productId}` } }));
             const validDays = (prodRes.Item && prodRes.Item.valid_days) ? prodRes.Item.valid_days : DEFAULT_VALID_DAYS;
             const now = new Date();
             const expiresAt = new Date(now);
@@ -252,7 +253,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 ConditionExpression: '#status = :linked AND shop_id = :sid',
                 ExpressionAttributeNames: { '#status': 'status' },
                 ExpressionAttributeValues: {
-                    ':active': 'ACTIVE', ':linked': 'LINKED', ':sid': shop_id,
+                    ':active': 'ACTIVE', ':linked': 'LINKED', ':sid': shopId,
                     ':now': now.toISOString(), ':exp': qrRes.Item.ts_expired_at || expiresAt.toISOString(), ':gsi_pk': 'QR#ACTIVE'
                 }
             }));

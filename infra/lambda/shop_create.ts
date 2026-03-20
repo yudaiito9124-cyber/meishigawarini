@@ -27,10 +27,9 @@ export const handler: APIGatewayProxyHandler = async (event) => {
     try {
         if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers: corsHeaders, body: '' };
 
-        const claims = event.requestContext?.authorizer?.claims;
-        const userId = claims?.sub;
-        const userGroups = parseGroups(claims?.['cognito:groups']);
-        const isAdmin = isSystemAdmin(userGroups);
+        const authorizer = event.requestContext?.authorizer;
+        const userId = authorizer?.principalId;
+        const isAdmin = authorizer?.isGlobalAdmin === 'true';
 
         if (!userId || !isAdmin) return { statusCode: 401, headers: corsHeaders, body: JSON.stringify({ message: 'Unauthorized' }) };
 
@@ -134,7 +133,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             }
         }
 
-        return { statusCode: 201, headers: corsHeaders, body: JSON.stringify({ shop_id: newShopId, message: 'Shop created' }) };
+        return { statusCode: 201, headers: corsHeaders, body: JSON.stringify({ shopId: newShopId, message: 'Shop created' }) };
     } catch (error: any) {
         console.error(error);
         return { statusCode: 500, headers: corsHeaders, body: JSON.stringify({ message: 'Internal Server Error', error: String(error) }) };

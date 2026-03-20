@@ -24,21 +24,22 @@ export const handler: APIGatewayProxyHandler = async (event) => {
     try {
         if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers: corsHeaders, body: '' };
 
-        const claims = event.requestContext?.authorizer?.claims;
-        const userId = claims?.sub;
+        const authorizer = event.requestContext?.authorizer;
+        const userId = authorizer?.principalId;
+        const claims = authorizer;
         if (!userId) return { statusCode: 401, headers: corsHeaders, body: JSON.stringify({ message: 'Unauthorized' }) };
 
         const body = JSON.parse(event.body || '{}');
-        const { shop_id } = body;
+        const { shopId } = body;
 
-        if (!shop_id) return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Missing shop_id' }) };
+        if (!shopId) return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Missing shopId' }) };
 
         // 【DB操作: 内部モジュールによる GetItem・BatchGetItem】
         // - 目的: 実行ユーザーが対象ショップのオーナーまたはGMであるかの権限を検証し、ショップ情報を取得
         // - テーブル: TABLE_NAME
-        // - リクエストキー: { PK: `SHOP#${shop_id}`, SK: 'METADATA' } および { PK: `USER#${userId}`, SK: 'SHOP' }
+        // - リクエストキー: { PK: `SHOP#${shopId}`, SK: 'METADATA' } および { PK: `USER#${userId}`, SK: 'SHOP' }
         // - 取得カラム: ショップのメタデータ一式(owner_id, gm_ids 等)
-        const shopMetadata = await checkShopOwnerOrGM(ddb, TABLE_NAME, shop_id, userId, event);
+        const shopMetadata = await checkShopOwnerOrGM(ddb, TABLE_NAME, shopId, userId, event);
         if (shopMetadata === false) {
             return { statusCode: 401, headers: corsHeaders, body: JSON.stringify({ message: 'Unauthorized' }) };
         }

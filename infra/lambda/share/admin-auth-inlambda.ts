@@ -6,25 +6,8 @@ import { parseGroups, isSystemAdmin } from '../utils/auth';
  * @returns { isAdmin: boolean, errorResponse?: APIGatewayProxyResult }
  */
 export function verifyAdmin(event: any) {
-    // API Gateway (Cognito Authorizer) から渡されるグループ情報を取得
-    const groupsField = event.requestContext?.authorizer?.claims?.['cognito:groups'];
-    const groups = parseGroups(groupsField);
-
-    if (!isSystemAdmin(groups)) {
-        console.log("Unauthorized access attempt. Admin group not found in:", groups);
-
-        return {
-            isAdmin: false,
-            errorResponse: {
-                statusCode: 404, // 403を隠して404を返す
-                body: JSON.stringify({ message: "Not Found" }),
-                headers: {
-                    "Content-Type": "application/json",
-                    "Access-Control-Allow-Origin": "*", // CORS対応
-                }
-            }
-        };
-    }
+    // API Gateway (TokenAuthorizer) はすでに adminAuthorizer.ts でシステム管理者以外のアクセスをブロックします。
+    // そのため、ここに到達した時点でシステム管理者であることが保証されています。
 
     return { isAdmin: true };
 }

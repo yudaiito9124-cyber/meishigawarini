@@ -44,12 +44,13 @@ export const handler: APIGatewayProxyHandler = async (event) => {
     try {
         if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers: corsHeaders, body: '' };
 
-        const claims = event.requestContext?.authorizer?.claims;
-        const userId = claims?.sub;
+        const authorizer = event.requestContext?.authorizer;
+        const userId = authorizer?.principalId;
+        const claims = authorizer;
         if (!userId) return { statusCode: 401, headers: corsHeaders, body: JSON.stringify({ message: 'Unauthorized' }) };
 
         const body = JSON.parse(event.body || '{}');
-        const { shop_id } = body;
+        const { shopId } = body;
         
         // Determine action from path or body
         let action = body.action;
@@ -59,12 +60,12 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         else if (res.endsWith('/update')) action = 'update_status';
         else if (res.endsWith('/delete')) action = 'delete';
 
-        if (!shop_id) return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Missing shop_id' }) };
+        if (!shopId) return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Missing shopId' }) };
         if (!action || !['create', 'list', 'update_status', 'delete'].includes(action)) {
             return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Invalid action. Received: ' + action + ' for ' + res }) };
         }
 
-        const shopMetadata = await checkShopOwnerOrGM(ddb, TABLE_NAME, shop_id, userId, event);
+        const shopMetadata = await checkShopOwnerOrGM(ddb, TABLE_NAME, shopId, userId, event);
         if (shopMetadata === false) {
             return { statusCode: 401, headers: corsHeaders, body: JSON.stringify({ message: 'Unauthorized' }) };
         }
@@ -80,19 +81,19 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             // 【DB操作: PutItem】
             // - 目的: ショップに紐づく新規商品(PRODUCT)レコードの作成
             // - テーブル: TABLE_NAME
-            // - リクエストキー(プライマリ): { PK: `SHOP#${shop_id}`, SK: `PRODUCT#${productId}` }
+            // - リクエストキー(プライマリ): { PK: `SHOP#${shopId}`, SK: `PRODUCT#${productId}` }
             // - 登録カラム: product_id, name, description, image_url, price, status, GSI1_PK, GSI2_PK 等すべて
             await ddb.send(new PutCommand({
                 TableName: TABLE_NAME,
                 Item: {
-                    PK: `SHOP#${shop_id}`, SK: `PRODUCT#${productId}`,
+                    PK: `SHOP#${shopId}`, SK: `PRODUCT#${productId}`,
                     product_id: productId, name, description,
                     detail_html: stripSignaturesInHtml(detail_html || '', BUCKET_NAME),
                     image_url: stripSignature(image_url),
                     price, valid_days: validityPeriod,
                     status: 'ACTIVE',
                     GSI1_PK: 'PRODUCT#ACTIVE', GSI1_SK: now,
-                    GSI2_PK: `PRODUCT#${productId}`, GSI2_SK: `SHOP#${shop_id}`,
+                    GSI2_PK: `PRODUCT#${productId}`, GSI2_SK: `SHOP#${shopId}`,
                     ts_created_at: now
                 }
             }));
@@ -103,12 +104,12 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             // 【DB操作: Query】
             // - 目的: 指定したショップに紐づく全商品の一覧取得
             // - テーブル: TABLE_NAME
-            // - 検索条件: PK = `SHOP#${shop_id}` AND begins_with(SK, 'PRODUCT#')
+            // - 検索条件: PK = `SHOP#${shopId}` AND begins_with(SK, 'PRODUCT#')
             // - 取得カラム: ALL (プログラム側で後続処理にて status !== 'DELETED' をフィルタ)
             const res = await ddb.send(new QueryCommand({
                 TableName: TABLE_NAME,
                 KeyConditionExpression: 'PK = :pk AND begins_with(SK, :sk)',
-                ExpressionAttributeValues: { ':pk': `SHOP#${shop_id}`, ':sk': 'PRODUCT#' }
+                ExpressionAttributeValues: { ':pk': `SHOP#${shopId}`, ':sk': 'PRODUCT#' }
             }));
             const items: any[] = (res.Items || [])
                 .filter(item => item.status !== 'DELETED')
@@ -131,11 +132,11 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             // 【DB操作: UpdateItem】
             // - 目的: 商品のステータス(ACTIVE⇆STOPPED)の更新
             // - テーブル: TABLE_NAME
-            // - リクエストキー: { PK: `SHOP#${shop_id}`, SK: `PRODUCT#${product_id}` }
+            // - リクエストキー: { PK: `SHOP#${shopId}`, SK: `PRODUCT#${product_id}` }
             // - 更新カラム: status および GSI1_PK (QR一覧取得等のインデックスに連動させるため)
             await ddb.send(new UpdateCommand({
                 TableName: TABLE_NAME,
-                Key: { PK: `SHOP#${shop_id}`, SK: `PRODUCT#${product_id}` },
+                Key: { PK: `SHOP#${shopId}`, SK: `PRODUCT#${product_id}` },
                 UpdateExpression: 'SET #status = :s, GSI1_PK = :gsi_pk',
                 ExpressionAttributeNames: { '#status': 'status' },
                 ExpressionAttributeValues: { ':s': status, ':gsi_pk': `PRODUCT#${status}` }
@@ -150,11 +151,11 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             // 【DB操作: GetItem】
             // - 目的: 削除対象となる商品の存在確認、および現在のステータスがSTOPPEDかの確認
             // - テーブル: TABLE_NAME
-            // - リクエストキー: { PK: `SHOP#${shop_id}`, SK: `PRODUCT#${product_id}` }
+            // - リクエストキー: { PK: `SHOP#${shopId}`, SK: `PRODUCT#${product_id}` }
             // - 取得カラム: レコード全体
             const prodRes = await ddb.send(new GetCommand({
                 TableName: TABLE_NAME,
-                Key: { PK: `SHOP#${shop_id}`, SK: `PRODUCT#${product_id}` }
+                Key: { PK: `SHOP#${shopId}`, SK: `PRODUCT#${product_id}` }
             }));
             if (!prodRes.Item) return { statusCode: 404, headers: corsHeaders, body: JSON.stringify({ message: 'Product not found' }) };
             if (prodRes.Item.status !== 'STOPPED') {
@@ -179,7 +180,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             ]);
             
             const activeOrUsedQRs = [...(usedRes.Items || []), ...(activeRes.Items || [])];
-            const relatedQRs = activeOrUsedQRs.filter(item => item.product_id === product_id && item.shop_id === shop_id);
+            const relatedQRs = activeOrUsedQRs.filter(item => item.product_id === product_id && item.shop_id === shopId);
             if (relatedQRs.length > 0) {
                 return {
                     statusCode: 409, headers: corsHeaders, body: JSON.stringify({
@@ -196,7 +197,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             // 【DB操作: PutItem】
             // - 目的: 商品の論理削除（実際に物理削除はせず、ステータスをDELETEDに上書き更新する）
             // - テーブル: TABLE_NAME
-            // - リクエストキー: { PK: `SHOP#${shop_id}`, SK: `PRODUCT#${product_id}` }
+            // - リクエストキー: { PK: `SHOP#${shopId}`, SK: `PRODUCT#${product_id}` }
             // - 更新カラム: status = 'DELETED', GSI1_PK = 'PRODUCT#DELETED' に書き換えたレコード全体をPut
             await ddb.send(new PutCommand({
                 TableName: TABLE_NAME,

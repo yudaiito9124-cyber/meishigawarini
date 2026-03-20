@@ -37,12 +37,13 @@ export const handler: APIGatewayProxyHandler = async (event) => {
     try {
         if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers: corsHeaders, body: '' };
 
-        const claims = event.requestContext?.authorizer?.claims;
-        const userId = claims?.sub;
+        const authorizer = event.requestContext?.authorizer;
+        const userId = authorizer?.principalId;
+        const claims = authorizer;
         if (!userId) return { statusCode: 401, headers: corsHeaders, body: JSON.stringify({ message: 'Unauthorized' }) };
 
         const body = JSON.parse(event.body || '{}');
-        const { shop_id } = body;
+        const { shopId } = body;
         
         // Determine action from path or body
         let action = body.action;
@@ -50,12 +51,12 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         if (resPath.endsWith('/list')) action = 'list';
         else if (resPath.endsWith('/update')) action = 'update';
 
-        if (!shop_id) return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Missing shop_id' }) };
+        if (!shopId) return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Missing shopId' }) };
         if (!action || !['list', 'update'].includes(action)) {
             return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Invalid action. Received: ' + action + ' for ' + resPath }) };
         }
 
-        const shopMetadata = await checkShopOwnerOrGM(ddb, TABLE_NAME, shop_id, userId, event);
+        const shopMetadata = await checkShopOwnerOrGM(ddb, TABLE_NAME, shopId, userId, event);
         if (!shopMetadata) return { statusCode: 401, headers: corsHeaders, body: JSON.stringify({ message: 'Unauthorized' }) };
 
         if (action === 'list') {
@@ -77,7 +78,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 const items = queryRes.Items || [];
                 const metadata = items.find(i => i.SK === 'METADATA');
                 
-                if (!metadata || metadata.shop_id !== shop_id) {
+                if (!metadata || metadata.shop_id !== shopId) {
                     return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ orders: [] }) };
                 }
 
@@ -94,13 +95,13 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             // - 目的: ログイン中ショップに紐づくすべてのQRコードメタデータを全件検索
             // - テーブル: TABLE_NAME
             // - インデックス: GSI2
-            // - 検索条件: GSI2_PK = `SHOP#${shop_id}`
+            // - 検索条件: GSI2_PK = `SHOP#${shopId}`
             // - 取得カラム: ALL (ページネーションなしで全結果を取得する)
             const queryRes = await ddb.send(new QueryCommand({
                 TableName: TABLE_NAME,
                 IndexName: 'GSI2',
                 KeyConditionExpression: 'GSI2_PK = :sid',
-                ExpressionAttributeValues: { ':sid': `SHOP#${shop_id}` }
+                ExpressionAttributeValues: { ':sid': `SHOP#${shopId}` }
             }));
 
             if (!queryRes.Items || queryRes.Items.length === 0) {
@@ -173,7 +174,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             // - 取得カラム: ALL (shop_id, status, pin, ts_shipped_at等すべて)
             const metaRes = await ddb.send(new GetCommand({ TableName: TABLE_NAME, Key: { PK: `QR#${qr_id}`, SK: 'METADATA' } }));
             if (!metaRes.Item) return { statusCode: 404, headers: corsHeaders, body: JSON.stringify({ message: 'Order not found' }) };
-            if (metaRes.Item.shop_id !== shop_id) return { statusCode: 403, headers: corsHeaders, body: JSON.stringify({ message: 'QR does not belong to this shop' }) };
+            if (metaRes.Item.shop_id !== shopId) return { statusCode: 403, headers: corsHeaders, body: JSON.stringify({ message: 'QR does not belong to this shop' }) };
 
             const currentStatus = metaRes.Item.status;
             // 未発送から発送済みへの遷移チェック条件

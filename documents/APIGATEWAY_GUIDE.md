@@ -56,55 +56,45 @@ api.addGatewayResponse('Default401Response', {
 
 ---
 
-## 3. Cognito認証（Authorizer）との連携
-「ショップオーナー」や「管理者」のみが実行できるAPIを守るために、Cognito User Poolを利用したオーソライザーを設定しています。
+## 3. 認証 (Authorizer) との連携
+本プロジェクトでは、セキュリティ要件（MFAの強制やカスタム権限チェック等）を満たすため、標準のCognito Authorizerではなく、**Custom Lambda Authorizer (`RequestAuthorizer`)** を採用しています。
+
+*   **ShopAuthorizer**: `Authorization` ヘッダーを受け取り、JWT検証・グループチェック・MFA認証済みかを確認します。
+*   **ReceiveAuthorizer**: `X-QR-UUID` および `X-QR-PIN` ヘッダーを受け取り、QRの有効性と所有権を動的に検証します。
 
 ```typescript
-import * as cognito from 'aws-cdk-lib/aws-cognito';
-
-// UserPoolの参照（事前に定義されているもの）
-// const userPool = new cognito.UserPool(...);
-
-// API Gateway用のCognito Authorizerを作成
-const authorizer = new apigateway.CognitoUserPoolsAuthorizer(this, 'ShopAuthorizer', {
-  cognitoUserPools: [userPool],
+// Shop/Admin用 Authorizerの定義例 (cdk)
+const authorizer = new apigateway.RequestAuthorizer(this, 'ShopAuthorizer', {
+  handler: shopAuthFn,
+  identitySources: [apigateway.IdentitySource.header('Authorization')],
 });
 ```
 
 ---
 
-## 4. ルーティングとLambdaの統合 (リソースとメソッドの追加)
-APIのURLパス（リソース）を作成し、それぞれにHTTPメソッド（GET, POSTなど）と、実行するLambda関数を紐付けます。
+## 4. フラットなアクションベースのルーティング設計
+以前の設計（RESTfulなパスパラメータ `/shop/{id}/...`）から、**フラットなアクションベースのPOSTエンドポイント**へ移行しました。
 
-### ① 認証が不要なAPI（一般ユーザー向け）
-QRコード受け取り画面など、誰でもアクセスできるAPIの定義例です。
+### メリット
+- APIパスが単純明快になり、フロントエンドからの呼び出し(`fetch_post`)が統一できる。
+- パスパラメータのパースミスや、CORSのワイルドカード問題（サブパスの網羅漏れ）を回避できる。
+- 全てのアクションを `POST` で統一することで、パラメータの隠蔽性が向上する。
 
-```typescript
-// 1. URLパスを作成: /recipient/submit
-const recipientResource = api.root.addResource('recipient');
-const submitResource = recipientResource.addResource('submit');
-
-// 2. メソッドを追加してLambda(recipientSubmitFn)と統合
-submitResource.addMethod('POST', new apigateway.LambdaIntegration(recipientSubmitFn));
-```
-
-### ② 認証が必要なAPI（管理者・オーナー向け）
-ショップ管理など、ログイン必須のAPIには `authorizer` をアタッチします。
-リクエストヘッダーに有効なCognitoのToken（IdTokenなど）が含まれていない場合、Lambdaは実行されません（401エラーになります）。
+### 実装例
+各リソースに対して具体的なアクション（`list`, `create`, `get`, `update` 等）をサブパスとして定義し、Lambda関数を統合します。
 
 ```typescript
-// 1. URLパスを作成: /shop/{shopId}/products
-const shopResource = api.root.addResource('shop');
-const shopIdResource = shopResource.addResource('{shopId}');
-const productsResource = shopIdResource.addResource('products');
+// /shop/products 例
+const productsResource = shopResource.addResource('products'); 
 
-// 2. メソッドを追加し、Authorizerを設定
-productsResource.addMethod('POST', new apigateway.LambdaIntegration(shopMgmtFn), {
-  authorizer, // Cognito Authorizerの適用
-  authorizationType: apigateway.AuthorizationType.COGNITO // 認証タイプを指定
-});
+// 全て POST メソッドで、パスによりアクションを明示
+productsResource.addResource('list').addMethod('POST', integration, routeOptions);
+productsResource.addResource('create').addMethod('POST', integration, routeOptions);
+productsResource.addResource('update').addMethod('POST', integration, routeOptions);
 ```
 
-### 💡 パスパラメータ（`{shopId}` など）の利用
-URLの中に `{shopId}` のように中括弧を含めることで、動的な変数をLambdaに渡すことができます。
-Lambda側では `event.pathParameters.shopId` としてこれを受け取ります。
+### 💡 パラメータの渡し方
+パスパラメータ（`{shopId}`）は使用せず、リクエストボディ（JSON）に含めて送信します。
+- **リクエスト**: `POST /shop/products/list`  Body: `{"shopId": "..."}`
+- **Lambda側**: `JSON.parse(event.body).shopId` で取得します。
+- **Action判別**: 1つのLambdaで複数パスを処理する場合、`event.resource` を見てパスの末尾（`/list` 等）から処理を振り分けます。

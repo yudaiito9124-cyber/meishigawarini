@@ -41,12 +41,7 @@ export async function checkShopOwnerOrGM(ddb: DynamoDBDocumentClient, tableName:
     if (!shopuuid || !userid) return false;
 
     if (event) {
-        const claims = event.requestContext?.authorizer?.claims;
-        const groupsField = claims?.['cognito:groups'];
-        const userGroups = parseGroups(groupsField);
-        
-        // GlobalAdmins グループに属している場合は、オーナーチェックをスキップしてメタデータを返す
-        const isGlobalAdmin = userGroups.includes('GlobalAdmins');
+        const isGlobalAdmin = event.requestContext?.authorizer?.isGlobalAdmin === 'true';
 
         if (isGlobalAdmin) {
             const shopRes = await ddb.send(new GetCommand({

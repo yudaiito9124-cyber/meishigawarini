@@ -240,22 +240,34 @@ QRコードのライフサイクルや注文の進捗状況を表します。
 
 ## 3. 主なデータベース操作パターン (Lambda関数との対応)
 
-1. **ショップ管理 (`shop-mgmt.ts`)**
-   - ショップの作成: `PutCommand` (Shop)
-   - ショップ一覧の取得: `QueryCommand` (GSI2 使用, Owner IDで絞り込み)
-   - 商品の作成・更新・削除: `PutCommand`, `UpdateCommand`, `DeleteCommand` (Product)
-   - QRコードの紐付け/有効化: `UpdateCommand` (QR Metadata)
+1. **ショップ管理 (`shop_create.ts`, `shop_list.ts`, `shop_details.ts`)**
+   - ショップの作成: `PutCommand` (Shop Metadata)
+   - ショップ一覧の取得: `GetCommand` (User Shop) + `BatchGetCommand` (Shop Metadata)
+   - ショップ詳細の取得・更新: `GetCommand`, `UpdateCommand` (Shop Metadata)
 
-2. **QR生成/管理者 (`admin-generate.ts` 等)**
-   - QRコードの一括生成: `BatchWriteItemCommand` (QR Metadata を一括作成)
+2. **商品管理 (`shop_products.ts`, `shop_products_import.ts`, `shop_products_uploadurl.ts`)**
+   - 商品のCRUD操作: `PutCommand`, `UpdateCommand`, `DeleteCommand`, `QueryCommand` (Product)
+   - 商品のインポート: `GetCommand` (Source Product) + `PutCommand` (Target Product)
+   - 画像アップロードURL発行: (S3 Presigned URL発行)
 
-3. **受取人アクション (`recipient-submit.ts`, `recipient-verify-pin.ts`)**
-   - PINコードの照合: `GetCommand` (QR Metadata)
-   - 配送先情報の登録: `PutCommand` または `UpdateCommand` (Order および QR Metadataのステータス更新)
+3. **QR管理 (`shop_qr.ts`, `admin-generate.ts`)**
+   - QRコードの一括生成: `BatchWriteItemCommand` (QR Metadata)
+   - QRコードの一覧・検索: `QueryCommand` (GSI2 使用)
+   - QRコードの紐付け・有効化: `UpdateCommand` (QR Metadata)
+   - QR状態チェック: `GetCommand` (QR Metadata)
 
-4. **注文管理/発送処理 (`shop-orders.ts`)**
+4. **注文管理/発送処理 (`shop_orders.ts`)**
    - 注文一覧の取得: `QueryCommand` (GSI2 使用で特定のショップのQR) + `BatchGetCommand` (対応するOrder情報を取得)
    - 発送ステータスへの更新: `UpdateCommand` (QR Metadata のステータスと、Order の追跡番号を更新)
+
+5. **受取人アクション (`receive_verify.ts`, `receive_submit.ts`, `receive_completed.ts`)**
+   - PINコードの照合・メタデータ取得: `GetCommand` (QR Metadata)
+   - 配送先情報の登録: `PutCommand` (Order) + `UpdateCommand` (QR Metadata ステータス更新)
+   - 受取完了報告: `UpdateCommand` (QR Metadata)
+
+6. **チャット/送り主管理 (`receive_chat.ts`, `receive_sender.ts`)**
+   - チャット履歴の取得・追加: `GetCommand`, `UpdateCommand` (Chat)
+   - 送り主プロフィールの読込・保存: `GetCommand`, `PutCommand` (User SENDER)
 
 
 
