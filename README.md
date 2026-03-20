@@ -114,6 +114,7 @@ c:\git\meishigawarini\
 -  **[RUNNING_COSTS.md](./documents/RUNNING_COSTS.md)** 
 
 ### 📊 その他資料
+- **[ENVIRONMENT_SWITCHING.md](./documents/ENVIRONMENT_SWITCHING.md)**: 開発・検証・本番環境の切り替え方法、GitブランチとAmplifyの運用詳細。
 - **[開発説明スライド](./slide.md)** : システム全体のコンセプトやアーキテクチャの視覚資料。
 - **[更新ログ (Update Log)](./updatelog.md)** : プロジェクトの変更履歴。
 

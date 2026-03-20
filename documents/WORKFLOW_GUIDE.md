@@ -95,6 +95,8 @@
 
 ## 🧪 3. テスト環境（Staging）の利用手順
 
+各環境のより詳細な切り替え方（Git/Amplify/Local）については、**[ENVIRONMENT_SWITCHING.md](./ENVIRONMENT_SWITCHING.md)** を参照してください。
+
 本番環境（Production）とは独立したテスト用の環境（Staging）を利用できます。新しい機能を本番にマージする前に、ここで十分に動作確認を行ってください。
 
 ### バックエンド（インフラ）のテスト環境デプロイ
