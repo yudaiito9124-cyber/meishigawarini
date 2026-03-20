@@ -24,6 +24,25 @@ export class RecipientApi extends Construct {
 
     const { table, bucket, userPool, api, commonProps, grantTablePermissions } = props;
 
+    // Receive Authorizer (Custom Lambda Authorizer)
+    const lampath = (name: string) => path.join(__dirname, `../../lambda/${name}.ts`);
+    const receiveAuthFn = new nodejs.NodejsFunction(this, 'ReceiveAuthorizerFn', {
+      entry: lampath('receiveAuthorizer'),
+      environment: {
+        TABLE_NAME: table.tableName,
+      },
+    });
+    grantTablePermissions(receiveAuthFn, true); // Updates failed attempts
+
+    const authorizer = new apigateway.RequestAuthorizer(this, 'ReceiveAuthorizer', {
+      handler: receiveAuthFn,
+      identitySources: [
+        apigateway.IdentitySource.header('X-QR-UUID'),
+        apigateway.IdentitySource.header('X-QR-PIN'),
+      ],
+      resultsCacheTtl: cdk.Duration.minutes(5),
+    });
+
     // Lambda: Recipient Submit
     const recipientSubmitFn = new nodejs.NodejsFunction(this, 'RecipientSubmitFn', {
       entry: path.join(__dirname, '../../lambda/recipient-submit.ts'),
@@ -103,18 +122,33 @@ export class RecipientApi extends Construct {
     verifyResource.addMethod('POST', new apigateway.LambdaIntegration(recipientVerifyPinFn));
 
     const submitResource = recipientResource.addResource('submit');
-    submitResource.addMethod('POST', new apigateway.LambdaIntegration(recipientSubmitFn));
+    submitResource.addMethod('POST', new apigateway.LambdaIntegration(recipientSubmitFn), {
+      authorizer,
+      authorizationType: apigateway.AuthorizationType.CUSTOM,
+    });
 
     const completedResource = recipientResource.addResource('completed');
-    completedResource.addMethod('POST', new apigateway.LambdaIntegration(recipientCompletedFn));
+    completedResource.addMethod('POST', new apigateway.LambdaIntegration(recipientCompletedFn), {
+      authorizer,
+      authorizationType: apigateway.AuthorizationType.CUSTOM,
+    });
 
     const qrIdResourceRecip = qrResourceRecip.addResource('{uuid}');
 
     const chatResource = qrIdResourceRecip.addResource('chat');
-    chatResource.addMethod('GET', new apigateway.LambdaIntegration(recipientChatFn));
-    chatResource.addMethod('POST', new apigateway.LambdaIntegration(recipientChatFn));
+    chatResource.addMethod('GET', new apigateway.LambdaIntegration(recipientChatFn), {
+      authorizer,
+      authorizationType: apigateway.AuthorizationType.CUSTOM,
+    });
+    chatResource.addMethod('POST', new apigateway.LambdaIntegration(recipientChatFn), {
+      authorizer,
+      authorizationType: apigateway.AuthorizationType.CUSTOM,
+    });
 
     const uploadUrlResourceChat = qrIdResourceRecip.addResource('upload-url');
-    uploadUrlResourceChat.addMethod('GET', new apigateway.LambdaIntegration(recipientUploadUrlFn));
+    uploadUrlResourceChat.addMethod('GET', new apigateway.LambdaIntegration(recipientUploadUrlFn), {
+      authorizer,
+      authorizationType: apigateway.AuthorizationType.CUSTOM,
+    });
   }
 }

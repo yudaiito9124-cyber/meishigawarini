@@ -147,10 +147,8 @@ export class AdminApi extends Construct {
     ////////////////////////////////////////////////////////////////////////////////
     // URLに対するLambdaの紐づけ
 
-    // -- Admin -- //
-    const adminResource = api.root.addResource('admin'); // /admin
-
     // /admin
+    const adminResource = api.root.addResource('admin');
     adminResource.addMethod('GET', new apigateway.LambdaIntegration(admin_check), { authorizer: authorizerOfAdmin, });
     adminResource.addResource('dump').addMethod('POST', new apigateway.LambdaIntegration(admin_dump), { authorizer: authorizerOfAdmin, });
     adminResource.addResource('links').addMethod('POST', new apigateway.LambdaIntegration(admin_links), { authorizer: authorizerOfAdmin, });

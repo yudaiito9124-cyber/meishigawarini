@@ -19,13 +19,13 @@ export const handler = async (event: APIGatewayTokenAuthorizerEvent): Promise<AP
     const authorizationToken = event.authorizationToken;
     if (!authorizationToken) {
       console.log('No authorization token provided');
-      return generatePolicy('user', 'Deny', event.methodArn);
+      return generatePolicy('unauthorized-user', 'Deny', event.methodArn);
     }
 
     const token = authorizationToken.replace('Bearer ', '');
     if (!token || token === 'undefined' || token === 'null') {
       console.log('Invalid token format or value:', token);
-      return generatePolicy('user', 'Deny', event.methodArn);
+      return generatePolicy('invalid-token', 'Deny', event.methodArn);
     }
 
     // 1. JWTの検証
@@ -37,7 +37,7 @@ export const handler = async (event: APIGatewayTokenAuthorizerEvent): Promise<AP
 
     if (!isAdmin) {
       console.log('User is not an administrator. Groups:', groups);
-      return generatePolicy('user', 'Deny', event.methodArn);
+      return generatePolicy(payload.sub, 'Deny', event.methodArn);
     }
 
     // 3. MFAチェック
@@ -83,10 +83,17 @@ export const handler = async (event: APIGatewayTokenAuthorizerEvent): Promise<AP
 
   } catch (err) {
     console.error('Token verification failed:', err);
-    return generatePolicy('user', 'Deny', event.methodArn);
+    return generatePolicy('verification-failed', 'Deny', event.methodArn);
   }
 };
 
+/**
+ * API Gateway に返すための認可ポリシーを生成する
+ * @param principalId ユーザーを一意に識別するID (ログやメトリクスで使用)
+ * @param effect 'Allow' (許可) または 'Deny' (拒否)
+ * @param resource リクエストされたリソースのARN
+ * @param context 後続のLambdaハンドラーに引き継ぐ追加情報
+ */
 function generatePolicy(principalId: string, effect: string, resource: string, context?: any): APIGatewayAuthorizerResult {
   const authResponse: any = {
     principalId,
@@ -96,7 +103,8 @@ function generatePolicy(principalId: string, effect: string, resource: string, c
         {
           Action: 'execute-api:Invoke',
           Effect: effect,
-          // admin配下をワイルドカードで許可
+          // 特定のURLだけでなく、このAPIステージ全体へのアクセスを許可する (キャッシュ対策)
+          // 例: arn:aws:execute-api:region:account:api-id/stage/*/*
           Resource: resource.split('/').slice(0, 2).join('/') + '/*/*', 
         },
       ],
@@ -104,7 +112,7 @@ function generatePolicy(principalId: string, effect: string, resource: string, c
   };
 
   if (context) {
-    authResponse.context = context;
+    authResponse.context = context; // 後続の Lambda で event.requestContext.authorizer.[key] として取得可能
   }
 
   return authResponse;

@@ -296,6 +296,7 @@ export class InfraStack extends cdk.Stack {
       table,
       bucket,
       userPool,
+      userPoolClient,
       api,
       commonProps,
       grantTablePermissions,
