@@ -628,7 +628,7 @@ function QRCodeListSection({ apiUrl, onGeneratePDF, paperFormat, cardFormat, dbC
 
     return (
         <Card className="w-full">
-            <CardHeader className="p-4 sm:p-6">
+            <CardHeader className="">
                 <CardTitle className="flex flex-col sm:flex-row justify-between items-center gap-4">
                     <span className="w-full sm:w-auto text-center sm:text-left">{t('list.title')}</span>
                     <div className="flex gap-2 flex-wrap justify-center sm:justify-end">
@@ -649,7 +649,7 @@ function QRCodeListSection({ apiUrl, onGeneratePDF, paperFormat, cardFormat, dbC
                     </div>
                 </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4 p-4 sm:p-6">
+            <CardContent className="space-y-4 ">
                 <div className="grid grid-cols-2 xs:grid-cols-3 sm:flex sm:flex-wrap gap-2 justify-center sm:justify-start items-center">
                     {["UNASSIGNED", "LINKED", "ACTIVE", "USED", "SHIPPED", "COMPLETED", "EXPIRED", "BANNED", "PROMOTION"].map((s) => (
                         <Button
@@ -667,6 +667,16 @@ function QRCodeListSection({ apiUrl, onGeneratePDF, paperFormat, cardFormat, dbC
                     ))}
                 </div>
                 <div className="flex flex-col sm:flex-row gap-2">
+                    <div className="flex-1 min-w-0">
+                        <Input
+                            id="keyword"
+                            type="text"
+                            value={keyword}
+                            placeholder={t('list.keyword.placeholder')}
+                            onChange={(e) => setKeyword(e.target.value)}
+                            className="w-full"
+                        />
+                    </div>
                     <div className="flex gap-2 flex-wrap justify-center sm:justify-start">
                         {["SEARCH"].map((s) => (
                             <Button
@@ -685,16 +695,6 @@ function QRCodeListSection({ apiUrl, onGeneratePDF, paperFormat, cardFormat, dbC
                                 {t(`list.status.${s.toLowerCase()}`)}
                             </Button>
                         ))}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                        <Input
-                            id="keyword"
-                            type="text"
-                            value={keyword}
-                            placeholder={t('list.keyword.placeholder')}
-                            onChange={(e) => setKeyword(e.target.value)}
-                            className="w-full"
-                        />
                     </div>
                 </div>
 
