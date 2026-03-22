@@ -629,23 +629,23 @@ function QRCodeListSection({ apiUrl, onGeneratePDF, paperFormat, cardFormat, dbC
     return (
         <Card className="w-full">
             <CardHeader className="">
-                <CardTitle className="flex flex-col sm:flex-row justify-between items-center gap-4">
+                <CardTitle className="flex flex-col sm:flex-col items-start gap-4">
                     <span className="w-full sm:w-auto text-center sm:text-left">{t('list.title')}</span>
-                    <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-                        <Button variant="outline" size="sm" onClick={() => setIsDenseManual(prev => prev === null ? !isDense : !prev)} className="w-full sm:w-auto">
-                            {isDense ? t('list.normalView') : t('list.compactView')}
-                        </Button>
-                        <Button variant="outline" size="sm" onClick={handleExportCSV} disabled={loading || codes.length === 0} className="w-full sm:w-auto">
-                            {t('list.exportCsv')}
-                        </Button>
-                        <Button variant="outline" size="sm" onClick={() => fetchCodes()} disabled={loading} className="w-full sm:w-auto">
-                            {loading ? t('list.loading') : t('list.refresh')}
-                        </Button>
-                    </div>
                 </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4 p-3 sm:p-6 overflow-hidden">
-                <div className="grid grid-cols-3 md:flex md:flex-wrap gap-2 justify-center sm:justify-start items-center">
+            <CardContent className="space-y-4 overflow-hidden">
+                <div className="w-full grid grid-cols-3 gap-2">
+                    <Button variant="outline" size="sm" onClick={() => setIsDenseManual(prev => prev === null ? !isDense : !prev)} className="w-full sm:w-auto">
+                        {isDense ? t('list.normalView') : t('list.compactView')}
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={handleExportCSV} disabled={loading || codes.length === 0} className="w-full sm:w-auto">
+                        {t('list.exportCsv')}
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => fetchCodes()} disabled={loading} className="w-full sm:w-auto">
+                        {loading ? t('list.loading') : t('list.refresh')}
+                    </Button>
+                </div>
+                <div className="grid grid-cols-3 md:grid-cols-5 gap-2 justify-center sm:justify-start items-center">
                     {["UNASSIGNED", "LINKED", "ACTIVE", "USED", "SHIPPED", "COMPLETED", "EXPIRED", "BANNED", "PROMOTION"].map((s) => (
                         <Button
                             key={s}
@@ -792,13 +792,15 @@ function QRCodeRow({ item, apiUrl, onGeneratePDF, onRefresh, paperFormat, cardFo
                     <DialogDescription asChild>
                         <div className="font-mono text-sm text-gray-500 w-full flex flex-col gap-0 text-left mt-4 text-center sm:text-left">
                             <div className="flex items-center gap-2">
-                                ID: {uuid}
+                                ID:
                                 <Copy className="cursor-pointer w-4 h-4 shrink-0" onClick={() => navigator.clipboard.writeText(uuid)} />
                                 <ExternalLink className="cursor-pointer w-4 h-4 shrink-0" onClick={() => window.open(`${NEXT_PUBLIC_APP_URL}/receive/${uuid}`, '_blank')} />
+                                {uuid}
                             </div>
                             <div className="flex items-center gap-2">
-                                PIN: {item.pin}
+                                PIN:
                                 <Copy className="cursor-pointer w-4 h-4 shrink-0" onClick={() => navigator.clipboard.writeText(item.pin)} />
+                                {item.pin}
                             </div>
                         </div>
                     </DialogDescription>
