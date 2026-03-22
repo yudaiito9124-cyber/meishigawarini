@@ -323,10 +323,10 @@ export default function AdminPage() {
                                     </div>
 
                                     <h3 className="text-sm font-semibold pt-8">{t('generate.pdfOptions')}</h3>
-                                    <div className="space-y-4 rounded-xl bg-gray-100 border border-gray-200 border-dashed border-5 p-4">
-                                        <div className="flex flex-row flex-wrap gap-1">
-                                            <div className="flex flex-row w-full">
-                                                <label className="flex w-20 items-center text-xs text-gray-700">{t('generate.paperFormat')}</label>
+                                    <div className="space-y-4 rounded-xl bg-gray-100 border border-gray-200 border-dashed border-5 p-3 sm:p-4">
+                                        <div className="flex flex-col gap-3">
+                                            <div className="flex flex-col sm:flex-row w-full gap-1">
+                                                <label className="flex w-full sm:w-24 items-center text-[11px] sm:text-xs text-gray-700 font-medium">{t('generate.paperFormat')}</label>
                                                 <select
                                                     className="flex-1 min-w-0 w-full rounded-md p-2 text-sm border border-gray-200 shadow-sm text-black bg-white"
                                                     value={paperFormat}
@@ -337,8 +337,8 @@ export default function AdminPage() {
                                                     ))}
                                                 </select>
                                             </div>
-                                            <div className="flex flex-row w-full">
-                                                <label className="flex w-20 items-center text-xs text-gray-700">{t('generate.cardFormat')}</label>
+                                            <div className="flex flex-col sm:flex-row w-full gap-1">
+                                                <label className="flex w-full sm:w-24 items-center text-[11px] sm:text-xs text-gray-700 font-medium">{t('generate.cardFormat')}</label>
                                                 <select
                                                     className="flex-1 min-w-0 w-full rounded-md p-2 text-sm border border-gray-200 shadow-sm text-black bg-white"
                                                     value={cardFormat}
@@ -645,7 +645,7 @@ function QRCodeListSection({ apiUrl, onGeneratePDF, paperFormat, cardFormat, dbC
                 </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4 p-3 sm:p-6 overflow-hidden">
-                <div className="grid grid-cols-1 xs:grid-cols-2 md:flex md:flex-wrap gap-2 justify-center sm:justify-start items-center">
+                <div className="grid grid-cols-3 md:flex md:flex-wrap gap-2 justify-center sm:justify-start items-center">
                     {["UNASSIGNED", "LINKED", "ACTIVE", "USED", "SHIPPED", "COMPLETED", "EXPIRED", "BANNED", "PROMOTION"].map((s) => (
                         <Button
                             key={s}
@@ -700,9 +700,9 @@ function QRCodeListSection({ apiUrl, onGeneratePDF, paperFormat, cardFormat, dbC
                     <Table wrapperClassName="max-h-[70vh] overflow-auto" className="w-full table-fixed">
                         <TableHeader className="sticky top-0 bg-white z-10 shadow-sm">
                             <TableRow className={isDense ? "h-6" : "h-10"}>
-                                <TableHead className={cn("py-1 w-[90px]", isDense ? "h-6 px-1 text-[9px]" : "h-8 px-2")}>{t('list.table.createdAt')}</TableHead>
-                                <TableHead className={cn("py-1 w-[60px]", isDense ? "h-6 px-1 text-[9px]" : "h-8 px-2")}>{t('list.table.status')}</TableHead>
-                                <TableHead className={cn("py-1 hidden md:table-cell", isDense ? "h-6 px-1 text-[9px]" : "h-8 px-2")}>{t('list.table.pin')}</TableHead>
+                                <TableHead className={cn("py-1 w-[115px]", isDense ? "h-6 px-1 text-[9px]" : "h-8 px-2")}>{t('list.table.createdAt')}</TableHead>
+                                <TableHead className={cn("py-1 w-[100px] text-center", isDense ? "h-6 px-1 text-[9px]" : "h-8 px-2")}>{t('list.table.status')}</TableHead>
+                                <TableHead className={cn("py-1 w-[90px] text-center hidden sm:table-cell", isDense ? "h-6 px-1 text-[9px]" : "h-8 px-2")}>{t('list.table.pin')}</TableHead>
                                 <TableHead className={cn("py-1 min-w-[110px] break-all", isDense ? "h-6 px-1 text-[9px]" : "h-8 px-2")}>{t('list.table.uuid')}</TableHead>
                             </TableRow>
                         </TableHeader>
@@ -774,11 +774,11 @@ function QRCodeRow({ item, apiUrl, onGeneratePDF, onRefresh, paperFormat, cardFo
                         {item.ts_updated_at ? new Date(item.ts_updated_at).toLocaleString() : '-'}
                     </TableCell>
                     <TableCell className="py-0 px-2">
-                        <span className={cn("px-2 py-0 rounded", isDense ? "text-[10px]" : "text-[13px]", statusColor)}>
+                        <span className={cn("px-2 py-0 rounded text-center block", isDense ? "text-[10px]" : "text-[13px]", statusColor)}>
                             {st(item.status ? item.status.toLowerCase() : 'active')}
                         </span>
                     </TableCell>
-                    <TableCell className={cn("font-mono select-all py-0 hidden sm:table-cell", isDense ? "text-[10px] px-2" : "text-xs px-4")}>
+                    <TableCell className={cn("font-mono select-all py-0 text-center hidden sm:table-cell", isDense ? "text-[10px] px-2" : "text-xs px-4")}>
                         {item.pin}
                     </TableCell>
                     <TableCell className={cn("font-mono select-all py-0 min-w-[110px] break-all", isDense ? "text-[9px] px-1" : "text-[11px] px-2")}>
