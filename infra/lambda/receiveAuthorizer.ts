@@ -106,7 +106,7 @@ export const handler = async (event: APIGatewayRequestAuthorizerEvent): Promise<
         let policyResource: string | string[];
 
         if (item.status === 'PROMOTION') {
-            // PROMOTIONの場合は特定の取得系エンドポイントのみを許可
+            // PROMOTION(プロモーション用のQRコード)の場合は特定の取得系エンドポイントのみを許可
             policyResource = [
                 `${stageArn}/POST/receive/chat/get`,
                 `${stageArn}/POST/receive/sender/load`

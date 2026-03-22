@@ -1008,9 +1008,6 @@ export default function ShopPage() {
 
                                                         <QRScanner
                                                             qrCodeSuccessCallback={handleScanSuccess}
-                                                            qrbox={(viewfinderWidth, viewfinderHeight) => {
-                                                                return Math.floor(Math.min(viewfinderWidth, viewfinderHeight) * 0.7);
-                                                            }}
                                                             disableFlip={false}
                                                             onFatalError={handleScannerError}
                                                         />

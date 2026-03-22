@@ -355,25 +355,25 @@ export default function AdminPage() {
                                         </div>
 
                                         {/* Card Preview */}
-                                        <div className="">
+                                        <div className="w-full overflow-hidden">
                                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                                <div className="space-y-1">
-                                                    <div className="aspect-[84/52] relative rounded shadow-lg overflow-hidden border border-gray-700 bg-white">
+                                                <div className="space-y-1 w-full">
+                                                    <div className="aspect-[84/52] w-full relative rounded shadow-lg overflow-hidden border border-gray-700 bg-white">
                                                         <img
                                                             src={dbCardDesigns.find(d => d.design_id === cardFormat)?.bgimgf || cardformats[cardFormat]?.bgimgf}
                                                             alt={t('generate.frontPreview')}
-                                                            className="w-full h-full object-cover"
+                                                            className="absolute inset-0 w-full h-full object-cover"
                                                             crossOrigin="anonymous"
                                                         />
                                                     </div>
                                                     <p className="text-[10px] text-gray-500 text-center uppercase tracking-wider">{t('generate.front')}</p>
                                                 </div>
-                                                <div className="space-y-1">
-                                                    <div className="aspect-[84/52] relative rounded shadow-lg overflow-hidden border border-gray-700 bg-white">
+                                                <div className="space-y-1 w-full">
+                                                    <div className="aspect-[84/52] w-full relative rounded shadow-lg overflow-hidden border border-gray-700 bg-white">
                                                         <img
                                                             src={dbCardDesigns.find(d => d.design_id === cardFormat)?.bgimgb || cardformats[cardFormat]?.bgimgb}
                                                             alt={t('generate.backPreview')}
-                                                            className="w-full h-full object-cover"
+                                                            className="absolute inset-0 w-full h-full object-cover"
                                                             crossOrigin="anonymous"
                                                         />
                                                     </div>
@@ -628,7 +628,7 @@ function QRCodeListSection({ apiUrl, onGeneratePDF, paperFormat, cardFormat, dbC
 
     return (
         <Card className="w-full">
-            <CardHeader>
+            <CardHeader className="p-4 sm:p-6">
                 <CardTitle className="flex flex-col sm:flex-row justify-between items-center gap-4">
                     <span className="w-full sm:w-auto text-center sm:text-left">{t('list.title')}</span>
                     <div className="flex gap-2 flex-wrap justify-center sm:justify-end">
@@ -649,8 +649,8 @@ function QRCodeListSection({ apiUrl, onGeneratePDF, paperFormat, cardFormat, dbC
                     </div>
                 </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4 ">
-                <div className="flex flex-wrap gap-2 justify-center sm:justify-start items-center">
+            <CardContent className="space-y-4 p-4 sm:p-6">
+                <div className="grid grid-cols-2 xs:grid-cols-3 sm:flex sm:flex-wrap gap-2 justify-center sm:justify-start items-center">
                     {["UNASSIGNED", "LINKED", "ACTIVE", "USED", "SHIPPED", "COMPLETED", "EXPIRED", "BANNED", "PROMOTION"].map((s) => (
                         <Button
                             key={s}
@@ -705,8 +705,8 @@ function QRCodeListSection({ apiUrl, onGeneratePDF, paperFormat, cardFormat, dbC
                     <Table wrapperClassName="max-h-[70vh] overflow-auto">
                         <TableHeader className="sticky top-0 bg-white z-10 shadow-sm">
                             <TableRow className={isDense ? "h-6" : "h-10"}>
-                                <TableHead className={cn("py-1", isDense ? "h-6 px-2 text-[10px]" : "h-8 px-4")}>{t('list.table.createdAt')}</TableHead>
-                                <TableHead className={cn("py-1", isDense ? "h-6 px-2 text-[10px]" : "h-8 px-4")}>{t('list.table.status')}</TableHead>
+                                <TableHead className={cn("py-1 min-w-[100px]", isDense ? "h-6 px-2 text-[10px]" : "h-8 px-4")}>{t('list.table.createdAt')}</TableHead>
+                                <TableHead className={cn("py-1 min-w-[70px]", isDense ? "h-6 px-2 text-[10px]" : "h-8 px-4")}>{t('list.table.status')}</TableHead>
                                 <TableHead className={cn("py-1 hidden sm:table-cell", isDense ? "h-6 px-2 text-[10px]" : "h-8 px-4")}>{t('list.table.pin')}</TableHead>
                                 <TableHead className={cn("py-1 min-w-[120px] max-w-[200px]", isDense ? "h-6 px-2 text-[10px]" : "h-8 px-4")}>{t('list.table.uuid')}</TableHead>
                             </TableRow>

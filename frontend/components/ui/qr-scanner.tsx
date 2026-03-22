@@ -24,7 +24,23 @@ const QRScanner = (props: QRScannerProps) => {
     // Unique ID for this instance to prevent collisions in Strict Mode
     const scannerRegionId = useRef(`html5qr-code-${Math.random().toString(36).substring(7)}`).current;
     const scannerRef = useRef<Html5Qrcode | null>(null);
+    const [qrboxSize, setQrboxSize] = useState<number>(250);
     const [permissionError, setPermissionError] = useState(false);
+
+    // Calculate qrbox size based on container since passing a function can cause scaling issues on some devices
+    useEffect(() => {
+        const updateSize = () => {
+            const container = document.getElementById(scannerRegionId);
+            if (container && container.clientWidth > 0) {
+                const size = Math.floor(Math.min(container.clientWidth, container.clientHeight) * 0.7);
+                if (size > 0) setQrboxSize(size);
+            }
+        };
+        updateSize();
+        // Also update on resize if needed
+        window.addEventListener('resize', updateSize);
+        return () => window.removeEventListener('resize', updateSize);
+    }, [scannerRegionId]);
 
     // Store latest callbacks in refs to avoid stale closures in the mount-only useEffect
     const successCallbackRef = useRef(props.qrCodeSuccessCallback);
@@ -44,10 +60,7 @@ const QRScanner = (props: QRScannerProps) => {
 
         const config = {
             fps: props.fps || 10,
-            qrbox: (props.qrbox || ((viewfinderWidth: number, viewfinderHeight: number) => {
-                const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
-                return Math.floor(minEdge * 0.6);
-            })) as any,
+            qrbox: props.qrbox || qrboxSize,
             aspectRatio: props.aspectRatio || 1.0,
             disableFlip: props.disableFlip !== undefined ? props.disableFlip : false,
         };
@@ -57,7 +70,7 @@ const QRScanner = (props: QRScannerProps) => {
                 // Use rear camera by default
                 await html5QrCode.start(
                     { facingMode: "environment" },
-                    config,
+                    config as any,
                     (decodedText: string, decodedResult: any) => {
                         if (isMounted) {
                             successCallbackRef.current(decodedText, decodedResult);
@@ -120,22 +133,14 @@ const QRScanner = (props: QRScannerProps) => {
             }
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+    }, [qrboxSize]); // Restart if qrboxSize changes significantly
 
     if (permissionError) {
         return <div className="p-4 text-red-500">{t("Camera permission denied or error starting scanner")}</div>;
     }
 
     return (
-        <div id={scannerRegionId} className="w-full h-full overflow-hidden rounded-lg bg-gray-100">
-            <style>{`
-                #${scannerRegionId} video, #${scannerRegionId} canvas {
-                    object-fit: cover !important;
-                    width: 100% !important;
-                    height: 100% !important;
-                }
-            `}</style>
-        </div>
+        <div id={scannerRegionId} className="w-full h-full overflow-hidden rounded-lg bg-gray-100 flex items-center justify-center" />
     );
 };
 
