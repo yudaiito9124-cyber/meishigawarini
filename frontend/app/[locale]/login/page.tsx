@@ -139,105 +139,110 @@ export default function LoginPage() {
     };
 
     return (
-        <div className={cn("min-h-screen flex flex-col items-center justify-center bg-gray-100 p-4 pt-16 sm:pt-4", isAdmin && "bg-mist-900")}>
-            {isLoggedIn && (
-                <div className="w-full max-w-lg mb-8 flex flex-wrap justify-between items-start gap-4">
-                    {isAdmin && (
-                        <div className="flex gap-2 flex-col items-start w-full sm:w-auto">
-                            <Link href="/help/admin" className="w-full sm:w-auto">
-                                <Button variant="ghost" className="shadow-md cursor-pointer text-white h-10 flex items-center gap-1.5 px-3 w-full sm:w-40 bg-mist-800/50 hover:bg-mist-700">
-                                    <HelpCircle className="size-5" />
-                                    <span className="text-xs font-bold">{t('helpAdminPage')}</span>
-                                </Button>
-                            </Link>
-                            <Link href="/admin" className="w-full sm:w-auto">
-                                <Button variant="destructive" className="shadow-md cursor-pointer border border-red-900 h-32 sm:h-40 w-full sm:w-40 flex flex-col items-center justify-center p-2 hover:bg-red-700 transition-colors">
-                                    <Crown className="size-12 sm:size-18 drop-shadow-md stroke-[2]" />
-                                    <div className='font-bold text-base sm:text-lg leading-tight text-center mt-1'>{t('qrAdminPage')}</div>
-                                </Button>
-                            </Link>
-                        </div>
-                    )}
-                    <div className="flex gap-2 flex-col items-start sm:items-end w-full sm:w-auto">
-                        <Button
-                            variant="ghost"
-                            className="hover:bg-red-50 hover:text-red-600 cursor-pointer text-white w-full sm:w-40 justify-center h-10 bg-mist-800/50"
-                            onClick={async () => {
-                                await signOut();
-                                setIsLoggedIn(false);
-                                setIsAdmin(false);
-                            }}
-                        >
-                            {t('logout')}
-                        </Button>
-                        {!singleShopOwner && (
-                            <Link href="/shop" className="w-full sm:w-auto">
-                                <Button variant="secondary" className="shadow-md cursor-pointer border border-gray-200 flex flex-col items-center gap-2 font-bold h-32 sm:h-40 px-4 w-full sm:w-40">
-                                    <Store className="size-12 sm:size-18 drop-shadow-md stroke-[1.5]" />
-                                    <div className='font-bold text-base sm:text-lg leading-tight text-center mt-1'>{t('shopAdminPage')}</div>
-                                </Button>
-                            </Link>
+        <div className={cn("flex flex-col items-center justify-center bg-gray-100 p-4 pt-16 sm:pt-4", isAdmin && "bg-mist-900")}>
+            <div className="w-full min-h-screen">
+                {isLoggedIn && (
+                    <div className="w-full pt-0 flex flex-wrap justify-between items-start gap-4">
+                        {isAdmin && (
+                            <div className="flex gap-2 flex-col items-start w-full sm:w-auto">
+                                <Link href="/help/admin" className="w-full sm:w-auto">
+                                    <Button
+                                        variant="ghost"
+                                        className="cursor-pointer text-white h-10 flex items-center gap-1.5 px-3 w-full sm:w-40 hover:text-white hover:bg-mist-700">
+                                        <HelpCircle className="size-5" />
+                                        <span className="text-xs font-bold">{t('helpAdminPage')}</span>
+                                    </Button>
+                                </Link>
+                                <Link href="/admin" className="w-full sm:w-auto">
+                                    <Button variant="destructive" className="shadow-md cursor-pointer border border-red-900 h-32 sm:h-40 w-full sm:w-40 flex flex-col items-center justify-center p-2 hover:bg-red-700 transition-colors">
+                                        <Crown className="size-12 sm:size-18 drop-shadow-md stroke-[2]" />
+                                        <div className='font-bold text-base sm:text-lg leading-tight text-center mt-1'>{t('qrAdminPage')}</div>
+                                    </Button>
+                                </Link>
+                            </div>
                         )}
-                    </div>
-                </div>
-            )}
-            <Card className="w-full max-w-md">
-                <CardHeader>
-                    <CardTitle className="text-center text-2xl whitespace-pre-wrap break-all overflow-hidden">{isAdmin ? `Admin \n\n${userEmail}` : t('title')}</CardTitle>
-                </CardHeader>
-                <CardContent>
-                    {!isAdmin && (
-
-                        <form onSubmit={handleLogin} className="space-y-4">
-                            {!showMfa ? (
-                                <>
-                                    <div className="space-y-2">
-                                        <Label htmlFor="email">{t('email')}</Label>
-                                        <Input
-                                            id="email"
-                                            type="email"
-                                            placeholder="you@example.com"
-                                            value={email}
-                                            onChange={(e) => setEmail(e.target.value)}
-                                            required
-                                        />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label htmlFor="password">{t('password')}</Label>
-                                        <Input
-                                            id="password"
-                                            type="password"
-                                            value={password}
-                                            onChange={(e) => setPassword(e.target.value)}
-                                            required
-                                        />
-                                    </div>
-                                </>
-                            ) : (
-                                <div className="space-y-2">
-                                    <Label htmlFor="mfaCode">{t('mfaCodeLabel')}</Label>
-                                    <Input
-                                        id="mfaCode"
-                                        type="text"
-                                        placeholder={t('mfaPlaceholder')}
-                                        value={mfaCode}
-                                        onChange={(e) => setMfaCode(e.target.value)}
-                                        className="text-center text-2xl tracking-widest"
-                                        maxLength={6}
-                                        required
-                                        autoFocus
-                                    />
-                                    <p className="text-xs text-gray-500 text-center">
-                                        {t('mfaInstructions')}
-                                    </p>
-                                </div>
-                            )}
-                            {error && <p className="text-sm text-red-500 text-center font-medium">{error}</p>}
-                            <Button type="submit" className="w-full h-11 text-base font-bold" disabled={loading}>
-                                {loading ? (showMfa ? t('verifyingMfa') : t('signingIn')) : (showMfa ? t('verifyAndSignIn') : t('signIn'))}
+                        <div className="flex gap-2 flex-col items-start sm:items-end w-full sm:w-auto">
+                            <Button
+                                variant="ghost"
+                                className="hover:bg-red-50 hover:text-red-600 cursor-pointer text-white w-full sm:w-40 justify-center h-10 "
+                                onClick={async () => {
+                                    await signOut();
+                                    setIsLoggedIn(false);
+                                    setIsAdmin(false);
+                                }}
+                            >
+                                {t('logout')}
                             </Button>
+                            {!singleShopOwner && (
+                                <Link href="/shop" className="w-full sm:w-auto">
+                                    <Button variant="secondary" className="shadow-md cursor-pointer border border-gray-200 flex flex-col items-center gap-2 font-bold h-32 sm:h-40 px-4 w-full sm:w-40">
+                                        <Store className="size-12 sm:size-18 drop-shadow-md stroke-[1.5]" />
+                                        <div className='font-bold text-base sm:text-lg leading-tight text-center mt-1'>{t('shopAdminPage')}</div>
+                                    </Button>
+                                </Link>
+                            )}
+                        </div>
+                    </div>
+                )}
+                <div className="w-full flex-1 flex flex-col items-center justify-center min-h-[80vh] py-8 px-4">
 
-                            {/* 生体認証は一旦コメントアウト
+                    <Card className="w-full max-w-2xl shadow-xl border-mist-700/50 bg-white/95 backdrop-blur-sm">
+                        <CardHeader>
+                            <CardTitle className="text-center text-2xl whitespace-pre-wrap break-all overflow-hidden">{isAdmin ? `Admin \n\n${userEmail}` : t('title')}</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            {!isAdmin && (
+
+                                <form onSubmit={handleLogin} className="space-y-4">
+                                    {!showMfa ? (
+                                        <>
+                                            <div className="space-y-2">
+                                                <Label htmlFor="email">{t('email')}</Label>
+                                                <Input
+                                                    id="email"
+                                                    type="email"
+                                                    placeholder="you@example.com"
+                                                    value={email}
+                                                    onChange={(e) => setEmail(e.target.value)}
+                                                    required
+                                                />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label htmlFor="password">{t('password')}</Label>
+                                                <Input
+                                                    id="password"
+                                                    type="password"
+                                                    value={password}
+                                                    onChange={(e) => setPassword(e.target.value)}
+                                                    required
+                                                />
+                                            </div>
+                                        </>
+                                    ) : (
+                                        <div className="space-y-2">
+                                            <Label htmlFor="mfaCode">{t('mfaCodeLabel')}</Label>
+                                            <Input
+                                                id="mfaCode"
+                                                type="text"
+                                                placeholder={t('mfaPlaceholder')}
+                                                value={mfaCode}
+                                                onChange={(e) => setMfaCode(e.target.value)}
+                                                className="text-center text-2xl tracking-widest"
+                                                maxLength={6}
+                                                required
+                                                autoFocus
+                                            />
+                                            <p className="text-xs text-gray-500 text-center">
+                                                {t('mfaInstructions')}
+                                            </p>
+                                        </div>
+                                    )}
+                                    {error && <p className="text-sm text-red-500 text-center font-medium">{error}</p>}
+                                    <Button type="submit" className="w-full h-11 text-base font-bold" disabled={loading}>
+                                        {loading ? (showMfa ? t('verifyingMfa') : t('signingIn')) : (showMfa ? t('verifyAndSignIn') : t('signIn'))}
+                                    </Button>
+
+                                    {/* 生体認証は一旦コメントアウト
                         {!showMfa && (
                             <div className="space-y-4 pt-2">
                                 <div className="relative">
@@ -282,42 +287,44 @@ export default function LoginPage() {
                             </div>
                         )}
                         */}
-                            {showMfa && (
-                                <Button
-                                    type="button"
-                                    variant="ghost"
-                                    className="w-full text-gray-500"
-                                    onClick={() => setShowMfa(false)}
-                                >
-                                    {t('back')}
-                                </Button>
+                                    {showMfa && (
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            className="w-full text-gray-500"
+                                            onClick={() => setShowMfa(false)}
+                                        >
+                                            {t('back')}
+                                        </Button>
+                                    )}
+                                </form>
                             )}
-                        </form>
-                    )}
-                    {isAdmin && (
-                        <>
-                            <p className="text-sm text-gray-500 text-center break-all px-4">
-                                Your roles : <br />
-                                {userInfo}
-                            </p>
-                        </>
-                    )}
-                </CardContent>
-                <CardFooter className="flex-col gap-4">
-                    {!isAdmin && (
-                        <p className="text-sm text-gray-500">
-                            {t('noAccount')} <Link href="/register" className="text-blue-600 hover:underline">{t('signUpLink')}</Link>
-                        </p>
-                    )}
-                    {isAdmin && (
-                        <div className="pt-2 border-t w-full text-center">
-                            <Link href="/mfa-setup" className="text-sm text-gray-500 hover:text-blue-600 transition-colors">
-                                {t('mfaLink')}
-                            </Link>
-                        </div>
-                    )}
-                </CardFooter>
-            </Card>
-        </div>
+                            {isAdmin && (
+                                <>
+                                    <p className="text-sm text-gray-500 text-center break-all px-4">
+                                        Your roles : <br />
+                                        {userInfo}
+                                    </p>
+                                </>
+                            )}
+                        </CardContent>
+                        <CardFooter className="flex-col gap-4">
+                            {!isAdmin && (
+                                <p className="text-sm text-gray-500">
+                                    {t('noAccount')} <Link href="/register" className="text-blue-600 hover:underline">{t('signUpLink')}</Link>
+                                </p>
+                            )}
+                            {isAdmin && (
+                                <div className="pt-2 border-t w-full text-center">
+                                    <Link href="/mfa-setup" className="text-sm text-gray-500 hover:text-blue-600 transition-colors">
+                                        {t('mfaLink')}
+                                    </Link>
+                                </div>
+                            )}
+                        </CardFooter>
+                    </Card>
+                </div>
+            </div>
+        </div >
     );
 }
