@@ -16,7 +16,6 @@ interface QRScannerProps {
     verbose?: boolean;
     qrCodeSuccessCallback: (decodedText: string, decodedResult: any) => void;
     qrCodeErrorCallback?: (errorMessage: string) => void;
-    onFatalError?: (error: any) => void;
 }
 
 const QRScanner = (props: QRScannerProps) => {
@@ -25,7 +24,7 @@ const QRScanner = (props: QRScannerProps) => {
     const scannerRegionId = useRef(`html5qr-code-${Math.random().toString(36).substring(7)}`).current;
     const scannerRef = useRef<Html5Qrcode | null>(null);
     const [permissionError, setPermissionError] = useState(false);
-    
+
     // Store latest callbacks in refs to avoid stale closures in the mount-only useEffect
     const successCallbackRef = useRef(props.qrCodeSuccessCallback);
     const errorCallbackRef = useRef(props.qrCodeErrorCallback);
@@ -86,9 +85,6 @@ const QRScanner = (props: QRScannerProps) => {
                     if (err.name !== 'AbortError') {
                         console.error(t("Error starting scanner"), err);
                         setPermissionError(true);
-                        if (props.onFatalError) {
-                            props.onFatalError(err);
-                        }
                     }
                 }
             }
