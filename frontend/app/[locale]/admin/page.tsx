@@ -138,8 +138,8 @@ export default function AdminPage() {
 
 
     return (
-        <div className="min-h-screen bg-mist-900 p-4 sm:p-8 text-white"> {/* bg-[#383838] */}
-            <div className="w-full max-w-[1600px] mx-auto space-y-6">
+        <div className="min-h-screen bg-mist-900 p-3 sm:p-8 text-white overflow-x-hidden"> {/* bg-[#383838] */}
+            <div className="w-full max-w-[1600px] mx-auto space-y-6 overflow-x-hidden">
                 <div className="flex justify-between items-center flex-wrap gap-4">
                     <h1 className="text-2xl font-bold text-white w-full sm:w-auto text-center sm:text-left">{t('title')}</h1>
                     <div className="flex items-center gap-2 flex-wrap justify-center sm:justify-end w-full sm:w-auto">
@@ -158,7 +158,7 @@ export default function AdminPage() {
                 </div>
 
 
-                <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-8">
+                <div className="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
                     <button
                         onClick={() => setActiveTab("qrcodes")}
                         className={cn(
@@ -631,36 +631,31 @@ function QRCodeListSection({ apiUrl, onGeneratePDF, paperFormat, cardFormat, dbC
             <CardHeader className="">
                 <CardTitle className="flex flex-col sm:flex-row justify-between items-center gap-4">
                     <span className="w-full sm:w-auto text-center sm:text-left">{t('list.title')}</span>
-                    <div className="flex gap-2 flex-wrap justify-center sm:justify-end">
-                        {/* {status === 'BANNED' && ( // すべてのBAN済みのコードを削除するコード　一旦コメントアウト
-                            <Button variant="destructive" size="sm" onClick={handleDeleteAllBanned} disabled={loading}>
-                                {t('list.deleteAllBanned')}
-                            </Button>
-                        )} */}
-                        <Button variant="outline" size="sm" onClick={() => setIsDenseManual(prev => prev === null ? !isDense : !prev)}>
+                    <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                        <Button variant="outline" size="sm" onClick={() => setIsDenseManual(prev => prev === null ? !isDense : !prev)} className="w-full sm:w-auto">
                             {isDense ? t('list.normalView') : t('list.compactView')}
                         </Button>
-                        <Button variant="outline" size="sm" onClick={handleExportCSV} disabled={loading || codes.length === 0}>
+                        <Button variant="outline" size="sm" onClick={handleExportCSV} disabled={loading || codes.length === 0} className="w-full sm:w-auto">
                             {t('list.exportCsv')}
                         </Button>
-                        <Button variant="outline" size="sm" onClick={() => fetchCodes()} disabled={loading}>
+                        <Button variant="outline" size="sm" onClick={() => fetchCodes()} disabled={loading} className="w-full sm:w-auto">
                             {loading ? t('list.loading') : t('list.refresh')}
                         </Button>
                     </div>
                 </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4 ">
-                <div className="grid grid-cols-2 xs:grid-cols-3 sm:flex sm:flex-wrap gap-2 justify-center sm:justify-start items-center">
+            <CardContent className="space-y-4 p-3 sm:p-6 overflow-hidden">
+                <div className="grid grid-cols-1 xs:grid-cols-2 md:flex md:flex-wrap gap-2 justify-center sm:justify-start items-center">
                     {["UNASSIGNED", "LINKED", "ACTIVE", "USED", "SHIPPED", "COMPLETED", "EXPIRED", "BANNED", "PROMOTION"].map((s) => (
                         <Button
                             key={s}
                             variant={status === s ? "default" : "secondary"}
+                            size="sm"
                             onClick={() => {
                                 setStatus(s);
                                 fetchCodes(s);
-                                // optional: auto fetch on click
-                                // setTimeout(fetchCodes, 0);
                             }}
+                            className="w-full sm:w-auto text-xs"
                         >
                             {t(`list.status.${s.toLowerCase()}`)}
                         </Button>
@@ -677,7 +672,7 @@ function QRCodeListSection({ apiUrl, onGeneratePDF, paperFormat, cardFormat, dbC
                             className="w-full"
                         />
                     </div>
-                    <div className="flex gap-2 flex-wrap justify-center sm:justify-start">
+                    <div className="w-full sm:w-auto">
                         {["SEARCH"].map((s) => (
                             <Button
                                 key={s}
@@ -690,7 +685,7 @@ function QRCodeListSection({ apiUrl, onGeneratePDF, paperFormat, cardFormat, dbC
                                     setStatus(s);
                                     fetchCodes(s);
                                 }}
-                                className="px-4"
+                                className="w-full px-4"
                             >
                                 {t(`list.status.${s.toLowerCase()}`)}
                             </Button>
@@ -702,13 +697,13 @@ function QRCodeListSection({ apiUrl, onGeneratePDF, paperFormat, cardFormat, dbC
                     <p className="text-sm text-gray-500 mb-2">
                         {t('list.info', { status: t(`list.status.${status.toLowerCase()}`), count: codes.length })}
                     </p>
-                    <Table wrapperClassName="max-h-[70vh] overflow-auto">
+                    <Table wrapperClassName="max-h-[70vh] overflow-auto" className="w-full table-fixed">
                         <TableHeader className="sticky top-0 bg-white z-10 shadow-sm">
                             <TableRow className={isDense ? "h-6" : "h-10"}>
-                                <TableHead className={cn("py-1 min-w-[100px]", isDense ? "h-6 px-2 text-[10px]" : "h-8 px-4")}>{t('list.table.createdAt')}</TableHead>
-                                <TableHead className={cn("py-1 min-w-[70px]", isDense ? "h-6 px-2 text-[10px]" : "h-8 px-4")}>{t('list.table.status')}</TableHead>
-                                <TableHead className={cn("py-1 hidden sm:table-cell", isDense ? "h-6 px-2 text-[10px]" : "h-8 px-4")}>{t('list.table.pin')}</TableHead>
-                                <TableHead className={cn("py-1 min-w-[120px] max-w-[200px]", isDense ? "h-6 px-2 text-[10px]" : "h-8 px-4")}>{t('list.table.uuid')}</TableHead>
+                                <TableHead className={cn("py-1 w-[90px]", isDense ? "h-6 px-1 text-[9px]" : "h-8 px-2")}>{t('list.table.createdAt')}</TableHead>
+                                <TableHead className={cn("py-1 w-[60px]", isDense ? "h-6 px-1 text-[9px]" : "h-8 px-2")}>{t('list.table.status')}</TableHead>
+                                <TableHead className={cn("py-1 hidden md:table-cell", isDense ? "h-6 px-1 text-[9px]" : "h-8 px-2")}>{t('list.table.pin')}</TableHead>
+                                <TableHead className={cn("py-1 min-w-[110px] break-all", isDense ? "h-6 px-1 text-[9px]" : "h-8 px-2")}>{t('list.table.uuid')}</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -775,7 +770,7 @@ function QRCodeRow({ item, apiUrl, onGeneratePDF, onRefresh, paperFormat, cardFo
         <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
                 <TableRow className={cn("cursor-pointer hover:bg-gray-100", isDense ? "h-6" : "h-10")}>
-                    <TableCell className={cn("text-gray-500 py-0", isDense ? "text-[10px] px-2" : "text-[14px] px-4")}>
+                    <TableCell className={cn("text-gray-500 py-0", isDense ? "text-[9px] px-1" : "text-[12px] px-2")}>
                         {item.ts_updated_at ? new Date(item.ts_updated_at).toLocaleString() : '-'}
                     </TableCell>
                     <TableCell className="py-0 px-2">
@@ -786,7 +781,7 @@ function QRCodeRow({ item, apiUrl, onGeneratePDF, onRefresh, paperFormat, cardFo
                     <TableCell className={cn("font-mono select-all py-0 hidden sm:table-cell", isDense ? "text-[10px] px-2" : "text-xs px-4")}>
                         {item.pin}
                     </TableCell>
-                    <TableCell className={cn("font-mono select-all py-0 min-w-[120px] break-all", isDense ? "text-[10px] px-2" : "text-xs px-4")}>
+                    <TableCell className={cn("font-mono select-all py-0 min-w-[110px] break-all", isDense ? "text-[9px] px-1" : "text-[11px] px-2")}>
                         {uuid}
                     </TableCell>
                 </TableRow>
