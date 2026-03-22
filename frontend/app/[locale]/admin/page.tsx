@@ -700,8 +700,8 @@ function QRCodeListSection({ apiUrl, onGeneratePDF, paperFormat, cardFormat, dbC
                     <Table wrapperClassName="max-h-[70vh] overflow-auto" className="w-full table-fixed">
                         <TableHeader className="sticky top-0 bg-white z-10 shadow-sm">
                             <TableRow className={isDense ? "h-6" : "h-10"}>
-                                <TableHead className={cn("py-1 w-[115px]", isDense ? "h-6 px-1 text-[9px]" : "h-8 px-2")}>{t('list.table.createdAt')}</TableHead>
-                                <TableHead className={cn("py-1 w-[100px] text-center", isDense ? "h-6 px-1 text-[9px]" : "h-8 px-2")}>{t('list.table.status')}</TableHead>
+                                <TableHead className={cn("py-1 ", isDense ? "w-[90px] h-6 px-1 text-[9px]" : "w-[120px] h-8 px-2")}>{t('list.table.createdAt')}</TableHead>
+                                <TableHead className={cn("py-1 text-center", isDense ? "w-[100px] h-6 px-1 text-[9px]" : "w-[120px] h-8 px-2")}>{t('list.table.status')}</TableHead>
                                 <TableHead className={cn("py-1 w-[90px] text-center hidden sm:table-cell", isDense ? "h-6 px-1 text-[9px]" : "h-8 px-2")}>{t('list.table.pin')}</TableHead>
                                 <TableHead className={cn("py-1 min-w-[110px] break-all", isDense ? "h-6 px-1 text-[9px]" : "h-8 px-2")}>{t('list.table.uuid')}</TableHead>
                             </TableRow>
