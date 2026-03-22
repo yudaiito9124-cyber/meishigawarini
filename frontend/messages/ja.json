@@ -26,7 +26,8 @@
     "shipped": "発送済み",
     "completed": "受取り完了",
     "expired": "期限切れ",
-    "banned": "BAN済み"
+    "banned": "BAN済み",
+    "promotion": "プロモーション"
   },
   "Time": {
     "timeMorning": "午前中",
@@ -564,6 +565,7 @@
         "banned": "BAN済み",
         "expired": "期限切れ",
         "search": "UUIDで検索",
+        "promotion": "プロモーション",
         "undefined": "不明な状態"
       },
       "info": "ステータス: {status} • 件数: {count}",

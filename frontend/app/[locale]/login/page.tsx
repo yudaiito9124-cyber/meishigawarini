@@ -139,29 +139,29 @@ export default function LoginPage() {
     };
 
     return (
-        <div className={cn("min-h-screen flex items-center justify-center bg-gray-100 p-4", isAdmin && "bg-mist-900")}>
+        <div className={cn("min-h-screen flex flex-col items-center justify-center bg-gray-100 p-4 pt-16 sm:pt-4", isAdmin && "bg-mist-900")}>
             {isLoggedIn && (
-                <div className="fixed top-0 p-4 z-50 flex w-full items-center gap-2 flex-wrap justify-between">
+                <div className="w-full max-w-lg mb-8 flex flex-wrap justify-between items-start gap-4">
                     {isAdmin && (
-                        <div className="flex gap-2 flex-col items-start">
-                            <Link href="/help/admin">
-                                <Button variant="ghost" className="shadow-md cursor-pointer text-white h-10 flex items-center gap-1.5 px-3 w-40">
+                        <div className="flex gap-2 flex-col items-start w-full sm:w-auto">
+                            <Link href="/help/admin" className="w-full sm:w-auto">
+                                <Button variant="ghost" className="shadow-md cursor-pointer text-white h-10 flex items-center gap-1.5 px-3 w-full sm:w-40 bg-mist-800/50 hover:bg-mist-700">
                                     <HelpCircle className="size-5" />
                                     <span className="text-xs font-bold">{t('helpAdminPage')}</span>
                                 </Button>
                             </Link>
-                            <Link href="/admin">
-                                <Button variant="destructive" className="shadow-md cursor-pointer border border-red-900 h-40 w-40 flex flex-col items-center justify-center p-2 hover:bg-red-700 transition-colors">
-                                    <Crown className="size-18 drop-shadow-md stroke-[2]" />
-                                    <div className='font-bold text-lg leading-tight text-center mt-1'>{t('qrAdminPage')}</div>
+                            <Link href="/admin" className="w-full sm:w-auto">
+                                <Button variant="destructive" className="shadow-md cursor-pointer border border-red-900 h-32 sm:h-40 w-full sm:w-40 flex flex-col items-center justify-center p-2 hover:bg-red-700 transition-colors">
+                                    <Crown className="size-12 sm:size-18 drop-shadow-md stroke-[2]" />
+                                    <div className='font-bold text-base sm:text-lg leading-tight text-center mt-1'>{t('qrAdminPage')}</div>
                                 </Button>
                             </Link>
                         </div>
                     )}
-                    <div className="flex gap-2 flex-col items-start">
+                    <div className="flex gap-2 flex-col items-start sm:items-end w-full sm:w-auto">
                         <Button
                             variant="ghost"
-                            className="hover:bg-red-50 hover:text-red-600 cursor-pointer text-white justify-end w-40 justify-center"
+                            className="hover:bg-red-50 hover:text-red-600 cursor-pointer text-white w-full sm:w-40 justify-center h-10 bg-mist-800/50"
                             onClick={async () => {
                                 await signOut();
                                 setIsLoggedIn(false);
@@ -171,10 +171,10 @@ export default function LoginPage() {
                             {t('logout')}
                         </Button>
                         {!singleShopOwner && (
-                            <Link href="/shop">
-                                <Button variant="secondary" className="shadow-md cursor-pointer border border-gray-200 flex flex-col items-center gap-2 font-bold h-10 px-4 w-40 h-40">
-                                    <Store className="size-18 drop-shadow-md stroke-[1.5]" />
-                                    <div className='font-bold text-lg leading-tight text-center mt-1'>{t('shopAdminPage')}</div>
+                            <Link href="/shop" className="w-full sm:w-auto">
+                                <Button variant="secondary" className="shadow-md cursor-pointer border border-gray-200 flex flex-col items-center gap-2 font-bold h-32 sm:h-40 px-4 w-full sm:w-40">
+                                    <Store className="size-12 sm:size-18 drop-shadow-md stroke-[1.5]" />
+                                    <div className='font-bold text-base sm:text-lg leading-tight text-center mt-1'>{t('shopAdminPage')}</div>
                                 </Button>
                             </Link>
                         )}
@@ -183,7 +183,7 @@ export default function LoginPage() {
             )}
             <Card className="w-full max-w-md">
                 <CardHeader>
-                    <CardTitle className="text-center text-2xl whitespace-pre-wrap">{isAdmin ? `Admin \n\n${userEmail}` : t('title')}</CardTitle>
+                    <CardTitle className="text-center text-2xl whitespace-pre-wrap break-words overflow-hidden [word-break:break-word]">{isAdmin ? `Admin \n\n${userEmail}` : t('title')}</CardTitle>
                 </CardHeader>
                 <CardContent>
                     {!isAdmin && (
@@ -296,7 +296,7 @@ export default function LoginPage() {
                     )}
                     {isAdmin && (
                         <>
-                            <p className="text-sm text-gray-500 text-center">
+                            <p className="text-sm text-gray-500 text-center break-words [word-break:break-word] px-4">
                                 Your roles : <br />
                                 {userInfo}
                             </p>

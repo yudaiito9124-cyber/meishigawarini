@@ -138,19 +138,19 @@ export default function AdminPage() {
 
 
     return (
-        <div className="min-h-screen bg-mist-900 p-8 text-white"> {/* bg-[#383838] */}
-            <div className="max-w-[98vw] 2xl:max-w-[1600px] mx-auto space-y-6">
+        <div className="min-h-screen bg-mist-900 p-4 sm:p-8 text-white"> {/* bg-[#383838] */}
+            <div className="w-full max-w-[1600px] mx-auto space-y-6">
                 <div className="flex justify-between items-center flex-wrap gap-4">
-                    <h1 className="text-2xl font-bold text-white">{t('title')}</h1>
-                    <div className="flex items-center gap-2">
+                    <h1 className="text-2xl font-bold text-white w-full sm:w-auto text-center sm:text-left">{t('title')}</h1>
+                    <div className="flex items-center gap-2 flex-wrap justify-center sm:justify-end w-full sm:w-auto">
                         <Link href="/admin/help/overview">
                             <Button variant="outline" className="bg-mist-800 border-mist-700 text-mist-300 hover:bg-mist-700 hover:text-white transition-all duration-300">
                                 <HelpCircle className="w-4 h-4 mr-2" />
                                 {t('helpButton') || "Help"}
                             </Button>
                         </Link>
-                        <Link href="/login">
-                            <Button variant="destructive" className="shadow-md cursor-pointer border border-red-900">
+                        <Link href="/login" className="w-full sm:w-auto">
+                            <Button variant="destructive" className="shadow-md cursor-pointer border border-red-900 w-full sm:w-auto">
                                 {t('qrAdminLoginPage')}
                             </Button>
                         </Link>
@@ -328,7 +328,7 @@ export default function AdminPage() {
                                             <div className="flex flex-row w-full">
                                                 <label className="flex w-20 items-center text-xs text-gray-700">{t('generate.paperFormat')}</label>
                                                 <select
-                                                    className="w-full rounded-md p-2 text-sm border border-gray-200 shadow-sm"
+                                                    className="flex-1 min-w-0 w-full rounded-md p-2 text-sm border border-gray-200 shadow-sm text-black bg-white"
                                                     value={paperFormat}
                                                     onChange={(e) => setPaperFormat(e.target.value)}
                                                 >
@@ -340,7 +340,7 @@ export default function AdminPage() {
                                             <div className="flex flex-row w-full">
                                                 <label className="flex w-20 items-center text-xs text-gray-700">{t('generate.cardFormat')}</label>
                                                 <select
-                                                    className="w-full rounded-md p-2 text-sm border border-gray-200 shadow-sm"
+                                                    className="flex-1 min-w-0 w-full rounded-md p-2 text-sm border border-gray-200 shadow-sm text-black bg-white"
                                                     value={cardFormat}
                                                     onChange={(e) => setCardFormat(e.target.value)}
                                                 >
@@ -650,8 +650,8 @@ function QRCodeListSection({ apiUrl, onGeneratePDF, paperFormat, cardFormat, dbC
                 </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4 ">
-                <div className="flex flex-wrap fpex gap-2 justify-start items-center ">
-                    {["UNASSIGNED", "LINKED", "ACTIVE", "USED", "SHIPPED", "COMPLETED", "EXPIRED", "BANNED"].map((s) => (
+                <div className="flex flex-wrap gap-2 justify-start items-center ">
+                    {["UNASSIGNED", "LINKED", "ACTIVE", "USED", "SHIPPED", "COMPLETED", "EXPIRED", "BANNED", "PROMOTION"].map((s) => (
                         <Button
                             key={s}
                             variant={status === s ? "default" : "secondary"}
