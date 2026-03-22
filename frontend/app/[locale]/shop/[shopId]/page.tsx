@@ -465,6 +465,8 @@ export default function ShopPage() {
             }
         } catch (err: any) {
             alert(t('linkQr.error') + ": " + (tb(err.message.replace(/\./g, '_')) || err.message));
+            setScannedUuid('');
+            setScannedUuids([]);
         } finally {
             setIsLinking(false);
         }
@@ -598,9 +600,9 @@ export default function ShopPage() {
     const checkQrStatus = async (uuid: string) => {
         setQrStatusDetails(null);
         try {
-            const data = await shopApi.shop_qrcodecheck({ 
+            const data = await shopApi.shop_qrcodecheck({
                 shopId: shopId as string,
-                qr_id: uuid 
+                qr_id: uuid
             });
             setScannedUuid(uuid);
             setQrStatusDetails(data);
@@ -609,6 +611,7 @@ export default function ShopPage() {
             const translatedError = error.message ? tb(error.message.replace(/\./g, '_')) : t('linkQr.foreignQrError');
             setScannedUuids([{ uuid, error: translatedError }]);
             alert(translatedError + (error.detail ? ` (${error.detail})` : ''));
+            setScannedUuid('');
         } finally {
             setIsScanning(false);
         }
@@ -637,18 +640,19 @@ export default function ShopPage() {
 
             // Status check for sequential scan
             try {
-                const data = await shopApi.shop_qrcodecheck({ 
+                const data = await shopApi.shop_qrcodecheck({
                     shopId: shopId as string,
-                    qr_id: uuid 
+                    qr_id: uuid
                 });
                 setScannedUuids(prev => prev.map(item =>
                     item.uuid === uuid ? { ...item, status: data } : item
                 ));
             } catch (err: any) {
                 const translatedError = err.message ? tb(err.message.replace(/\./g, '_')) : t('linkQr.foreignQrError');
-                setScannedUuids(prev => prev.map(item =>
-                    item.uuid === uuid ? { ...item, error: translatedError } : item
-                ));
+                alert(translatedError + (err.detail ? ` (${err.detail})` : ''));
+                setIsScanning(false);
+                setScannedUuid('');
+                setScannedUuids([]);
             }
             return;
         }
@@ -977,7 +981,7 @@ export default function ShopPage() {
                                                     <span>{t('linkQr.scan')}</span>
                                                 </Button>
                                             </DialogTrigger>
-                                            <DialogContent className="max-h-[94vh] max-w-[95vw] md:max-w-3xl lg:max-w-3xl w-full h-full overflow-y-auto">
+                                            <DialogContent className="max-h-[90vh] max-w-[90vw] md:max-w-3xl lg:max-w-3xl w-full h-full overflow-y-auto">
                                                 <DialogHeader>
                                                     <DialogTitle>{t('linkQr.scanDialog.title')}</DialogTitle>
                                                     <DialogDescription>{t('linkQr.scanDialog.description')}</DialogDescription>
@@ -997,7 +1001,7 @@ export default function ShopPage() {
                                                         </div>
                                                     </div>
 
-                                                    <div 
+                                                    <div
                                                         className="w-full aspect-square mx-auto flex items-center justify-center overflow-hidden rounded-lg bg-gray-100"
                                                         style={{ maxWidth: 'min(400px, 50vh)', maxHeight: '50vh' }}
                                                     >
@@ -1005,8 +1009,7 @@ export default function ShopPage() {
                                                         <QRScanner
                                                             qrCodeSuccessCallback={handleScanSuccess}
                                                             qrbox={(viewfinderWidth, viewfinderHeight) => {
-                                                                const size = Math.floor(Math.min(viewfinderWidth, viewfinderHeight) * 0.7);
-                                                                return { width: size, height: size };
+                                                                return Math.floor(Math.min(viewfinderWidth, viewfinderHeight) * 0.7);
                                                             }}
                                                             disableFlip={false}
                                                             onFatalError={handleScannerError}

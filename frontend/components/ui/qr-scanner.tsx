@@ -10,7 +10,7 @@ import { useTranslations } from 'next-intl';
 
 interface QRScannerProps {
     fps?: number;
-    qrbox?: number | ((viewfinderWidth: number, viewfinderHeight: number) => { width: number; height: number });
+    qrbox?: number | ((viewfinderWidth: number, viewfinderHeight: number) => { width: number; height: number } | number);
     aspectRatio?: number;
     disableFlip?: boolean;
     verbose?: boolean;
@@ -46,11 +46,7 @@ const QRScanner = (props: QRScannerProps) => {
             fps: props.fps || 10,
             qrbox: (props.qrbox || ((viewfinderWidth: number, viewfinderHeight: number) => {
                 const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
-                const qrboxSize = Math.floor(minEdge * 0.6);
-                return {
-                    width: qrboxSize,
-                    height: qrboxSize
-                };
+                return Math.floor(minEdge * 0.6);
             })) as any,
             aspectRatio: props.aspectRatio || 1.0,
             disableFlip: props.disableFlip !== undefined ? props.disableFlip : false,
@@ -131,7 +127,15 @@ const QRScanner = (props: QRScannerProps) => {
     }
 
     return (
-        <div id={scannerRegionId} className="w-full h-full overflow-hidden rounded-lg bg-gray-100" />
+        <div id={scannerRegionId} className="w-full h-full overflow-hidden rounded-lg bg-gray-100">
+            <style>{`
+                #${scannerRegionId} video, #${scannerRegionId} canvas {
+                    object-fit: cover !important;
+                    width: 100% !important;
+                    height: 100% !important;
+                }
+            `}</style>
+        </div>
     );
 };
 
