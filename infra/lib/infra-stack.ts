@@ -176,7 +176,7 @@ export class InfraStack extends cdk.Stack {
       defaultCorsPreflightOptions: {
         allowOrigins: allowedOrigins,
         allowMethods: apigateway.Cors.ALL_METHODS,
-        allowHeaders: apigateway.Cors.DEFAULT_HEADERS,
+        allowHeaders: [...apigateway.Cors.DEFAULT_HEADERS, 'X-QR-UUID', 'X-QR-PIN'],
       },
     });
 

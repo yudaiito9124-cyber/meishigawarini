@@ -29,12 +29,13 @@ const BUCKET_NAME = process.env.BUCKET_NAME || '';
 
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type,Authorization',
-    'Access-Control-Allow-Methods': 'POST'
+    'Access-Control-Allow-Headers': 'Content-Type,Authorization,X-QR-UUID,X-QR-PIN',
+    'Access-Control-Allow-Methods': 'OPTIONS,POST'
 };
 
 export const handler: APIGatewayProxyHandler = async (event) => {
     try {
+        if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers: corsHeaders, body: '' };
         if (event.httpMethod !== 'POST') {
             return { statusCode: 405, headers: corsHeaders, body: JSON.stringify({ message: 'Method Not Allowed' }) };
         }
@@ -134,7 +135,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 shop_email = shopRes.Item.email;
                 shop_name = shopRes.Item.name;
                 shop_detail_html = await signUrlsInHtml(shopRes.Item.detail_html, BUCKET_NAME);
-                
+
                 // Email不在時のCognitoフォールバック
                 if (!shop_email && shopRes.Item.owner_id && USER_POOL_ID) {
                     const user = await cognito.send(new AdminGetUserCommand({ UserPoolId: USER_POOL_ID, Username: shopRes.Item.owner_id })).catch(() => null);

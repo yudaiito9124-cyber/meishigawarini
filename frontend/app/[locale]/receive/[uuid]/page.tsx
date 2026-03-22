@@ -362,11 +362,18 @@ export default function ReceivePage() {
         try {
             const isSubscribed = !!notificationEmail; // Check if notificationEmail is set
             await receiveApi.receive_submit(uuid, pin, {
-                name,
-                address,
-                zipCode,
-                email: isSubscribed ? email : undefined,
-                client_timestamp: new Date().toISOString(),
+                qr_id: uuid,
+                pin_code: pin,
+                shipping_info: {
+                    name,
+                    address,
+                    zipCode,
+                    phone,
+                    email: isSubscribed ? email : undefined,
+                    preferredDate,
+                    preferredTime,
+                    client_timestamp: new Date().toISOString(),
+                },
                 password
             });
             setStep("SUCCESS");
@@ -382,7 +389,7 @@ export default function ReceivePage() {
         e.preventDefault();
         setLoading(true);
         try {
-            await receiveApi.receive_completed(uuid, pin, {});
+            await receiveApi.receive_completed(uuid, pin, { qr_id: uuid, pin_code: pin });
             setStep("COMPLETED");
         } catch (error: any) {
             // console.error("Receive error:", error);
@@ -458,7 +465,8 @@ export default function ReceivePage() {
 
                 const { uploadUrl, fileUrl } = await receiveApi.receive_uploadurl_get(uuid, pin, {
                     filename: selectedFile.name,
-                    contentType: 'image/webp'
+                    contentType: uploadFile.type,
+                    fileSize: uploadFile.size
                 });
 
                 const uploadRes = await fetch(uploadUrl, {
@@ -556,7 +564,7 @@ export default function ReceivePage() {
                 }
             }
 
-            const { uploadUrl, fileUrl } = await receiveApi.receive_uploadurl_get(uuid, pin, { filename: file.name, contentType: 'image/webp' });
+            const { uploadUrl, fileUrl } = await receiveApi.receive_uploadurl_get(uuid, pin, { filename: file.name, contentType: uploadFile.type, fileSize: uploadFile.size });
 
             const s3Res = await fetch(uploadUrl, {
                 method: 'PUT',
@@ -625,7 +633,7 @@ export default function ReceivePage() {
             const { uploadUrl, fileUrl } = await receiveApi.receive_uploadurl_get(
                 uuid,
                 pin,
-                { filename: file.name, contentType: 'image/webp' }
+                { filename: file.name, contentType: uploadFile.type, fileSize: uploadFile.size }
             );
 
             const uploadRes = await fetch(uploadUrl, {
@@ -1112,7 +1120,7 @@ export default function ReceivePage() {
                                         id="zipCode"
                                         required
                                         value={zipCode}
-                                        pattern="^(?=([^0-9]*[0-9]){7}[^0-9]*$)[0-9-]*$"
+                                        pattern="^(?=([^0-9]*[0-9]){7}[^0-9]*$)[0-9\-]*$"
                                         onChange={handleZipCodeChange}
                                         placeholder={t('formStep.zipCode-placeholder')}
                                     />
@@ -1134,7 +1142,7 @@ export default function ReceivePage() {
                                         required
                                         type="tel"
                                         value={phone}
-                                        pattern="^(?=([^0-9]*[0-9]){7}[^0-9]*$)[0-9-]*$"
+                                        pattern="^(?=([^0-9]*[0-9]){10,11}[^0-9]*$)[0-9\-]*$"
                                         onChange={handlePhoneChange}
                                         placeholder={t('formStep.phone-placeholder')}
                                     />
@@ -1147,7 +1155,7 @@ export default function ReceivePage() {
                                         type="email"
                                         value={email}
                                         onChange={(e) => setEmail(e.target.value)}
-                                        pattern="^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)*$"
+                                        // pattern="^[a-zA-Z0-9.!#$%&'*+\\/=?^_`\\{\\|\\}~\\-]+@[a-zA-Z0-9\\-]+(?:\\.[a-zA-Z0-9\\-]+)*$"
                                         placeholder={t('formStep.email-placeholder')}
                                     />
                                     {email && (
@@ -1158,7 +1166,7 @@ export default function ReceivePage() {
                                             onPaste={(e) => e.preventDefault()}
                                             required={!!email}
                                             onChange={(e) => setEmail2(e.target.value)}
-                                            pattern={email ? email.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') : undefined}
+                                            pattern={email ? email.replace(/[.*+?^${}()|[\]\\/\-]/g, '\\$&') : undefined}
                                             title={t('formStep.email-mismatch-error')}
                                             placeholder={t('formStep.email-confirm-placeholder')}
                                         />

@@ -118,6 +118,7 @@ export const handler = async (event: APIGatewayRequestAuthorizerEvent): Promise<
 
         return generatePolicy(`receiver-${uuid}`, 'Allow', policyResource, {
             uuid: uuid,
+            pin: pin,
             status: item.status,
             shopId: item.shop_id
         });

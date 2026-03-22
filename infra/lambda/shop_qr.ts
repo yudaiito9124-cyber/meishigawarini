@@ -51,7 +51,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         if (res.endsWith('/list')) action = 'list';
         else if (res.endsWith('/link')) action = 'link';
         else if (res.endsWith('/activate')) action = 'activate';
-        else if (res.includes('/qrcode-check')) action = 'check';
+        else if (res.includes('/qrcodecheck')) action = 'check';
 
         if (!shopId) return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Missing shopId' }) };
         if (!action || !['list', 'link', 'activate', 'check'].includes(action)) {

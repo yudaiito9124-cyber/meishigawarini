@@ -1,7 +1,7 @@
 /**
  * 概要: 商品画像アップロード用URLの発行
  * 詳細: S3へ画像を直接アップロードするための署名付きURL（Presigned URL）を発行します。
- * エンドポイント: POST /shop/products/upload-url
+ * エンドポイント: POST /shop/products/uploadurl
  * リクエストボディ:
  *  - shop_id: 紐付け対象のショップID (必須)
  *  - filename: アップロード予定のファイル名 (必須)

@@ -1,7 +1,7 @@
 /**
  * 概要: チャット添付用画像アップロード用URLの発行
  * 詳細: チャットに画像を添付するための署名付きURL（Presigned URL）を発行します。チャット容量制限のチェックも行います。
- * エンドポイント: POST /receive/upload-url
+ * エンドポイント: POST /receive/uploadurl/get
  * リクエストボディ:
  *  - contentType: ファイルのMIMEタイプ (例: image/jpeg) (必須)
  *  - fileSize: ファイルサイズ (byte) (必須)
@@ -23,7 +23,7 @@ const BUCKET_NAME = process.env.BUCKET_NAME || '';
 
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type,Authorization',
+    'Access-Control-Allow-Headers': 'Content-Type,Authorization,X-QR-UUID,X-QR-PIN',
     'Access-Control-Allow-Methods': 'OPTIONS,GET,POST'
 };
 

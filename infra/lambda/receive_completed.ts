@@ -17,12 +17,13 @@ const TABLE_NAME = process.env.TABLE_NAME || '';
 
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type,Authorization',
-    'Access-Control-Allow-Methods': 'POST'
+    'Access-Control-Allow-Headers': 'Content-Type,Authorization,X-QR-UUID,X-QR-PIN',
+    'Access-Control-Allow-Methods': 'OPTIONS,POST'
 };
 
 export const handler: APIGatewayProxyHandler = async (event) => {
     try {
+        if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers: corsHeaders, body: '' };
         if (event.httpMethod !== 'POST') {
             return { statusCode: 405, headers: corsHeaders, body: JSON.stringify({ message: 'Method Not Allowed' }) };
         }

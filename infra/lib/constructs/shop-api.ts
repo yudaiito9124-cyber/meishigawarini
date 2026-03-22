@@ -104,7 +104,7 @@ export class ShopApi extends Construct {
     const importRes = productsResource.addResource('import');
     importRes.addResource('list').addMethod('POST', new apigateway.LambdaIntegration(shop_products_import), routeOptions);
     importRes.addResource('execute').addMethod('POST', new apigateway.LambdaIntegration(shop_products_import), routeOptions);
-    productsResource.addResource('upload-url').addMethod('POST', new apigateway.LambdaIntegration(shop_products_uploadurl), routeOptions);
+    productsResource.addResource('uploadurl').addMethod('POST', new apigateway.LambdaIntegration(shop_products_uploadurl), routeOptions);
 
     // /shop/qr
     const qrResource = shopResource.addResource('qr');
@@ -114,7 +114,7 @@ export class ShopApi extends Construct {
     qrResource.addResource('activate').addMethod('POST', new apigateway.LambdaIntegration(shop_qr), routeOptions);
     qrResource.addResource('deactivate').addMethod('POST', new apigateway.LambdaIntegration(shop_qr), routeOptions);
     
-    shopResource.addResource('qrcode-check').addMethod('POST', new apigateway.LambdaIntegration(shop_qr), routeOptions);
+    shopResource.addResource('qrcodecheck').addMethod('POST', new apigateway.LambdaIntegration(shop_qr), routeOptions);
 
     // /shop/orders
     const ordersResource = shopResource.addResource('orders');

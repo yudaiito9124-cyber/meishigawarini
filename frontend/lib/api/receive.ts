@@ -70,13 +70,27 @@ export const receiveApi = createReceiveApi<ReceiveApiSchema>(receiveApiBase);
  * 受取人用 API の型定義
  */
 type ReceiveApiSchema = {
-    receive_submit: { name: string; zipCode?: string; address?: string; phone?: string; email?: string; preferredDate?: string; preferredTime?: string; client_timestamp?: string; password?: string };
-    receive_completed: {};
+    receive_submit: { 
+        qr_id: string; 
+        pin_code: string; 
+        shipping_info: { 
+            name: string; 
+            zipCode: string; 
+            address: string; 
+            phone?: string; 
+            email?: string; 
+            preferredDate?: string; 
+            preferredTime?: string; 
+            client_timestamp?: string 
+        }; 
+        password?: string 
+    };
+    receive_completed: { qr_id: string; pin_code: string };
     receive_chat_get: {};
     receive_chat_send: { username: string; message?: string; file_url?: string; file_name?: string; file_size?: number; file_type?: string };
     receive_subscription: { email: string; locale: string };
     receive_sender_update: { sender_info: any; deleted_html_image_urls?: string[]; locale?: string };
     receive_sender_load: { id: string };
     receive_sender_save: { sender_info: any; id?: string };
-    receive_uploadurl_get: { filename: string; contentType: string; folder?: string };
+    receive_uploadurl_get: { filename: string; contentType: string; fileSize: number; folder?: string };
 };
