@@ -993,11 +993,18 @@ export default function ShopPage() {
                                                         </div>
                                                     </div>
 
-                                                    <div className="w-full aspect-square items-center justify-center h-[400px]">
+                                                    <div className="w-full aspect-square max-w-[400px] max-h-[50vh] mx-auto flex items-center justify-center overflow-hidden">
 
                                                         <QRScanner
                                                             qrCodeSuccessCallback={handleScanSuccess}
-                                                            qrbox={250}
+                                                            qrbox={(viewfinderWidth, viewfinderHeight) => {
+                                                                const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
+                                                                const qrboxSize = Math.floor(minEdge * 0.7);
+                                                                return {
+                                                                    width: qrboxSize,
+                                                                    height: qrboxSize
+                                                                };
+                                                            }}
                                                             disableFlip={false}
 
                                                         />

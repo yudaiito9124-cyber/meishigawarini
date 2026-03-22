@@ -10,7 +10,7 @@ import { useTranslations } from 'next-intl';
 
 interface QRScannerProps {
     fps?: number;
-    qrbox?: number;
+    qrbox?: number | ((viewfinderWidth: number, viewfinderHeight: number) => { width: number; height: number });
     aspectRatio?: number;
     disableFlip?: boolean;
     verbose?: boolean;
@@ -43,7 +43,14 @@ const QRScanner = (props: QRScannerProps) => {
 
         const config = {
             fps: props.fps || 10,
-            qrbox: props.qrbox || 250,
+            qrbox: (props.qrbox || ((viewfinderWidth: number, viewfinderHeight: number) => {
+                const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
+                const qrboxSize = Math.floor(minEdge * 0.6);
+                return {
+                    width: qrboxSize,
+                    height: qrboxSize
+                };
+            })) as any,
             aspectRatio: props.aspectRatio || 1.0,
             disableFlip: props.disableFlip !== undefined ? props.disableFlip : false,
         };
@@ -119,7 +126,7 @@ const QRScanner = (props: QRScannerProps) => {
     }
 
     return (
-        <div id={scannerRegionId} className="w-full max-w-sm mx-auto overflow-hidden rounded-lg bg-gray-100" />
+        <div id={scannerRegionId} className="w-full h-full overflow-hidden rounded-lg bg-gray-100" />
     );
 };
 

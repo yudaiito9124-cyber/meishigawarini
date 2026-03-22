@@ -58,8 +58,8 @@ export class ReceiveApi extends Construct {
       }
     };
 
-    const receive_verify = new nodejs.NodejsFunction(this, 'receive_verify', { 
-      entry: lampath('receive_verify'), 
+    const receive_verify = new nodejs.NodejsFunction(this, 'receive_verify', {
+      entry: lampath('receive_verify'),
       ...fnProps,
       environment: {
         ...fnProps.environment,
@@ -67,8 +67,8 @@ export class ReceiveApi extends Construct {
       }
     });
 
-    const receive_submit = new nodejs.NodejsFunction(this, 'receive_submit', { 
-      entry: lampath('receive_submit'), 
+    const receive_submit = new nodejs.NodejsFunction(this, 'receive_submit', {
+      entry: lampath('receive_submit'),
       ...fnProps,
       environment: {
         ...fnProps.environment,
@@ -86,14 +86,14 @@ export class ReceiveApi extends Construct {
     // Grant Permissions
     const allLambdas = [receive_verify, receive_submit, receive_completed, receive_chat, receive_subscription, receive_sender, receive_upload_url];
     allLambdas.forEach(fn => {
-        grantTablePermissions(fn, true);
-        bucket.grantRead(fn);
-        bucket.grantPut(fn);
-        bucket.grantDelete(fn);
-        fn.addToRolePolicy(new iam.PolicyStatement({
-          actions: ['cognito-idp:AdminGetUser'],
-          resources: [userPool.userPoolArn]
-        }));
+      grantTablePermissions(fn, true);
+      bucket.grantRead(fn);
+      bucket.grantPut(fn);
+      bucket.grantDelete(fn);
+      fn.addToRolePolicy(new iam.PolicyStatement({
+        actions: ['cognito-idp:AdminGetUser'],
+        resources: [userPool.userPoolArn]
+      }));
     });
 
     // --- Routes ---
@@ -103,13 +103,13 @@ export class ReceiveApi extends Construct {
     receiveRes.addResource('verify').addMethod('POST', new apigateway.LambdaIntegration(receive_verify));
     receiveRes.addResource('submit').addMethod('POST', new apigateway.LambdaIntegration(receive_submit), routeOptions);
     receiveRes.addResource('completed').addMethod('POST', new apigateway.LambdaIntegration(receive_completed), routeOptions);
-    
+
     const chatRes = receiveRes.addResource('chat');
     chatRes.addResource('get').addMethod('POST', new apigateway.LambdaIntegration(receive_chat), routeOptions);
     chatRes.addResource('send').addMethod('POST', new apigateway.LambdaIntegration(receive_chat), routeOptions);
 
     receiveRes.addResource('subscription').addMethod('POST', new apigateway.LambdaIntegration(receive_subscription), routeOptions);
-    
+
     const senderRes = receiveRes.addResource('sender');
     senderRes.addResource('update').addMethod('POST', new apigateway.LambdaIntegration(receive_sender), routeOptions);
     senderRes.addResource('load').addMethod('POST', new apigateway.LambdaIntegration(receive_sender), routeOptions);

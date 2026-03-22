@@ -9,7 +9,7 @@ if (!env || !validEnvs.includes(env)) {
   process.exit(1);
 }
 
-const sourceFile = (env === 'stg' || env === 'staging') ? '.env.staging' : '.env.production';
+const sourceFile = (env === 'prod' || env == "production") ? '.env.production' : '.env.staging';
 const targetFile = '.env.local';
 
 const sourcePath = path.resolve(__dirname, '..', sourceFile);

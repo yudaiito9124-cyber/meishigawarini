@@ -227,7 +227,7 @@ export default function ReceivePage() {
     const [chatcontent, setChatcontent] = useState("");
 
     // Steps: PIN -> FORM (or SHIPPED/SUCCESS) -> RESTRICTED (if blocked)
-    const [step, setStep] = useState<"PIN" | "FORM" | "SUCCESS" | "SHIPPED" | "EXPIRED" | "COMPLETED" | "RESTRICTED">("PIN");
+    const [step, setStep] = useState<"PIN" | "FORM" | "SUCCESS" | "SHIPPED" | "EXPIRED" | "COMPLETED" | "RESTRICTED" | "PROMOTION">("PIN");
 
     const [error, setError] = useState<string | null>(null);
     const [pinError, setPinError] = useState("");
@@ -269,6 +269,8 @@ export default function ReceivePage() {
                     setStep("FORM");
                 } else if (data.status === 'EXPIRED') {
                     setStep("EXPIRED");
+                } else if (data.status === 'PROMOTION') {
+                    setStep("PROMOTION");
                 } else {
                     setError(t('errors.inactive'));
                 }
@@ -359,10 +361,10 @@ export default function ReceivePage() {
 
         try {
             const isSubscribed = !!notificationEmail; // Check if notificationEmail is set
-            await receiveApi.receive_submit(uuid, pin, { 
-                name, 
-                address, 
-                zipCode, 
+            await receiveApi.receive_submit(uuid, pin, {
+                name,
+                address,
+                zipCode,
                 email: isSubscribed ? email : undefined,
                 client_timestamp: new Date().toISOString(),
                 password

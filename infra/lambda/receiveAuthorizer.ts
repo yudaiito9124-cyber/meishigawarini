@@ -38,52 +38,85 @@ export const handler = async (event: APIGatewayRequestAuthorizerEvent): Promise<
 
         const item = getRes.Item;
 
-        // 1. 状態チェック (Banned / Closed etc)
-        if (item.ts_banned_at) {
-            console.log(`QR is banned: ${uuid}`);
-            return generatePolicy(`receiver-${uuid}`, 'Deny', event.methodArn);
-        }
 
-        // 2. Lockチェック
-        if (isLocked(item)) {
-            console.log(`QR is locked: ${uuid}`);
-            return generatePolicy(`receiver-${uuid}`, 'Deny', event.methodArn, { locked: 'true' });
-        }
+        if (item.status !== 'PROMOTION') {
+            // 1. 状態チェック (Banned / Closed etc)
+            if (item.ts_banned_at) {
+                console.log(`QR is banned: ${uuid}`);
+                return generatePolicy(`receiver-${uuid}`, 'Deny', event.methodArn);
+            }
 
-        // 2. PIN検証
-        if (String(item.pin) !== String(pin)) {
-            console.log(`Invalid PIN for QR: ${uuid}`);
-            
-            // 失敗回数のカウントアップ (Side Effect)
-            const { UpdateExpression, ExpressionAttributeValues, ExpressionAttributeNames } = getRateLimitUpdate(item);
-            await ddb.send(new UpdateCommand({
-                TableName: TABLE_NAME,
-                Key: { PK: `QR#${uuid}`, SK: 'METADATA' },
-                UpdateExpression,
-                ExpressionAttributeValues,
-                ExpressionAttributeNames
-            }));
+            // 2. Lockチェック
+            if (isLocked(item)) {
+                console.log(`QR is locked: ${uuid}`);
+                return generatePolicy(`receiver-${uuid}`, 'Deny', event.methodArn, { locked: 'true' });
+            }
 
-            return generatePolicy(`receiver-${uuid}`, 'Deny', event.methodArn);
-        }
+            // 2. PIN検証
+            if (String(item.pin) !== String(pin)) {
+                console.log(`Invalid PIN for QR: ${uuid}`);
 
-        // 3. 成功時：失敗回数のリセット (もしあれば)
-        if (item.failed_attempts || item.locked_until) {
-            const { UpdateExpression, ExpressionAttributeNames } = getResetRateLimitUpdate();
-            try {
+                // 失敗回数のカウントアップ (Side Effect)
+                const { UpdateExpression, ExpressionAttributeValues, ExpressionAttributeNames } = getRateLimitUpdate(item);
                 await ddb.send(new UpdateCommand({
                     TableName: TABLE_NAME,
                     Key: { PK: `QR#${uuid}`, SK: 'METADATA' },
                     UpdateExpression,
+                    ExpressionAttributeValues,
                     ExpressionAttributeNames
                 }));
-            } catch (e) {
-                console.error("Failed to reset rate limit:", e);
+
+                return generatePolicy(`receiver-${uuid}`, 'Deny', event.methodArn);
+            }
+
+            // 3. 成功時：失敗回数のリセット (もしあれば)
+            if (item.failed_attempts || item.locked_until) {
+                const { UpdateExpression, ExpressionAttributeNames } = getResetRateLimitUpdate();
+                try {
+                    await ddb.send(new UpdateCommand({
+                        TableName: TABLE_NAME,
+                        Key: { PK: `QR#${uuid}`, SK: 'METADATA' },
+                        UpdateExpression,
+                        ExpressionAttributeNames
+                    }));
+                } catch (e) {
+                    console.error("Failed to reset rate limit:", e);
+                }
+            }
+
+        } else {
+            // 4. PROMOTIONステータス時の制限 (情報取得系のみ許可)
+            const methodArnParts = event.methodArn.split('/');
+            const path = methodArnParts.slice(3).join('/');
+
+            const allowedPaths = [
+                'receive/chat/get',
+                'receive/sender/load'
+            ];
+
+            if (!allowedPaths.includes(path)) {
+                console.log(`PROMOTION status restricted access to: ${path}`);
+                return generatePolicy(`receiver-${uuid}`, 'Deny', event.methodArn);
             }
         }
 
-        // 4. ポリシーの生成 (Allow)
-        return generatePolicy(`receiver-${uuid}`, 'Allow', event.methodArn, {
+
+        // 5. ポリシーの生成 (Allow)
+        const stageArn = event.methodArn.split('/').slice(0, 2).join('/');
+        let policyResource: string | string[];
+
+        if (item.status === 'PROMOTION') {
+            // PROMOTIONの場合は特定の取得系エンドポイントのみを許可
+            policyResource = [
+                `${stageArn}/POST/receive/chat/get`,
+                `${stageArn}/POST/receive/sender/load`
+            ];
+        } else {
+            // 通常は /receive/* 配下すべてを許可 (他の /admin/ などは含めない)
+            policyResource = `${stageArn}/*/receive/*`;
+        }
+
+        return generatePolicy(`receiver-${uuid}`, 'Allow', policyResource, {
             uuid: uuid,
             status: item.status,
             shopId: item.shop_id
@@ -102,26 +135,26 @@ export const handler = async (event: APIGatewayRequestAuthorizerEvent): Promise<
  * @param resource リクエストされたリソースのARN
  * @param context 後続のLambdaハンドラーに引き継ぐ追加情報
  */
-function generatePolicy(principalId: string, effect: string, resource: string, context?: any): APIGatewayAuthorizerResult {
-  const authResponse: any = {
-    principalId,
-    policyDocument: {
-      Version: '2012-10-17',
-      Statement: [
-        {
-          Action: 'execute-api:Invoke',
-          Effect: effect,
-          // 特定のURLだけでなく、このAPIステージ全体へのアクセスを許可する (キャッシュ対策)
-          // 例: arn:aws:execute-api:region:account:api-id/stage/*
-          Resource: resource.split('/').slice(0, 2).join('/') + '/*', 
+function generatePolicy(principalId: string, effect: string, resource: string | string[], context?: any): APIGatewayAuthorizerResult {
+    const authResponse: any = {
+        principalId,
+        policyDocument: {
+            Version: '2012-10-17',
+            Statement: [
+                {
+                    Action: 'execute-api:Invoke',
+                    Effect: effect,
+                    // 特定のURLだけでなく、このAPIステージ全体へのアクセスを許可する (キャッシュ対策)
+                    // 例: arn:aws:execute-api:region:account:api-id/stage/*
+                    Resource: resource,
+                },
+            ],
         },
-      ],
-    },
-  };
+    };
 
-  if (context) {
-    authResponse.context = context; // 後続の Lambda で event.requestContext.authorizer.[key] として取得可能
-  }
+    if (context) {
+        authResponse.context = context; // 後続の Lambda で event.requestContext.authorizer.[key] として取得可能
+    }
 
-  return authResponse;
+    return authResponse;
 }
