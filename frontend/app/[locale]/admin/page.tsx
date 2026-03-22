@@ -447,8 +447,8 @@ export default function AdminPage() {
                                                         <tbody>
                                                             {batch.codes?.map((code: any) => (
                                                                 <tr key={code.uuid} className="border-b border-gray-200 last:border-0">
-                                                                    <td className="pr-4 py-0.5 select-all text-[10px]">{code.uuid}</td>
-                                                                    <td className="py-0.5 select-all text-[10px]">{code.pin}</td>
+                                                                    <td className="pr-4 py-0.5 select-all text-[10px] break-all">{code.uuid}</td>
+                                                                    <td className="py-0.5 select-all text-[10px] break-all">{code.pin}</td>
                                                                 </tr>
                                                             ))}
                                                         </tbody>
@@ -629,9 +629,9 @@ function QRCodeListSection({ apiUrl, onGeneratePDF, paperFormat, cardFormat, dbC
     return (
         <Card className="w-full">
             <CardHeader>
-                <CardTitle className="flex justify-between items-center">
-                    <span className="min-w-[100px]">{t('list.title')}</span>
-                    <div className="flex gap-2 flex-wrap justify-end">
+                <CardTitle className="flex flex-col sm:flex-row justify-between items-center gap-4">
+                    <span className="w-full sm:w-auto text-center sm:text-left">{t('list.title')}</span>
+                    <div className="flex gap-2 flex-wrap justify-center sm:justify-end">
                         {/* {status === 'BANNED' && ( // すべてのBAN済みのコードを削除するコード　一旦コメントアウト
                             <Button variant="destructive" size="sm" onClick={handleDeleteAllBanned} disabled={loading}>
                                 {t('list.deleteAllBanned')}
@@ -650,7 +650,7 @@ function QRCodeListSection({ apiUrl, onGeneratePDF, paperFormat, cardFormat, dbC
                 </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4 ">
-                <div className="flex flex-wrap gap-2 justify-start items-center ">
+                <div className="flex flex-wrap gap-2 justify-center sm:justify-start items-center">
                     {["UNASSIGNED", "LINKED", "ACTIVE", "USED", "SHIPPED", "COMPLETED", "EXPIRED", "BANNED", "PROMOTION"].map((s) => (
                         <Button
                             key={s}
@@ -666,32 +666,36 @@ function QRCodeListSection({ apiUrl, onGeneratePDF, paperFormat, cardFormat, dbC
                         </Button>
                     ))}
                 </div>
-                <div className="flex gap-2">
-                    {["SEARCH"].map((s) => (
-                        <Button
-                            key={s}
-                            variant={status === s ? "default" : "secondary"}
-                            onClick={() => {
-                                if (keyword.length < 8) {
-                                    alert(t('list.keyword.tooShort'));
-                                    return;
-                                }
-                                setStatus(s);
-                                fetchCodes(s);
-                                // optional: auto fetch on click
-                                // setTimeout(fetchCodes, 0);
-                            }}
-                        >
-                            {t(`list.status.${s.toLowerCase()}`)}
-                        </Button>
-                    ))}
-                    <Input
-                        id="keyword"
-                        type="text"
-                        value={keyword}
-                        placeholder={t('list.keyword.placeholder')}
-                        onChange={(e) => setKeyword(e.target.value)}
-                    />
+                <div className="flex flex-col sm:flex-row gap-2">
+                    <div className="flex gap-2 flex-wrap justify-center sm:justify-start">
+                        {["SEARCH"].map((s) => (
+                            <Button
+                                key={s}
+                                variant={status === s ? "default" : "secondary"}
+                                onClick={() => {
+                                    if (keyword.length < 8) {
+                                        alert(t('list.keyword.tooShort'));
+                                        return;
+                                    }
+                                    setStatus(s);
+                                    fetchCodes(s);
+                                }}
+                                className="px-4"
+                            >
+                                {t(`list.status.${s.toLowerCase()}`)}
+                            </Button>
+                        ))}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                        <Input
+                            id="keyword"
+                            type="text"
+                            value={keyword}
+                            placeholder={t('list.keyword.placeholder')}
+                            onChange={(e) => setKeyword(e.target.value)}
+                            className="w-full"
+                        />
+                    </div>
                 </div>
 
                 <div className="bg-white border rounded-md p-4">
@@ -704,7 +708,7 @@ function QRCodeListSection({ apiUrl, onGeneratePDF, paperFormat, cardFormat, dbC
                                 <TableHead className={cn("py-1", isDense ? "h-6 px-2 text-[10px]" : "h-8 px-4")}>{t('list.table.createdAt')}</TableHead>
                                 <TableHead className={cn("py-1", isDense ? "h-6 px-2 text-[10px]" : "h-8 px-4")}>{t('list.table.status')}</TableHead>
                                 <TableHead className={cn("py-1 hidden sm:table-cell", isDense ? "h-6 px-2 text-[10px]" : "h-8 px-4")}>{t('list.table.pin')}</TableHead>
-                                <TableHead className={cn("py-1 min-w-[200px]", isDense ? "h-6 px-2 text-[10px]" : "h-8 px-4")}>{t('list.table.uuid')}</TableHead>
+                                <TableHead className={cn("py-1 min-w-[120px] max-w-[200px]", isDense ? "h-6 px-2 text-[10px]" : "h-8 px-4")}>{t('list.table.uuid')}</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -782,7 +786,7 @@ function QRCodeRow({ item, apiUrl, onGeneratePDF, onRefresh, paperFormat, cardFo
                     <TableCell className={cn("font-mono select-all py-0 hidden sm:table-cell", isDense ? "text-[10px] px-2" : "text-xs px-4")}>
                         {item.pin}
                     </TableCell>
-                    <TableCell className={cn("font-mono select-all py-0 min-w-[200px]", isDense ? "text-[10px] px-2" : "text-xs px-4")}>
+                    <TableCell className={cn("font-mono select-all py-0 min-w-[120px] break-all", isDense ? "text-[10px] px-2" : "text-xs px-4")}>
                         {uuid}
                     </TableCell>
                 </TableRow>

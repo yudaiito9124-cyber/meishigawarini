@@ -660,7 +660,11 @@ export default function ShopPage() {
         checkQrStatus(uuid);
     };
 
-
+    const handleScannerError = (err: any) => {
+        setIsScanning(false);
+        const translatedError = err.message ? tb(err.message.replace(/\./g, '_')) : t('UI.Camera permission denied or error starting scanner');
+        alert(translatedError);
+    };
 
     if (error) return <div className="p-8 text-red-500">Error: {error}</div>;
 
@@ -993,20 +997,19 @@ export default function ShopPage() {
                                                         </div>
                                                     </div>
 
-                                                    <div className="w-full aspect-square max-w-[400px] max-h-[50vh] mx-auto flex items-center justify-center overflow-hidden">
+                                                    <div 
+                                                        className="w-full aspect-square mx-auto flex items-center justify-center overflow-hidden rounded-lg bg-gray-100"
+                                                        style={{ maxWidth: 'min(400px, 50vh)', maxHeight: '50vh' }}
+                                                    >
 
                                                         <QRScanner
                                                             qrCodeSuccessCallback={handleScanSuccess}
                                                             qrbox={(viewfinderWidth, viewfinderHeight) => {
-                                                                const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
-                                                                const qrboxSize = Math.floor(minEdge * 0.7);
-                                                                return {
-                                                                    width: qrboxSize,
-                                                                    height: qrboxSize
-                                                                };
+                                                                const size = Math.floor(Math.min(viewfinderWidth, viewfinderHeight) * 0.7);
+                                                                return { width: size, height: size };
                                                             }}
                                                             disableFlip={false}
-
+                                                            onFatalError={handleScannerError}
                                                         />
                                                     </div>
                                                     <div className="flex flex-col gap-4">

@@ -183,7 +183,7 @@ export default function LoginPage() {
             )}
             <Card className="w-full max-w-md">
                 <CardHeader>
-                    <CardTitle className="text-center text-2xl whitespace-pre-wrap break-words overflow-hidden [word-break:break-word]">{isAdmin ? `Admin \n\n${userEmail}` : t('title')}</CardTitle>
+                    <CardTitle className="text-center text-2xl whitespace-pre-wrap break-all overflow-hidden">{isAdmin ? `Admin \n\n${userEmail}` : t('title')}</CardTitle>
                 </CardHeader>
                 <CardContent>
                     {!isAdmin && (
@@ -296,7 +296,7 @@ export default function LoginPage() {
                     )}
                     {isAdmin && (
                         <>
-                            <p className="text-sm text-gray-500 text-center break-words [word-break:break-word] px-4">
+                            <p className="text-sm text-gray-500 text-center break-all px-4">
                                 Your roles : <br />
                                 {userInfo}
                             </p>

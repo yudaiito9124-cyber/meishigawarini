@@ -16,6 +16,7 @@ interface QRScannerProps {
     verbose?: boolean;
     qrCodeSuccessCallback: (decodedText: string, decodedResult: any) => void;
     qrCodeErrorCallback?: (errorMessage: string) => void;
+    onFatalError?: (error: any) => void;
 }
 
 const QRScanner = (props: QRScannerProps) => {
@@ -85,6 +86,9 @@ const QRScanner = (props: QRScannerProps) => {
                     if (err.name !== 'AbortError') {
                         console.error(t("Error starting scanner"), err);
                         setPermissionError(true);
+                        if (props.onFatalError) {
+                            props.onFatalError(err);
+                        }
                     }
                 }
             }
