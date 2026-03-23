@@ -73,9 +73,10 @@ export const adminApi = createAdminApi<AdminApiSchema>(adminApiBase);
  */
 type AdminApiSchema = {
     // 管理
-    admin_dump: { pks: string[] }; //PKとIDでレコードを取得
+    admin_dump: { pks: string[] }; //PKでレコードを取得
     admin_links: { shopIds: string[]; userIds: string[]; action: "validate" | "execute" }; //ショップと別の管理者をリンク
     admin_changeowner: { shopId: string, newUserId: string, action: "validate" | "execute" }; // ショップのオーナー変更
+    admin_shop_create: { name: string; description?: string; owner_id?: string; gm_ids?: string[] }; // ショップの作成
     // QRコード
     admin_qr_ban: { uuid: string; reason?: string }; //QRコードをBAN / 解除
     admin_qr_deleteban: { target?: string }; //BANされたQRコードを削除 (指定がない場合は全件)

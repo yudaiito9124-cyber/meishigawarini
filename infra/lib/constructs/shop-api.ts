@@ -55,7 +55,6 @@ export class ShopApi extends Construct {
       }
     };
 
-    const shop_create = new nodejs.NodejsFunction(this, 'shop_create', { entry: lampath('shop_create'), ...fnProps });
     const shop_list = new nodejs.NodejsFunction(this, 'shop_list', { entry: lampath('shop_list'), ...fnProps });
     const shop_details = new nodejs.NodejsFunction(this, 'shop_details', { entry: lampath('shop_details'), ...fnProps });
     const shop_products = new nodejs.NodejsFunction(this, 'shop_products', { entry: lampath('shop_products'), ...fnProps });
@@ -68,24 +67,23 @@ export class ShopApi extends Construct {
 
     // Grant Permissions
     const allShopLambdas = [
-        shop_create, shop_list, shop_details, shop_products, shop_products_import, 
-        shop_products_uploadurl, shop_qr, shop_admins, shop_delete_images, shop_orders
+      shop_list, shop_details, shop_products, shop_products_import,
+      shop_products_uploadurl, shop_qr, shop_admins, shop_delete_images, shop_orders
     ];
     allShopLambdas.forEach(fn => {
-        grantTablePermissions(fn, true);
-        bucket.grantPut(fn);
-        bucket.grantRead(fn);
-        bucket.grantDelete(fn);
+      grantTablePermissions(fn, true);
+      bucket.grantPut(fn);
+      bucket.grantRead(fn);
+      bucket.grantDelete(fn);
     });
 
     // Shop Routes
-    const shopResource = api.root.addResource('shop'); 
+    const shopResource = api.root.addResource('shop');
     const routeOptions = { authorizer, authorizationType: apigateway.AuthorizationType.CUSTOM };
 
     // Action-based POST Routes (Standard)
-    shopResource.addResource('create').addMethod('POST', new apigateway.LambdaIntegration(shop_create), routeOptions);
     shopResource.addResource('list').addMethod('POST', new apigateway.LambdaIntegration(shop_list), routeOptions);
-    
+
     const detailsRes = shopResource.addResource('details');
     detailsRes.addResource('get').addMethod('POST', new apigateway.LambdaIntegration(shop_details), routeOptions);
     detailsRes.addResource('update').addMethod('POST', new apigateway.LambdaIntegration(shop_details), routeOptions);
@@ -95,12 +93,12 @@ export class ShopApi extends Construct {
 
 
     // /shop/products
-    const productsResource = shopResource.addResource('products'); 
+    const productsResource = shopResource.addResource('products');
     productsResource.addResource('list').addMethod('POST', new apigateway.LambdaIntegration(shop_products), routeOptions);
     productsResource.addResource('create').addMethod('POST', new apigateway.LambdaIntegration(shop_products), routeOptions);
     productsResource.addResource('update').addMethod('POST', new apigateway.LambdaIntegration(shop_products), routeOptions);
     productsResource.addResource('delete').addMethod('POST', new apigateway.LambdaIntegration(shop_products), routeOptions);
-    
+
     const importRes = productsResource.addResource('import');
     importRes.addResource('list').addMethod('POST', new apigateway.LambdaIntegration(shop_products_import), routeOptions);
     importRes.addResource('execute').addMethod('POST', new apigateway.LambdaIntegration(shop_products_import), routeOptions);
@@ -113,7 +111,7 @@ export class ShopApi extends Construct {
     qrResource.addResource('unlink').addMethod('POST', new apigateway.LambdaIntegration(shop_qr), routeOptions);
     qrResource.addResource('activate').addMethod('POST', new apigateway.LambdaIntegration(shop_qr), routeOptions);
     qrResource.addResource('deactivate').addMethod('POST', new apigateway.LambdaIntegration(shop_qr), routeOptions);
-    
+
     shopResource.addResource('qrcodecheck').addMethod('POST', new apigateway.LambdaIntegration(shop_qr), routeOptions);
 
     // /shop/orders

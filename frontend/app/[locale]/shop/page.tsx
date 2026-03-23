@@ -10,6 +10,7 @@ import { useTranslations } from 'next-intl';
 import { fetchAuthSession, getCurrentUser, signOut } from 'aws-amplify/auth';
 import { Badge } from "lucide-react";
 import { shopApi } from '@/lib/api/shop';
+import { adminApi } from '@/lib/api/admin';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -95,9 +96,9 @@ export default function ShopListPage() {
         e.preventDefault();
         setCreating(true);
         try {
-            const data = await shopApi.shop_create({ 
-                name: createName.trim(), 
-                owner_id: createOwnerId.trim(), 
+            const data = await adminApi.admin_shop_create({
+                name: createName.trim(),
+                owner_id: createOwnerId.trim(),
                 gm_ids: createGmId ? createGmId.split(';').map(id => id.trim()).filter(Boolean) : undefined
             });
             // Redirect to the new shop

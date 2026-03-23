@@ -61,13 +61,16 @@ function createShopApi<T extends Record<string, any>>(base: typeof shopApiBase) 
 // 外部公開用のインスタンス
 export const shopApi = createShopApi<ShopApiSchema>(shopApiBase);
 
+////////////////////////////////////////////////////////////////////////////////////////
+// lambda関数を変更したら以下の型定義を更新してください
+////////////////////////////////////////////////////////////////////////////////////////
 /**
  * ショップ用 API の型定義
  * キー名がそのまま API パス（/shop/キー名）として使用されます。
+ * _ は / に置換されます
  */
 type ShopApiSchema = {
     shop_list: {};
-    shop_create: { name: string; description?: string; owner_id?: string; gm_ids?: string[] };
     shop_details_get: { shopId: string };
     shop_details_update: { shopId: string; name?: string; description?: string; detail_html?: string; html_image_urls?: string[]; deleted_html_image_urls?: string[] };
     shop_admins: { shopId: string };

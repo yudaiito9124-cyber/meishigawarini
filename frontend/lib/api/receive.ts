@@ -66,24 +66,29 @@ function createReceiveApi<T extends Record<string, any>>(base: typeof receiveApi
 // 外部公開用のインスタンス
 export const receiveApi = createReceiveApi<ReceiveApiSchema>(receiveApiBase);
 
+////////////////////////////////////////////////////////////////////////////////////////
+// lambda関数を変更したら以下の型定義を更新してください
+////////////////////////////////////////////////////////////////////////////////////////
 /**
  * 受取人用 API の型定義
+ * キー名がそのまま API パス（/receive/キー名）として使用されます。
+ * _ は / に置換されます
  */
 type ReceiveApiSchema = {
-    receive_submit: { 
-        qr_id: string; 
-        pin_code: string; 
-        shipping_info: { 
-            name: string; 
-            zipCode: string; 
-            address: string; 
-            phone?: string; 
-            email?: string; 
-            preferredDate?: string; 
-            preferredTime?: string; 
-            client_timestamp?: string 
-        }; 
-        password?: string 
+    receive_submit: {
+        qr_id: string;
+        pin_code: string;
+        shipping_info: {
+            name: string;
+            zipCode: string;
+            address: string;
+            phone?: string;
+            email?: string;
+            preferredDate?: string;
+            preferredTime?: string;
+            client_timestamp?: string
+        };
+        password?: string
     };
     receive_completed: { qr_id: string; pin_code: string };
     receive_chat_get: {};

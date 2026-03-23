@@ -25,7 +25,12 @@ const corsHeaders = {
 
 export const handler: APIGatewayProxyHandler = async (event) => {
     try {
-        if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers: corsHeaders, body: '' };
+        if (event.httpMethod === 'OPTIONS') {
+            return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ message: 'OK' }) };
+        }
+        if (event.httpMethod !== 'POST') {
+            return { statusCode: 405, headers: corsHeaders, body: JSON.stringify({ message: 'Method Not Allowed' }) };
+        }
 
         const authorizer = event.requestContext?.authorizer;
         const userId = authorizer?.principalId;
