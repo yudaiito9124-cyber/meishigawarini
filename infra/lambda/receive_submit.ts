@@ -14,6 +14,7 @@ import { DynamoDBDocumentClient, TransactWriteCommand, GetCommand, UpdateCommand
 import { CognitoIdentityProviderClient, AdminGetUserCommand } from '@aws-sdk/client-cognito-identity-provider';
 import { sendLocalizedEmail } from './templates/email';
 import { isLocked, getRateLimitUpdate } from './utils/rate-limit';
+import { checkAndExpire } from './utils/expiration';
 
 const client = new DynamoDBClient({});
 const cognito = new CognitoIdentityProviderClient({});
@@ -66,25 +67,16 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 
         const item = getRes.Item;
 
-        // 状態チェック
-        if (item.status !== 'ACTIVE') {
-            const msg = item.status === 'EXPIRED' ? 'QR Code has expired' : 'QR Code is not active';
-            return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: msg }) };
+        // 期限切れチェック (共通ユーティリティ)
+        const status = await checkAndExpire(ddb, TABLE_NAME, qr_id, item as any);
+        if (status === 'EXPIRED') {
+            return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'QR Code has expired' }) };
         }
 
-        // 期限切れチェック (遅延評価)
-        const now = new Date();
-        if (item.ts_expired_at && now > new Date(item.ts_expired_at)) {
-            // 【DB操作: UpdateItem】
-            // - 目的: 期限切れと判定された場合DBの状態をEXPIREDに自動更新する（遅延評価）
-            await ddb.send(new UpdateCommand({
-                TableName: TABLE_NAME,
-                Key: { PK: `QR#${qr_id}`, SK: 'METADATA' },
-                UpdateExpression: 'SET #status = :expired, GSI1_PK = :gsi_pk, ts_updated_at = :now',
-                ExpressionAttributeNames: { '#status': 'status' },
-                ExpressionAttributeValues: { ':expired': 'EXPIRED', ':gsi_pk': 'QR#EXPIRED', ':now': now.toISOString() }
-            })).catch(e => console.error('Failed lazy expire update', e));
-            return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'QR Code has expired' }) };
+        // 状態チェック
+        if (status !== 'ACTIVE') {
+            const msg = status === 'EXPIRED' ? 'QR Code has expired' : (status === 'BANNED' ? 'QR Code is banned' : 'QR Code is not active');
+            return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: msg }) };
         }
 
         // レートリミット/PIN検証 (Authorizerと重複するがロジック維持)
@@ -107,6 +99,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             password_hash = await bcrypt.hash(password, await bcrypt.genSalt(10));
         }
 
+        const now = new Date();
         const nowIso = now.toISOString();
 
         // 【DB操作: TransactWriteItems】

@@ -120,7 +120,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             gm_shop_ids = userRes?.Item?.gm_shop_ids || [];
         }
 
-        let shops = [...owner_shop_ids, ...gm_shop_ids];
+        let shops = Array.from(new Set([...owner_shop_ids, ...gm_shop_ids]));
 
         if (shops.length === 0) {
             return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ shops: [], roles, owner_shop_ids, gm_shop_ids }) };

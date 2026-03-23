@@ -31,9 +31,9 @@ export const shopApiBase = {
 
         if (!res.ok) {
             // API Gateway 401/403 -> 404 偽装への対応
-            if (res.status === 404) {
-                throw { status: 404, message: "権限がないか、ショップが見つかりません。" };
-            }
+            // if (res.status === 404) {
+            //     throw { status: 404, message: "fetch error" + " error: " + res?.statusText };
+            // }
             const error = await res.json().catch(() => ({ message: res.statusText }));
             throw { status: res.status, ...error };
         }

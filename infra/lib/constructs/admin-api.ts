@@ -142,8 +142,19 @@ export class AdminApi extends Construct {
     bucket.grantReadWrite(admin_carddesigns);
 
 
-    const admin_shop_create = new nodejs.NodejsFunction(this, 'admin_shop_create', { entry: lampath('admin_shop_create'), ...commonProps });
+    const admin_shop_create = new nodejs.NodejsFunction(this, 'admin_shop_create', {
+      entry: lampath('admin_shop_create'),
+      ...commonProps,
+      environment: {
+        ...commonProps.environment,
+        USER_POOL_ID: userPool.userPoolId,
+      }
+    });
     grantTablePermissions(admin_shop_create, true);
+    admin_shop_create.addToRolePolicy(new iam.PolicyStatement({
+      actions: ['cognito-idp:AdminGetUser'],
+      resources: [userPool.userPoolArn]
+    }));
 
 
 

@@ -32,7 +32,10 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         }
 
         const body = JSON.parse(event.body || '{}');
-        const { shopIds, userIds, action } = body;
+        let { shopIds, userIds, action } = body;
+
+        if (Array.isArray(shopIds)) shopIds = Array.from(new Set(shopIds));
+        if (Array.isArray(userIds)) userIds = Array.from(new Set(userIds));
 
         if (!Array.isArray(shopIds) || !Array.isArray(userIds) || !action) {
             return {
