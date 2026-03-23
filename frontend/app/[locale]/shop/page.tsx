@@ -32,6 +32,7 @@ export default function ShopListPage() {
     const [createOwnerId, setCreateOwnerId] = useState('');
     const [createGmId, setCreateGmId] = useState('');
     const [creating, setCreating] = useState(false);
+    const [createOpen, setCreateOpen] = useState(false);
     const [userId, setUserId] = useState('');
     const [isAdmin, setIsAdmin] = useState(false);
 
@@ -101,7 +102,10 @@ export default function ShopListPage() {
                 owner_id: createOwnerId.trim(),
                 gm_ids: createGmId ? createGmId.split(';').map(id => id.trim()).filter(Boolean) : undefined
             });
-            // Redirect to the new shop
+            // Refresh the list instead of immediate redirect to avoid eventual consistency issues
+            await fetchShops();
+            setCreateName('');
+            setCreateOpen(false);
             router.push(`/shop/${data.shop_id}`);
         } catch (e: any) {
             console.error(e);
@@ -172,7 +176,7 @@ export default function ShopListPage() {
                     {isAdmin && (
 
                         <div className="flex w-full h-full flex-col sm:flex-row sm:items-center sm:justify-between sm:space-y-0 min-h-40">
-                            <Dialog>
+                            <Dialog open={createOpen} onOpenChange={setCreateOpen}>
                                 <DialogTrigger asChild className="flex w-full h-full">
                                     <Button size="lg" className="text-xs md:text-sm" >{t('createShop')}</Button>
                                 </DialogTrigger>
@@ -222,7 +226,6 @@ export default function ShopListPage() {
                                                 value={createOwnerId === userId ? '' : createGmId}
                                                 onChange={(e) => setCreateGmId(e.target.value)}
                                                 placeholder={t('createDialog.placeholder-gm')}
-                                                required
                                             />
                                         </div>
                                         <DialogFooter>

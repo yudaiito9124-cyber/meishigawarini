@@ -8,7 +8,6 @@ import { APIGatewayProxyHandler } from 'aws-lambda';
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, GetCommand, QueryCommand, BatchGetCommand, PutCommand } from '@aws-sdk/lib-dynamodb';
 import { generateId } from './utils/id';
-import { parseGroups, isSystemAdmin } from './utils/auth';
 
 const client = new DynamoDBClient({});
 const ddb = DynamoDBDocumentClient.from(client);
@@ -30,7 +29,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         if (!userId) return { statusCode: 401, headers: corsHeaders, body: JSON.stringify({ message: 'Unauthorized' }) };
 
         let roles = [];
-        let owner_shop_ids = []; 
+        let owner_shop_ids = [];
         let gm_shop_ids = [];
 
         // 【DB操作: GetItem】
@@ -40,7 +39,8 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         // - 取得カラム: roles, owner_shop_ids, gm_shop_ids
         let userRes = await ddb.send(new GetCommand({
             TableName: TABLE_NAME,
-            Key: { PK: `USER#${userId}`, SK: 'SHOP' }
+            Key: { PK: `USER#${userId}`, SK: 'SHOP' },
+            ConsistentRead: true
         }));
 
         if (!userRes?.Item) {
@@ -83,7 +83,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             const newShopId = generateId();
             const now = new Date().toISOString();
             const email = claims?.email;
-            
+
             // 【DB操作: PutItem】
             // - 目的: 完全新規のユーザー向けにデフォルトのショップメタデータを自動作成
             // - テーブル: TABLE_NAME

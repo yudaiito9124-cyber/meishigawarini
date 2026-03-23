@@ -1,7 +1,8 @@
 import { APIGatewayAuthorizerResult, APIGatewayRequestAuthorizerEvent } from 'aws-lambda';
 import { CognitoJwtVerifier } from 'aws-jwt-verify';
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
-import { DynamoDBDocumentClient, GetCommand } from '@aws-sdk/lib-dynamodb';
+import { DynamoDBDocumentClient } from '@aws-sdk/lib-dynamodb';
+import { checkShopOwnerOrGM } from './share/shop-auth';
 
 const USER_POOL_ID = process.env.USER_POOL_ID || '';
 const CLIENT_ID = process.env.CLIENT_ID || '';
@@ -34,6 +35,7 @@ export const handler = async (event: APIGatewayRequestAuthorizerEvent): Promise<
     // 1. JWTの検証
     const payload = await verifier.verify(token);
     const userId = payload.sub;
+    const groups = (payload['cognito:groups'] as string[]) || [];
 
     // 2. ショップIDの取得 (パスパラメータから)
     // Request Authorizerでは event.pathParameters が利用可能
@@ -41,71 +43,25 @@ export const handler = async (event: APIGatewayRequestAuthorizerEvent): Promise<
 
     if (!shopId) {
       // shopIdがないリクエスト（一覧取得や作成など）
-      // 一覧取得(/shop)や作成(POST /shop)の場合は、ログインしていればまずは許可
-      // ※より厳密にするなら、ここではパスを見て判断を分ける
       console.log('No shopId in path, allowing based on valid token');
       return generatePolicy(userId, 'Allow', event.methodArn, {
         username: payload['cognito:username'] as string,
         email: payload.email as string,
+        groups: JSON.stringify(groups)
       });
     }
 
-    // 3. ショップ所有権のチェック
-    // Original logic: GlobalAdmin bypass -> User Role Record Check -> Metadata Fallback
-    const groups = (payload['cognito:groups'] as string[]) || [];
-    const isGlobalAdmin = groups.includes('GlobalAdmins') || groups.includes('Administrators');
+    // 3. ショップ所有権のチェック (共通ロジックを使用)
+    const shopMetadata = await checkShopOwnerOrGM(ddb, TABLE_NAME, shopId, userId, null, groups);
 
-    if (isGlobalAdmin) {
+    if (shopMetadata) {
+      const isGlobalAdmin = groups.includes('GlobalAdmins');
       return generatePolicy(userId, 'Allow', event.methodArn, {
         username: payload['cognito:username'] as string,
         email: payload.email as string,
+        groups: JSON.stringify(groups),
         shopId: shopId,
-        isGlobalAdmin: 'true'
-      });
-    }
-
-    // Check User Role Record
-    const userRes = await ddb.send(new GetCommand({
-      TableName: TABLE_NAME,
-      Key: { PK: `USER#${userId}`, SK: 'SHOP' }
-    }));
-
-    if (userRes.Item) {
-      const ownerIds = userRes.Item.owner_shop_ids || [];
-      const gmIds = userRes.Item.gm_shop_ids || [];
-      if (ownerIds.includes(shopId) || gmIds.includes(shopId)) {
-        return generatePolicy(userId, 'Allow', event.methodArn, {
-          username: payload['cognito:username'] as string,
-          email: payload.email as string,
-          shopId: shopId,
-          isGlobalAdmin: 'false'
-        });
-      }
-    }
-
-    // Fallback: Check Shop Metadata direct ownership
-    const shopRes = await ddb.send(new GetCommand({
-      TableName: TABLE_NAME,
-      Key: {
-        PK: `SHOP#${shopId}`,
-        SK: 'METADATA'
-      }
-    }));
-
-    if (!shopRes.Item) {
-      console.log(`Shop not found or no permission: ${shopId}`);
-      return generatePolicy(userId, 'Deny', event.methodArn);
-    }
-
-    const isOwner = shopRes.Item.owner_id === userId;
-    const isGM = (shopRes.Item.gm_ids || []).includes(userId);
-
-    if (isOwner || isGM) {
-      return generatePolicy(userId, 'Allow', event.methodArn, {
-        username: payload['cognito:username'] as string,
-        email: payload.email as string,
-        shopId: shopId,
-        isGlobalAdmin: 'false'
+        isGlobalAdmin: isGlobalAdmin ? 'true' : 'false'
       });
     }
 
@@ -136,7 +92,7 @@ function generatePolicy(principalId: string, effect: string, resource: string, c
           Effect: effect,
           // 特定のURLだけでなく、このAPIステージ全体へのアクセスを許可する (キャッシュ対策)
           // 例: arn:aws:execute-api:region:account:api-id/stage/*
-          Resource: resource.split('/').slice(0, 2).join('/') + '/*', 
+          Resource: resource.split('/').slice(0, 2).join('/') + '/*',
         },
       ],
     },

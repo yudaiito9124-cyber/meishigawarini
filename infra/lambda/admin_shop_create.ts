@@ -11,7 +11,6 @@ import { APIGatewayProxyHandler } from 'aws-lambda';
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, GetCommand, PutCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
 import { generateId } from './utils/id';
-import { parseGroups, isSystemAdmin } from './utils/auth';
 
 const client = new DynamoDBClient({});
 const ddb = DynamoDBDocumentClient.from(client);
@@ -138,7 +137,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             }
         }
 
-        return { statusCode: 201, headers: corsHeaders, body: JSON.stringify({ shopId: newShopId, message: 'Shop created' }) };
+        return { statusCode: 201, headers: corsHeaders, body: JSON.stringify({ shop_id: newShopId, message: 'Shop created' }) };
     } catch (error: any) {
         console.error(error);
         return { statusCode: 500, headers: corsHeaders, body: JSON.stringify({ message: 'Internal Server Error', error: String(error) }) };

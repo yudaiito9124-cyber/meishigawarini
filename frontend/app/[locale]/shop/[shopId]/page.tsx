@@ -91,8 +91,8 @@ export default function ShopPage() {
             const session = await fetchAuthSession();
             if (session.tokens) {
                 const groups = (session.tokens.idToken?.payload['cognito:groups'] as string[]) || [];
-                const isAdmin = groups.includes('Administrators') || groups.includes('GlobalAdmins');
-                setIsAdmin(isAdmin);
+                const isadmin = groups.includes('Administrators') || groups.includes('GlobalAdmins');
+                setIsAdmin(isadmin);
             }
         } catch (e) {
             // Not logged in
@@ -932,7 +932,7 @@ export default function ShopPage() {
                             <DialogFooter>
                             </DialogFooter>
                         </Dialog>
-                        {!singleShopOwner || isAdmin && <Button variant="secondary" className="shadow-md cursor-pointer border border-gray-200" onClick={handleShops}>{t('movetoshops')}</Button>}
+                        {(!singleShopOwner || isAdmin) && <Button variant="secondary" className="shadow-md cursor-pointer border border-gray-200" onClick={handleShops}>{t('movetoshops')}</Button>}
                         <Button
                             variant="ghost"
                             className="hover:bg-red-50 hover:text-red-600 cursor-pointer"

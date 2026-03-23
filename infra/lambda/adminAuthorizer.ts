@@ -55,7 +55,7 @@ export const handler = async (event: APIGatewayTokenAuthorizerEvent): Promise<AP
 
         // PreferredMfaSetting が設定されているか、MFAOptions が存在すれば MFA ユーザーとみなす
         const hasMfaEnabled = !!(user.PreferredMfaSetting || (user.MFAOptions && user.MFAOptions.length > 0));
-        
+
         if (hasMfaEnabled) {
           console.log('User has MFA enabled/preferred in Cognito. Success login implies MFA usage.');
           usedMfa = true;
@@ -79,6 +79,8 @@ export const handler = async (event: APIGatewayTokenAuthorizerEvent): Promise<AP
       username: payload['cognito:username'] as string,
       email: payload.email as string,
       groups: JSON.stringify(groups),
+      isGlobalAdmin: groups.includes('GlobalAdmins') ? 'true' : 'false',
+      isAdmin: groups.includes('Administrators') ? 'true' : 'false',
     });
 
   } catch (err) {
@@ -105,7 +107,7 @@ function generatePolicy(principalId: string, effect: string, resource: string, c
           Effect: effect,
           // 特定のURLだけでなく、このAPIステージ全体へのアクセスを許可する (キャッシュ対策)
           // 例: arn:aws:execute-api:region:account:api-id/stage/*/*
-          Resource: resource.split('/').slice(0, 2).join('/') + '/*/*', 
+          Resource: resource.split('/').slice(0, 2).join('/') + '/*/*',
         },
       ],
     },

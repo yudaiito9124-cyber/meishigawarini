@@ -84,7 +84,10 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         return {
             statusCode: 200,
             headers: corsHeaders,
-            body: JSON.stringify({ admins: [owner, ...gms] })
+            body: JSON.stringify({ 
+                owner_email: ownerRes.Item?.email || 'Unknown',
+                manager_emails: gmRes.map((res: any) => res.Item?.email || 'Unknown').filter(email => email !== 'Unknown')
+            })
         };
     } catch (error: any) {
         console.error(error);
