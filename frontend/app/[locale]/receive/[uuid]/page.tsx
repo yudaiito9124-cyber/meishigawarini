@@ -249,7 +249,7 @@ export default function ReceivePage() {
             setGift(data);
             if (data.status === 'COMPLETED') {
                 setShowWhiteFade(true);
-            } else if (['ACTIVE', 'USED', 'SHIPPED', `RESTRICTED`].includes(data.status) && !error) {
+            } else if (['ACTIVE', 'USED', 'SHIPPED', `RESTRICTED`, `PROMOTION`].includes(data.status) && !error) {
                 fireConfetti();
             }
 
@@ -328,6 +328,10 @@ export default function ReceivePage() {
 
     const handleAddressSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+
+        if (step === "PROMOTION") {
+            return;
+        }
 
         const form = e.currentTarget as HTMLFormElement;
 
@@ -945,8 +949,9 @@ export default function ReceivePage() {
                             <div className="relative mb-6 overflow-hidden rounded-xl shadow-2xl group border-4 border-white/50">
                                 <img
                                     src={gift.product.image_url}
+                                    onClick={() => step === "PROMOTION" && window.open('https://meishigawarini.com', '_blank')}
                                     alt="Gift"
-                                    className="w-full object-contain max-h-260 object-cover transform transition-transform duration-700 group-hover:scale-105"
+                                    className={cn("w-full object-contain max-h-260 object-cover transform transition-transform duration-700 group-hover:scale-105", step === "PROMOTION" ? "cursor-pointer" : "cursor-default")}
                                 />
                                 {/* Diagonal Corner Ribbon (Top Right) */}
                                 <div className="absolute top-0 right-0 w-24 h-24 overflow-hidden pointer-events-none z-10 animate-reveal reveal-delay-200">
@@ -1031,13 +1036,13 @@ export default function ReceivePage() {
             </Card>
 
             {/* --- Form / notification Section --- */}
-            {(["FORM", "SUCCESS", "SHIPPED", "EXPIRED", "RESTRICTED"].includes(step)) && (
+            {(["FORM", "SUCCESS", "SHIPPED", "EXPIRED", "RESTRICTED", "PROMOTION"].includes(step)) && (
                 <Card className="w-full max-w-xl mt-20">
                     <CardHeader>
                         <CardTitle className="text-xl text-center">
                             {/* <Label className="text-xl text-center flex flex-col text-gray-500"> */}
                             {
-                                step === "FORM" ? t('titles.form') :
+                                step === "FORM" || step === "PROMOTION" ? t('titles.form') + (step === "PROMOTION" ? " (sample)" : "") :
                                     step === "SUCCESS" ? t('titles.success') :
                                         step === "SHIPPED" ? t('titles.shipped') :
                                             step === "EXPIRED" ? t('titles.expired') :
@@ -1101,7 +1106,7 @@ export default function ReceivePage() {
                             </div>
                         )}
 
-                        {step === "FORM" && (
+                        {(step === "FORM" || step === "PROMOTION") && (
                             <form onSubmit={handleAddressSubmit} className="space-y-6 space-y-4 p-8">
                                 {/* <Label className="font-semibold">{t('formStep.title')}</Label> */}
                                 <div className="space-y-2">

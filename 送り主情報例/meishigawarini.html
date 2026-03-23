@@ -1,0 +1,267 @@
+USER#20260323163002mnn-f93a298b-4ae9-47d0-b066-f89562ac27c8
+
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;700&display=swap');
+
+    /* プレフィックス: mg-premium- */
+    .mg-premium-root,
+    .mg-premium-root * {
+        box-sizing: border-box !important;
+        margin: 0;
+        padding: 0;
+        font-family: 'Noto Sans JP', sans-serif;
+    }
+
+    .mg-premium-root {
+        max-width: 600px;
+        margin: 0 auto;
+        background-color: #ffffff;
+        color: #000000;
+        line-height: 1.6;
+        height: auto;
+    }
+
+    /* ヒーローセクション */
+    .mg-premium-hero {
+        background-color: #000000;
+        color: #ffffff;
+        padding: 60px 40px;
+        text-align: center;
+    }
+
+    .mg-premium-logo {
+        font-size: 0.9rem;
+        letter-spacing: 0.3em;
+        font-weight: 300;
+        margin-bottom: 24px;
+        display: block;
+    }
+
+    .mg-premium-title {
+        font-size: 1.8rem;
+        font-weight: 700;
+        line-height: 1.4;
+        margin-bottom: 20px;
+        letter-spacing: 0.05em;
+    }
+
+    .mg-premium-lead {
+        font-size: 1rem;
+        font-weight: 300;
+        opacity: 0.8;
+    }
+
+    /* メインコンテンツ */
+    .mg-premium-body {
+        padding: 50px 30px;
+    }
+
+    /* 特徴セクション */
+    .mg-premium-section {
+        margin-bottom: 30px;
+        /* 余白を調整 */
+    }
+
+    /* セクションの最後の要素の余白を消してボタンとの距離を詰める */
+    .mg-premium-section:last-child {
+        margin-bottom: 0;
+    }
+
+    .mg-premium-section-title {
+        font-size: 1.2rem;
+        font-weight: 700;
+        text-align: center;
+        margin-bottom: 40px;
+        position: relative;
+        padding-bottom: 15px;
+    }
+
+    .mg-premium-section-title::after {
+        content: '';
+        position: absolute;
+        bottom: 0;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 40px;
+        height: 1px;
+        background: #000000;
+    }
+
+    /* 3つの柱 */
+    .mg-premium-grid {
+        display: flex;
+        flex-direction: column;
+        gap: 30px;
+    }
+
+    .mg-premium-card {
+        border: 1px solid #eeeeee;
+        padding: 30px;
+        transition: background 0.3s ease;
+    }
+
+    .mg-premium-card:hover {
+        background: #f9f9f9;
+    }
+
+    .mg-premium-card-tag {
+        font-size: 0.7rem;
+        font-weight: 700;
+        letter-spacing: 0.1em;
+        color: #888888;
+        margin-bottom: 10px;
+        display: block;
+        text-transform: uppercase;
+    }
+
+    .mg-premium-card-h {
+        font-size: 1.1rem;
+        font-weight: 700;
+        margin-bottom: 12px;
+    }
+
+    .mg-premium-card-p {
+        font-size: 0.9rem;
+        color: #333333;
+        font-weight: 300;
+    }
+
+    /* CTAセクション - 上の要素との隙間を最小限に */
+    .mg-premium-cta {
+        padding: 10px 30px 40px 30px;
+        text-align: center;
+    }
+
+    /* 画像背景付きボタンのスタイル */
+    .mg-premium-btn {
+        display: flex;
+        /* flexに変更して安定化 */
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        width: 100%;
+        min-height: 120px;
+        /* 固定ではなく最小高さに */
+        max-width: 100%;
+        /* 親要素(cta)の幅に合わせる */
+        padding: 20px;
+        text-decoration: none;
+        color: #FFFFFF;
+        font-size: 1.1rem;
+        font-weight: 700;
+        letter-spacing: 0.1em;
+        position: relative;
+        overflow: hidden;
+        border: 1px solid #000000;
+        transition: all 0.5s cubic-bezier(0.23, 1, 0.32, 1);
+        box-shadow: 0 10px 20px rgba(0, 0, 0, 0.15);
+        z-index: 1;
+        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        /* 視認性向上のため少し濃く */
+    }
+
+    /* ボタンの背景画像設定 */
+    .mg-premium-btn-bg {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        z-index: -2;
+        transition: transform 0.6s ease;
+    }
+
+    /* 画像の上に重ねるオーバーレイ */
+    .mg-premium-btn::after {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.1);
+        /* 少しだけ濃くして文字を保護 */
+        z-index: -1;
+        transition: background 0.4s ease;
+    }
+
+    /* ホバー時の挙動 */
+    .mg-premium-btn:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 15px 30px rgba(0, 0, 0, 0.3);
+    }
+
+    .mg-premium-btn:hover .mg-premium-btn-bg {
+        transform: scale(1.05);
+    }
+
+    .mg-premium-btn:hover::after {
+        background: rgba(0, 0, 0, 0.45);
+        /* ホバー時に少し暗くして高級感を出す */
+    }
+
+    /* フッター */
+    .mg-premium-footer {
+        padding: 15px 20px;
+        font-size: 0.7rem;
+        text-align: center;
+        color: #999999;
+        border-top: 1px solid #eeeeee;
+        letter-spacing: 0.1em;
+    }
+
+    @media (max-width: 480px) {
+        .mg-premium-btn {
+            font-size: 1rem;
+            min-height: 100px;
+        }
+    }
+</style>
+
+<div class="mg-premium-root">
+    <header class="mg-premium-hero">
+        <span class="mg-premium-logo">名刺代わりに。</span>
+        <h1 class="mg-premium-title">名刺代わりに、心を贈る。</h1>
+        <p class="mg-premium-lead">QRカード一枚で届ける、新しい「手渡し」の形。</p>
+    </header>
+
+    <div class="mg-premium-body">
+        <section class="mg-premium-section">
+            <h2 class="mg-premium-section-title">これまでのギフトカードとは違う体験</h2>
+
+            <div class="mg-premium-grid">
+                <div class="mg-premium-card">
+                    <span class="mg-premium-card-tag">Identity</span>
+                    <h3 class="mg-premium-card-h">名刺を添えて、想いを渡す</h3>
+                    <p class="mg-premium-card-p">単なる贈り物に留まらず、名刺やデジタルプロフィールを添付可能。ビジネスの挨拶を、より印象的な出会いへと変えます。</p>
+                </div>
+
+                <div class="mg-premium-card">
+                    <span class="mg-premium-card-tag">Memory</span>
+                    <h3 class="mg-premium-card-h">受け取った後も続く、思い出</h3>
+                    <p class="mg-premium-card-p">荷物が届いた後も、添付された写真やメッセージをデジタルアーカイブとして保存. カードをきっかけに始まった交流を、一生の記録に。</p>
+                </div>
+
+                <div class="mg-premium-card">
+                    <span class="mg-premium-card-tag">Sustainability</span>
+                    <h3 class="mg-premium-card-h">使い捨てない「デジタルの鍵」</h3>
+                    <p class="mg-premium-card-p">一度使ったら終わりではありません。カードはあなたと相手を繋ぐ「入り口」として機能し続け、永続的なコネクションを構築します。</p>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <section class="mg-premium-cta">
+        <a href="https://meishigawarini.com/" target="_blank" class="mg-premium-btn">
+            <img src="https://infrastack-productimagebucketdce10e3f-qmgx3s9tvlno.s3.ap-northeast-1.amazonaws.com/qrcode/20260323145301rqs-bdc55db5-464e-4683-a0dc-5685c99ad9b4/chat/20260323155420lca-975efc9e-0296-42a3-b070-bc1841d791b9.jpg?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=ASIAYTMSSPW4D5NTKDZ4%2F20260323%2Fap-northeast-1%2Fs3%2Faws4_request&X-Amz-Date=20260323T160725Z&X-Amz-Expires=3600&X-Amz-Security-Token=IQoJb3JpZ2luX2VjELf%2F%2F%2F%2F%2F%2F%2F%2F%2F%2FwEaDmFwLW5vcnRoZWFzdC0xIkcwRQIhAN6eSjM3hLfhp4lTdOaE8mvkqwu%2FT9l0ckiatsKOG9%2FxAiBykUkhH5ZepswR4DHYQUB%2Bva4mI1lmxvc9mT%2BIzNZE8iqGBQiB%2F%2F%2F%2F%2F%2F%2F%2F%2F%2F8BEAAaDDU5MTQwMjI3MDEzNiIM8CKrmOEnpV1afHAnKtoELL3CXr47HDCaxPRumyiSqWoBw%2B31gmM59SerM4BoZizU%2B7q0LAFa8C3T9MVmPZJRh1je5PrmGrW9AGxMOud7XXbMlq2fIxbdC%2B%2BMOTjs0BTpfaxi7X3ZP9NZBb3em1WBpj2cEf%2FSDdx3lx4Va%2F%2BemdwxiucQTkLSLBTFkCpYqNgs8NckOtJ5wO064HczDKknyFdeWLM4g3TZlNqWrQMN99LsVeif7ITkGu8DxWcaKWFGg%2FibHTC9zTiA6euhabrwa2trxSZMICF%2BcWTkTVn833qR%2F1ixLOOzrBFLAA7CBr%2FznUlt2F2ll71upvkiZUZjvzI5eg577wRiwUykKbktmpz21ulRy6cedNXgsyhxBt3BYae9s8vsnBzGljUx0NfZ%2BTNP3UDE7Pg3NGx%2BOCNlAaIbXGIiYjwtcrC5WV3emBeCZDf4UfuLA7ZYyT%2FL5s%2FV6O77IL%2FLwSRMyVLahrP4SKorGNJ1%2Biz1ZOqsUM7h4YPIHfdnQr9pLL82c3Zew8f%2FtS%2BMnGjc1hhI6Rb%2BfSaWMoWu2dxxOzt2VkjTpR10DLLVPD9lTETJXChoWfXlMaZjLV1NSvhSMbBt2bV0Xn2d1FgsvMgRrgFyyU1AsX0XtZA7sSRTPxGL9znz%2BJdih3ZihvuidzjVI5KWsFa3qOsPqAGzYf8%2Fnw%2BVDlEw1YpwWZZgs0Xx9Z4QYtAugoOyZqx7WqTiaK1c0fuzdUds2pMSuSKURhqXzviZoitCuDCZrcPBW2gipJMVeDf9Dm1dWyF%2BMydWKAUDfUzuhwNFTweUsY19ioDdmYy2AUQworuFzgY6owHiEhwjRgL0vo3g3VUcplFrt3I%2FNpaOXg0ZKUMVjZdoQwtB1kW6ubkzAlvdvnQPRJ7kM5QYsFdMVaPQoEphRK752YvdcuArw1Z%2BZJNxoJwhecU%2BCU%2FEXmMwnpBn7y8BjU6tIB5SBFcdCHETmzu7dWcV1OK5tVchBDJI9OAfnYXCzPBUw4L905hAXVwNBTmCEmg4nPyLrKX3XLHzNf6Y%2BNNPwc0m&X-Amz-Signature=226a384834ad2261b78f97ed7dc76cd2f5b6aba6c42a4c4ed3ddbce73ac3aed7&X-Amz-SignedHeaders=host&x-amz-checksum-mode=ENABLED&x-id=GetObject"
+                alt="" class="mg-premium-btn-bg">
+            詳細はこちら<br>
+            あなたもきっと気に入ります
+        </a>
+    </section>
+
+    <footer class="mg-premium-footer">
+        &copy; 2026 MeishiGawarini.
+    </footer>
+</div>
