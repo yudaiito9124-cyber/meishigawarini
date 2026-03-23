@@ -21,6 +21,7 @@ import { APIGatewayProxyHandler } from 'aws-lambda';
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, GetCommand, UpdateCommand, QueryCommand } from '@aws-sdk/lib-dynamodb';
 import { checkShopOwnerOrGM, checkUserShopPermission } from './share/shop-auth';
+import { checkAndExpire } from './utils/expiration';
 
 const client = new DynamoDBClient({});
 const ddb = DynamoDBDocumentClient.from(client);
@@ -76,15 +77,24 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             if (!qrRes.Item) return { statusCode: 404, headers: corsHeaders, body: JSON.stringify({ message: 'QR not found', detail: `QRcode:${qr_id}` }) };
 
             const qrItem = qrRes.Item;
+            let qrproductName = '';
+            let productLinked = false;
+            
+            // 期限切れチェック (共通ユーティリティ)
+            // checkAndExpire は内部で有効なステータス(UNASSIGNED, LINKED, ACTIVE)の場合のみ判定を行います
+            const currentStatus = await checkAndExpire(ddb, TABLE_NAME, qr_id, qrItem as any);
+
+            if (currentStatus === 'EXPIRED') {
+                return { statusCode: 410, headers: corsHeaders, body: JSON.stringify({ message: 'QR Code has expired', status: 'EXPIRED' }) };
+            }
+
             if (qrItem.shop_id && qrItem.shop_id !== shopId) {
                 return { statusCode: 403, headers: corsHeaders, body: JSON.stringify({ message: 'QR does not belong to this shop', detail: `QRcode:${qr_id}, shop:${qrItem.shop_id}` }) };
             }
-            if (qrItem.status !== 'UNASSIGNED' && qrItem.status !== 'LINKED') {
-                return { statusCode: 403, headers: corsHeaders, body: JSON.stringify({ message: 'QR is not in a valid state', detail: `QRcode:${qr_id}, status:${qrItem.status}` }) };
+            if (currentStatus !== 'UNASSIGNED' && currentStatus !== 'LINKED') {
+                return { statusCode: 403, headers: corsHeaders, body: JSON.stringify({ message: 'QR is not in a valid state', detail: `QRcode:${qr_id}, status:${currentStatus}`, status: currentStatus }) };
             }
 
-            let qrproductName = '';
-            let productLinked = false;
             if (qrItem.product_id) {
                 // 【DB操作: GetItem】
                 // - 目的: QRコードに紐付いている商品情報の取得、および販売停止(STOPPED)状態でないかの確認
@@ -101,7 +111,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 qrproductName = productRes.Item.name;
                 productLinked = true;
             }
-            return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ product_id: qrItem.product_id, product_name: qrproductName, product_linked: productLinked, status: qrItem.status }) };
+            return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ product_id: qrItem.product_id, product_name: qrproductName, product_linked: productLinked, status: currentStatus }) };
         }
 
         if (action === 'list') {
@@ -124,30 +134,23 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 let ts_expired_at = item.ts_expired_at;
                 
                 // 【DB操作: UpdateItem (非同期ループ)】
-                // - 目的: 一覧取得時に期限切れ(EXPIRED)になっているACTIVEなQRレコードを発見した場合、DBの状態を自動更新する（遅延評価）
-                // - テーブル: TABLE_NAME
-                // - リクエストキー: { PK: item.PK, SK: 'METADATA' }
-                // - 更新カラム: status='EXPIRED', GSI1_PK='QR#EXPIRED', ts_updated_at=現在時刻
-                if (status === 'ACTIVE' && ts_expired_at) {
-                    const expiresAt = new Date(ts_expired_at);
-                    if (now > expiresAt) {
-                        status = 'EXPIRED';
-                        updatePromises.push(
-                            ddb.send(new UpdateCommand({
-                                TableName: TABLE_NAME, Key: { PK: item.PK, SK: 'METADATA' },
-                                UpdateExpression: 'SET #status = :expired, GSI1_PK = :gsi_pk, ts_updated_at = :now',
-                                ExpressionAttributeNames: { '#status': 'status' },
-                                ExpressionAttributeValues: { ':expired': 'EXPIRED', ':gsi_pk': 'QR#EXPIRED', ':now': now.toISOString() }
-                            })).catch(e => console.error(`Failed to update expired status for ${item.PK}`, e))
-                        );
-                    }
-                }
+                // - 目的: 一覧取得時に期限切れ(EXPIRED)になっているQRレコードを発見した場合、DBの状態を自動更新する（遅延評価）
+                // - 共通ユーティリティを使用
+                const statusPromise = checkAndExpire(ddb, TABLE_NAME, item.PK.replace('QR#', ''), item as any);
+                updatePromises.push(statusPromise);
+
                 return {
-                    id: item.PK.replace('QR#', ''), status: status, product_id: item.product_id,
+                    id: item.PK.replace('QR#', ''), status: item.status, product_id: item.product_id,
                     ts_created_at: item.ts_created_at, ts_activated_at: item.ts_activated_at, ts_expired_at: ts_expired_at
                 };
             });
-            if (updatePromises.length > 0) await Promise.all(updatePromises);
+
+            const updatedStatuses = await Promise.all(updatePromises);
+            // 呼び出し元のitemsに更新後のステータスを反映
+            items.forEach((item, index) => {
+                item.status = updatedStatuses[index];
+            });
+
             return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ items }) };
         }
 

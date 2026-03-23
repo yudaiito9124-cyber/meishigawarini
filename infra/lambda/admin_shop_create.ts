@@ -10,12 +10,19 @@
 import { APIGatewayProxyHandler } from 'aws-lambda';
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, GetCommand, PutCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
+import { CognitoIdentityProviderClient, AdminGetUserCommand } from '@aws-sdk/client-cognito-identity-provider';
 import { generateId } from './utils/id';
-import { parseGroups, isSystemAdmin } from './utils/auth';
 
 const client = new DynamoDBClient({});
-const ddb = DynamoDBDocumentClient.from(client);
+const ddb = DynamoDBDocumentClient.from(client, {
+    marshallOptions: {
+        removeUndefinedValues: true,
+        convertEmptyValues: true
+    }
+});
+const cognito = new CognitoIdentityProviderClient({});
 const TABLE_NAME = process.env.TABLE_NAME || '';
+const USER_POOL_ID = process.env.USER_POOL_ID || '';
 
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
@@ -25,7 +32,12 @@ const corsHeaders = {
 
 export const handler: APIGatewayProxyHandler = async (event) => {
     try {
-        if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers: corsHeaders, body: '' };
+        if (event.httpMethod === 'OPTIONS') {
+            return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ message: 'OK' }) };
+        }
+        if (event.httpMethod !== 'POST') {
+            return { statusCode: 405, headers: corsHeaders, body: JSON.stringify({ message: 'Method Not Allowed' }) };
+        }
 
         const authorizer = event.requestContext?.authorizer;
         const userId = authorizer?.principalId;
@@ -67,8 +79,22 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Invalid gm_id', detail: gmid }) };
             }
         }
+        
+        let email = userownerRes?.Item.email;
 
-        const email = userownerRes?.Item.email;
+        // Email不在時のCognitoフォールバック
+        if (!email && owner_id && USER_POOL_ID) {
+            try {
+                const user = await cognito.send(new AdminGetUserCommand({
+                    UserPoolId: USER_POOL_ID,
+                    Username: owner_id
+                }));
+                email = user.UserAttributes?.find(attr => attr.Name === 'email')?.Value;
+            } catch (e) {
+                console.warn(`Failed to fetch owner email from Cognito: ${owner_id}`, e);
+            }
+        }
+
         const newShopId = generateId();
         const now = new Date().toISOString();
 
@@ -133,7 +159,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             }
         }
 
-        return { statusCode: 201, headers: corsHeaders, body: JSON.stringify({ shopId: newShopId, message: 'Shop created' }) };
+        return { statusCode: 201, headers: corsHeaders, body: JSON.stringify({ shop_id: newShopId, message: 'Shop created' }) };
     } catch (error: any) {
         console.error(error);
         return { statusCode: 500, headers: corsHeaders, body: JSON.stringify({ message: 'Internal Server Error', error: String(error) }) };

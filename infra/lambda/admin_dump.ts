@@ -53,6 +53,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                     ':pk': pk
                 }
             }));
+            items = items.concat({ PK: pk });
             items = items.concat(res.Items || []);
         }
 

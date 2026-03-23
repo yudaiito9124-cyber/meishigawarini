@@ -117,7 +117,8 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             const allOrderDetails: any[] = [];
             for (let i = 0; i < relevantItems.length; i += 100) {
                 const chunk = relevantItems.slice(i, i + 100);
-                const keys = chunk.map(item => ({ PK: item.PK, SK: 'ORDER' }));
+                // Deduplicate keys in case the index query returned same PK multiple times (unexpected but safer)
+                const keys = Array.from(new Map(chunk.map(item => [item.PK + '#ORDER', { PK: item.PK, SK: 'ORDER' }])).values());
                 const batchRes = await ddb.send(new BatchGetCommand({ RequestItems: { [TABLE_NAME]: { Keys: keys } } }));
                 if (batchRes.Responses?.[TABLE_NAME]) allOrderDetails.push(...batchRes.Responses[TABLE_NAME]);
             }

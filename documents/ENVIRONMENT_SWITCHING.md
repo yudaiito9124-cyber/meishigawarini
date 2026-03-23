@@ -18,13 +18,27 @@
 
 ## 2. 各環境の対応とデプロイ方法
 
-「どのブランチのコード」を「どこに反映（デプロイ）」するかの一覧です。
 
-| 環境 | 対象ブランチ | 実行場所 | 実行方法 (デプロイ) |
+
+この開発環境では、バックエンドはAWS上のみで動かす前提です(フロントエンドはローカルでも動かすことができます)。AWS上には**検証用**と**本番用**の実行環境がそれぞれ用意されています。
+
+|  | AWS上で実行 | localで実行 | 備考 |
 | :--- | :--- | :--- | :--- |
-| **本番 (Prod)** | `master` | AWS | **フロント**: `git push` で自動 (Amplify)<br>**バック**: `cdk deploy` (手動) |
-| **検証 (Stg)** | `stg` | AWS | **フロント**: `git push` で自動 (Amplify)<br>**バック**: `cdk deploy -c stage=stg` (手動) |
-| **開発 (Local)** | 作業ブランチ | **自分のPC** | `npm run dev:stg` または `dev:prod` |
+| バックエンド | 検証用(stg), 本番用(prod) | - | CDKを使ってデプロイ(各種AWSサービスが連携) |
+| フロントエンド | 検証用(stg), 本番用(prod) | local | AWS上ではAmplifyがgitの更新を検知して自動デプロイします |
+
+
+Gitのブランチは検証用と本番用の2種類があります。
+- 本番用: master
+- 検証用: stg
+
+
+「どのブランチのコード」を「どこの環境に」「どのようにデプロイ」するかの一覧です。
+
+| 環境 | 対象ブランチ |  フロントエンドデプロイ方法(AWS Amplify) | フロントエンドのみローカルで実行する方法  | バックエンドデプロイ方法(AWS CDK) |
+| :--- | :--- | :--- | :--- | :--- |
+| **本番 (Prod)** | `master` | masterブランチの更新で自動デプロイ | `npm run dev:prod` | `cdk deploy -c stage=prod` (手動デプロイ) |
+| **検証 (Stg)** | `stg` | stgブランチの更新で自動デプロイ | `npm run dev:stg` | `cdk deploy -c stage=stg` (手動デプロイ) |
 
 > [!IMPORTANT]
 > **バックエンドは常にAWS上で動作します。**
@@ -34,19 +48,28 @@
 
 ## 3. 具体的な切り替え手順
 
-### A. フロントエンドをローカルで動かす (Local接続先の切り替え)
+### A. フロントエンドをローカルで動かす (バックエンドの切り替え)
 `frontend` フォルダでコマンドを実行します。
+- バックエンドを**Stagingに繋ぐ (推奨)**: `npm run dev:stg`
+  - `.env.staging` が `.env.local` にコピーされ、バックエンドは検証用AWSに接続します。
+- バックエンドを**Productionに繋ぐ**: `npm run dev:prod`
+  - `.env.production` が `.env.local` にコピーされ、バックエンドは本番用AWSに接続します。
+  
+[開発用URL(http://localhost:3000)](http://localhost:3000)
 
-- **Stagingに繋ぐ (推奨)**: `npm run dev:stg`
-  - `.env.staging` が `.env.local` にコピーされ、検証用AWSに接続します。
-- **Productionに繋ぐ**: `npm run dev:prod`
-  - `.env.production` が `.env.local` にコピーされ、本番用AWSに接続します。
+### B. フロントエンドをAWSにデプロイする
+`frontend` フォルダで各ブランチを更新するとAWS Amplifyが自動デプロイします。
 
-### B. バックエンド (AWS) を更新する
+- **検証環境にデプロイ**: `git push origin stg`
+[検証用URL(https://stg.dh74sua11za2r.amplifyapp.com/)](https://stg.dh74sua11za2r.amplifyapp.com/)
+- **本番環境にデプロイ**: `git push origin master`
+[本番URL(https://meishigawarini.com)](https://meishigawarini.com)
+
+### C. バックエンドをAWSにデプロイする
 `infra` フォルダでコマンドを実行します。※デプロイにはAWS認証 (`aws login`) が必要です。
 
-- **検証環境の更新**: `npx cdk deploy -c stage=stg`
-- **本番環境の更新**: `npx cdk deploy`
+- **検証環境にデプロイ**: `npx cdk deploy -c stage=stg`
+- **本番環境にデプロイ**: `npx cdk deploy -c stage=prod`
 
 ---
 

@@ -91,8 +91,8 @@ export default function ShopPage() {
             const session = await fetchAuthSession();
             if (session.tokens) {
                 const groups = (session.tokens.idToken?.payload['cognito:groups'] as string[]) || [];
-                const isAdmin = groups.includes('Administrators') || groups.includes('GlobalAdmins');
-                setIsAdmin(isAdmin);
+                const isadmin = groups.includes('Administrators') || groups.includes('GlobalAdmins');
+                setIsAdmin(isadmin);
             }
         } catch (e) {
             // Not logged in
@@ -649,10 +649,10 @@ export default function ShopPage() {
                 ));
             } catch (err: any) {
                 const translatedError = err.message ? tb(err.message.replace(/\./g, '_')) : t('linkQr.foreignQrError');
-                alert(translatedError + (err.detail ? ` (${err.detail})` : ''));
-                setIsScanning(false);
-                setScannedUuid('');
-                setScannedUuids([]);
+                // In continuous mode, don't stop scanning - just record error in the list
+                setScannedUuids(prev => prev.map(item =>
+                    item.uuid === uuid ? { ...item, error: translatedError + (err.detail ? ` (${err.detail})` : '') } : item
+                ));
             }
             return;
         }
@@ -932,7 +932,7 @@ export default function ShopPage() {
                             <DialogFooter>
                             </DialogFooter>
                         </Dialog>
-                        {!singleShopOwner || isAdmin && <Button variant="secondary" className="shadow-md cursor-pointer border border-gray-200" onClick={handleShops}>{t('movetoshops')}</Button>}
+                        {(!singleShopOwner || isAdmin) && <Button variant="secondary" className="shadow-md cursor-pointer border border-gray-200" onClick={handleShops}>{t('movetoshops')}</Button>}
                         <Button
                             variant="ghost"
                             className="hover:bg-red-50 hover:text-red-600 cursor-pointer"
@@ -981,12 +981,12 @@ export default function ShopPage() {
                                                     <span>{t('linkQr.scan')}</span>
                                                 </Button>
                                             </DialogTrigger>
-                                            <DialogContent className="max-h-[90vh] max-w-[90vw] md:max-w-3xl lg:max-w-3xl w-full h-full overflow-y-auto">
+                                            <DialogContent className="max-h-[90vh] w-[98vw] max-w-[98vw] sm:max-w-[90vw] md:max-w-3xl lg:max-w-3xl h-full overflow-y-auto p-2 sm:p-6">
                                                 <DialogHeader>
                                                     <DialogTitle>{t('linkQr.scanDialog.title')}</DialogTitle>
                                                     <DialogDescription>{t('linkQr.scanDialog.description')}</DialogDescription>
                                                 </DialogHeader>
-                                                <div className="p-4 min-h-[300px] flex flex-col gap-y-4">
+                                                <div className="p-1 sm:p-4 min-h-[300px] flex flex-col gap-y-4">
                                                     <div className="flex items-center justify-center h-[20px] gap-x-2">
                                                         <Switch
                                                             id="continuous-scan"
@@ -1029,34 +1029,42 @@ export default function ShopPage() {
                                                             </Button>
                                                         )}
                                                         {isContinuousScan && scannedUuids.length > 0 && (
-                                                            <div className="mt-2 border rounded-md bg-gray-50 max-h-[80vh] overflow-y-auto">
-                                                                <ul className="text-[10px] font-mono p-2 space-y-1">
+                                                            <div className="mt-2 border rounded-md bg-gray-50 max-h-[80vh] overflow-y-auto w-full overflow-x-hidden">
+                                                                <ul className="text-[10px] font-mono p-1 sm:p-2 space-y-1">
                                                                     {scannedUuids.map((item, i) => (
                                                                         <li key={item.uuid} className="border-b last:border-0 pb-1 last:pb-0 flex flex-col">
-                                                                            <div className="flex justify-between items-center">
-                                                                                <div className="flex items-center gap-1.5 flex-1 min-w-0">
-                                                                                    <span className="truncate">{i + 1}. {item.uuid}</span>
-                                                                                    <Button
-                                                                                        variant="ghost"
-                                                                                        size="icon"
-                                                                                        className="h-4 w-4 shrink-0"
-                                                                                        onClick={() => handleCopy(item.uuid)}
-                                                                                    >
-                                                                                        {copiedId === item.uuid ? (
-                                                                                            <Check className="h-3 w-3 text-green-500" />
-                                                                                        ) : (
-                                                                                            <Copy className="h-3 w-3" />
-                                                                                        )}
-                                                                                    </Button>
+                                                                            <div className="flex flex-col gap-1 py-1 w-full overflow-hidden">
+                                                                                <div className="flex items-center justify-between gap-1 w-full overflow-hidden">
+                                                                                    <div className="flex items-center gap-1 min-w-0 flex-1 overflow-hidden">
+                                                                                        <span className="truncate opacity-70 text-[10px] leading-tight block w-0 flex-1">{i + 1}. {item.uuid}</span>
+                                                                                        <Button
+                                                                                            variant="ghost"
+                                                                                            size="icon"
+                                                                                            className="h-3.5 w-3.5 shrink-0 opacity-50 hover:opacity-100"
+                                                                                            onClick={() => handleCopy(item.uuid)}
+                                                                                        >
+                                                                                            {copiedId === item.uuid ? (
+                                                                                                <Check className="h-2.5 w-2.5 text-green-500" />
+                                                                                            ) : (
+                                                                                                <Copy className="h-2.5 w-2.5" />
+                                                                                            )}
+                                                                                        </Button>
+                                                                                    </div>
+                                                                                    {!item.status && !item.error && (
+                                                                                        <span className="animate-pulse text-gray-400 shrink-0 text-[10px]">...</span>
+                                                                                    )}
                                                                                 </div>
-                                                                                {item.status ? (
-                                                                                    <span className={`text-[8px] px-1 rounded ${item.status.product_linked ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
-                                                                                        {item.status.product_linked ? item.status.product_name : 'OK'}
-                                                                                    </span>
-                                                                                ) : item.error ? (
-                                                                                    <span className="text-[8px] px-1 rounded bg-red-100 text-red-700">{item.error}</span>
-                                                                                ) : (
-                                                                                    <span className="animate-pulse">...</span>
+
+                                                                                {(item.status || item.error) && (
+                                                                                    <div className="flex justify-end w-full overflow-hidden">
+                                                                                        {item.status ? (
+                                                                                            <span className={`text-[10px] px-1.5 py-0.5 rounded-sm font-bold block text-left break-all sm:break-words max-w-full ${item.status.status === 'EXPIRED' ? 'bg-red-100 text-red-700' : (item.status.product_linked ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700')}`}>
+                                                                                                {item.status.status === 'EXPIRED' ? st('expired') : (item.status.product_linked ? item.status.product_name : 'OK')}
+                                                                                            </span>
+                                                                                        ) : (
+                                                                                            <span className="text-[10px] px-1.5 py-0.5 rounded-sm bg-red-100 text-red-700 font-medium text-left leading-tight break-all sm:break-words max-w-full" title={item.error}>{item.error}</span>
+                                                                                        )}
+                                                                                    </div>
                                                                                 )}
                                                                             </div>
                                                                         </li>
@@ -1818,7 +1826,7 @@ export default function ShopPage() {
                                     .filter(o => ['LINKED', 'ACTIVE', 'SHIPPED', 'COMPLETED', 'EXPIRED', 'BANNED'].includes(o.status))
                                     .filter(o => !searchUuid || (o.id || o.qr_id).includes(searchUuid))
                                     .length === 0 ? (
-                                    <TableRow><TableCell colSpan={3} className="text-center">{t('orders.noOrders')}</TableCell></TableRow>
+                                    <TableRow><TableCell colSpan={4} className="text-center">{t('orders.noOrders')}</TableCell></TableRow>
                                 ) : (
                                     orders
                                         .filter(o => ['LINKED', 'ACTIVE', 'SHIPPED', 'COMPLETED', 'EXPIRED', 'BANNED'].includes(o.status))

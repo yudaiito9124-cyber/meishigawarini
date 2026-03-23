@@ -142,6 +142,20 @@ export class AdminApi extends Construct {
     bucket.grantReadWrite(admin_carddesigns);
 
 
+    const admin_shop_create = new nodejs.NodejsFunction(this, 'admin_shop_create', {
+      entry: lampath('admin_shop_create'),
+      ...commonProps,
+      environment: {
+        ...commonProps.environment,
+        USER_POOL_ID: userPool.userPoolId,
+      }
+    });
+    grantTablePermissions(admin_shop_create, true);
+    admin_shop_create.addToRolePolicy(new iam.PolicyStatement({
+      actions: ['cognito-idp:AdminGetUser'],
+      resources: [userPool.userPoolArn]
+    }));
+
 
 
     ////////////////////////////////////////////////////////////////////////////////
@@ -168,6 +182,10 @@ export class AdminApi extends Construct {
     cardDesignsResource.addResource('uploadurl').addMethod('POST', new apigateway.LambdaIntegration(admin_carddesigns), { authorizer: authorizerOfAdmin, });
     cardDesignsResource.addResource('update').addMethod('POST', new apigateway.LambdaIntegration(admin_carddesigns), { authorizer: authorizerOfAdmin, });
     cardDesignsResource.addResource('delete').addMethod('POST', new apigateway.LambdaIntegration(admin_carddesigns), { authorizer: authorizerOfAdmin, });
+
+    // /admin/shop
+    const shopResource = adminResource.addResource('shop');
+    shopResource.addResource('create').addMethod('POST', new apigateway.LambdaIntegration(admin_shop_create), { authorizer: authorizerOfAdmin, });
 
   }
 }

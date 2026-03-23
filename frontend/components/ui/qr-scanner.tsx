@@ -48,7 +48,7 @@ const QRScanner = (props: QRScannerProps) => {
                 const size = Math.floor(Math.min(viewfinderWidth, viewfinderHeight) * 0.7);
                 return { width: size, height: size };
             })) as any,
-            aspectRatio: props.aspectRatio,
+            aspectRatio: props.aspectRatio || 1.0,
             disableFlip: props.disableFlip !== undefined ? props.disableFlip : false,
         };
 

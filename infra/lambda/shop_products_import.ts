@@ -14,7 +14,6 @@ import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, QueryCommand, ScanCommand, PutCommand } from '@aws-sdk/lib-dynamodb';
 import { S3Client, CopyObjectCommand } from '@aws-sdk/client-s3';
 import { checkShopOwnerOrGM } from './share/shop-auth';
-import { parseGroups, isGlobalAdmin } from './utils/auth';
 import { generateId } from './utils/id';
 
 const client = new DynamoDBClient({});
@@ -85,7 +84,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                     ExpressionAttributeValues: { ':uid': `USER#${userId}` }
                 }));
             }
-            
+
             const shops = (res.Items || []).map(s => ({
                 id: s.PK.replace('SHOP#', ''),
                 name: s.name

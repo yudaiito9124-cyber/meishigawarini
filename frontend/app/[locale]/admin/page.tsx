@@ -253,7 +253,7 @@ export default function AdminPage() {
                                                 id="shopId"
                                                 type="text"
                                                 value={shopId}
-                                                placeholder="UUID..."
+                                                placeholder=""
                                                 onChange={(e) => setShopId(e.target.value)}
                                             />
                                         </div>
@@ -266,7 +266,7 @@ export default function AdminPage() {
                                                 id="productId"
                                                 type="text"
                                                 value={productId}
-                                                placeholder="UUID..."
+                                                placeholder=""
                                                 onChange={(e) => setProductId(e.target.value)}
                                             />
                                         </div>
@@ -279,7 +279,7 @@ export default function AdminPage() {
                                                 id="ownerUuid"
                                                 type="text"
                                                 value={ownerUuid}
-                                                placeholder="UUID..."
+                                                placeholder=""
                                                 onChange={(e) => setOwnerUuid(e.target.value)}
                                             />
                                         </div>
@@ -292,7 +292,7 @@ export default function AdminPage() {
                                                 id="senderId"
                                                 type="text"
                                                 value={senderId}
-                                                placeholder="USER#UUID..."
+                                                placeholder=""
                                                 onChange={(e) => setSenderId(e.target.value)}
                                             />
                                         </div>
@@ -1218,7 +1218,7 @@ function DataDumpSection({ apiUrl }: { apiUrl: string }) {
                         <Label htmlFor="dumpUserId">{t('list.dump.userId')}</Label>
                         <Input
                             id="dumpUserId"
-                            placeholder="USER#..."
+                            placeholder=""
                             value={userId}
                             onChange={(e) => setUserId(e.target.value)}
                         />
@@ -1227,7 +1227,7 @@ function DataDumpSection({ apiUrl }: { apiUrl: string }) {
                         <Label htmlFor="dumpShopId">{t('list.dump.shopId')}</Label>
                         <Input
                             id="dumpShopId"
-                            placeholder="SHOP#..."
+                            placeholder=""
                             value={shopId}
                             onChange={(e) => setShopId(e.target.value)}
                         />
@@ -1261,8 +1261,8 @@ function ManagerLinkingSection({ apiUrl }: { apiUrl: string }) {
     const [isConfirmOpen, setIsConfirmOpen] = useState(false);
 
     const handleValidate = async () => {
-        const uids = userIdsStr.split('\n').map(s => s.trim()).filter(Boolean);
-        const sids = shopIdsStr.split('\n').map(s => s.trim()).filter(Boolean);
+        const uids = Array.from(new Set(userIdsStr.split('\n').map(s => s.trim()).filter(Boolean)));
+        const sids = Array.from(new Set(shopIdsStr.split('\n').map(s => s.trim()).filter(Boolean)));
 
         if (uids.length === 0 || sids.length === 0) return;
 
@@ -1288,8 +1288,8 @@ function ManagerLinkingSection({ apiUrl }: { apiUrl: string }) {
     };
 
     const handleExecute = async () => {
-        const uids = userIdsStr.split('\n').map(s => s.trim()).filter(Boolean);
-        const sids = shopIdsStr.split('\n').map(s => s.trim()).filter(Boolean);
+        const uids = Array.from(new Set(userIdsStr.split('\n').map(s => s.trim()).filter(Boolean)));
+        const sids = Array.from(new Set(shopIdsStr.split('\n').map(s => s.trim()).filter(Boolean)));
 
         setLoading(true);
         try {
@@ -1323,7 +1323,7 @@ function ManagerLinkingSection({ apiUrl }: { apiUrl: string }) {
                         <Label htmlFor="linkingUserIds">{t('list.managerLinking.userIds')}</Label>
                         <Textarea
                             id="linkingUserIds"
-                            placeholder="UUID\nUUID..."
+                            placeholder=""
                             value={userIdsStr}
                             onChange={(e) => setUserIdsStr(e.target.value)}
                             className="min-h-[120px] font-mono text-sm text-black"
@@ -1333,7 +1333,7 @@ function ManagerLinkingSection({ apiUrl }: { apiUrl: string }) {
                         <Label htmlFor="linkingShopIds">{t('list.managerLinking.shopIds')}</Label>
                         <Textarea
                             id="linkingShopIds"
-                            placeholder="UUID\nUUID..."
+                            placeholder=""
                             value={shopIdsStr}
                             onChange={(e) => setShopIdsStr(e.target.value)}
                             className="min-h-[120px] font-mono text-sm text-black"
@@ -1460,7 +1460,7 @@ function ShopOwnerChangeSection({ apiUrl }: { apiUrl: string }) {
                         <Label htmlFor="ownerChangeShopId">{t('list.ownerChange.shopId')}</Label>
                         <Input
                             id="ownerChangeShopId"
-                            placeholder="UUID..."
+                            placeholder=""
                             value={shopId}
                             onChange={(e) => setShopId(e.target.value)}
                             className="font-mono text-sm text-black"
@@ -1470,7 +1470,7 @@ function ShopOwnerChangeSection({ apiUrl }: { apiUrl: string }) {
                         <Label htmlFor="ownerChangeNewUserId">{t('list.ownerChange.newUserId')}</Label>
                         <Input
                             id="ownerChangeNewUserId"
-                            placeholder="UUID..."
+                            placeholder=""
                             value={newUserId}
                             onChange={(e) => setNewUserId(e.target.value)}
                             className="font-mono text-sm text-black"
@@ -1540,13 +1540,10 @@ function AdminShopCreationSection({ apiUrl }: { apiUrl: string }) {
         if (!userData) return;
         setLoading(true);
         try {
-            await adminApi.fetch("/shop", {
-                method: "POST",
-                body: JSON.stringify({
-                    name: "My Default Shop",
-                    owner_id: userData.id,
-                    gm_ids: []
-                }),
+            await adminApi.admin_shop_create({
+                name: "My Default Shop",
+                owner_id: userData.id,
+                gm_ids: []
             });
             alert(t('list.shopCreation.success'));
             setIsConfirmOpen(false);
@@ -1572,7 +1569,7 @@ function AdminShopCreationSection({ apiUrl }: { apiUrl: string }) {
                     <Label htmlFor="creationUserId">{t('list.shopCreation.userId')}</Label>
                     <Input
                         id="creationUserId"
-                        placeholder="UUID..."
+                        placeholder=""
                         value={userId}
                         onChange={(e) => setUserId(e.target.value)}
                         className="font-mono text-sm text-black"

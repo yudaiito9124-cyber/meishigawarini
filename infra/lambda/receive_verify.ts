@@ -14,6 +14,7 @@ import { CognitoIdentityProviderClient, AdminGetUserCommand } from '@aws-sdk/cli
 import * as bcrypt from 'bcryptjs';
 import { isLocked, getRateLimitUpdate, getResetRateLimitUpdate } from './utils/rate-limit';
 import { signUrlIfS3, signUrlsInHtml } from './utils/s3';
+import { checkAndExpire } from './utils/expiration';
 
 const client = new DynamoDBClient({});
 const ddb = DynamoDBDocumentClient.from(client, {
@@ -97,20 +98,9 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         }
 
         const { product_id, shop_id } = item;
-        let status = item.status;
-
-        // 期限切れチェック (遅延評価)
-        if (status === 'ACTIVE' && item.ts_expired_at && new Date() > new Date(item.ts_expired_at)) {
-            status = 'EXPIRED';
-            // 【DB操作: UpdateItem】
-            // - 目的: 期限切れ状態をDBに反映(遅延評価)
-            await ddb.send(new UpdateCommand({
-                TableName: TABLE_NAME, Key: { PK: `QR#${uuid}`, SK: 'METADATA' },
-                UpdateExpression: 'SET #status = :expired, GSI1_PK = :gsi_pk, ts_updated_at = :now',
-                ExpressionAttributeNames: { '#status': 'status' },
-                ExpressionAttributeValues: { ':expired': 'EXPIRED', ':gsi_pk': 'QR#EXPIRED', ':now': new Date().toISOString() }
-            })).catch(e => console.error('Failed lazy expire update', e));
-        }
+        
+        // 期限切れチェック (共通ユーティリティ)
+        const status = await checkAndExpire(ddb, TABLE_NAME, uuid, item as any);
 
         // 商品情報の取得
         let product = null;
