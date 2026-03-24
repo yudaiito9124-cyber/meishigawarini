@@ -37,6 +37,22 @@ export const paperformats: { [format: string]: any } = {
         dots: false,
         dotsedge: true
     },
+    "10S31251-2": {
+        description: "[A-one 31251] 【フチなし】 A4-10切 返礼品用(はがせるタイプ・クレジットカードサイズ) 印刷時 向き注意",
+        pageWidth: 210, // mm
+        pageHeight: 297, // mm
+        cols: 2,
+        rows: 5,
+        cols_gap: 8, // mm
+        rows_gap: 4, // mm
+        offset_x: 17, // mm
+        offset_y: 10.7 - 1, // mm
+        uraomote: false,
+        comment: "Please pay attention to the orientation when printing. Printing in the wrong orientation (as indicated on the paper) will result in misalignment.",
+        scale: 1.03,
+        dots: false,
+        dotsedge: true
+    },
     "10S31370": {
         description: "[A-one 31370] A4-10切 返礼品用(クレカより横長・縦短)",
         pageWidth: 210, // mm
@@ -193,11 +209,11 @@ const genQR = async (code: string) => {
 }
 
 
-export const generatePDF = async (batch: any, paperformat: string, cardformat: string | any) => {
+export const generatePDF = async (batch: any, paperformat: string, cardformat: string | any, fillall: boolean = false) => {
     // Dynamically import jsPDF only when this function is called (on the client)
     const { default: jsPDF } = await import('jspdf');
 
-    const codes = batch.codes || [];
+    let codes = batch.codes || [];
     if (codes.length === 0) return;
 
     let doc = new jsPDF({
@@ -260,8 +276,22 @@ export const generatePDF = async (batch: any, paperformat: string, cardformat: s
     const marginLeft = pf.offset_x === 0 ? (pageWidth - totalGridWidth) / 2 : 0;
     const marginTop = pf.offset_y === 0 ? (pageHeight - totalGridHeight) / 2 : 0;
     const itemsPerPage = cols * rows;
+    const cardsPerPage = pf.uraomote ? itemsPerPage : itemsPerPage / 2;
+    const fbswitch = pf.uraomote ? cols * rows : 1;
     const scaleofx = (1 - pf.scale) / 2 * cardWidth;
     const scaleofy = (1 - pf.scale) / 2 * cardHeight;
+
+    console.log("fillall", fillall);
+    console.log("codes.length", codes.length);
+    console.log("cardsPerPage", cardsPerPage);
+    console.log("fbswitch", fbswitch);
+    if (fillall && codes.length < cardsPerPage) {
+        console.log("fillall is true and codes.length < cardsPerPage");
+        const times = Math.floor(cardsPerPage / codes.length);
+        console.log("times", times);
+        codes = Array(times).fill(codes).flat();
+        console.log("codes.length", codes.length);
+    }
 
     // Helper to get position
     const getFrontPos = (indexInPage: number) => {
@@ -287,20 +317,23 @@ export const generatePDF = async (batch: any, paperformat: string, cardformat: s
     };
 
 
-    for (let i = 0; i < codes.length; i += itemsPerPage) {
-        if (i > 0) doc.addPage();
+    let posInSheet = 0;
+    for (let i = 0; i < codes.length; i += fbswitch) {
+        if (i > 0 && pf.uraomote || posInSheet >= itemsPerPage) {
+            doc.addPage();
+            posInSheet = 0;
+        }
 
         doc.setTextColor(0, 0, 0);
         doc.setFontSize(5);
         doc.setFont("helvetica", "normal");
         doc.text(pf.comment, 3, 3);
 
-        const pageCodes = codes.slice(i, i + itemsPerPage);
-
+        const pageCodes = codes.slice(i, i + fbswitch);
         // FRONT PAGE (QR Codes)
         for (let j = 0; j < pageCodes.length; j++) {
             const code = pageCodes[j];
-            const { ax, ay } = getFrontPos(j); // anchor point
+            const { ax, ay } = getFrontPos(posInSheet); // anchor point
 
             // Draw Background Image
             if (bgImgf.naturalWidth > 0) {
@@ -353,6 +386,7 @@ export const generatePDF = async (batch: any, paperformat: string, cardformat: s
                     baseline: 'middle'  // 垂直方向の中央揃え
                 });
             }
+            posInSheet++;
         }
         if (pf.dotsedge) {
             const dotRadius = 0.2; // mm radius
@@ -363,11 +397,15 @@ export const generatePDF = async (batch: any, paperformat: string, cardformat: s
             doc.circle(pf.offset_x + cardWidth * pf.cols + pf.cols_gap * (pf.cols - 1) - scaleofx, pf.offset_y + cardHeight * pf.rows + pf.rows_gap * (pf.rows - 1) - scaleofy, dotRadius, 'F');// Bottom Right
         }
 
-        doc.addPage(); // Back Page
+        if (pf.uraomote) {
+            doc.addPage(); // Back Page
+            posInSheet = 0;
+        }
+
         // BACK PAGE (PIN Codes)
         for (let j = 0; j < pageCodes.length; j++) {
             const code = pageCodes[j];
-            const { ax, ay } = pf.uraomote ? getBackPos(j) : getFrontPos(j); // anchor point
+            const { ax, ay } = pf.uraomote ? getBackPos(posInSheet) : getFrontPos(posInSheet); // anchor point
 
             // Draw Background Image (Reuse same bg or different back bg?)
             // Assuming same bg for now, typically back has instructions
@@ -415,6 +453,7 @@ export const generatePDF = async (batch: any, paperformat: string, cardformat: s
                     baseline: 'middle'  // 垂直方向の中央揃え
                 });
             }
+            posInSheet++;
         }
         if (pf.dotsedge) {
             const dotRadius = 0.2; // mm radius

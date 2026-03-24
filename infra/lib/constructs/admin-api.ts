@@ -31,19 +31,19 @@ export class AdminApi extends Construct {
     // 自動作成するためのコードで、作成済みの場合はエラーになるので今後使用することはないはず…
 
 
-    // // システム管理者画面等へのアクセス権 (/admin 以下へのアクセス権)
-    // new cognito.CfnUserPoolGroup(this, 'AdministratorsGroup', {
-    //   userPoolId: userPool.userPoolId,
-    //   groupName: 'Administrators',
-    //   description: 'System administrators with access to the admin dashboard',
-    // });
+    // システム管理者画面等へのアクセス権 (/admin 以下へのアクセス権)
+    new cognito.CfnUserPoolGroup(this, 'AdministratorsGroup', {
+      userPoolId: userPool.userPoolId,
+      groupName: 'Administrators',
+      description: 'System administrators with access to the admin dashboard',
+    });
 
-    // // システム管理者画面等へのアクセス権 (/admin 以下へのアクセス権) & 全ユーザのショップ管理画面へのアクセス
-    // new cognito.CfnUserPoolGroup(this, 'GlobalAdminsGroup', {
-    //   userPoolId: userPool.userPoolId,
-    //   groupName: 'GlobalAdmins',
-    //   description: 'Global administrators with cross-shop access and admin dashboard access',
-    // });
+    // システム管理者画面等へのアクセス権 (/admin 以下へのアクセス権) & 全ユーザのショップ管理画面へのアクセス
+    new cognito.CfnUserPoolGroup(this, 'GlobalAdminsGroup', {
+      userPoolId: userPool.userPoolId,
+      groupName: 'GlobalAdmins',
+      description: 'Global administrators with cross-shop access and admin dashboard access',
+    });
 
 
 

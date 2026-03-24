@@ -360,7 +360,7 @@ export default function AdminPage() {
                                                 <div className="space-y-1 w-full">
                                                     <div className="aspect-[84/52] w-full relative rounded shadow-lg overflow-hidden border border-gray-700 bg-white">
                                                         <img
-                                                            src={dbCardDesigns.find(d => d.design_id === cardFormat)?.bgimgf || cardformats[cardFormat]?.bgimgf}
+                                                            src={(dbCardDesigns.find(d => d.design_id === cardFormat)?.thumbf || dbCardDesigns.find(d => d.design_id === cardFormat)?.bgimgf) || cardformats[cardFormat]?.bgimgf}
                                                             alt={t('generate.frontPreview')}
                                                             className="absolute inset-0 w-full h-full object-cover"
                                                             crossOrigin="anonymous"
@@ -371,7 +371,7 @@ export default function AdminPage() {
                                                 <div className="space-y-1 w-full">
                                                     <div className="aspect-[84/52] w-full relative rounded shadow-lg overflow-hidden border border-gray-700 bg-white">
                                                         <img
-                                                            src={dbCardDesigns.find(d => d.design_id === cardFormat)?.bgimgb || cardformats[cardFormat]?.bgimgb}
+                                                            src={(dbCardDesigns.find(d => d.design_id === cardFormat)?.thumbb || dbCardDesigns.find(d => d.design_id === cardFormat)?.bgimgb) || cardformats[cardFormat]?.bgimgb}
                                                             alt={t('generate.backPreview')}
                                                             className="absolute inset-0 w-full h-full object-cover"
                                                             crossOrigin="anonymous"
@@ -739,7 +739,7 @@ function QRCodeListSection({ apiUrl, onGeneratePDF, paperFormat, cardFormat, dbC
 function QRCodeRow({ item, apiUrl, onGeneratePDF, onRefresh, paperFormat, cardFormat, dbCardDesigns, isDense }: {
     item: any;
     apiUrl: string;
-    onGeneratePDF: (batch: any, paperformat: string, cardformat: string | any) => Promise<void>;
+    onGeneratePDF: (batch: any, paperformat: string, cardformat: string | any, fillall: boolean) => Promise<void>;
     onRefresh: (targetStatus?: string) => Promise<void>;
     paperFormat: string;
     cardFormat: string;
@@ -858,7 +858,7 @@ function QRCodeRow({ item, apiUrl, onGeneratePDF, onRefresh, paperFormat, cardFo
                                         <div className="space-y-1">
                                             <div className="aspect-[84/52] relative rounded shadow-sm overflow-hidden border border-gray-100 bg-white">
                                                 <img
-                                                    src={item.thumbf || cardformats[item.card_design]?.bgimgf}
+                                                    src={item.thumbf || dbCardDesigns.find(d => d.design_id === item.card_design)?.thumbf || dbCardDesigns.find(d => d.design_id === item.card_design)?.bgimgf || cardformats[item.card_design]?.bgimgf}
                                                     alt="Front"
                                                     className="w-full h-full object-cover"
                                                     crossOrigin="anonymous"
@@ -869,7 +869,7 @@ function QRCodeRow({ item, apiUrl, onGeneratePDF, onRefresh, paperFormat, cardFo
                                         <div className="space-y-1">
                                             <div className="aspect-[84/52] relative rounded shadow-sm overflow-hidden border border-gray-100 bg-white">
                                                 <img
-                                                    src={item.thumbb || cardformats[item.card_design]?.bgimgb}
+                                                    src={item.thumbb || dbCardDesigns.find(d => d.design_id === item.card_design)?.thumbb || dbCardDesigns.find(d => d.design_id === item.card_design)?.bgimgb || cardformats[item.card_design]?.bgimgb}
                                                     alt="Back"
                                                     className="w-full h-full object-cover"
                                                     crossOrigin="anonymous"
@@ -1030,7 +1030,7 @@ function QRCodeRow({ item, apiUrl, onGeneratePDF, onRefresh, paperFormat, cardFo
                             onGeneratePDF({
                                 id: uuid,
                                 codes: [{ uuid, pin: item.pin }]
-                            }, paperFormat, design);
+                            }, paperFormat, design, Boolean(item.status === "PROMOTION"));
                         }}
                     >
                         <QrCode className="mr-2 h-4 w-4" />
