@@ -78,7 +78,9 @@
     "qrAdminPage": "システム管理者画面",
     "AdminNeed2FA": "管理者は2段階認証が必要です",
     "logout": "ログアウト",
-    "helpAdminPage": "管理者ヘルプ(初期設定)"
+    "helpAdminPage": "管理者ヘルプ(初期設定)",
+    "signInWithAWS": "AWS標準画面でログイン",
+    "forgotPassword": "パスワードを忘れた方はこちら"
   },
   "RegisterPage": {
     "title": "アカウント作成",

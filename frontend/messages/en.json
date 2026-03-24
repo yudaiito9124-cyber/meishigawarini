@@ -77,7 +77,9 @@
     "qrAdminPage": "QR Generation / Admin",
     "AdminNeed2FA": "Admin Required 2FA",
     "logout": "Logout",
-    "helpAdminPage": "Admin Help (Initial Setup)"
+    "helpAdminPage": "Admin Help (Initial Setup)",
+    "signInWithAWS": "Sign in with AWS (Standard)",
+    "forgotPassword": "Forgot your password?"
   },
   "RegisterPage": {
     "title": "Create Account",

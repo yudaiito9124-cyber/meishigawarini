@@ -143,6 +143,14 @@ export class InfraStack extends cdk.Stack {
       removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
 
+    // Add User Pool Domain for Hosted UI
+    // Note: Prefix must be globally unique across AWS in the region.
+    userPool.addDomain('CognitoDomain', {
+      cognitoDomain: {
+        domainPrefix: `meishigawarini${suffix}`,
+      },
+    });
+
     // パスキー (WebAuthn) 対応のために Essentials ティアに設定
     const cfnUserPool = userPool.node.defaultChild as cognito.CfnUserPool;
     cfnUserPool.userPoolTier = 'ESSENTIALS';
@@ -153,6 +161,18 @@ export class InfraStack extends cdk.Stack {
       idTokenValidity: cdk.Duration.hours(1),       // IDトークン有効期限: 1時間
       accessTokenValidity: cdk.Duration.hours(1),   // アクセストークン有効期限: 1時間
       refreshTokenValidity: cdk.Duration.days(30),  // リフレッシュトークン有効期限: 30日
+      oAuth: {
+        flows: {
+          authorizationCodeGrant: true,
+        },
+        callbackUrls: allowedOrigins.map(origin => `${origin}/`), // Add trailing slash for Cognito
+        logoutUrls: allowedOrigins.map(origin => `${origin}/`),
+        scopes: [
+          cognito.OAuthScope.EMAIL,
+          cognito.OAuthScope.OPENID,
+          cognito.OAuthScope.PROFILE,
+        ],
+      },
     });
 
     // ALLOW_USER_AUTH を有効化 (パスキー / WebAuthn に必要)
@@ -317,6 +337,7 @@ export class InfraStack extends cdk.Stack {
     new cdk.CfnOutput(this, 'ApiUrl', { value: api.url });
     new cdk.CfnOutput(this, 'UserPoolId', { value: userPool.userPoolId });
     new cdk.CfnOutput(this, 'UserPoolClientId', { value: userPoolClient.userPoolClientId });
+    new cdk.CfnOutput(this, 'CognitoDomain', { value: `meishigawarini${suffix}.auth.${this.region}.amazoncognito.com` });
     new cdk.CfnOutput(this, 'TableName', { value: table.tableName });
     new cdk.CfnOutput(this, 'BucketName', { value: bucket.bucketName });
   }

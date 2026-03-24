@@ -5,9 +5,10 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { signIn, fetchAuthSession, confirmSignIn, signOut } from 'aws-amplify/auth';
+import { signIn, fetchAuthSession, confirmSignIn, signOut, signInWithRedirect } from 'aws-amplify/auth';
 import { useRouter, Link } from '@/i18n/routing';
 import { useTranslations } from 'next-intl';
+import { useParams } from 'next/navigation';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
@@ -87,6 +88,17 @@ export default function LoginPage() {
     useEffect(() => {
         checkAuth();
     }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+    const { locale } = useParams();
+
+    const handleHostedUILogin = async () => {
+        try {
+            await signInWithRedirect();
+        } catch (err) {
+            console.error('Hosted UI login error', err);
+            setError(t('errors.default'));
+        }
+    };
 
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -296,6 +308,39 @@ export default function LoginPage() {
                                         >
                                             {t('back')}
                                         </Button>
+                                    )}
+
+                                    {!showMfa && (
+                                        <>
+                                            <div className="relative py-4">
+                                                <div className="absolute inset-0 flex items-center" aria-hidden="true">
+                                                    <div className="w-full border-t border-gray-200"></div>
+                                                </div>
+                                                <div className="relative flex justify-center text-sm">
+                                                    <span className="px-2 bg-white text-gray-500">{t('or')}</span>
+                                                </div>
+                                            </div>
+
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                className="w-full h-11 border-orange-500 text-orange-600 hover:bg-orange-50 font-bold flex items-center justify-center gap-2"
+                                                onClick={handleHostedUILogin}
+                                            >
+                                                <HelpCircle className="size-5" />
+                                                {t('signInWithAWS')}
+                                            </Button>
+
+                                            <div className="text-center pt-2">
+                                                <button
+                                                    type="button"
+                                                    className="text-sm text-blue-600 hover:underline"
+                                                    onClick={handleHostedUILogin}
+                                                >
+                                                    {t('forgotPassword')}
+                                                </button>
+                                            </div>
+                                        </>
                                     )}
                                 </form>
                             )}

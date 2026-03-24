@@ -28,9 +28,8 @@ export class AdminApi extends Construct {
 
     ////////////////////////////////////////////////////////////////////////////////
     // ユーザグループ(権限として取り扱い)
-    // 自動作成するためのコードで、作成済みの場合はエラーになるので今後使用することはないはず…
-
-
+    // 自動作成するためのコードで、作成済みの場合はエラーになるのでコメントアウト
+    /*
     // システム管理者画面等へのアクセス権 (/admin 以下へのアクセス権)
     new cognito.CfnUserPoolGroup(this, 'AdministratorsGroup', {
       userPoolId: userPool.userPoolId,
@@ -44,6 +43,7 @@ export class AdminApi extends Construct {
       groupName: 'GlobalAdmins',
       description: 'Global administrators with cross-shop access and admin dashboard access',
     });
+    */
 
 
 
