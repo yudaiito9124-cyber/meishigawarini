@@ -170,12 +170,11 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 if (shopEmail) {
                     await sendLocalizedEmail({
                         type: 'ADDRESS_REGISTRATION_NOTIFICATION', to: shopEmail,
-                        params: { 
-                            shopName: shopRes.Item?.name || '不明なショップ', 
-                            productName: productRes.Item?.name || '不明な商品', 
-                            qr_id, 
-                            shopId, 
-                            timestamp: shipping_info.client_timestamp || new Date(nowIso).toLocaleString() 
+                        params: {
+                            shopName: shopRes.Item?.name || '不明なショップ',
+                            productName: productRes.Item?.name || '不明な商品',
+                            qr_id,
+                            shopId
                         },
                         lang: 'ja'
                     });

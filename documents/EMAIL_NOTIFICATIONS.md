@@ -87,7 +87,7 @@ AWS Cognitoから直接送信される、アカウントセキュリティに関
 | `SYSTEM_NOTIFICATION` | システム通知 | `message`, `uuid`, `pin`, `baseUrl` |
 | `SHIPPING_NOTIFICATION` | 発送完了 | `uuid`, `pin`, `baseUrl` |
 | `ADDRESS_REGISTRATION_CONFIRMATION` | 住所登録完了（注文者） | `uuid`, `pin`, `baseUrl` |
-| `ADDRESS_REGISTRATION_NOTIFICATION` | 住所登録発生（オーナー） | `shopName`, `productName`, `qr_id`, `shopId`, `timestamp`, `baseUrl` |
+| `ADDRESS_REGISTRATION_NOTIFICATION` | 住所登録発生（オーナー） | `shopName`, `productName`, `qr_id`, `shopId`, `baseUrl` |
 
 ---
 

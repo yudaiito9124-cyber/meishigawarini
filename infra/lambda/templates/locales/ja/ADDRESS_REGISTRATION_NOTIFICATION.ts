@@ -5,7 +5,6 @@ export const body = `
 
 商品名: {{productName}}
 注文ID: {{qr_id}}
-登録日時: {{timestamp}}
 
 管理画面から注文詳細を確認し、発送準備を進めてください。
 
