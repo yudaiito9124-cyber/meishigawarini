@@ -643,6 +643,21 @@
         "success": "Owner changed successfully",
         "error": "An error occurred",
         "cancel": "Cancel"
+      },
+      "shopCardDesignLink": {
+        "title": "Shop & Card Design Linkage",
+        "description": "Select and update card designs available for the shop.",
+        "shopIdLabel": "Shop ID",
+        "shopIdPlaceholder": "Enter Shop ID...",
+        "loadButton": "Load",
+        "shopNameLabel": "Shop Name",
+        "emailLabel": "Email",
+        "allowedDesignsLabel": "Allowed Card Designs",
+        "allowedDesignsDesc": "Select designs available for this shop.",
+        "saveButton": "Save Linkage",
+        "saveSuccess": "Linkage updated successfully.",
+        "saveFailed": "Failed to update linkage.",
+        "notFound": "Shop not found."
       }
     },
     "shopInfo": {

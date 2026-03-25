@@ -10,13 +10,13 @@ import { getCurrentUser, fetchAuthSession } from 'aws-amplify/auth';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { APP_CONFIG } from "@/lib/config";
 import { generateId } from '@/lib/id';
 import { useTranslations } from 'next-intl';
 import { generatePDF, cardformats, paperformats } from '@/lib/generatePDF';
-import { ExternalLink, Copy, Eye, QrCode, Store, Wrench, Layers, HelpCircle, Home, Trash2, RotateCcw, Loader2 } from 'lucide-react';
+import { ExternalLink, Copy, Eye, QrCode, Store, Wrench, Layers, HelpCircle, Home, Trash2, RotateCcw, Loader2, Plus, X, Search, Save } from 'lucide-react';
 import CardDesignEditor from "@/components/admin/CardDesignEditor";
 const NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 const NEXT_PUBLIC_APP_URL = process.env.NEXT_PUBLIC_APP_URL || "";
@@ -475,6 +475,9 @@ export default function AdminPage() {
 
                 {activeTab === "shops" && (
                     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                        {/* ショップのメタデータ管理 (NEW) */}
+                        <AdminShopCardDesignLinkSection apiUrl={NEXT_PUBLIC_API_URL} dbCardDesigns={dbCardDesigns} />
+
                         {/* ショップの新規作成 (NEW) */}
                         <AdminShopCreationSection apiUrl={NEXT_PUBLIC_API_URL} />
 
@@ -1597,6 +1600,154 @@ function AdminShopCreationSection({ apiUrl }: { apiUrl: string }) {
                         </div>
                     </DialogContent>
                 </Dialog>
+            </CardContent>
+        </Card>
+    );
+}
+
+function AdminShopCardDesignLinkSection({ apiUrl, dbCardDesigns }: { apiUrl: string, dbCardDesigns: any[] }) {
+    const t = useTranslations('AdminPage');
+    const tLink = useTranslations('AdminPage.list.shopCardDesignLink');
+    const [shopId, setShopId] = useState("");
+    const [shopData, setShopData] = useState<any>(null);
+    const [loading, setLoading] = useState(false);
+    const [saving, setSaving] = useState(false);
+    const [selectedDesignIds, setSelectedDesignIds] = useState<string[]>([]);
+
+    const handleLoadShop = async () => {
+        if (!shopId.trim()) return;
+        setLoading(true);
+        try {
+            const data = await adminApi.admin_shop_carddesign_link_get({ shopId: shopId.trim() });
+            setShopData(data);
+            setSelectedDesignIds(data.card_designs || []);
+        } catch (e: any) {
+            alert(tLink('notFound') + ": " + (e.message || ""));
+            setShopData(null);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleSave = async () => {
+        if (!shopData) return;
+        setSaving(true);
+        try {
+            await adminApi.admin_shop_carddesign_link_update({
+                shopId: shopData.PK.replace(/^SHOP#/, ""),
+                card_designs: selectedDesignIds
+            });
+            alert(tLink('saveSuccess'));
+        } catch (e: any) {
+            alert(tLink('saveFailed') + ": " + (e.message || ""));
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const toggleDesign = (designId: string) => {
+        setSelectedDesignIds(prev =>
+            prev.includes(designId)
+                ? prev.filter(id => id !== designId)
+                : [...prev, designId]
+        );
+    };
+
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle>{tLink('title')}</CardTitle>
+                <CardDescription>{tLink('description')}</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+                <div className="flex gap-2">
+                    <div className="flex-1">
+                        <Label htmlFor="manageShopId">{tLink('shopIdLabel')}</Label>
+                        <Input
+                            id="manageShopId"
+                            placeholder={tLink('shopIdPlaceholder')}
+                            value={shopId}
+                            onChange={(e) => setShopId(e.target.value)}
+                            className="font-mono"
+                        />
+                    </div>
+                    <Button onClick={handleLoadShop} disabled={loading || !shopId.trim()} className="mt-auto">
+                        {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4 mr-2" />}
+                        {tLink('loadButton')}
+                    </Button>
+                </div>
+
+                {shopData && (
+                    <div className="space-y-6 pt-4 border-t animate-in fade-in duration-300">
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <Label className="text-gray-500">{tLink('shopNameLabel')}</Label>
+                                <p className="font-bold text-lg">{shopData.name}</p>
+                            </div>
+                            <div>
+                                <Label className="text-gray-500">{tLink('emailLabel')}</Label>
+                                <p>{shopData.email || "-"}</p>
+                            </div>
+                        </div>
+
+                        <div className="space-y-3">
+                            <Label className="text-gray-500">{tLink('allowedDesignsLabel')}</Label>
+                            <p className="text-xs text-gray-400 mb-2 italic">{tLink('allowedDesignsDesc')}</p>
+
+                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+                                {dbCardDesigns.map((design) => {
+                                    const isSelected = selectedDesignIds.includes(design.design_id);
+                                    return (
+                                        <div
+                                            key={design.design_id}
+                                            onClick={() => toggleDesign(design.design_id)}
+                                            className={cn(
+                                                "relative cursor-pointer rounded-lg border-2 p-1 transition-all group overflow-hidden",
+                                                isSelected
+                                                    ? "border-green-500 bg-green-50"
+                                                    : "border-transparent bg-gray-100 hover:border-gray-200"
+                                            )}
+                                        >
+                                            {isSelected && (
+                                                <div className="absolute top-0 right-0 bg-green-500 text-white px-1.5 py-0.5 text-[8px] font-bold rounded-bl shadow-sm z-10 animate-in fade-in zoom-in duration-200">
+                                                    LINK
+                                                </div>
+                                            )}
+                                            <div className="aspect-[84/52] relative rounded overflow-hidden">
+                                                <img
+                                                    src={design.thumbf || design.bgimgf}
+                                                    alt={design.description}
+                                                    className="w-full h-full object-cover"
+                                                    crossOrigin="anonymous"
+                                                />
+                                                {isSelected && (
+                                                    <div className="absolute inset-0 bg-green-500/10 flex items-center justify-center">
+                                                        <div className="bg-mist-500 text-white rounded-full p-1 shadow-lg">
+                                                            <Plus className="w-4 h-4 rotate-45" />
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <div className="mt-1 px-1">
+                                                <p className="text-[10px] font-medium truncate text-black" title={design.description}>
+                                                    {design.description}
+                                                </p>
+                                                <p className="text-[8px] text-gray-500 font-mono truncate">
+                                                    {design.design_id}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+
+                        <Button onClick={handleSave} disabled={saving} className="w-full bg-mist-600 hover:bg-mist-700">
+                            {saving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}
+                            {tLink('saveButton')}
+                        </Button>
+                    </div>
+                )}
             </CardContent>
         </Card>
     );

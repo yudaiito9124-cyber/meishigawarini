@@ -156,6 +156,12 @@ export class AdminApi extends Construct {
       resources: [userPool.userPoolArn]
     }));
 
+    const admin_shop_carddesign_link = new nodejs.NodejsFunction(this, 'admin_shop_carddesign_link', {
+      entry: lampath('admin_shop_carddesign_link'),
+      ...commonProps,
+    });
+    grantTablePermissions(admin_shop_carddesign_link, true);
+
 
 
     ////////////////////////////////////////////////////////////////////////////////
@@ -186,6 +192,11 @@ export class AdminApi extends Construct {
     // /admin/shop
     const shopResource = adminResource.addResource('shop');
     shopResource.addResource('create').addMethod('POST', new apigateway.LambdaIntegration(admin_shop_create), { authorizer: authorizerOfAdmin, });
+    
+    // /admin/shop/carddesign/link
+    const cardDesignLinkResource = shopResource.addResource('carddesign').addResource('link');
+    cardDesignLinkResource.addResource('get').addMethod('POST', new apigateway.LambdaIntegration(admin_shop_carddesign_link), { authorizer: authorizerOfAdmin, });
+    cardDesignLinkResource.addResource('update').addMethod('POST', new apigateway.LambdaIntegration(admin_shop_carddesign_link), { authorizer: authorizerOfAdmin, });
 
   }
 }

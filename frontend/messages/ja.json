@@ -660,6 +660,21 @@
         "success": "オーナーを変更しました",
         "error": "エラーが発生しました",
         "cancel": "キャンセル"
+      },
+      "shopCardDesignLink": {
+        "title": "ショップとカードデザインの紐付け管理",
+        "description": "ショップが利用可能なカードデザインを選択・更新します。",
+        "shopIdLabel": "ショップID",
+        "shopIdPlaceholder": "ショップIDを入力...",
+        "loadButton": "読み込み",
+        "shopNameLabel": "ショップ名",
+        "emailLabel": "メールアドレス",
+        "allowedDesignsLabel": "許可されたカードデザイン",
+        "allowedDesignsDesc": "このショップで使用可能なデザインを選択してください。",
+        "saveButton": "紐付けを保存",
+        "saveSuccess": "紐付けを更新しました。",
+        "saveFailed": "更新に失敗しました。",
+        "notFound": "ショップが見つかりません。"
       }
     },
     "shopInfo": {

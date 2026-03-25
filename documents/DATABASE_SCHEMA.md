@@ -82,6 +82,7 @@
 | `email` | String | ショップの連絡先メールアドレス （例: `info@example.com`） |
 | `owner_id` | String | オーナーのCognitoユーザーID （UUID形式の `sub` 属性） |
 | `gm_ids` | Array<String> | マネージャーのCognitoユーザーIDのリスト （UUID形式の `sub` 属性） |
+| `card_designs` | Array<String> | ショップが利用可能なカードデザインIDのリスト |
 | `ts_created_at` | String | 作成日時 （ISO 8601形式のUTC日時文字列、例: `2024-03-01T12:00:00.000Z`） |
 | `GSI2_PK` | String | `USER#{owner_id}` （オーナーのショップ一覧取得用、例: `USER#123e4567-...`） |
 | `GSI2_SK` | String | 作成日時等ソートキー （ISO 8601形式のUTC日時文字列） |
