@@ -5,7 +5,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { RefreshCw, ArrowRight, HelpCircle, Camera, Settings, ShoppingBasket, Eye, Plus, Trash2, Copy, ImageIcon, Save, Loader2, Pencil, ChevronDown, Download, Check } from 'lucide-react';
+import { RefreshCw, ArrowRight, HelpCircle, Camera, Settings, ShoppingBasket, Eye, Plus, Trash2, Copy, ImageIcon, Save, Loader2, Pencil, ChevronDown, Download, Check, QrCode, Package, Truck } from 'lucide-react';
 import { notFound, useParams } from 'next/navigation';
 import { useRouter } from '@/i18n/routing';
 import { useTranslations } from 'next-intl';
@@ -43,6 +43,8 @@ export default function ShopPage() {
 
     const [shop, setShop] = useState<any>(null);
     const [userId, setUserId] = useState<string>('');
+    const [activeTab, setActiveTab] = useState("activation");
+
     const [products, setProducts] = useState<any[]>([]);
     const [qrCodes, setQrCodes] = useState<any[]>([]);
     const [orders, setOrders] = useState<any[]>([]);
@@ -990,1179 +992,569 @@ export default function ShopPage() {
                 </div>
 
             </div>
-            <div className="max-w-7xl mx-auto px-8 py-10 space-y-10">
-
-
-
-
-
-                {/* Link QR */}
-                <div className="grid grid-cols-1 lg:grid-cols-1 gap-6">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>{t('linkQr.title')}</CardTitle>
-                            <CardDescription>{t('linkQr.description')}</CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                            <form onSubmit={handleLinkQr} className="space-y-4">
-                                {!scannedUuid ? (
-                                    <div className="flex flex-col gap-4">
-                                        <Dialog open={isScanning} onOpenChange={(open) => {
-                                            setIsScanning(open);
-                                            if (open) {
-                                                setManualInput('');
-                                                setQrStatusDetails(null);
-                                                setScannedUuids([]);
-                                            }
-                                        }}
-                                        >
-                                            <DialogTrigger asChild>
-                                                <Button type="button" variant="outline" className="w-full h-auto flex flex-col justify-center items-center gap-4 text-xl py-16 bg-gray-300">
-                                                    <div style={{ width: '100px', aspectRatio: '1' }}>
-                                                        <Camera style={{ width: '100%', height: '100%', display: 'block' }} />
-                                                    </div>
-                                                    <span>{t('linkQr.scan')}</span>
-                                                </Button>
-                                            </DialogTrigger>
-                                            <DialogContent className="max-h-[90vh] w-[98vw] max-w-[98vw] sm:max-w-[90vw] md:max-w-3xl lg:max-w-3xl h-full overflow-y-auto p-2 sm:p-6">
-                                                <DialogHeader>
-                                                    <DialogTitle>{t('linkQr.scanDialog.title')}</DialogTitle>
-                                                    <DialogDescription>{t('linkQr.scanDialog.description')}</DialogDescription>
-                                                </DialogHeader>
-                                                <div className="p-1 sm:p-4 min-h-[300px] flex flex-col gap-y-4">
-                                                    <div className="flex items-center justify-center h-[20px] gap-x-2">
-                                                        <Switch
-                                                            id="continuous-scan"
-                                                            checked={isContinuousScan}
-                                                            onCheckedChange={setIsContinuousScan}
-                                                        />
-                                                        <div className="flex flex-col">
-                                                            <Label htmlFor="continuous-scan" className="text-sm font-bold">{t('linkQr.continuousScan')}</Label>
-                                                            {isContinuousScan && (
-                                                                <span className="text-[10px] text-blue-600 font-bold">{t('linkQr.scannedCount', { count: scannedUuids.length })}</span>
-                                                            )}
-                                                        </div>
-                                                    </div>
-
-                                                    <div
-                                                        className="w-full aspect-square mx-auto flex items-center justify-center overflow-hidden rounded-lg bg-gray-100"
-                                                        style={{ maxWidth: 'min(400px, 50vh)', maxHeight: '50vh' }}
-                                                    >
-
-                                                        <QRScanner
-                                                            qrCodeSuccessCallback={handleScanSuccess}
-                                                            disableFlip={false}
-                                                            onFatalError={handleScannerError}
-                                                        />
-                                                    </div>
-                                                    <div className="flex flex-col gap-4">
-                                                        {isContinuousScan && scannedUuids.length > 0 && (
-                                                            <Button
-                                                                type="button"
-                                                                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold"
-                                                                onClick={async () => {
-                                                                    const validItems = scannedUuids.filter(item => !item.error);
-                                                                    if (validItems.length > 0) {
-                                                                        setScannedUuid(validItems.map(item => item.uuid).join('\n'));
-                                                                        setIsScanning(false);
-                                                                    }
-                                                                }}
-                                                            >
-                                                                {t('linkQr.finishScan')} ({scannedUuids.length})
-                                                            </Button>
-                                                        )}
-                                                        {isContinuousScan && scannedUuids.length > 0 && (
-                                                            <div className="mt-2 border rounded-md bg-gray-50 max-h-[80vh] overflow-y-auto w-full overflow-x-hidden">
-                                                                <ul className="text-[10px] font-mono p-1 sm:p-2 space-y-1">
-                                                                    {scannedUuids.map((item, i) => (
-                                                                        <li key={item.uuid} className="border-b last:border-0 pb-1 last:pb-0 flex flex-col">
-                                                                            <div className="flex flex-col gap-1 py-1 w-full overflow-hidden">
-                                                                                <div className="flex items-center justify-between gap-1 w-full overflow-hidden">
-                                                                                    <div className="flex items-center gap-1 min-w-0 flex-1 overflow-hidden">
-                                                                                        <span className="truncate opacity-70 text-[10px] leading-tight block w-0 flex-1">{i + 1}. {item.uuid}</span>
-                                                                                        <Button
-                                                                                            variant="ghost"
-                                                                                            size="icon"
-                                                                                            className="h-3.5 w-3.5 shrink-0 opacity-50 hover:opacity-100"
-                                                                                            onClick={() => handleCopy(item.uuid)}
-                                                                                        >
-                                                                                            {copiedId === item.uuid ? (
-                                                                                                <Check className="h-2.5 w-2.5 text-green-500" />
-                                                                                            ) : (
-                                                                                                <Copy className="h-2.5 w-2.5" />
-                                                                                            )}
-                                                                                        </Button>
-                                                                                    </div>
-                                                                                    {!item.status && !item.error && (
-                                                                                        <span className="animate-pulse text-gray-400 shrink-0 text-[10px]">...</span>
-                                                                                    )}
-                                                                                </div>
-
-                                                                                {(item.status || item.error) && (
-                                                                                    <div className="flex justify-end w-full overflow-hidden">
-                                                                                        {item.status ? (
-                                                                                            <span className={`text-[10px] px-1.5 py-0.5 rounded-sm font-bold block text-left break-all sm:break-words max-w-full ${item.status.status === 'EXPIRED' ? 'bg-red-100 text-red-700' : (item.status.product_linked ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700')}`}>
-                                                                                                {item.status.status === 'EXPIRED' ? st('expired') : (item.status.product_linked ? item.status.product_name : 'OK')}
-                                                                                            </span>
-                                                                                        ) : (
-                                                                                            <span className="text-[10px] px-1.5 py-0.5 rounded-sm bg-red-100 text-red-700 font-medium text-left leading-tight break-all sm:break-words max-w-full" title={item.error}>{item.error}</span>
-                                                                                        )}
-                                                                                    </div>
-                                                                                )}
-                                                                            </div>
-                                                                        </li>
-                                                                    ))}
-                                                                </ul>
-                                                            </div>
-                                                        )}
-                                                        {isManualInput && !(isContinuousScan && scannedUuids.length > 0) && (
-                                                            <div className="flex w-full flex-col sm:flex-row gap-3">
-                                                                <Input
-                                                                    id="uuid_manual"
-                                                                    name="uuid_manual"
-                                                                    placeholder={t('linkQr.placeholder')}
-                                                                    value={manualInput}
-                                                                    onChange={(e) => setManualInput(e.target.value)}
-                                                                    className="bg-gray-100"
-                                                                />
-                                                                <Button type="button" variant="default" disabled={!manualInput} onClick={() => handleScanSuccess(manualInput)} className="shrink-0">
-                                                                    {t('linkQr.scanDialog.apply')}
-                                                                </Button>
-                                                            </div>
-                                                        )}
-                                                        {!isManualInput && !isContinuousScan && (
-                                                            <div className="flex justify-center">
-                                                                <Button type="button" variant="ghost" size="sm" onClick={() => setisManualInput(true)} className="h-8 text-xs text-gray-500 hover:text-gray-900 px-2 -ml-2 right">
-                                                                    {t('linkQr.manualinput')}
-                                                                </Button>
-                                                            </div>
-                                                        )}
-
-                                                        {/* <Button type="button" variant="ghost" onClick={() => setIsScanning(false)}>
-                                                        {t('linkQr.scanDialog.cancel')}
-                                                    </Button> */}
-                                                    </div>
-                                                </div>
-
-                                                <DialogFooter className="">
-
-                                                </DialogFooter>
-                                            </DialogContent>
-                                        </Dialog>
-                                    </div>
-                                ) : (
-                                    <div className="space-y-6">
-                                        <div className="space-y-4">
-                                            {/* Linked Section */}
-                                            {scannedUuids.filter(item => item.status?.product_linked).length > 0 && (
-                                                <div className="space-y-2">
-                                                    <Label className="text-sm font-bold text-gray-500 flex items-center gap-2">
-                                                        <div className="w-1 h-4 bg-amber-400 rounded-full" />
-                                                        {t('linkQr.linkedTitle')}
-                                                    </Label>
-                                                    <div className="bg-amber-50/50 rounded-lg border border-amber-100 divide-y divide-amber-100 max-h-[150px] overflow-y-auto">
-                                                        {scannedUuids.filter(item => item.status?.product_linked).map((item) => (
-                                                            <div key={item.uuid} className="p-3 flex justify-between items-center bg-white/40">
-                                                                <div className="flex items-center gap-2">
-                                                                    <span className="font-mono text-xs">{item.uuid}</span>
-                                                                    <Button
-                                                                        variant="ghost"
-                                                                        size="icon"
-                                                                        className="h-4 w-4"
-                                                                        onClick={(e) => { e.stopPropagation(); handleCopy(item.uuid); }}
-                                                                    >
-                                                                        {copiedId === item.uuid ? (
-                                                                            <Check className="h-3 w-3 text-green-500" />
-                                                                        ) : (
-                                                                            <Copy className="h-3 w-3" />
-                                                                        )}
-                                                                    </Button>
-                                                                </div>
-                                                                <span className="text-[10px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-bold">
-                                                                    {item.status.product_name}
-                                                                </span>
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                </div>
-                                            )}
-
-                                            {/* Available Section */}
-                                            {scannedUuids.filter(item => item.status && !item.status.product_linked).length > 0 && (
-                                                <div className="space-y-2">
-                                                    <Label className="text-sm font-bold text-blue-600 flex items-center gap-2">
-                                                        <div className="w-1 h-4 bg-blue-500 rounded-full" />
-                                                        {t('linkQr.availableTitle')}
-                                                    </Label>
-                                                    <div className="bg-blue-50/30 rounded-lg border border-blue-100 divide-y divide-blue-100 max-h-[150px] overflow-y-auto">
-                                                        {scannedUuids.filter(item => item.status && !item.status.product_linked).map((item) => (
-                                                            <div key={item.uuid} className="p-3 bg-white/40 flex items-center gap-2">
-                                                                <span className="font-mono text-xs">{item.uuid}</span>
-                                                                <Button
-                                                                    variant="ghost"
-                                                                    size="icon"
-                                                                    className="h-4 w-4"
-                                                                    onClick={(e) => { e.stopPropagation(); handleCopy(item.uuid); }}
-                                                                >
-                                                                    {copiedId === item.uuid ? (
-                                                                        <Check className="h-3 w-3 text-green-500" />
-                                                                    ) : (
-                                                                        <Copy className="h-3 w-3" />
-                                                                    )}
-                                                                </Button>
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                </div>
-                                            )}
-                                        </div>
-
-                                        {/* Unified Action Area */}
-                                        <div className="space-y-4 pt-4 border-t border-gray-100">
-                                            <div className="space-y-4 bg-gray-50 p-4 rounded-xl border-dashed border-2">
-                                                <select
-                                                    id="product_id"
-                                                    name="product_id"
-                                                    className="flex h-12 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                                                    required={scannedUuids.some(item => item.status && !item.status.product_linked)}
-                                                    defaultValue=""
-                                                >
-                                                    <option value="" disabled>{t('linkQr.selectPlaceholder')}</option>
-                                                    {products.filter(p => p.status === 'ACTIVE').map(p => (
-                                                        <option key={p.product_id} value={p.product_id}>{p.name}</option>
-                                                    ))}
-                                                </select>
-
-                                                {showOptions ? (
-                                                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                                                        <Input
-                                                            id="memo_for_users"
-                                                            name="memo_for_users"
-                                                            placeholder={t('linkQr.memoForUsersPlaceholder')}
-                                                            className="h-10 border-gray-300"
-                                                        />
-                                                        <Input
-                                                            id="memo_for_shop"
-                                                            name="memo_for_shop"
-                                                            placeholder={t('linkQr.memoForShopPlaceholder')}
-                                                            className="h-10 border-gray-300"
-                                                        />
-                                                    </div>
-                                                ) : (
-                                                    <div className="flex justify-start">
-                                                        <Button type="button" variant="ghost" size="sm" onClick={() => setShowOptions(true)} className="h-8 text-xs text-gray-500 hover:text-gray-900 px-2 -ml-2">
-                                                            + {t('linkQr.option')}
-                                                        </Button>
-                                                    </div>
-                                                )}
-
-                                                <Button type="submit" className="w-full font-bold text-lg h-16 shadow-lg shadow-blue-100" disabled={isLinking}>
-                                                    {isLinking ? t('linkQr.processing') : t('linkQr.submit')}
-                                                    <ArrowRight className="ml-2 h-5 w-5" />
-                                                </Button>
-                                            </div>
-
-                                            <div className="flex justify-center">
-                                                <Button type="button" variant="ghost" size="sm" onClick={() => { setScannedUuid(''); setScannedUuids([]); setQrStatusDetails(null); setShowOptions(false); lastScannedTimeRef.current = {}; }} className="text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors">
-                                                    {t('linkQr.clear')}
-                                                </Button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
-                            </form>
-                        </CardContent>
-                    </Card>
+            <div className="max-w-7xl mx-auto px-4 sm:px-8 py-4 sm:py-8 space-y-6">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-2">
+                    <button
+                        onClick={() => setActiveTab("activation")}
+                        className={`flex flex-col items-center justify-center p-4 sm:p-6 rounded-2xl border-2 transition-all duration-200 cursor-pointer shadow-sm hover:shadow-md ${activeTab === "activation"
+                            ? "bg-white border-white text-gray-900 ring-2 ring-gray-700 ring-offset-2"
+                            : "bg-white border-gray-200 text-gray-500 hover:border-gray-300"
+                            }`}
+                    >
+                        <QrCode className={`w-8 h-8 sm:w-10 sm:h-10 mb-2 sm:mb-3 ${activeTab === "activation" ? "text-gray-900" : "text-gray-400"}`} />
+                        <span className="text-sm sm:text-lg font-bold">{t('tabs.activation') || "アクティベーション"}</span>
+                    </button>
+                    <button
+                        onClick={() => setActiveTab("shipping")}
+                        className={`flex flex-col items-center justify-center p-4 sm:p-6 rounded-2xl border-2 transition-all duration-200 cursor-pointer shadow-sm hover:shadow-md ${activeTab === "shipping"
+                            ? "bg-white border-white text-gray-900 ring-2 ring-gray-700 ring-offset-2"
+                            : "bg-white border-gray-200 text-gray-500 hover:border-gray-300"
+                            }`}
+                    >
+                        <Truck className={`w-8 h-8 sm:w-10 sm:h-10 mb-2 sm:mb-3 ${activeTab === "shipping" ? "text-gray-900" : "text-gray-400"}`} />
+                        <span className="text-sm sm:text-lg font-bold">{t('tabs.shipping') || "発送管理"}</span>
+                    </button>
+                    <button
+                        onClick={() => setActiveTab("products")}
+                        className={`flex flex-col items-center justify-center p-4 sm:p-6 rounded-2xl border-2 transition-all duration-200 cursor-pointer shadow-sm hover:shadow-md ${activeTab === "products"
+                            ? "bg-white border-white text-gray-900 ring-2 ring-gray-700 ring-offset-2"
+                            : "bg-white border-gray-200 text-gray-500 hover:border-gray-300"
+                            }`}
+                    >
+                        <Package className={`w-8 h-8 sm:w-10 sm:h-10 mb-2 sm:mb-3 ${activeTab === "products" ? "text-gray-900" : "text-gray-400"}`} />
+                        <span className="text-sm sm:text-lg font-bold">{t('tabs.products') || "商品管理・card発行"}</span>
+                    </button>
                 </div>
 
 
 
+                {/* --- Wrapper for Activation --- */}
+                {activeTab === 'activation' && (
+                    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
 
 
-                {/* Incoming Orders */}
-                <Card>
-                    <CardHeader>
-                        <div className="flex flex-col space-y-4 md:flex-row md:items-center md:justify-between md:space-y-0">
-                            <div>
-                                <CardTitle>{t('incomingOrders')}</CardTitle>
-                                <CardDescription>{t('ordersDesc')}</CardDescription>
-                            </div>
-                            <div className="flex flex-col w-full space-y-2 md:flex-row md:items-center md:space-x-2 md:space-y-0 md:w-auto">
-                                <div className="flex w-full items-center space-x-2 md:max-w-sm">
-                                    <Input
-                                        placeholder={t('search.placeholder')}
-                                        value={searchUuid}
-                                        onChange={(e) => setSearchUuid(e.target.value)}
-                                        className="w-full"
-                                    />
-                                    {searchUuid && (
-                                        <Button variant="ghost" onClick={() => setSearchUuid('')} className="shrink-0">
-                                            {t('search.clear')}
-                                        </Button>
-                                    )}
-                                </div>
-                                <Button variant="outline" size="sm" className="w-full shrink-0 md:w-auto" onClick={() => fetchShopData(true)} disabled={isRefreshing}>
-                                    <RefreshCw className={`mr-2 h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-                                    {t('refresh')}
-                                </Button>
-                            </div>
-                        </div>
-                    </CardHeader>
-                    <CardContent className="p-4 w-full">
-                        <Table wrapperStyle={{ maxHeight: 'calc(100vh - 200px)' }}>
-                            <TableHeader className="sticky top-0 bg-white z-10 drop-shadow-sm">
-                                <TableRow>
-                                    <TableHead className="text-xs md:text-sm">{t('orders.date')}</TableHead>
-                                    <TableHead className="text-xs md:text-sm hidden sm:table-cell">{t('orders.productName')}</TableHead>
-                                    <TableHead className="text-xs md:text-sm">{t('orders.status')}</TableHead>
-                                    <TableHead className="text-xs md:text-sm hidden md:table-cell">{t('orders.shopMemo')}</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {ordersLoading ? (
-                                    <TableRow><TableCell colSpan={4} className="text-center py-4"><RefreshCw className="animate-spin h-5 w-5 mx-auto text-gray-400" /></TableCell></TableRow>
-                                ) : orders
-                                    .filter(o => ['USED'].includes(o.status))
-                                    .filter(o => !searchUuid || (o.id || o.qr_id).includes(searchUuid))
-                                    .length === 0 ? (
-                                    <TableRow><TableCell colSpan={4} className="text-center">{t('orders.noOrders')}</TableCell></TableRow>
-                                ) : (
-                                    orders
-                                        .filter(o => ['USED'].includes(o.status))
-                                        .filter(o => !searchUuid || (o.id || o.qr_id).includes(searchUuid))
-                                        .sort((a, b) => {
-                                            const sortorder: { [name: string]: number } = { 'LINKED': 0, 'ACTIVE': 1, 'USED': 3, 'SHIPPED': 2 };
-                                            // 1. Status: compare
-                                            if (a.status !== b.status) return sortorder[b.status] - sortorder[a.status];
-                                            // 2. Date: Newest first
-                                            const dateA = new Date(a.ts_updated_at || a.ts_created_at).getTime();
-                                            const dateB = new Date(b.ts_updated_at || b.ts_created_at).getTime();
-                                            return dateB - dateA;
-                                        })
-                                        .map((order: any) => {
-                                            const product = products.find(p => p.product_id === order.product_id);
-                                            const uuid = order.id || order.qr_id.replace('QR#', '');
 
-                                            return (
-                                                <Dialog key={order.qr_id}>
+
+
+
+                        {/* Link QR */}
+                        <div className="grid grid-cols-1 lg:grid-cols-1 gap-6">
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle>{t('linkQr.title')}</CardTitle>
+                                    <CardDescription>{t('linkQr.description')}</CardDescription>
+                                </CardHeader>
+                                <CardContent>
+                                    <form onSubmit={handleLinkQr} className="space-y-4">
+                                        {!scannedUuid ? (
+                                            <div className="flex flex-col gap-4">
+                                                <Dialog open={isScanning} onOpenChange={(open) => {
+                                                    setIsScanning(open);
+                                                    if (open) {
+                                                        setManualInput('');
+                                                        setQrStatusDetails(null);
+                                                        setScannedUuids([]);
+                                                    }
+                                                }}
+                                                >
                                                     <DialogTrigger asChild>
-                                                        <TableRow className="cursor-pointer hover:bg-gray-100">
-                                                            {/* <TableCell className="text-xs md:text-sm">{order.ts_updated_at ? new Date(order.ts_updated_at).toLocaleString() : "-"}</TableCell> */}
-                                                            <TableCell className="text-xs md:text-sm">
-                                                                {order.ts_updated_at ? (
-                                                                    <div className="flex flex-col">
-                                                                        <span className="whitespace-nowrap">{new Date(order.ts_updated_at).toLocaleDateString()}</span>
-                                                                        <span className="text-[10px] text-gray-500 whitespace-nowrap">{new Date(order.ts_updated_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                                                                    </div>
-                                                                ) : "-"}
-                                                            </TableCell>
-                                                            <TableCell className="text-xs md:text-sm font-bold hidden sm:table-cell">{product?.name || order.product_id}</TableCell>
-                                                            <TableCell>
-                                                                <span className={`px-2 py-1 rounded text-xs ${order.status === 'UNASSIGNED' ? 'bg-gray-100' :
-                                                                    order.status === 'LINKED' ? 'bg-emerald-100 text-emerald-800' :
-                                                                        order.status === 'ACTIVE' ? 'bg-yellow-100 text-yellow-800' :
-                                                                            order.status === 'USED' ? 'bg-orange-100 text-orange-800' :
-                                                                                order.status === 'SHIPPED' ? 'bg-indigo-100 text-indigo-800' :
-                                                                                    order.status === 'COMPLETED' ? 'bg-purple-100 text-purple-800' :
-                                                                                        order.status === 'EXPIRED' ? 'bg-gray-100 text-gray-800' :
-                                                                                            order.status === 'BANNED' ? 'bg-red-100 text-red-800' :
-                                                                                                'bg-green-100 text-green-800'
-                                                                    }`}>{st(order.status.toLowerCase())}</span>
-                                                            </TableCell>
-                                                            <TableCell className="text-xs md:text-sm hidden md:table-cell">{order.memo_for_shop}</TableCell>
-                                                        </TableRow>
-                                                    </DialogTrigger>
-                                                    <DialogContent className="max-w-md">
-                                                        <DialogHeader>
-                                                            <DialogTitle>{t('orders.details')}</DialogTitle>
-                                                            <DialogDescription className="font-mono text-xs text-gray-500 flex items-center gap-2">
-                                                                ID: {uuid}
-                                                                <Button
-                                                                    variant="ghost"
-                                                                    size="icon"
-                                                                    className="h-6 w-6"
-                                                                    onClick={(e) => { e.stopPropagation(); handleCopy(uuid); }}
-                                                                >
-                                                                    {copiedId === uuid ? (
-                                                                        <Check className="h-3 w-3 text-green-500" />
-                                                                    ) : (
-                                                                        <Copy className="h-3 w-3" />
-                                                                    )}
-                                                                </Button>
-                                                            </DialogDescription>
-                                                        </DialogHeader>
-
-                                                        <div className="space-y-4 py-4 max-h-[70vh] overflow-y-auto p-2">
-                                                            {/* Product Info */}
-                                                            <div>
-                                                                <h4 className="text-sm font-semibold text-gray-500">{t('orders.productName')}</h4>
-                                                                <p className="font-medium">{product?.name || order.product_id}</p>
+                                                        <Button type="button" variant="outline" className="w-full h-auto flex flex-col justify-center items-center gap-4 text-xl py-16 bg-gray-300">
+                                                            <div style={{ width: '100px', aspectRatio: '1' }}>
+                                                                <Camera style={{ width: '100%', height: '100%', display: 'block' }} />
                                                             </div>
-
-                                                            {/* Status */}
-                                                            <div>
-                                                                <h4 className="text-sm font-semibold text-gray-500">{t('orders.status')}</h4>
-
-                                                                <span className={`px-2 py-1 rounded text-xs ${order.status === 'UNASSIGNED' ? 'bg-gray-100' :
-                                                                    order.status === 'LINKED' ? 'bg-emerald-100 text-emerald-800' :
-                                                                        order.status === 'ACTIVE' ? 'bg-yellow-100 text-yellow-800' :
-                                                                            order.status === 'USED' ? 'bg-orange-100 text-orange-800' :
-                                                                                order.status === 'SHIPPED' ? 'bg-indigo-100 text-indigo-800' :
-                                                                                    order.status === 'COMPLETED' ? 'bg-purple-100 text-purple-800' :
-                                                                                        order.status === 'EXPIRED' ? 'bg-gray-100 text-gray-800' :
-                                                                                            order.status === 'BANNED' ? 'bg-red-100 text-red-800' :
-                                                                                                'bg-green-100 text-green-800'
-                                                                    }`}>{st(order.status.toLowerCase())}</span>
-                                                            </div>
-
-                                                            {/* Card Preview */}
-                                                            {order.card_design && (
-                                                                <div className="space-y-2">
-                                                                    <h4 className="text-sm font-semibold text-gray-500">{t('linkQr.cardDesign')}</h4>
-                                                                    {(order.thumbf || order.thumbb || cardformats[order.card_design]) && (
-                                                                        <div className="grid grid-cols-2 gap-2">
-                                                                            <div className="space-y-1">
-                                                                                <div className="aspect-[84/52] relative rounded shadow-sm overflow-hidden border border-gray-100 bg-white">
-                                                                                    <img
-                                                                                        src={order.thumbf || cardformats[order.card_design]?.bgimgf}
-                                                                                        alt="Front"
-                                                                                        className="w-full h-full object-cover"
-                                                                                        crossOrigin="anonymous"
-                                                                                    />
-                                                                                </div>
-                                                                            </div>
-                                                                            <div className="space-y-1">
-                                                                                <div className="aspect-[84/52] relative rounded shadow-sm overflow-hidden border border-gray-100 bg-white">
-                                                                                    <img
-                                                                                        src={order.thumbb || cardformats[order.card_design]?.bgimgb}
-                                                                                        alt="Back"
-                                                                                        className="w-full h-full object-cover"
-                                                                                        crossOrigin="anonymous"
-                                                                                    />
-                                                                                </div>
-                                                                            </div>
-                                                                        </div>
-                                                                    )}
-                                                                </div>
-                                                            )}
-
-                                                            {/* Recipient Info */}
-                                                            <div>
-                                                                <h4 className="text-sm font-semibold text-gray-500">{t('orders.recipient')}</h4>
-                                                                <p>{order.recipient_name}</p>
-                                                            </div>
-                                                            <div>
-                                                                <h4 className="text-sm font-semibold text-gray-500">{t('orders.contact')}</h4>
-                                                                <p className="break-all">{order.shipping_info?.email || '-'}</p>
-                                                                <p className="text-sm mt-1">{order.shipping_info?.phone || '-'}</p>
-                                                            </div>
-
-                                                            <div>
-                                                                <h4 className="text-sm font-semibold text-gray-500">{t('orders.address')}</h4>
-                                                                {order.postal_code && <p className="text-sm">〒{order.postal_code}</p>}
-                                                                <p className="whitespace-pre-wrap text-sm">{order.address}</p>
-                                                            </div>
-
-                                                            <div>
-                                                                <h4 className="text-sm font-semibold text-gray-500">{t('orders.preferredDateTime')}</h4>
-                                                                <p className="text-sm">{order.preferred_date ? order.preferred_date : '-'}  /  {order.preferred_time ? tt(order.preferred_time) : '-'}</p>
-                                                            </div>
-
-                                                            {/* User Message & Shop Memo Section (Editable - Unified for all statuses) */}
-
-
-                                                            {/* Shipping Action Section (Visible only when status is USED) */}
-                                                            {order.status === 'USED' && (
-                                                                <div className="mt-4 p-4 border-2 border-orange-200 rounded-xl bg-orange-50/50 shadow-sm">
-                                                                    <div className="flex items-center gap-2 mb-4">
-                                                                        <div className="w-2.5 h-2.5 rounded-full bg-orange-500 animate-pulse shadow-[0_0_8px_rgba(249,115,22,0.6)]" />
-                                                                        <h4 className="text-sm font-bold text-orange-900 uppercase tracking-wide">{t('orders.action')}</h4>
-                                                                    </div>
-                                                                    <form onSubmit={(e) => {
-                                                                        e.preventDefault();
-                                                                        const fd = new FormData(e.target as HTMLFormElement);
-                                                                        handleUpdateOrderMeta(
-                                                                            uuid,
-                                                                            fd.get('delivery_company') as string,
-                                                                            fd.get('tracking') as string
-                                                                        );
-                                                                    }} className="space-y-4">
-                                                                        <div className="space-y-2">
-                                                                            <Label htmlFor={`delivery_company-${uuid}`} className="text-orange-900/70">{t('orders.shipDialog.deliveryCompany')}</Label>
-                                                                            <Input id={`delivery_company-${uuid}`} name="delivery_company" placeholder={t('orders.shipDialog.deliveryCompanyPlaceholder')} required className="bg-white border-orange-100 focus:border-orange-500 focus:ring-orange-500" />
-                                                                        </div>
-                                                                        <div className="space-y-2">
-                                                                            <Label htmlFor={`tracking-${uuid}`} className="text-orange-900/70">{t('orders.shipDialog.label')}</Label>
-                                                                            <Input id={`tracking-${uuid}`} name="tracking" placeholder="1234-5678..." required className="bg-white border-orange-100 focus:border-orange-500 focus:ring-orange-500" />
-                                                                        </div>
-
-                                                                        <Button type="submit" className="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold h-10 shadow-md transition-all active:scale-[0.98]" disabled={shippingOrderId === uuid}>
-                                                                            {shippingOrderId === uuid ? (
-                                                                                <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> {t('linkQr.processing')}</>
-                                                                            ) : (
-                                                                                t('orders.shipDialog.submit')
-                                                                            )}
-                                                                        </Button>
-                                                                    </form>
-                                                                </div>
-                                                            )}
-
-
-                                                            {/* Admin Meta Edit Section */}
-                                                            <div className="pt-6 border-t border-dashed mt-6">
-                                                                <h4 className="text-sm font-bold text-gray-900 mb-4 flex items-center gap-2">
-                                                                    <Pencil className="w-4 h-4 text-gray-400" />
-                                                                    {t('orders.updateMeta')}
-                                                                </h4>
-                                                                <form onSubmit={async (e) => {
-                                                                    e.preventDefault();
-                                                                    const fd = new FormData(e.currentTarget);
-                                                                    await handleUpdateOrderMeta(
-                                                                        uuid,
-                                                                        undefined,
-                                                                        undefined,
-                                                                        fd.get('memo_for_users') as string,
-                                                                        fd.get('memo_for_shop') as string
-                                                                    );
-                                                                }} className="space-y-4">
-
-                                                                    <div className="space-y-2">
-                                                                        <Label htmlFor={`m_u-${uuid}`} className="text-xs text-gray-500">{t('orders.userMessage')}</Label>
-                                                                        <Textarea
-                                                                            id={`m_u-${uuid}`}
-                                                                            name="memo_for_users"
-                                                                            defaultValue={order.memo_for_users || ""}
-                                                                            disabled={['COMPLETED', 'EXPIRED', 'BANNED'].includes(order.status)}
-                                                                            placeholder={['COMPLETED', 'EXPIRED', 'BANNED'].includes(order.status) ? t('orders.shipDialog.Completed-state messages cannot be updated') : ""}
-                                                                            className="text-sm min-h-[60px]"
-                                                                        />
-                                                                    </div>
-
-                                                                    <div className="space-y-2">
-                                                                        <Label htmlFor={`m_s-${uuid}`} className="text-xs text-gray-500">{t('orders.shopMemo')}</Label>
-                                                                        <Textarea
-                                                                            id={`m_s-${uuid}`}
-                                                                            name="memo_for_shop"
-                                                                            defaultValue={order.memo_for_shop || ""}
-                                                                            className="text-sm min-h-[60px]"
-                                                                        />
-                                                                    </div>
-
-                                                                    <Button
-                                                                        type="submit"
-                                                                        className="w-full"
-                                                                        disabled={shippingOrderId === uuid}
-                                                                    >
-                                                                        {shippingOrderId === uuid ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}
-                                                                        {shippingOrderId === uuid ? t('orders.processing') : t('shopSettings.submit')}
-                                                                    </Button>
-                                                                </form>
-                                                            </div>
-
-                                                            <div className="">
-                                                                <div>
-                                                                    <h4 className="text-sm font-semibold text-gray-500">{t('orders.timestamps')}</h4>
-                                                                    <p className="text-sm">{ts('ts_updated_at') + ": " + (order.ts_updated_at ? new Date(order.ts_updated_at).toLocaleString() : "-")}</p>
-                                                                    <p className="text-sm">{ts('ts_linked_at') + ": " + (order.ts_linked_at ? new Date(order.ts_linked_at).toLocaleString() : "-")}</p>
-                                                                    <p className="text-sm">{ts('ts_activated_at') + ": " + (order.ts_activated_at ? new Date(order.ts_activated_at).toLocaleString() : "-")}</p>
-                                                                    <p className="text-sm">{ts('ts_submitted_at') + ": " + (order.ts_submitted_at ? new Date(order.ts_submitted_at).toLocaleString() : "-")}</p>
-                                                                    <p className="text-sm">{ts('ts_shipped_at') + ": " + (order.ts_shipped_at ? new Date(order.ts_shipped_at).toLocaleString() : "-")}</p>
-                                                                    <p className="text-sm">{ts('ts_completed_at') + ": " + (order.ts_completed_at ? new Date(order.ts_completed_at).toLocaleString() : "-")}</p>
-                                                                    <p className="text-sm">{ts('ts_expired_at') + ": " + (order.ts_expired_at ? new Date(order.ts_expired_at).toLocaleString() : "-")}</p>
-                                                                    <p className="text-sm">{ts('ts_banned_at') + ": " + (order.ts_banned_at ? new Date(order.ts_banned_at).toLocaleString() : "-")}</p>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    </DialogContent>
-                                                </Dialog>
-                                            );
-                                        })
-                                )}
-                            </TableBody>
-                        </Table>
-                    </CardContent>
-                </Card>
-
-
-
-
-                {/* Existing Products */}
-                <Card style={{ maxHeight: 'calc(100vh - 100px)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-                    <CardHeader className="flex flex-row items-center justify-between shrink-0">
-                        <CardTitle>{t('products')}</CardTitle>
-                    </CardHeader>
-                    <div style={{ flex: '1 1 auto', overflowY: 'auto', minHeight: 0 }} className="p-4 w-full">
-                        <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                            {productsLoading ? (
-                                <div className="col-span-full py-8 flex justify-center"><RefreshCw className="animate-spin h-6 w-6 text-gray-400" /></div>
-                            ) : products.map((product) => (
-                                <Dialog key={product.product_id}>
-                                    <DialogTrigger asChild>
-                                        <Card className="overflow-hidden cursor-pointer hover:ring-2 hover:ring-primary/50 transition-all relative aspect-[84/52]">
-                                            {/* 背景: カードデザイン */}
-                                            {product.design && (
-                                                <img
-                                                    src={product.design.thumbf || product.design.bgimgf}
-                                                    alt={product.design.name}
-                                                    className="absolute inset-0 w-full h-full object-cover"
-                                                    crossOrigin="anonymous"
-                                                />
-                                            )}
-                                            {/* オーバーレイ */}
-                                            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
-
-                                            {/* 商品画像 (小) */}
-                                            {product.image_url && (
-                                                <div className="absolute bottom-2 right-2 w-10 h-10 rounded-md overflow-hidden border border-white/50 shadow-md bg-white">
-                                                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                                                    <img
-                                                        src={product.image_url}
-                                                        alt={product.name}
-                                                        className="w-full h-full object-cover"
-                                                    />
-                                                </div>
-                                            )}
-
-                                            {/* 商品名と価格 */}
-                                            <div className="absolute bottom-0 left-0 right-0 p-2.5 text-white">
-                                                <h3 className="font-bold text-xs truncate drop-shadow-lg">{product.name}</h3>
-                                                {/* <p className="text-[10px] opacity-90 drop-shadow-md">¥{product.price ? Number(product.price).toLocaleString("ja-JP") : "0"}</p> */}
-                                            </div>
-
-                                            {/* ステータスバッジ */}
-                                            <div className="absolute top-2 left-2 flex gap-1">
-                                                <span className={`px-1.5 py-0.5 rounded text-[8px] font-bold backdrop-blur-sm ${product.status === 'ACTIVE' ? 'bg-green-500/80 text-white' : 'bg-red-500/80 text-white'
-                                                    }`}>
-                                                    {product.status}
-                                                </span>
-                                            </div>
-                                        </Card>
-                                    </DialogTrigger>
-                                    <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-                                        <DialogHeader>
-                                            <DialogTitle>{t('productDetails.title')}</DialogTitle>
-                                        </DialogHeader>
-                                        <div className="space-y-6 py-4">
-                                            <div className="aspect-[16/9] w-full relative rounded-lg overflow-hidden border">
-                                                {/* eslint-disable-next-line @next/next/no-img-element */}
-                                                <img src={product.image_url} alt={product.name} className="w-full h-full object-cover" />
-                                            </div>
-
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                                <div className="space-y-1">
-                                                    <p className="text-xs text-gray-500 font-medium">{t('productDetails.name')}</p>
-                                                    <p className="font-bold text-lg">{product.name}</p>
-                                                </div>
-                                                <div className="space-y-1 col-span-2">
-                                                    <p className="text-xs text-gray-500 font-medium">{t('productDetails.description')}</p>
-                                                    <p className="text-sm text-gray-700 whitespace-pre-wrap">{product.description || '-'}</p>
-                                                </div>
-                                                <div className="space-y-1">
-                                                    <p className="text-xs text-gray-500 font-medium">{t('productDetails.price')}</p>
-                                                    <p className="font-bold text-lg text-emerald-600">¥{Number(product.price || 0).toLocaleString()}</p>
-                                                </div>
-                                                <div className="space-y-1">
-                                                    <p className="text-xs text-gray-500 font-medium">{t('productDetails.validDays')}</p>
-                                                    <p className="font-medium">{product.valid_days || APP_CONFIG.DEFAULT_VALID_DAYS} {t('productDetails.validDaysSuffix')}</p>
-                                                </div>
-                                            </div>
-
-                                            {product.design && (
-                                                <div className="space-y-3 p-4 bg-gray-50 rounded-lg border border-gray-100">
-                                                    <div className="text-xs text-gray-500 font-bold flex items-center gap-2">
-                                                        <div className="w-1 h-3 bg-primary rounded-full" />
-                                                        {t('addProduct.cardDesign')}
-                                                    </div>
-                                                    <div className="flex flex-col sm:flex-row gap-4">
-                                                        <div className="flex flex-wrap gap-4 w-full sm:w-auto shrink-0">
-                                                            <div className="flex flex-col gap-1">
-                                                                <p className="text-[10px] text-gray-400 font-bold">{t('productDetails.front')}</p>
-                                                                <div className="w-full sm:w-48 aspect-[84/52] rounded-md border-2 border-white shadow-sm overflow-hidden bg-white">
-                                                                    <img src={product.design.thumbf} alt={product.design.name} className="w-full h-full object-cover" crossOrigin="anonymous" />
-                                                                </div>
-                                                            </div>
-                                                            {product.design.thumbb && (
-                                                                <div className="flex flex-col gap-1">
-                                                                    <p className="text-[10px] text-gray-400 font-bold">{t('productDetails.back')}</p>
-                                                                    <div className="w-full sm:w-48 aspect-[84/52] rounded-md border-2 border-white shadow-sm overflow-hidden bg-white">
-                                                                        <img src={product.design.thumbb} alt={product.design.name} className="w-full h-full object-cover" crossOrigin="anonymous" />
-                                                                    </div>
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                        <div className="flex-1 space-y-1 py-1">
-                                                            <p className="font-bold text-gray-900">{product.design.name}</p>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            )}
-
-
-                                            {product.detail_html && (
-                                                <>
-                                                    <div className="w-full space-y-4 pt-4 border-t">
-                                                        <div className="w-full space-y-2">
-                                                            <p className="w-full text-xs text-gray-500 font-medium">{t('productDetails.detailHtml')}</p>
-                                                            <div className="w-full border rounded-md p-4 bg-white shadow-sm overflow-hidden">
-                                                                <CardContent className="min-h-0 flex flex-1 p-0 w-full"> {/* w-fullを追加 */}
-                                                                    <div className="w-full mt-0 mr-0 ml-0 p-0 relative"> {/* w-fullを追加 */}
-                                                                        {/* Top fade effect */}
-                                                                        {/* <div className="absolute top-0 left-0 right-0 h-5 bg-gradient-to-b from-white to-transparent pointer-events-none z-10" /> */}
-
-                                                                        {/* コンテンツ */}
-                                                                        <SandboxedHtml html={debouncedPreviewHtml} />
-
-                                                                        {/* Bottom fade effect */}
-                                                                        {/* <div className="absolute bottom-0 left-0 right-0 h-5 bg-gradient-to-t from-white to-transparent pointer-events-none z-10" /> */}
-                                                                    </div>
-                                                                </CardContent>
-                                                            </div>
-                                                        </div>
-                                                        <div className="space-y-2">
-                                                            <p className="text-xs text-gray-500 font-medium">{t('productDetails.rawDetailHtml')}</p>
-                                                            <textarea
-                                                                readOnly
-                                                                value={product.detail_html}
-                                                                className="w-full h-32 p-3 text-xs font-mono bg-gray-50 border rounded-md focus:outline-none focus:ring-1 focus:ring-primary/20"
-                                                            />
-                                                        </div>
-                                                    </div>
-                                                </>
-                                                // <div className="w-full space-y-4 pt-4 border-t">
-                                                //     <div className="w-full space-y-2">
-                                                //         <p className="w-full text-xs text-gray-500 font-medium">{t('productDetails.detailHtml')}</p>
-                                                //         <div className="w-full border rounded-md p-4 bg-white shadow-sm overflow-hidden">
-                                                //             <SandboxedHtml html={product.detail_html} />
-                                                //         </div>
-                                                //     </div>
-                                                //     <div className="space-y-2">
-                                                //         <p className="text-xs text-gray-500 font-medium">{t('productDetails.rawDetailHtml')}</p>
-                                                //         <textarea
-                                                //             readOnly
-                                                //             value={product.detail_html}
-                                                //             className="w-full h-32 p-3 text-xs font-mono bg-gray-50 border rounded-md focus:outline-none focus:ring-1 focus:ring-primary/20"
-                                                //         />
-                                                //     </div>
-                                                // </div>
-                                            )}
-                                        </div>
-                                        <div className="mt-8 pt-6 border-t border-dashed border-gray-100">
-                                            <div className="flex flex-col gap-1">
-                                                <p className="text-[9px] font-mono text-gray-400">Product ID: {product.product_id}</p>
-                                                <p className="text-[9px] font-mono text-gray-400">Design ID: {product.design.design_id}</p>
-                                            </div>
-                                        </div>
-                                        <DialogFooter className="mt-6">
-                                            <div className="flex w-full items-center justify-between">
-                                                <div className="flex gap-2">
-                                                    <Button variant="outline" size="sm" onClick={() => handleToggleStatus(product.product_id, product.status)} disabled={togglingProductId === product.product_id}>
-                                                        {togglingProductId === product.product_id ? t('linkQr.processing') : (product.status === 'ACTIVE' ? t('product.stop') : t('product.activate'))}
-                                                    </Button>
-                                                    <Button variant="outline" size="sm" onClick={() => handleOpenDuplicateDialog(product)}>
-                                                        <Copy className="w-4 h-4 mr-1" />
-                                                        {t('productDetails.duplicate')}
-                                                    </Button>
-                                                    <Button variant="outline" size="sm" onClick={() => handleOpenEditDialog(product)}>
-                                                        <Pencil className="w-4 h-4 mr-1" />
-                                                        {t('productDetails.edit')}
-                                                    </Button>
-                                                    {product.status !== 'ACTIVE' && (
-                                                        <Button variant="destructive" size="sm" onClick={() => handleDeleteProduct(product.product_id, product.name)} disabled={deletingProductId === product.product_id}>
-                                                            {deletingProductId === product.product_id ? t('linkQr.processing') : t('product.delete')}
+                                                            <span>{t('linkQr.scan')}</span>
                                                         </Button>
-                                                    )}
-                                                </div>
-                                                <DialogTrigger asChild>
-                                                    <Button variant="outline" size="sm" className="px-4">{t('productDetails.close')}</Button>
-                                                </DialogTrigger>
-                                            </div>
-                                        </DialogFooter>
-                                    </DialogContent>
-                                </Dialog>
-                            ))}
-                            {/* 商品追加 */}
-                            <Dialog open={isAddProductDialogOpen} onOpenChange={(open) => {
-                                setIsAddProductDialogOpen(open);
-                                if (!open) {
-                                    setEditingProduct(null);
-                                    setIsDuplicateMode(false);
-                                    setSelectedCardDesignId('');
-                                }
-                            }}>
-                                <DialogTrigger asChild>
-                                    <Card
-                                        className="overflow-hidden cursor-pointer hover:ring-2 hover:ring-primary/50 transition-all border-dashed border-2 flex flex-col items-center justify-center min-h-[120px] bg-gray-50/50 hover:bg-gray-50 aspect-[84/52]"
-                                        onClick={() => {
-                                            setEditingProduct(null);
-                                            setIsDuplicateMode(false);
-                                            setSelectedCardDesignId('');
-                                        }}
-                                    >
-                                        <div className="flex flex-col items-center gap-1 text-gray-400 group-hover:text-primary">
-                                            <Plus className="w-8 h-8" />
-                                            <span className="text-xs font-bold">{t('addProduct.title')}</span>
-                                        </div>
-                                    </Card>
-                                </DialogTrigger>
-                                <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-                                    <DialogHeader>
-                                        <div className="flex items-center justify-between pr-8">
-                                            <DialogTitle>{editingProduct ? t('editProduct.title') : t('addProduct.title')}</DialogTitle>
-
-                                            {/* インポート */}
-                                            {!editingProduct && (
-                                                <Dialog open={isImportDialogOpen} onOpenChange={setIsImportDialogOpen}>
-                                                    <DialogTrigger asChild>
-                                                        <Button variant="outline" size="sm">{t('importProduct.button')}</Button>
                                                     </DialogTrigger>
-                                                    <DialogContent>
+                                                    <DialogContent className="max-h-[90vh] w-[98vw] max-w-[98vw] sm:max-w-[90vw] md:max-w-3xl lg:max-w-3xl h-full overflow-y-auto p-2 sm:p-6">
                                                         <DialogHeader>
-                                                            <DialogTitle>{t('importProduct.dialogTitle')}</DialogTitle>
-                                                            <DialogDescription>{t('importProduct.dialogDesc')}</DialogDescription>
+                                                            <DialogTitle>{t('linkQr.scanDialog.title')}</DialogTitle>
+                                                            <DialogDescription>{t('linkQr.scanDialog.description')}</DialogDescription>
                                                         </DialogHeader>
-                                                        <div className="space-y-4 py-4">
-                                                            <div className="space-y-2">
-                                                                <Label htmlFor="importShop">{t('importProduct.selectShop')}</Label>
-                                                                <select
-                                                                    id="importShop"
-                                                                    className="w-full p-2 border rounded-md"
-                                                                    value={selectedImportShopId}
-                                                                    onChange={(e) => setSelectedImportShopId(e.target.value)}
-                                                                >
-                                                                    <option value="">{t('importProduct.placeholder')}</option>
-                                                                    {importShops.map(s => (
-                                                                        <option key={s.id} value={s.id}>{s.name || s.id}</option>
-                                                                    ))}
-                                                                </select>
+                                                        <div className="p-1 sm:p-4 min-h-[300px] flex flex-col gap-y-4">
+                                                            <div className="flex items-center justify-center h-[20px] gap-x-2">
+                                                                <Switch
+                                                                    id="continuous-scan"
+                                                                    checked={isContinuousScan}
+                                                                    onCheckedChange={setIsContinuousScan}
+                                                                />
+                                                                <div className="flex flex-col">
+                                                                    <Label htmlFor="continuous-scan" className="text-sm font-bold">{t('linkQr.continuousScan')}</Label>
+                                                                    {isContinuousScan && (
+                                                                        <span className="text-[10px] text-blue-600 font-bold">{t('linkQr.scannedCount', { count: scannedUuids.length })}</span>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+
+                                                            <div
+                                                                className="w-full aspect-square mx-auto flex items-center justify-center overflow-hidden rounded-lg bg-gray-100"
+                                                                style={{ maxWidth: 'min(400px, 50vh)', maxHeight: '50vh' }}
+                                                            >
+
+                                                                <QRScanner
+                                                                    qrCodeSuccessCallback={handleScanSuccess}
+                                                                    disableFlip={false}
+                                                                    onFatalError={handleScannerError}
+                                                                />
+                                                            </div>
+                                                            <div className="flex flex-col gap-4">
+                                                                {isContinuousScan && scannedUuids.length > 0 && (
+                                                                    <Button
+                                                                        type="button"
+                                                                        className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold"
+                                                                        onClick={async () => {
+                                                                            const validItems = scannedUuids.filter(item => !item.error);
+                                                                            if (validItems.length > 0) {
+                                                                                setScannedUuid(validItems.map(item => item.uuid).join('\n'));
+                                                                                setIsScanning(false);
+                                                                            }
+                                                                        }}
+                                                                    >
+                                                                        {t('linkQr.finishScan')} ({scannedUuids.length})
+                                                                    </Button>
+                                                                )}
+                                                                {isContinuousScan && scannedUuids.length > 0 && (
+                                                                    <div className="mt-2 border rounded-md bg-gray-50 max-h-[80vh] overflow-y-auto w-full overflow-x-hidden">
+                                                                        <ul className="text-[10px] font-mono p-1 sm:p-2 space-y-1">
+                                                                            {scannedUuids.map((item, i) => (
+                                                                                <li key={item.uuid} className="border-b last:border-0 pb-1 last:pb-0 flex flex-col">
+                                                                                    <div className="flex flex-col gap-1 py-1 w-full overflow-hidden">
+                                                                                        <div className="flex items-center justify-between gap-1 w-full overflow-hidden">
+                                                                                            <div className="flex items-center gap-1 min-w-0 flex-1 overflow-hidden">
+                                                                                                <span className="truncate opacity-70 text-[10px] leading-tight block w-0 flex-1">{i + 1}. {item.uuid}</span>
+                                                                                                <Button
+                                                                                                    variant="ghost"
+                                                                                                    size="icon"
+                                                                                                    className="h-3.5 w-3.5 shrink-0 opacity-50 hover:opacity-100"
+                                                                                                    onClick={() => handleCopy(item.uuid)}
+                                                                                                >
+                                                                                                    {copiedId === item.uuid ? (
+                                                                                                        <Check className="h-2.5 w-2.5 text-green-500" />
+                                                                                                    ) : (
+                                                                                                        <Copy className="h-2.5 w-2.5" />
+                                                                                                    )}
+                                                                                                </Button>
+                                                                                            </div>
+                                                                                            {!item.status && !item.error && (
+                                                                                                <span className="animate-pulse text-gray-400 shrink-0 text-[10px]">...</span>
+                                                                                            )}
+                                                                                        </div>
+
+                                                                                        {(item.status || item.error) && (
+                                                                                            <div className="flex justify-end w-full overflow-hidden">
+                                                                                                {item.status ? (
+                                                                                                    <span className={`text-[10px] px-1.5 py-0.5 rounded-sm font-bold block text-left break-all sm:break-words max-w-full ${item.status.status === 'EXPIRED' ? 'bg-red-100 text-red-700' : (item.status.product_linked ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700')}`}>
+                                                                                                        {item.status.status === 'EXPIRED' ? st('expired') : (item.status.product_linked ? item.status.product_name : 'OK')}
+                                                                                                    </span>
+                                                                                                ) : (
+                                                                                                    <span className="text-[10px] px-1.5 py-0.5 rounded-sm bg-red-100 text-red-700 font-medium text-left leading-tight break-all sm:break-words max-w-full" title={item.error}>{item.error}</span>
+                                                                                                )}
+                                                                                            </div>
+                                                                                        )}
+                                                                                    </div>
+                                                                                </li>
+                                                                            ))}
+                                                                        </ul>
+                                                                    </div>
+                                                                )}
+                                                                {isManualInput && !(isContinuousScan && scannedUuids.length > 0) && (
+                                                                    <div className="flex w-full flex-col sm:flex-row gap-3">
+                                                                        <Input
+                                                                            id="uuid_manual"
+                                                                            name="uuid_manual"
+                                                                            placeholder={t('linkQr.placeholder')}
+                                                                            value={manualInput}
+                                                                            onChange={(e) => setManualInput(e.target.value)}
+                                                                            className="bg-gray-100"
+                                                                        />
+                                                                        <Button type="button" variant="default" disabled={!manualInput} onClick={() => handleScanSuccess(manualInput)} className="shrink-0">
+                                                                            {t('linkQr.scanDialog.apply')}
+                                                                        </Button>
+                                                                    </div>
+                                                                )}
+                                                                {!isManualInput && !isContinuousScan && (
+                                                                    <div className="flex justify-center">
+                                                                        <Button type="button" variant="ghost" size="sm" onClick={() => setisManualInput(true)} className="h-8 text-xs text-gray-500 hover:text-gray-900 px-2 -ml-2 right">
+                                                                            {t('linkQr.manualinput')}
+                                                                        </Button>
+                                                                    </div>
+                                                                )}
+
+                                                                {/* <Button type="button" variant="ghost" onClick={() => setIsScanning(false)}>
+                                                        {t('linkQr.scanDialog.cancel')}
+                                                    </Button> */}
                                                             </div>
                                                         </div>
-                                                        <DialogFooter>
-                                                            <Button variant="ghost" onClick={() => setIsImportDialogOpen(false)} disabled={isImporting}>
-                                                                {t('importProduct.cancel')}
-                                                            </Button>
-                                                            <Button onClick={handleImportProducts} disabled={isImporting || !selectedImportShopId}>
-                                                                {isImporting ? t('linkQr.processing') : t('importProduct.submit')}
-                                                            </Button>
+
+                                                        <DialogFooter className="">
+
                                                         </DialogFooter>
                                                     </DialogContent>
                                                 </Dialog>
-                                            )}
-                                        </div>
-                                    </DialogHeader>
-
-                                    <form key={editingProduct?.product_id || 'new'} onSubmit={handleCreateProduct} className="space-y-4 pt-4">
-                                        <div className="space-y-2">
-                                            <Label htmlFor="name">{t('addProduct.name')}</Label>
-                                            <Input id="name" name="name" defaultValue={editingProduct?.name} required />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label htmlFor="description">{t('addProduct.description')}</Label>
-                                            <Input id="description" name="description" defaultValue={editingProduct?.description} required />
-                                        </div>
-                                        <div className="grid grid-cols-2 gap-4">
-                                            <div className="space-y-2">
-                                                <Label htmlFor="price">{t('addProduct.price')}</Label>
-                                                <Input id="price" name="price" type="number" min="0" defaultValue={editingProduct?.price} required />
                                             </div>
-                                            <div className="space-y-2">
-                                                <Label htmlFor="valid_days">{t('addProduct.validDays')}</Label>
-                                                <Input id="valid_days" name="valid_days" type="number" defaultValue={editingProduct?.valid_days || APP_CONFIG.DEFAULT_VALID_DAYS} min={1} required />
-                                            </div>
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label htmlFor="image">{t('addProduct.image') + (editingProduct ? ' (' + t('editProduct.ifChange') + ')' : '')}</Label>
-                                            {editingProduct && <p className="text-xs text-gray-500">{t('editProduct.beforeImage')}</p>}
-                                            {editingProduct && <img src={editingProduct?.image_url} className="w-full h-auto rounded-md border shadow-sm" />}
-                                            <Input id="image" name="image" type="file" accept="image/png, image/jpeg, image/gif, image/webp" required={!editingProduct} />
-                                            <p className="text-xs text-gray-500">{t('addProduct.imagePlaceholder')}</p>
-                                        </div>
-
-                                        {/* Card Design Selection */}
-                                        <div className="space-y-4 pt-4 border-t">
-                                            <div className="flex items-center justify-between">
-                                                <Label className="text-sm font-bold flex items-center gap-2">
-                                                    <div className="w-1 h-4 bg-primary rounded-full" />
-                                                    {t('addProduct.cardDesign')}
-                                                </Label>
-                                                {(!shop?.allowed_designs || shop.allowed_designs.length === 0) && (
-                                                    <span className="text-[10px] text-red-500 font-medium">
-                                                        {t('addProduct.noDesignsLinked')}
-                                                    </span>
-                                                )}
-                                            </div>
-                                            <div className="grid grid-cols-2 gap-3 max-h-[300px] overflow-y-auto p-1">
-                                                {shop?.allowed_designs?.map((design: any) => (
-                                                    <div
-                                                        key={`${design.design_id}`}
-                                                        onClick={() => setSelectedCardDesignId(design.design_id)}
-                                                        className={`group relative aspect-[84/52] rounded-lg border-2 overflow-hidden cursor-pointer transition-all hover:shadow-md ${selectedCardDesignId === design.design_id
-                                                            ? 'border-green-500 ring-2 ring-green-500/20 shadow-lg'
-                                                            : 'border-gray-100 hover:border-primary/30'
-                                                            }`}
-                                                    >
-                                                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                                                        <img
-                                                            src={design.thumbf || design.bgimgf}
-                                                            alt={design.name}
-                                                            className="w-full h-full object-cover"
-                                                            crossOrigin="anonymous"
-                                                        />
-                                                        <div className={`absolute bottom-0 left-0 right-0 bg-black/60 p-1.5 transition-all duration-300 ${selectedCardDesignId === design.design_id ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
-                                                            }`}>
-                                                            <p className="text-[10px] text-white truncate text-center font-bold">
-                                                                {design.name}
-                                                            </p>
-                                                            {design.description && (
-                                                                <p className="text-[8px] text-gray-200 line-clamp-2 text-center mt-0.5 leading-tight opacity-0 group-hover:opacity-100 transition-opacity duration-500">
-                                                                    {design.description}
-                                                                </p>
-                                                            )}
+                                        ) : (
+                                            <div className="space-y-6">
+                                                <div className="space-y-4">
+                                                    {/* Linked Section */}
+                                                    {scannedUuids.filter(item => item.status?.product_linked).length > 0 && (
+                                                        <div className="space-y-2">
+                                                            <Label className="text-sm font-bold text-gray-500 flex items-center gap-2">
+                                                                <div className="w-1 h-4 bg-amber-400 rounded-full" />
+                                                                {t('linkQr.linkedTitle')}
+                                                            </Label>
+                                                            <div className="bg-amber-50/50 rounded-lg border border-amber-100 divide-y divide-amber-100 max-h-[150px] overflow-y-auto">
+                                                                {scannedUuids.filter(item => item.status?.product_linked).map((item) => (
+                                                                    <div key={item.uuid} className="p-3 flex justify-between items-center bg-white/40">
+                                                                        <div className="flex items-center gap-2">
+                                                                            <span className="font-mono text-xs">{item.uuid}</span>
+                                                                            <Button
+                                                                                variant="ghost"
+                                                                                size="icon"
+                                                                                className="h-4 w-4"
+                                                                                onClick={(e) => { e.stopPropagation(); handleCopy(item.uuid); }}
+                                                                            >
+                                                                                {copiedId === item.uuid ? (
+                                                                                    <Check className="h-3 w-3 text-green-500" />
+                                                                                ) : (
+                                                                                    <Copy className="h-3 w-3" />
+                                                                                )}
+                                                                            </Button>
+                                                                        </div>
+                                                                        <span className="text-[10px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-bold">
+                                                                            {item.status.product_name}
+                                                                        </span>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
                                                         </div>
-                                                        {selectedCardDesignId === design.design_id && (
-                                                            <div className="absolute top-0 right-0">
-                                                                <div className="bg-green-500 text-white text-[9px] font-bold px-2 py-0.5 rounded-bl shadow-sm flex items-center gap-1">
-                                                                    <Check className="w-2.5 h-2.5" />
-                                                                </div>
+                                                    )}
+
+                                                    {/* Available Section */}
+                                                    {scannedUuids.filter(item => item.status && !item.status.product_linked).length > 0 && (
+                                                        <div className="space-y-2">
+                                                            <Label className="text-sm font-bold text-blue-600 flex items-center gap-2">
+                                                                <div className="w-1 h-4 bg-blue-500 rounded-full" />
+                                                                {t('linkQr.availableTitle')}
+                                                            </Label>
+                                                            <div className="bg-blue-50/30 rounded-lg border border-blue-100 divide-y divide-blue-100 max-h-[150px] overflow-y-auto">
+                                                                {scannedUuids.filter(item => item.status && !item.status.product_linked).map((item) => (
+                                                                    <div key={item.uuid} className="p-3 bg-white/40 flex items-center gap-2">
+                                                                        <span className="font-mono text-xs">{item.uuid}</span>
+                                                                        <Button
+                                                                            variant="ghost"
+                                                                            size="icon"
+                                                                            className="h-4 w-4"
+                                                                            onClick={(e) => { e.stopPropagation(); handleCopy(item.uuid); }}
+                                                                        >
+                                                                            {copiedId === item.uuid ? (
+                                                                                <Check className="h-3 w-3 text-green-500" />
+                                                                            ) : (
+                                                                                <Copy className="h-3 w-3" />
+                                                                            )}
+                                                                        </Button>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </div>
+
+                                                {/* Unified Action Area */}
+                                                <div className="space-y-4 pt-4 border-t border-gray-100">
+                                                    <div className="space-y-4 bg-gray-50 p-4 rounded-xl border-dashed border-2">
+                                                        <select
+                                                            id="product_id"
+                                                            name="product_id"
+                                                            className="flex h-12 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                                            required={scannedUuids.some(item => item.status && !item.status.product_linked)}
+                                                            defaultValue=""
+                                                        >
+                                                            <option value="" disabled>{t('linkQr.selectPlaceholder')}</option>
+                                                            {products.filter(p => p.status === 'ACTIVE').map(p => (
+                                                                <option key={p.product_id} value={p.product_id}>{p.name}</option>
+                                                            ))}
+                                                        </select>
+
+                                                        {showOptions ? (
+                                                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                                                <Input
+                                                                    id="memo_for_users"
+                                                                    name="memo_for_users"
+                                                                    placeholder={t('linkQr.memoForUsersPlaceholder')}
+                                                                    className="h-10 border-gray-300"
+                                                                />
+                                                                <Input
+                                                                    id="memo_for_shop"
+                                                                    name="memo_for_shop"
+                                                                    placeholder={t('linkQr.memoForShopPlaceholder')}
+                                                                    className="h-10 border-gray-300"
+                                                                />
+                                                            </div>
+                                                        ) : (
+                                                            <div className="flex justify-start">
+                                                                <Button type="button" variant="ghost" size="sm" onClick={() => setShowOptions(true)} className="h-8 text-xs text-gray-500 hover:text-gray-900 px-2 -ml-2">
+                                                                    + {t('linkQr.option')}
+                                                                </Button>
                                                             </div>
                                                         )}
+
+                                                        <Button type="submit" className="w-full font-bold text-lg h-16 shadow-lg shadow-blue-100" disabled={isLinking}>
+                                                            {isLinking ? t('linkQr.processing') : t('linkQr.submit')}
+                                                            <ArrowRight className="ml-2 h-5 w-5" />
+                                                        </Button>
                                                     </div>
-                                                ))}
+
+                                                    <div className="flex justify-center">
+                                                        <Button type="button" variant="ghost" size="sm" onClick={() => { setScannedUuid(''); setScannedUuids([]); setQrStatusDetails(null); setShowOptions(false); lastScannedTimeRef.current = {}; }} className="text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors">
+                                                            {t('linkQr.clear')}
+                                                        </Button>
+                                                    </div>
+                                                </div>
                                             </div>
-                                        </div>
-
-                                        <Button type="submit" className="w-full" disabled={isCreatingProduct || !selectedCardDesignId}>
-                                            {isCreatingProduct ? t('linkQr.processing') : (editingProduct ? t('shopSettings.submit') : t('addProduct.submit'))}
-                                        </Button>
+                                        )}
                                     </form>
-                                </DialogContent>
-                            </Dialog>
+                                </CardContent>
+                            </Card>
                         </div>
+
+
+
+
+
                     </div>
-                </Card>
+                )}
 
-
-
-
-
-
-
-
-
-                {/* Order History */}
-                <Card>
-                    <CardHeader>
-                        <div className="flex flex-col space-y-4 md:flex-row md:items-center md:justify-between md:space-y-0">
-                            <div>
-                                <CardTitle>{t('history.title')}</CardTitle>
-                            </div>
-                            <div className="flex flex-col w-full space-y-2 md:flex-row md:items-center md:space-x-2 md:space-y-0 md:w-auto">
-                                <div className="flex w-full items-center space-x-2 md:max-w-sm">
-                                    <Input
-                                        placeholder={t('search.placeholder')}
-                                        value={searchUuid}
-                                        onChange={(e) => setSearchUuid(e.target.value)}
-                                        className="w-full"
-                                    />
-                                    {searchUuid && (
-                                        <Button variant="ghost" onClick={() => setSearchUuid('')} className="shrink-0">
-                                            {t('search.clear')}
+                {/* --- Wrapper for Shipping --- */}
+                {activeTab === 'shipping' && (
+                    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                        {/* Incoming Orders */}
+                        <Card>
+                            <CardHeader>
+                                <div className="flex flex-col space-y-4 md:flex-row md:items-center md:justify-between md:space-y-0">
+                                    <div>
+                                        <CardTitle>{t('incomingOrders')}</CardTitle>
+                                        <CardDescription>{t('ordersDesc')}</CardDescription>
+                                    </div>
+                                    <div className="flex flex-col w-full space-y-2 md:flex-row md:items-center md:space-x-2 md:space-y-0 md:w-auto">
+                                        <div className="flex w-full items-center space-x-2 md:max-w-sm">
+                                            <Input
+                                                placeholder={t('search.placeholder')}
+                                                value={searchUuid}
+                                                onChange={(e) => setSearchUuid(e.target.value)}
+                                                className="w-full"
+                                            />
+                                            {searchUuid && (
+                                                <Button variant="ghost" onClick={() => setSearchUuid('')} className="shrink-0">
+                                                    {t('search.clear')}
+                                                </Button>
+                                            )}
+                                        </div>
+                                        <Button variant="outline" size="sm" className="w-full shrink-0 md:w-auto" onClick={() => fetchShopData(true)} disabled={isRefreshing}>
+                                            <RefreshCw className={`mr-2 h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+                                            {t('refresh')}
                                         </Button>
-                                    )}
+                                    </div>
                                 </div>
-                                <Button variant="outline" size="sm" className="w-full shrink-0 md:w-auto" onClick={() => fetchShopData(true)} disabled={isRefreshing}>
-                                    <RefreshCw className={`mr-2 h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-                                    {t('refresh')}
-                                </Button>
-                            </div>
-                        </div>
-                    </CardHeader>
-                    <CardContent className="p-4 w-full">
-                        <Table wrapperStyle={{ maxHeight: 'calc(100vh - 200px)' }}>
-                            <TableHeader className="sticky top-0 bg-white z-10 drop-shadow-sm">
-                                <TableRow>
-                                    <TableHead className="text-xs md:text-sm">{t('orders.date')}</TableHead>
-                                    <TableHead className="text-xs md:text-sm hidden sm:table-cell">{t('orders.productName')}</TableHead>
-                                    <TableHead className="text-xs md:text-sm">{t('orders.status')}</TableHead>
-                                    <TableHead className="text-xs md:text-sm hidden md:table-cell">{t('orders.shopMemo')}</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {ordersLoading ? (
-                                    <TableRow><TableCell colSpan={4} className="text-center py-4"><RefreshCw className="animate-spin h-5 w-5 mx-auto text-gray-400" /></TableCell></TableRow>
-                                ) : orders
-                                    .filter(o => ['LINKED', 'ACTIVE', 'SHIPPED', 'COMPLETED', 'EXPIRED', 'BANNED'].includes(o.status))
-                                    .filter(o => !searchUuid || (o.id || o.qr_id).includes(searchUuid))
-                                    .length === 0 ? (
-                                    <TableRow><TableCell colSpan={4} className="text-center">{t('orders.noOrders')}</TableCell></TableRow>
-                                ) : (
-                                    orders
-                                        .filter(o => ['LINKED', 'ACTIVE', 'SHIPPED', 'COMPLETED', 'EXPIRED', 'BANNED'].includes(o.status))
-                                        .filter(o => !searchUuid || (o.id || o.qr_id).includes(searchUuid))
-                                        .sort((a, b) => {
-                                            const sortorder: { [name: string]: number } = { 'LINKED': 3, 'ACTIVE': 2, 'SHIPPED': 0, 'COMPLETED': 1, 'EXPIRED': 4, 'BANNED': 5 };
-                                            // 1. Status: compare
-                                            if (a.status !== b.status) return sortorder[a.status] - sortorder[b.status];
-                                            // Date: Newest first
-                                            const dateA = new Date(a.ts_updated_at || a.ts_created_at).getTime();
-                                            const dateB = new Date(b.ts_updated_at || b.ts_created_at).getTime();
-                                            return dateB - dateA;
-                                        })
-                                        .map((order: any) => {
-                                            const product = products.find(p => p.product_id === order.product_id);
-                                            const uuid = order.id || order.qr_id.replace('QR#', '');
+                            </CardHeader>
+                            <CardContent className="p-4 w-full">
+                                <Table wrapperStyle={{ maxHeight: 'calc(100vh - 200px)' }}>
+                                    <TableHeader className="sticky top-0 bg-white z-10 drop-shadow-sm">
+                                        <TableRow>
+                                            <TableHead className="text-xs md:text-sm">{t('orders.date')}</TableHead>
+                                            <TableHead className="text-xs md:text-sm hidden sm:table-cell">{t('orders.productName')}</TableHead>
+                                            <TableHead className="text-xs md:text-sm">{t('orders.status')}</TableHead>
+                                            <TableHead className="text-xs md:text-sm hidden md:table-cell">{t('orders.shopMemo')}</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {ordersLoading ? (
+                                            <TableRow><TableCell colSpan={4} className="text-center py-4"><RefreshCw className="animate-spin h-5 w-5 mx-auto text-gray-400" /></TableCell></TableRow>
+                                        ) : orders
+                                            .filter(o => ['USED'].includes(o.status))
+                                            .filter(o => !searchUuid || (o.id || o.qr_id).includes(searchUuid))
+                                            .length === 0 ? (
+                                            <TableRow><TableCell colSpan={4} className="text-center">{t('orders.noOrders')}</TableCell></TableRow>
+                                        ) : (
+                                            orders
+                                                .filter(o => ['USED'].includes(o.status))
+                                                .filter(o => !searchUuid || (o.id || o.qr_id).includes(searchUuid))
+                                                .sort((a, b) => {
+                                                    const sortorder: { [name: string]: number } = { 'LINKED': 0, 'ACTIVE': 1, 'USED': 3, 'SHIPPED': 2 };
+                                                    // 1. Status: compare
+                                                    if (a.status !== b.status) return sortorder[b.status] - sortorder[a.status];
+                                                    // 2. Date: Newest first
+                                                    const dateA = new Date(a.ts_updated_at || a.ts_created_at).getTime();
+                                                    const dateB = new Date(b.ts_updated_at || b.ts_created_at).getTime();
+                                                    return dateB - dateA;
+                                                })
+                                                .map((order: any) => {
+                                                    const product = products.find(p => p.product_id === order.product_id);
+                                                    const uuid = order.id || order.qr_id.replace('QR#', '');
 
-                                            return (
-                                                <Dialog key={order.qr_id}>
-                                                    <DialogTrigger asChild>
-                                                        <TableRow className="cursor-pointer hover:bg-gray-100">
-                                                            <TableCell className="text-xs md:text-sm">
-                                                                {order.ts_updated_at ? (
-                                                                    <div className="flex flex-col">
-                                                                        <span className="whitespace-nowrap">{new Date(order.ts_updated_at).toLocaleDateString()}</span>
-                                                                        <span className="text-[10px] text-gray-500 whitespace-nowrap">{new Date(order.ts_updated_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                                    return (
+                                                        <Dialog key={order.qr_id}>
+                                                            <DialogTrigger asChild>
+                                                                <TableRow className="cursor-pointer hover:bg-gray-100">
+                                                                    {/* <TableCell className="text-xs md:text-sm">{order.ts_updated_at ? new Date(order.ts_updated_at).toLocaleString() : "-"}</TableCell> */}
+                                                                    <TableCell className="text-xs md:text-sm">
+                                                                        {order.ts_updated_at ? (
+                                                                            <div className="flex flex-col">
+                                                                                <span className="whitespace-nowrap">{new Date(order.ts_updated_at).toLocaleDateString()}</span>
+                                                                                <span className="text-[10px] text-gray-500 whitespace-nowrap">{new Date(order.ts_updated_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                                                            </div>
+                                                                        ) : "-"}
+                                                                    </TableCell>
+                                                                    <TableCell className="text-xs md:text-sm font-bold hidden sm:table-cell">{product?.name || order.product_id}</TableCell>
+                                                                    <TableCell>
+                                                                        <span className={`px-2 py-1 rounded text-xs ${order.status === 'UNASSIGNED' ? 'bg-gray-100' :
+                                                                            order.status === 'LINKED' ? 'bg-emerald-100 text-emerald-800' :
+                                                                                order.status === 'ACTIVE' ? 'bg-yellow-100 text-yellow-800' :
+                                                                                    order.status === 'USED' ? 'bg-orange-100 text-orange-800' :
+                                                                                        order.status === 'SHIPPED' ? 'bg-indigo-100 text-indigo-800' :
+                                                                                            order.status === 'COMPLETED' ? 'bg-purple-100 text-purple-800' :
+                                                                                                order.status === 'EXPIRED' ? 'bg-gray-100 text-gray-800' :
+                                                                                                    order.status === 'BANNED' ? 'bg-red-100 text-red-800' :
+                                                                                                        'bg-green-100 text-green-800'
+                                                                            }`}>{st(order.status.toLowerCase())}</span>
+                                                                    </TableCell>
+                                                                    <TableCell className="text-xs md:text-sm hidden md:table-cell">{order.memo_for_shop}</TableCell>
+                                                                </TableRow>
+                                                            </DialogTrigger>
+                                                            <DialogContent className="max-w-md">
+                                                                <DialogHeader>
+                                                                    <DialogTitle>{t('orders.details')}</DialogTitle>
+                                                                    <DialogDescription className="font-mono text-xs text-gray-500 flex items-center gap-2">
+                                                                        ID: {uuid}
+                                                                        <Button
+                                                                            variant="ghost"
+                                                                            size="icon"
+                                                                            className="h-6 w-6"
+                                                                            onClick={(e) => { e.stopPropagation(); handleCopy(uuid); }}
+                                                                        >
+                                                                            {copiedId === uuid ? (
+                                                                                <Check className="h-3 w-3 text-green-500" />
+                                                                            ) : (
+                                                                                <Copy className="h-3 w-3" />
+                                                                            )}
+                                                                        </Button>
+                                                                    </DialogDescription>
+                                                                </DialogHeader>
+
+                                                                <div className="space-y-4 py-4 max-h-[70vh] overflow-y-auto p-2">
+                                                                    {/* Product Info */}
+                                                                    <div>
+                                                                        <h4 className="text-sm font-semibold text-gray-500">{t('orders.productName')}</h4>
+                                                                        <p className="font-medium">{product?.name || order.product_id}</p>
                                                                     </div>
-                                                                ) : "-"}
-                                                            </TableCell>
-                                                            <TableCell className="text-xs md:text-sm font-bold hidden md:table-cell">{product?.name || order.product_id}</TableCell>
-                                                            <TableCell>
-                                                                <span className={`px-2 py-1 rounded text-xs ${order.status === 'UNASSIGNED' ? 'bg-gray-100' :
-                                                                    order.status === 'LINKED' ? 'bg-emerald-100 text-emerald-800' :
-                                                                        order.status === 'ACTIVE' ? 'bg-yellow-100 text-yellow-800' :
-                                                                            order.status === 'USED' ? 'bg-orange-100 text-orange-800' :
-                                                                                order.status === 'SHIPPED' ? 'bg-indigo-100 text-indigo-800' :
-                                                                                    order.status === 'COMPLETED' ? 'bg-purple-100 text-purple-800' :
-                                                                                        order.status === 'EXPIRED' ? 'bg-gray-100 text-gray-800' :
-                                                                                            order.status === 'BANNED' ? 'bg-red-100 text-red-800' :
-                                                                                                'bg-green-100 text-green-800'
-                                                                    }`}>{st(order.status.toLowerCase())}</span>
-                                                            </TableCell>
-                                                            <TableCell className="font-medium hidden md:table-cell">{order.memo_for_shop}</TableCell>
-                                                        </TableRow>
-                                                    </DialogTrigger>
-                                                    <DialogContent className="max-w-md">
-                                                        <DialogHeader>
-                                                            <DialogTitle>{t('orders.details')}</DialogTitle>
-                                                            <DialogDescription className="font-mono text-xs text-gray-500 flex items-center gap-2">
-                                                                ID: {uuid}
-                                                                <Button
-                                                                    variant="ghost"
-                                                                    size="icon"
-                                                                    className="h-6 w-6"
-                                                                    onClick={(e) => { e.stopPropagation(); handleCopy(uuid); }}
-                                                                >
-                                                                    {copiedId === uuid ? (
-                                                                        <Check className="h-3 w-3 text-green-500" />
-                                                                    ) : (
-                                                                        <Copy className="h-3 w-3" />
-                                                                    )}
-                                                                </Button>
-                                                            </DialogDescription>
-                                                        </DialogHeader>
 
-                                                        <div className="space-y-4 py-4 max-h-[70vh] overflow-y-auto">
-                                                            {/* Product Info */}
-                                                            <div>
-                                                                <h4 className="text-sm font-semibold text-gray-500">{t('orders.productName')}</h4>
-                                                                <p className="font-medium">{product?.name || order.product_id}</p>
-                                                            </div>
+                                                                    {/* Status */}
+                                                                    <div>
+                                                                        <h4 className="text-sm font-semibold text-gray-500">{t('orders.status')}</h4>
 
+                                                                        <span className={`px-2 py-1 rounded text-xs ${order.status === 'UNASSIGNED' ? 'bg-gray-100' :
+                                                                            order.status === 'LINKED' ? 'bg-emerald-100 text-emerald-800' :
+                                                                                order.status === 'ACTIVE' ? 'bg-yellow-100 text-yellow-800' :
+                                                                                    order.status === 'USED' ? 'bg-orange-100 text-orange-800' :
+                                                                                        order.status === 'SHIPPED' ? 'bg-indigo-100 text-indigo-800' :
+                                                                                            order.status === 'COMPLETED' ? 'bg-purple-100 text-purple-800' :
+                                                                                                order.status === 'EXPIRED' ? 'bg-gray-100 text-gray-800' :
+                                                                                                    order.status === 'BANNED' ? 'bg-red-100 text-red-800' :
+                                                                                                        'bg-green-100 text-green-800'
+                                                                            }`}>{st(order.status.toLowerCase())}</span>
+                                                                    </div>
 
-                                                            {/* Status */}
-                                                            <div>
-                                                                <h4 className="text-sm font-semibold text-gray-500">{t('orders.status')}</h4>
-
-                                                                <span className={`px-2 py-1 rounded text-xs ${order.status === 'UNASSIGNED' ? 'bg-gray-100' :
-                                                                    order.status === 'LINKED' ? 'bg-emerald-100 text-emerald-800' :
-                                                                        order.status === 'ACTIVE' ? 'bg-yellow-100 text-yellow-800' :
-                                                                            order.status === 'USED' ? 'bg-orange-100 text-orange-800' :
-                                                                                order.status === 'SHIPPED' ? 'bg-indigo-100 text-indigo-800' :
-                                                                                    order.status === 'COMPLETED' ? 'bg-purple-100 text-purple-800' :
-                                                                                        order.status === 'EXPIRED' ? 'bg-gray-100 text-gray-800' :
-                                                                                            order.status === 'BANNED' ? 'bg-red-100 text-red-800' :
-                                                                                                'bg-green-100 text-green-800'
-                                                                    }`}>{st(order.status.toLowerCase())}</span>
-                                                            </div>
-
-                                                            {/* Card Preview */}
-                                                            {order.card_design && (
-                                                                <div className="space-y-2">
-                                                                    <h4 className="text-sm font-semibold text-gray-500">{t('linkQr.cardDesign')}</h4>
-                                                                    {(order.thumbf || order.thumbb || cardformats[order.card_design]) && (
-                                                                        <div className="grid grid-cols-2 gap-2">
-                                                                            <div className="space-y-1">
-                                                                                <div className="aspect-[84/52] relative rounded shadow-sm overflow-hidden border border-gray-100 bg-white">
-                                                                                    <img
-                                                                                        src={order.thumbf || cardformats[order.card_design]?.bgimgf}
-                                                                                        alt="Front"
-                                                                                        className="w-full h-full object-cover"
-                                                                                        crossOrigin="anonymous"
-                                                                                    />
+                                                                    {/* Card Preview */}
+                                                                    {order.card_design && (
+                                                                        <div className="space-y-2">
+                                                                            <h4 className="text-sm font-semibold text-gray-500">{t('linkQr.cardDesign')}</h4>
+                                                                            {(order.thumbf || order.thumbb || cardformats[order.card_design]) && (
+                                                                                <div className="grid grid-cols-2 gap-2">
+                                                                                    <div className="space-y-1">
+                                                                                        <div className="aspect-[84/52] relative rounded shadow-sm overflow-hidden border border-gray-100 bg-white">
+                                                                                            <img
+                                                                                                src={order.thumbf || cardformats[order.card_design]?.bgimgf}
+                                                                                                alt="Front"
+                                                                                                className="w-full h-full object-cover"
+                                                                                                crossOrigin="anonymous"
+                                                                                            />
+                                                                                        </div>
+                                                                                    </div>
+                                                                                    <div className="space-y-1">
+                                                                                        <div className="aspect-[84/52] relative rounded shadow-sm overflow-hidden border border-gray-100 bg-white">
+                                                                                            <img
+                                                                                                src={order.thumbb || cardformats[order.card_design]?.bgimgb}
+                                                                                                alt="Back"
+                                                                                                className="w-full h-full object-cover"
+                                                                                                crossOrigin="anonymous"
+                                                                                            />
+                                                                                        </div>
+                                                                                    </div>
                                                                                 </div>
-                                                                            </div>
-                                                                            <div className="space-y-1">
-                                                                                <div className="aspect-[84/52] relative rounded shadow-sm overflow-hidden border border-gray-100 bg-white">
-                                                                                    <img
-                                                                                        src={order.thumbb || cardformats[order.card_design]?.bgimgb}
-                                                                                        alt="Back"
-                                                                                        className="w-full h-full object-cover"
-                                                                                        crossOrigin="anonymous"
-                                                                                    />
-                                                                                </div>
-                                                                            </div>
+                                                                            )}
                                                                         </div>
                                                                     )}
-                                                                </div>
-                                                            )}
 
-                                                            {/* Recipient Info */}
-                                                            <div>
-                                                                <h4 className="text-sm font-semibold text-gray-500">{t('orders.recipient')}</h4>
-                                                                <p>{order.recipient_name}</p>
-                                                            </div>
-                                                            <div>
-                                                                <h4 className="text-sm font-semibold text-gray-500">{t('orders.contact')}</h4>
-                                                                <p className="break-all">{order.shipping_info?.email || '-'}</p>
-                                                                <p className="text-sm mt-1">{order.shipping_info?.phone || '-'}</p>
-                                                            </div>
-
-                                                            <div>
-                                                                <h4 className="text-sm font-semibold text-gray-500">{t('orders.address')}</h4>
-                                                                {order.postal_code && <p className="text-sm">〒{order.postal_code}</p>}
-                                                                <p className="whitespace-pre-wrap text-sm">{order.address}</p>
-                                                            </div>
-
-                                                            <div>
-                                                                <h4 className="text-sm font-semibold text-gray-500">{t('orders.preferredDateTime')}</h4>
-                                                                <p className="text-sm">{order.preferred_date ? order.preferred_date : '-'}  /  {order.preferred_time ? tt(order.preferred_time) : '-'}</p>
-                                                            </div>
-
-                                                            {/* Order Info */}
-                                                            <div className="pt-2 space-y-4">
-                                                                {/* Read-only view for SHIPPED, or we could allow edit. For now keeping read-only as per previous pattern but showing memos */}
-                                                                {order.memo_for_users && (
+                                                                    {/* Recipient Info */}
                                                                     <div>
-                                                                        <h4 className="text-sm font-semibold text-gray-500">{t('orders.userMessage')}</h4>
-                                                                        <p className="text-sm bg-blue-50 p-2 rounded">{order.memo_for_users}</p>
+                                                                        <h4 className="text-sm font-semibold text-gray-500">{t('orders.recipient')}</h4>
+                                                                        <p>{order.recipient_name}</p>
                                                                     </div>
-                                                                )}
-                                                                {order.memo_for_shop && (
                                                                     <div>
-                                                                        <h4 className="text-sm font-semibold text-gray-500">{t('orders.shopMemo')}</h4>
-                                                                        <p className="text-sm bg-gray-50 p-2 rounded">{order.memo_for_shop}</p>
+                                                                        <h4 className="text-sm font-semibold text-gray-500">{t('orders.contact')}</h4>
+                                                                        <p className="break-all">{order.shipping_info?.email || '-'}</p>
+                                                                        <p className="text-sm mt-1">{order.shipping_info?.phone || '-'}</p>
                                                                     </div>
-                                                                )}
-                                                                <div>
-                                                                    <h4 className="text-sm font-semibold text-gray-500">{t('orders.shipDialog.deliveryCompany')}</h4>
-                                                                    <p className="font-mono">{order.delivery_company || '-'}</p>
-                                                                </div>
-                                                                <div>
-                                                                    <h4 className="text-sm font-semibold text-gray-500">{t('orders.shipDialog.label')}</h4>
-                                                                    <p className="font-mono">{order.tracking_number || '-'}</p>
-                                                                </div>
-                                                            </div>
 
-                                                            <div className="">
-                                                                <div>
+                                                                    <div>
+                                                                        <h4 className="text-sm font-semibold text-gray-500">{t('orders.address')}</h4>
+                                                                        {order.postal_code && <p className="text-sm">〒{order.postal_code}</p>}
+                                                                        <p className="whitespace-pre-wrap text-sm">{order.address}</p>
+                                                                    </div>
+
+                                                                    <div>
+                                                                        <h4 className="text-sm font-semibold text-gray-500">{t('orders.preferredDateTime')}</h4>
+                                                                        <p className="text-sm">{order.preferred_date ? order.preferred_date : '-'}  /  {order.preferred_time ? tt(order.preferred_time) : '-'}</p>
+                                                                    </div>
+
+                                                                    {/* User Message & Shop Memo Section (Editable - Unified for all statuses) */}
+
+
+                                                                    {/* Shipping Action Section (Visible only when status is USED) */}
+                                                                    {order.status === 'USED' && (
+                                                                        <div className="mt-4 p-4 border-2 border-orange-200 rounded-xl bg-orange-50/50 shadow-sm">
+                                                                            <div className="flex items-center gap-2 mb-4">
+                                                                                <div className="w-2.5 h-2.5 rounded-full bg-orange-500 animate-pulse shadow-[0_0_8px_rgba(249,115,22,0.6)]" />
+                                                                                <h4 className="text-sm font-bold text-orange-900 uppercase tracking-wide">{t('orders.action')}</h4>
+                                                                            </div>
+                                                                            <form onSubmit={(e) => {
+                                                                                e.preventDefault();
+                                                                                const fd = new FormData(e.target as HTMLFormElement);
+                                                                                handleUpdateOrderMeta(
+                                                                                    uuid,
+                                                                                    fd.get('delivery_company') as string,
+                                                                                    fd.get('tracking') as string
+                                                                                );
+                                                                            }} className="space-y-4">
+                                                                                <div className="space-y-2">
+                                                                                    <Label htmlFor={`delivery_company-${uuid}`} className="text-orange-900/70">{t('orders.shipDialog.deliveryCompany')}</Label>
+                                                                                    <Input id={`delivery_company-${uuid}`} name="delivery_company" placeholder={t('orders.shipDialog.deliveryCompanyPlaceholder')} required className="bg-white border-orange-100 focus:border-orange-500 focus:ring-orange-500" />
+                                                                                </div>
+                                                                                <div className="space-y-2">
+                                                                                    <Label htmlFor={`tracking-${uuid}`} className="text-orange-900/70">{t('orders.shipDialog.label')}</Label>
+                                                                                    <Input id={`tracking-${uuid}`} name="tracking" placeholder="1234-5678..." required className="bg-white border-orange-100 focus:border-orange-500 focus:ring-orange-500" />
+                                                                                </div>
+
+                                                                                <Button type="submit" className="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold h-10 shadow-md transition-all active:scale-[0.98]" disabled={shippingOrderId === uuid}>
+                                                                                    {shippingOrderId === uuid ? (
+                                                                                        <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> {t('linkQr.processing')}</>
+                                                                                    ) : (
+                                                                                        t('orders.shipDialog.submit')
+                                                                                    )}
+                                                                                </Button>
+                                                                            </form>
+                                                                        </div>
+                                                                    )}
+
+
                                                                     {/* Admin Meta Edit Section */}
                                                                     <div className="pt-6 border-t border-dashed mt-6">
                                                                         <h4 className="text-sm font-bold text-gray-900 mb-4 flex items-center gap-2">
@@ -2214,9 +1606,9 @@ export default function ShopPage() {
                                                                         </form>
                                                                     </div>
 
-                                                                    <div className="pt-6 border-t mt-6">
+                                                                    <div className="">
                                                                         <div>
-                                                                            <h4 className="text-sm font-semibold text-gray-500 mb-2">{t('orders.timestamps')}</h4>
+                                                                            <h4 className="text-sm font-semibold text-gray-500">{t('orders.timestamps')}</h4>
                                                                             <p className="text-sm">{ts('ts_updated_at') + ": " + (order.ts_updated_at ? new Date(order.ts_updated_at).toLocaleString() : "-")}</p>
                                                                             <p className="text-sm">{ts('ts_linked_at') + ": " + (order.ts_linked_at ? new Date(order.ts_linked_at).toLocaleString() : "-")}</p>
                                                                             <p className="text-sm">{ts('ts_activated_at') + ": " + (order.ts_activated_at ? new Date(order.ts_activated_at).toLocaleString() : "-")}</p>
@@ -2228,42 +1620,335 @@ export default function ShopPage() {
                                                                         </div>
                                                                     </div>
                                                                 </div>
-                                                            </div>
-                                                        </div>
-                                                    </DialogContent>
-                                                </Dialog>
-                                            );
-                                        })
-                                )}
-                            </TableBody>
-                        </Table>
-                    </CardContent>
-                </Card>
+                                                            </DialogContent>
+                                                        </Dialog>
+                                                    );
+                                                })
+                                        )}
+                                    </TableBody>
+                                </Table>
+                            </CardContent>
+                        </Card>
 
-                {/* Status Guide */}
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                            <HelpCircle className="w-5 h-5" />
-                            {t('statusGuide.title')}
-                        </CardTitle>
-                        <CardDescription>{t('statusGuide.description')}</CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-8">
-                        {/* Flow */}
-                        <div className="space-y-4">
-                            <h3 className="font-bold text-gray-700">{t('statusGuide.flow')}</h3>
-                            <div className="flex flex-wrap items-center gap-2 text-sm">
-                                <span className="px-3 py-1 bg-gray-100 text-gray-700">    {st('unassigned')}</span>                                <ArrowRight className="w-4 h-4 text-gray-400" />
-                                <span className="px-3 py-1 bg-emerald-100 text-emerald-800">  {st('linked')}    </span>                                <ArrowRight className="w-4 h-4 text-gray-400" />
-                                <span className="px-3 py-1 bg-yellow-100 text-yellow-800">{st('active')}    </span>                                <ArrowRight className="w-4 h-4 text-gray-400" />
-                                <span className="px-3 py-1 bg-orange-100 text-orange-800">{st('used')}      </span>                                <ArrowRight className="w-4 h-4 text-gray-400" />
-                                <span className="px-3 py-1 bg-indigo-100 text-indigo-800">  {st('shipped')}   </span>                                <ArrowRight className="w-4 h-4 text-gray-400" />
-                                <span className="px-3 py-1 bg-purple-100 text-purple-800">{st('completed')} </span>
-                            </div>
-                        </div>
 
-                        {/* <span className={`px-2 py-1 rounded text-xs ${order.status === 'UNASSIGNED' ? 'bg-gray-100' :
+
+
+                        {/* Order History */}
+                        <Card>
+                            <CardHeader>
+                                <div className="flex flex-col space-y-4 md:flex-row md:items-center md:justify-between md:space-y-0">
+                                    <div>
+                                        <CardTitle>{t('history.title')}</CardTitle>
+                                    </div>
+                                    <div className="flex flex-col w-full space-y-2 md:flex-row md:items-center md:space-x-2 md:space-y-0 md:w-auto">
+                                        <div className="flex w-full items-center space-x-2 md:max-w-sm">
+                                            <Input
+                                                placeholder={t('search.placeholder')}
+                                                value={searchUuid}
+                                                onChange={(e) => setSearchUuid(e.target.value)}
+                                                className="w-full"
+                                            />
+                                            {searchUuid && (
+                                                <Button variant="ghost" onClick={() => setSearchUuid('')} className="shrink-0">
+                                                    {t('search.clear')}
+                                                </Button>
+                                            )}
+                                        </div>
+                                        <Button variant="outline" size="sm" className="w-full shrink-0 md:w-auto" onClick={() => fetchShopData(true)} disabled={isRefreshing}>
+                                            <RefreshCw className={`mr-2 h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+                                            {t('refresh')}
+                                        </Button>
+                                    </div>
+                                </div>
+                            </CardHeader>
+                            <CardContent className="p-4 w-full">
+                                <Table wrapperStyle={{ maxHeight: 'calc(100vh - 200px)' }}>
+                                    <TableHeader className="sticky top-0 bg-white z-10 drop-shadow-sm">
+                                        <TableRow>
+                                            <TableHead className="text-xs md:text-sm">{t('orders.date')}</TableHead>
+                                            <TableHead className="text-xs md:text-sm hidden sm:table-cell">{t('orders.productName')}</TableHead>
+                                            <TableHead className="text-xs md:text-sm">{t('orders.status')}</TableHead>
+                                            <TableHead className="text-xs md:text-sm hidden md:table-cell">{t('orders.shopMemo')}</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {ordersLoading ? (
+                                            <TableRow><TableCell colSpan={4} className="text-center py-4"><RefreshCw className="animate-spin h-5 w-5 mx-auto text-gray-400" /></TableCell></TableRow>
+                                        ) : orders
+                                            .filter(o => ['LINKED', 'ACTIVE', 'SHIPPED', 'COMPLETED', 'EXPIRED', 'BANNED'].includes(o.status))
+                                            .filter(o => !searchUuid || (o.id || o.qr_id).includes(searchUuid))
+                                            .length === 0 ? (
+                                            <TableRow><TableCell colSpan={4} className="text-center">{t('orders.noOrders')}</TableCell></TableRow>
+                                        ) : (
+                                            orders
+                                                .filter(o => ['LINKED', 'ACTIVE', 'SHIPPED', 'COMPLETED', 'EXPIRED', 'BANNED'].includes(o.status))
+                                                .filter(o => !searchUuid || (o.id || o.qr_id).includes(searchUuid))
+                                                .sort((a, b) => {
+                                                    const sortorder: { [name: string]: number } = { 'LINKED': 3, 'ACTIVE': 2, 'SHIPPED': 0, 'COMPLETED': 1, 'EXPIRED': 4, 'BANNED': 5 };
+                                                    // 1. Status: compare
+                                                    if (a.status !== b.status) return sortorder[a.status] - sortorder[b.status];
+                                                    // Date: Newest first
+                                                    const dateA = new Date(a.ts_updated_at || a.ts_created_at).getTime();
+                                                    const dateB = new Date(b.ts_updated_at || b.ts_created_at).getTime();
+                                                    return dateB - dateA;
+                                                })
+                                                .map((order: any) => {
+                                                    const product = products.find(p => p.product_id === order.product_id);
+                                                    const uuid = order.id || order.qr_id.replace('QR#', '');
+
+                                                    return (
+                                                        <Dialog key={order.qr_id}>
+                                                            <DialogTrigger asChild>
+                                                                <TableRow className="cursor-pointer hover:bg-gray-100">
+                                                                    <TableCell className="text-xs md:text-sm">
+                                                                        {order.ts_updated_at ? (
+                                                                            <div className="flex flex-col">
+                                                                                <span className="whitespace-nowrap">{new Date(order.ts_updated_at).toLocaleDateString()}</span>
+                                                                                <span className="text-[10px] text-gray-500 whitespace-nowrap">{new Date(order.ts_updated_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                                                            </div>
+                                                                        ) : "-"}
+                                                                    </TableCell>
+                                                                    <TableCell className="text-xs md:text-sm font-bold hidden md:table-cell">{product?.name || order.product_id}</TableCell>
+                                                                    <TableCell>
+                                                                        <span className={`px-2 py-1 rounded text-xs ${order.status === 'UNASSIGNED' ? 'bg-gray-100' :
+                                                                            order.status === 'LINKED' ? 'bg-emerald-100 text-emerald-800' :
+                                                                                order.status === 'ACTIVE' ? 'bg-yellow-100 text-yellow-800' :
+                                                                                    order.status === 'USED' ? 'bg-orange-100 text-orange-800' :
+                                                                                        order.status === 'SHIPPED' ? 'bg-indigo-100 text-indigo-800' :
+                                                                                            order.status === 'COMPLETED' ? 'bg-purple-100 text-purple-800' :
+                                                                                                order.status === 'EXPIRED' ? 'bg-gray-100 text-gray-800' :
+                                                                                                    order.status === 'BANNED' ? 'bg-red-100 text-red-800' :
+                                                                                                        'bg-green-100 text-green-800'
+                                                                            }`}>{st(order.status.toLowerCase())}</span>
+                                                                    </TableCell>
+                                                                    <TableCell className="font-medium hidden md:table-cell">{order.memo_for_shop}</TableCell>
+                                                                </TableRow>
+                                                            </DialogTrigger>
+                                                            <DialogContent className="max-w-md">
+                                                                <DialogHeader>
+                                                                    <DialogTitle>{t('orders.details')}</DialogTitle>
+                                                                    <DialogDescription className="font-mono text-xs text-gray-500 flex items-center gap-2">
+                                                                        ID: {uuid}
+                                                                        <Button
+                                                                            variant="ghost"
+                                                                            size="icon"
+                                                                            className="h-6 w-6"
+                                                                            onClick={(e) => { e.stopPropagation(); handleCopy(uuid); }}
+                                                                        >
+                                                                            {copiedId === uuid ? (
+                                                                                <Check className="h-3 w-3 text-green-500" />
+                                                                            ) : (
+                                                                                <Copy className="h-3 w-3" />
+                                                                            )}
+                                                                        </Button>
+                                                                    </DialogDescription>
+                                                                </DialogHeader>
+
+                                                                <div className="space-y-4 py-4 max-h-[70vh] overflow-y-auto">
+                                                                    {/* Product Info */}
+                                                                    <div>
+                                                                        <h4 className="text-sm font-semibold text-gray-500">{t('orders.productName')}</h4>
+                                                                        <p className="font-medium">{product?.name || order.product_id}</p>
+                                                                    </div>
+
+
+                                                                    {/* Status */}
+                                                                    <div>
+                                                                        <h4 className="text-sm font-semibold text-gray-500">{t('orders.status')}</h4>
+
+                                                                        <span className={`px-2 py-1 rounded text-xs ${order.status === 'UNASSIGNED' ? 'bg-gray-100' :
+                                                                            order.status === 'LINKED' ? 'bg-emerald-100 text-emerald-800' :
+                                                                                order.status === 'ACTIVE' ? 'bg-yellow-100 text-yellow-800' :
+                                                                                    order.status === 'USED' ? 'bg-orange-100 text-orange-800' :
+                                                                                        order.status === 'SHIPPED' ? 'bg-indigo-100 text-indigo-800' :
+                                                                                            order.status === 'COMPLETED' ? 'bg-purple-100 text-purple-800' :
+                                                                                                order.status === 'EXPIRED' ? 'bg-gray-100 text-gray-800' :
+                                                                                                    order.status === 'BANNED' ? 'bg-red-100 text-red-800' :
+                                                                                                        'bg-green-100 text-green-800'
+                                                                            }`}>{st(order.status.toLowerCase())}</span>
+                                                                    </div>
+
+                                                                    {/* Card Preview */}
+                                                                    {order.card_design && (
+                                                                        <div className="space-y-2">
+                                                                            <h4 className="text-sm font-semibold text-gray-500">{t('linkQr.cardDesign')}</h4>
+                                                                            {(order.thumbf || order.thumbb || cardformats[order.card_design]) && (
+                                                                                <div className="grid grid-cols-2 gap-2">
+                                                                                    <div className="space-y-1">
+                                                                                        <div className="aspect-[84/52] relative rounded shadow-sm overflow-hidden border border-gray-100 bg-white">
+                                                                                            <img
+                                                                                                src={order.thumbf || cardformats[order.card_design]?.bgimgf}
+                                                                                                alt="Front"
+                                                                                                className="w-full h-full object-cover"
+                                                                                                crossOrigin="anonymous"
+                                                                                            />
+                                                                                        </div>
+                                                                                    </div>
+                                                                                    <div className="space-y-1">
+                                                                                        <div className="aspect-[84/52] relative rounded shadow-sm overflow-hidden border border-gray-100 bg-white">
+                                                                                            <img
+                                                                                                src={order.thumbb || cardformats[order.card_design]?.bgimgb}
+                                                                                                alt="Back"
+                                                                                                className="w-full h-full object-cover"
+                                                                                                crossOrigin="anonymous"
+                                                                                            />
+                                                                                        </div>
+                                                                                    </div>
+                                                                                </div>
+                                                                            )}
+                                                                        </div>
+                                                                    )}
+
+                                                                    {/* Recipient Info */}
+                                                                    <div>
+                                                                        <h4 className="text-sm font-semibold text-gray-500">{t('orders.recipient')}</h4>
+                                                                        <p>{order.recipient_name}</p>
+                                                                    </div>
+                                                                    <div>
+                                                                        <h4 className="text-sm font-semibold text-gray-500">{t('orders.contact')}</h4>
+                                                                        <p className="break-all">{order.shipping_info?.email || '-'}</p>
+                                                                        <p className="text-sm mt-1">{order.shipping_info?.phone || '-'}</p>
+                                                                    </div>
+
+                                                                    <div>
+                                                                        <h4 className="text-sm font-semibold text-gray-500">{t('orders.address')}</h4>
+                                                                        {order.postal_code && <p className="text-sm">〒{order.postal_code}</p>}
+                                                                        <p className="whitespace-pre-wrap text-sm">{order.address}</p>
+                                                                    </div>
+
+                                                                    <div>
+                                                                        <h4 className="text-sm font-semibold text-gray-500">{t('orders.preferredDateTime')}</h4>
+                                                                        <p className="text-sm">{order.preferred_date ? order.preferred_date : '-'}  /  {order.preferred_time ? tt(order.preferred_time) : '-'}</p>
+                                                                    </div>
+
+                                                                    {/* Order Info */}
+                                                                    <div className="pt-2 space-y-4">
+                                                                        {/* Read-only view for SHIPPED, or we could allow edit. For now keeping read-only as per previous pattern but showing memos */}
+                                                                        {order.memo_for_users && (
+                                                                            <div>
+                                                                                <h4 className="text-sm font-semibold text-gray-500">{t('orders.userMessage')}</h4>
+                                                                                <p className="text-sm bg-blue-50 p-2 rounded">{order.memo_for_users}</p>
+                                                                            </div>
+                                                                        )}
+                                                                        {order.memo_for_shop && (
+                                                                            <div>
+                                                                                <h4 className="text-sm font-semibold text-gray-500">{t('orders.shopMemo')}</h4>
+                                                                                <p className="text-sm bg-gray-50 p-2 rounded">{order.memo_for_shop}</p>
+                                                                            </div>
+                                                                        )}
+                                                                        <div>
+                                                                            <h4 className="text-sm font-semibold text-gray-500">{t('orders.shipDialog.deliveryCompany')}</h4>
+                                                                            <p className="font-mono">{order.delivery_company || '-'}</p>
+                                                                        </div>
+                                                                        <div>
+                                                                            <h4 className="text-sm font-semibold text-gray-500">{t('orders.shipDialog.label')}</h4>
+                                                                            <p className="font-mono">{order.tracking_number || '-'}</p>
+                                                                        </div>
+                                                                    </div>
+
+                                                                    <div className="">
+                                                                        <div>
+                                                                            {/* Admin Meta Edit Section */}
+                                                                            <div className="pt-6 border-t border-dashed mt-6">
+                                                                                <h4 className="text-sm font-bold text-gray-900 mb-4 flex items-center gap-2">
+                                                                                    <Pencil className="w-4 h-4 text-gray-400" />
+                                                                                    {t('orders.updateMeta')}
+                                                                                </h4>
+                                                                                <form onSubmit={async (e) => {
+                                                                                    e.preventDefault();
+                                                                                    const fd = new FormData(e.currentTarget);
+                                                                                    await handleUpdateOrderMeta(
+                                                                                        uuid,
+                                                                                        undefined,
+                                                                                        undefined,
+                                                                                        fd.get('memo_for_users') as string,
+                                                                                        fd.get('memo_for_shop') as string
+                                                                                    );
+                                                                                }} className="space-y-4">
+
+                                                                                    <div className="space-y-2">
+                                                                                        <Label htmlFor={`m_u-${uuid}`} className="text-xs text-gray-500">{t('orders.userMessage')}</Label>
+                                                                                        <Textarea
+                                                                                            id={`m_u-${uuid}`}
+                                                                                            name="memo_for_users"
+                                                                                            defaultValue={order.memo_for_users || ""}
+                                                                                            disabled={['COMPLETED', 'EXPIRED', 'BANNED'].includes(order.status)}
+                                                                                            placeholder={['COMPLETED', 'EXPIRED', 'BANNED'].includes(order.status) ? t('orders.shipDialog.Completed-state messages cannot be updated') : ""}
+                                                                                            className="text-sm min-h-[60px]"
+                                                                                        />
+                                                                                    </div>
+
+                                                                                    <div className="space-y-2">
+                                                                                        <Label htmlFor={`m_s-${uuid}`} className="text-xs text-gray-500">{t('orders.shopMemo')}</Label>
+                                                                                        <Textarea
+                                                                                            id={`m_s-${uuid}`}
+                                                                                            name="memo_for_shop"
+                                                                                            defaultValue={order.memo_for_shop || ""}
+                                                                                            className="text-sm min-h-[60px]"
+                                                                                        />
+                                                                                    </div>
+
+                                                                                    <Button
+                                                                                        type="submit"
+                                                                                        className="w-full"
+                                                                                        disabled={shippingOrderId === uuid}
+                                                                                    >
+                                                                                        {shippingOrderId === uuid ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}
+                                                                                        {shippingOrderId === uuid ? t('orders.processing') : t('shopSettings.submit')}
+                                                                                    </Button>
+                                                                                </form>
+                                                                            </div>
+
+                                                                            <div className="pt-6 border-t mt-6">
+                                                                                <div>
+                                                                                    <h4 className="text-sm font-semibold text-gray-500 mb-2">{t('orders.timestamps')}</h4>
+                                                                                    <p className="text-sm">{ts('ts_updated_at') + ": " + (order.ts_updated_at ? new Date(order.ts_updated_at).toLocaleString() : "-")}</p>
+                                                                                    <p className="text-sm">{ts('ts_linked_at') + ": " + (order.ts_linked_at ? new Date(order.ts_linked_at).toLocaleString() : "-")}</p>
+                                                                                    <p className="text-sm">{ts('ts_activated_at') + ": " + (order.ts_activated_at ? new Date(order.ts_activated_at).toLocaleString() : "-")}</p>
+                                                                                    <p className="text-sm">{ts('ts_submitted_at') + ": " + (order.ts_submitted_at ? new Date(order.ts_submitted_at).toLocaleString() : "-")}</p>
+                                                                                    <p className="text-sm">{ts('ts_shipped_at') + ": " + (order.ts_shipped_at ? new Date(order.ts_shipped_at).toLocaleString() : "-")}</p>
+                                                                                    <p className="text-sm">{ts('ts_completed_at') + ": " + (order.ts_completed_at ? new Date(order.ts_completed_at).toLocaleString() : "-")}</p>
+                                                                                    <p className="text-sm">{ts('ts_expired_at') + ": " + (order.ts_expired_at ? new Date(order.ts_expired_at).toLocaleString() : "-")}</p>
+                                                                                    <p className="text-sm">{ts('ts_banned_at') + ": " + (order.ts_banned_at ? new Date(order.ts_banned_at).toLocaleString() : "-")}</p>
+                                                                                </div>
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            </DialogContent>
+                                                        </Dialog>
+                                                    );
+                                                })
+                                        )}
+                                    </TableBody>
+                                </Table>
+                            </CardContent>
+                        </Card>
+
+                        {/* Status Guide */}
+                        <Card>
+                            <CardHeader>
+                                <CardTitle className="flex items-center gap-2">
+                                    <HelpCircle className="w-5 h-5" />
+                                    {t('statusGuide.title')}
+                                </CardTitle>
+                                <CardDescription>{t('statusGuide.description')}</CardDescription>
+                            </CardHeader>
+                            <CardContent className="space-y-8">
+                                {/* Flow */}
+                                <div className="space-y-4">
+                                    <h3 className="font-bold text-gray-700">{t('statusGuide.flow')}</h3>
+                                    <div className="flex flex-wrap items-center gap-2 text-sm">
+                                        <span className="px-3 py-1 bg-gray-100 text-gray-700">    {st('unassigned')}</span>                                <ArrowRight className="w-4 h-4 text-gray-400" />
+                                        <span className="px-3 py-1 bg-emerald-100 text-emerald-800">  {st('linked')}    </span>                                <ArrowRight className="w-4 h-4 text-gray-400" />
+                                        <span className="px-3 py-1 bg-yellow-100 text-yellow-800">{st('active')}    </span>                                <ArrowRight className="w-4 h-4 text-gray-400" />
+                                        <span className="px-3 py-1 bg-orange-100 text-orange-800">{st('used')}      </span>                                <ArrowRight className="w-4 h-4 text-gray-400" />
+                                        <span className="px-3 py-1 bg-indigo-100 text-indigo-800">  {st('shipped')}   </span>                                <ArrowRight className="w-4 h-4 text-gray-400" />
+                                        <span className="px-3 py-1 bg-purple-100 text-purple-800">{st('completed')} </span>
+                                    </div>
+                                </div>
+
+                                {/* <span className={`px-2 py-1 rounded text-xs ${order.status === 'UNASSIGNED' ? 'bg-gray-100' :
                             order.status === 'LINKED' ? 'bg-emerald-100 text-emerald-800' :
                                 order.status === 'ACTIVE' ? 'bg-yellow-100 text-yellow-800' :
                                     order.status === 'USED' ? 'bg-orange-100 text-orange-800' :
@@ -2272,62 +1957,433 @@ export default function ShopPage() {
                                                 order.status === 'EXPIRED' ? 'bg-gray-100 text-gray-800' :
                                                     order.status === 'BANNED' ? 'bg-red-100 text-red-800' :
                                                         'bg-green-100 text-green-800' */}
-                        {/* List */}
-                        <div className="space-y-4">
-                            <h3 className="font-bold text-gray-700">{t('statusGuide.list')}</h3>
-                            <div className="grid gap-4 sm:grid-cols-2">
-                                <div className="space-y-2">
-                                    <div className="flex items-center gap-2">
-                                        <span className="bg-gray-100 text-gray-700 px-2 py-1 rounded text-xs">{st('unassigned')}</span>
+                                {/* List */}
+                                <div className="space-y-4">
+                                    <h3 className="font-bold text-gray-700">{t('statusGuide.list')}</h3>
+                                    <div className="grid gap-4 sm:grid-cols-2">
+                                        <div className="space-y-2">
+                                            <div className="flex items-center gap-2">
+                                                <span className="bg-gray-100 text-gray-700 px-2 py-1 rounded text-xs">{st('unassigned')}</span>
+                                            </div>
+                                            <p className="text-sm text-gray-600 pl-2 border-l-2 border-gray-200">{t('statusGuide.statuses.unassigned')}</p>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <div className="flex items-center gap-2">
+                                                <span className="bg-emerald-100 text-emerald-800 px-2 py-1 rounded text-xs">{st('linked')}</span>
+                                            </div>
+                                            <p className="text-sm text-gray-600 pl-2 border-l-2 border-emerald-200">{t('statusGuide.statuses.linked')}</p>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <div className="flex items-center gap-2">
+                                                <span className="bg-yellow-100 text-yellow-800 px-2 py-1 rounded text-xs">{st('active')}</span>
+                                            </div>
+                                            <p className="text-sm text-gray-600 pl-2 border-l-2 border-yellow-200">{t('statusGuide.statuses.active')}</p>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <div className="flex items-center gap-2">
+                                                <span className="bg-orange-100 text-orange-800 px-2 py-1 rounded text-xs">{st('used')}</span>
+                                            </div>
+                                            <p className="text-sm text-gray-600 pl-2 border-l-2 border-orange-200">{t('statusGuide.statuses.used')}</p>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <div className="flex items-center gap-2">
+                                                <span className="bg-indigo-100 text-indigo-800 px-2 py-1 rounded text-xs">{st('shipped')}</span>
+                                            </div>
+                                            <p className="text-sm text-gray-600 pl-2 border-l-2 border-indigo-200">{t('statusGuide.statuses.shipped')}</p>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <div className="flex items-center gap-2">
+                                                <span className="bg-purple-100 text-purple-800 px-2 py-1 rounded text-xs">{st('completed')}</span>
+                                            </div>
+                                            <p className="text-sm text-gray-600 pl-2 border-l-2 border-purple-200">{t('statusGuide.statuses.completed')}</p>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <div className="flex items-center gap-2">
+                                                <span className="bg-gray-200 text-gray-800 px-2 py-1 rounded text-xs">{st('expired')}</span>
+                                            </div>
+                                            <p className="text-sm text-gray-600 pl-2 border-l-2 border-gray-300">{t('statusGuide.statuses.expired')}</p>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <div className="flex items-center gap-2">
+                                                <span className="bg-red-100 text-red-800 px-2 py-1 rounded text-xs">{st('banned')}</span>
+                                            </div>
+                                            <p className="text-sm text-gray-600 pl-2 border-l-2 border-red-200">{t('statusGuide.statuses.banned')}</p>
+                                        </div>
                                     </div>
-                                    <p className="text-sm text-gray-600 pl-2 border-l-2 border-gray-200">{t('statusGuide.statuses.unassigned')}</p>
                                 </div>
-                                <div className="space-y-2">
-                                    <div className="flex items-center gap-2">
-                                        <span className="bg-emerald-100 text-emerald-800 px-2 py-1 rounded text-xs">{st('linked')}</span>
-                                    </div>
-                                    <p className="text-sm text-gray-600 pl-2 border-l-2 border-emerald-200">{t('statusGuide.statuses.linked')}</p>
-                                </div>
-                                <div className="space-y-2">
-                                    <div className="flex items-center gap-2">
-                                        <span className="bg-yellow-100 text-yellow-800 px-2 py-1 rounded text-xs">{st('active')}</span>
-                                    </div>
-                                    <p className="text-sm text-gray-600 pl-2 border-l-2 border-yellow-200">{t('statusGuide.statuses.active')}</p>
-                                </div>
-                                <div className="space-y-2">
-                                    <div className="flex items-center gap-2">
-                                        <span className="bg-orange-100 text-orange-800 px-2 py-1 rounded text-xs">{st('used')}</span>
-                                    </div>
-                                    <p className="text-sm text-gray-600 pl-2 border-l-2 border-orange-200">{t('statusGuide.statuses.used')}</p>
-                                </div>
-                                <div className="space-y-2">
-                                    <div className="flex items-center gap-2">
-                                        <span className="bg-indigo-100 text-indigo-800 px-2 py-1 rounded text-xs">{st('shipped')}</span>
-                                    </div>
-                                    <p className="text-sm text-gray-600 pl-2 border-l-2 border-indigo-200">{t('statusGuide.statuses.shipped')}</p>
-                                </div>
-                                <div className="space-y-2">
-                                    <div className="flex items-center gap-2">
-                                        <span className="bg-purple-100 text-purple-800 px-2 py-1 rounded text-xs">{st('completed')}</span>
-                                    </div>
-                                    <p className="text-sm text-gray-600 pl-2 border-l-2 border-purple-200">{t('statusGuide.statuses.completed')}</p>
-                                </div>
-                                <div className="space-y-2">
-                                    <div className="flex items-center gap-2">
-                                        <span className="bg-gray-200 text-gray-800 px-2 py-1 rounded text-xs">{st('expired')}</span>
-                                    </div>
-                                    <p className="text-sm text-gray-600 pl-2 border-l-2 border-gray-300">{t('statusGuide.statuses.expired')}</p>
-                                </div>
-                                <div className="space-y-2">
-                                    <div className="flex items-center gap-2">
-                                        <span className="bg-red-100 text-red-800 px-2 py-1 rounded text-xs">{st('banned')}</span>
-                                    </div>
-                                    <p className="text-sm text-gray-600 pl-2 border-l-2 border-red-200">{t('statusGuide.statuses.banned')}</p>
+                            </CardContent>
+                        </Card>
+                    </div>
+                )}
+
+                {/* --- Wrapper for Products --- */}
+                {activeTab === 'products' && (
+                    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                        {/* Existing Products */}
+                        <Card style={{ maxHeight: 'calc(100vh - 100px)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                            <CardHeader className="flex flex-row items-center justify-between shrink-0">
+                                <CardTitle>{t('products')}</CardTitle>
+                            </CardHeader>
+                            <div style={{ flex: '1 1 auto', overflowY: 'auto', minHeight: 0 }} className="p-4 w-full">
+                                <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                                    {productsLoading ? (
+                                        <div className="col-span-full py-8 flex justify-center"><RefreshCw className="animate-spin h-6 w-6 text-gray-400" /></div>
+                                    ) : products.map((product) => (
+                                        <Dialog key={product.product_id}>
+                                            <DialogTrigger asChild>
+                                                <Card className="overflow-hidden cursor-pointer hover:ring-2 hover:ring-primary/50 transition-all relative aspect-[84/52]">
+                                                    {/* 背景: カードデザイン */}
+                                                    {product.design && (
+                                                        <img
+                                                            src={product.design.thumbf || product.design.bgimgf}
+                                                            alt={product.design.name}
+                                                            className="absolute inset-0 w-full h-full object-cover"
+                                                            crossOrigin="anonymous"
+                                                        />
+                                                    )}
+                                                    {/* オーバーレイ */}
+                                                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+
+                                                    {/* 商品画像 (小) */}
+                                                    {product.image_url && (
+                                                        <div className="absolute bottom-2 right-2 w-10 h-10 rounded-md overflow-hidden border border-white/50 shadow-md bg-white">
+                                                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                                                            <img
+                                                                src={product.image_url}
+                                                                alt={product.name}
+                                                                className="w-full h-full object-cover"
+                                                            />
+                                                        </div>
+                                                    )}
+
+                                                    {/* 商品名と価格 */}
+                                                    <div className="absolute bottom-0 left-0 right-0 p-2.5 text-white">
+                                                        <h3 className="font-bold text-xs truncate drop-shadow-lg">{product.name}</h3>
+                                                        {/* <p className="text-[10px] opacity-90 drop-shadow-md">¥{product.price ? Number(product.price).toLocaleString("ja-JP") : "0"}</p> */}
+                                                    </div>
+
+                                                    {/* ステータスバッジ */}
+                                                    <div className="absolute top-2 left-2 flex gap-1">
+                                                        <span className={`px-1.5 py-0.5 rounded text-[8px] font-bold backdrop-blur-sm ${product.status === 'ACTIVE' ? 'bg-green-500/80 text-white' : 'bg-red-500/80 text-white'
+                                                            }`}>
+                                                            {product.status}
+                                                        </span>
+                                                    </div>
+                                                </Card>
+                                            </DialogTrigger>
+                                            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                                                <DialogHeader>
+                                                    <DialogTitle>{t('productDetails.title')}</DialogTitle>
+                                                </DialogHeader>
+                                                <div className="space-y-6 py-4">
+                                                    <div className="aspect-[16/9] w-full relative rounded-lg overflow-hidden border">
+                                                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                                                        <img src={product.image_url} alt={product.name} className="w-full h-full object-cover" />
+                                                    </div>
+
+                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                        <div className="space-y-1">
+                                                            <p className="text-xs text-gray-500 font-medium">{t('productDetails.name')}</p>
+                                                            <p className="font-bold text-lg">{product.name}</p>
+                                                        </div>
+                                                        <div className="space-y-1 col-span-2">
+                                                            <p className="text-xs text-gray-500 font-medium">{t('productDetails.description')}</p>
+                                                            <p className="text-sm text-gray-700 whitespace-pre-wrap">{product.description || '-'}</p>
+                                                        </div>
+                                                        <div className="space-y-1">
+                                                            <p className="text-xs text-gray-500 font-medium">{t('productDetails.price')}</p>
+                                                            <p className="font-bold text-lg text-emerald-600">¥{Number(product.price || 0).toLocaleString()}</p>
+                                                        </div>
+                                                        <div className="space-y-1">
+                                                            <p className="text-xs text-gray-500 font-medium">{t('productDetails.validDays')}</p>
+                                                            <p className="font-medium">{product.valid_days || APP_CONFIG.DEFAULT_VALID_DAYS} {t('productDetails.validDaysSuffix')}</p>
+                                                        </div>
+                                                    </div>
+
+                                                    {product.design && (
+                                                        <div className="space-y-3 p-4 bg-gray-50 rounded-lg border border-gray-100">
+                                                            <div className="text-xs text-gray-500 font-bold flex items-center gap-2">
+                                                                <div className="w-1 h-3 bg-primary rounded-full" />
+                                                                {t('addProduct.cardDesign')}
+                                                            </div>
+                                                            <div className="flex flex-col sm:flex-row gap-4">
+                                                                <div className="flex flex-wrap gap-4 w-full sm:w-auto shrink-0">
+                                                                    <div className="flex flex-col gap-1">
+                                                                        <p className="text-[10px] text-gray-400 font-bold">{t('productDetails.front')}</p>
+                                                                        <div className="w-full sm:w-48 aspect-[84/52] rounded-md border-2 border-white shadow-sm overflow-hidden bg-white">
+                                                                            <img src={product.design.thumbf} alt={product.design.name} className="w-full h-full object-cover" crossOrigin="anonymous" />
+                                                                        </div>
+                                                                    </div>
+                                                                    {product.design.thumbb && (
+                                                                        <div className="flex flex-col gap-1">
+                                                                            <p className="text-[10px] text-gray-400 font-bold">{t('productDetails.back')}</p>
+                                                                            <div className="w-full sm:w-48 aspect-[84/52] rounded-md border-2 border-white shadow-sm overflow-hidden bg-white">
+                                                                                <img src={product.design.thumbb} alt={product.design.name} className="w-full h-full object-cover" crossOrigin="anonymous" />
+                                                                            </div>
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                                <div className="flex-1 space-y-1 py-1">
+                                                                    <p className="font-bold text-gray-900">{product.design.name}</p>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    )}
+
+
+                                                    {product.detail_html && (
+                                                        <>
+                                                            <div className="w-full space-y-4 pt-4 border-t">
+                                                                <div className="w-full space-y-2">
+                                                                    <p className="w-full text-xs text-gray-500 font-medium">{t('productDetails.detailHtml')}</p>
+                                                                    <div className="w-full border rounded-md p-4 bg-white shadow-sm overflow-hidden">
+                                                                        <CardContent className="min-h-0 flex flex-1 p-0 w-full"> {/* w-fullを追加 */}
+                                                                            <div className="w-full mt-0 mr-0 ml-0 p-0 relative"> {/* w-fullを追加 */}
+                                                                                {/* Top fade effect */}
+                                                                                {/* <div className="absolute top-0 left-0 right-0 h-5 bg-gradient-to-b from-white to-transparent pointer-events-none z-10" /> */}
+
+                                                                                {/* コンテンツ */}
+                                                                                <SandboxedHtml html={debouncedPreviewHtml} />
+
+                                                                                {/* Bottom fade effect */}
+                                                                                {/* <div className="absolute bottom-0 left-0 right-0 h-5 bg-gradient-to-t from-white to-transparent pointer-events-none z-10" /> */}
+                                                                            </div>
+                                                                        </CardContent>
+                                                                    </div>
+                                                                </div>
+                                                                <div className="space-y-2">
+                                                                    <p className="text-xs text-gray-500 font-medium">{t('productDetails.rawDetailHtml')}</p>
+                                                                    <textarea
+                                                                        readOnly
+                                                                        value={product.detail_html}
+                                                                        className="w-full h-32 p-3 text-xs font-mono bg-gray-50 border rounded-md focus:outline-none focus:ring-1 focus:ring-primary/20"
+                                                                    />
+                                                                </div>
+                                                            </div>
+                                                        </>
+                                                        // <div className="w-full space-y-4 pt-4 border-t">
+                                                        //     <div className="w-full space-y-2">
+                                                        //         <p className="w-full text-xs text-gray-500 font-medium">{t('productDetails.detailHtml')}</p>
+                                                        //         <div className="w-full border rounded-md p-4 bg-white shadow-sm overflow-hidden">
+                                                        //             <SandboxedHtml html={product.detail_html} />
+                                                        //         </div>
+                                                        //     </div>
+                                                        //     <div className="space-y-2">
+                                                        //         <p className="text-xs text-gray-500 font-medium">{t('productDetails.rawDetailHtml')}</p>
+                                                        //         <textarea
+                                                        //             readOnly
+                                                        //             value={product.detail_html}
+                                                        //             className="w-full h-32 p-3 text-xs font-mono bg-gray-50 border rounded-md focus:outline-none focus:ring-1 focus:ring-primary/20"
+                                                        //         />
+                                                        //     </div>
+                                                        // </div>
+                                                    )}
+                                                </div>
+                                                <div className="mt-8 pt-6 border-t border-dashed border-gray-100">
+                                                    <div className="flex flex-col gap-1">
+                                                        <p className="text-[9px] font-mono text-gray-400">Product ID: {product.product_id}</p>
+                                                        <p className="text-[9px] font-mono text-gray-400">Design ID: {product.design.design_id}</p>
+                                                    </div>
+                                                </div>
+                                                <DialogFooter className="mt-6">
+                                                    <div className="flex w-full items-center justify-between">
+                                                        <div className="flex gap-2">
+                                                            <Button variant="outline" size="sm" onClick={() => handleToggleStatus(product.product_id, product.status)} disabled={togglingProductId === product.product_id}>
+                                                                {togglingProductId === product.product_id ? t('linkQr.processing') : (product.status === 'ACTIVE' ? t('product.stop') : t('product.activate'))}
+                                                            </Button>
+                                                            <Button variant="outline" size="sm" onClick={() => handleOpenDuplicateDialog(product)}>
+                                                                <Copy className="w-4 h-4 mr-1" />
+                                                                {t('productDetails.duplicate')}
+                                                            </Button>
+                                                            <Button variant="outline" size="sm" onClick={() => handleOpenEditDialog(product)}>
+                                                                <Pencil className="w-4 h-4 mr-1" />
+                                                                {t('productDetails.edit')}
+                                                            </Button>
+                                                            {product.status !== 'ACTIVE' && (
+                                                                <Button variant="destructive" size="sm" onClick={() => handleDeleteProduct(product.product_id, product.name)} disabled={deletingProductId === product.product_id}>
+                                                                    {deletingProductId === product.product_id ? t('linkQr.processing') : t('product.delete')}
+                                                                </Button>
+                                                            )}
+                                                        </div>
+                                                        <DialogTrigger asChild>
+                                                            <Button variant="outline" size="sm" className="px-4">{t('productDetails.close')}</Button>
+                                                        </DialogTrigger>
+                                                    </div>
+                                                </DialogFooter>
+                                            </DialogContent>
+                                        </Dialog>
+                                    ))}
+                                    {/* 商品追加 */}
+                                    <Dialog open={isAddProductDialogOpen} onOpenChange={(open) => {
+                                        setIsAddProductDialogOpen(open);
+                                        if (!open) {
+                                            setEditingProduct(null);
+                                            setIsDuplicateMode(false);
+                                            setSelectedCardDesignId('');
+                                        }
+                                    }}>
+                                        <DialogTrigger asChild>
+                                            <Card
+                                                className="overflow-hidden cursor-pointer hover:ring-2 hover:ring-primary/50 transition-all border-dashed border-2 flex flex-col items-center justify-center min-h-[120px] bg-gray-50/50 hover:bg-gray-50 aspect-[84/52]"
+                                                onClick={() => {
+                                                    setEditingProduct(null);
+                                                    setIsDuplicateMode(false);
+                                                    setSelectedCardDesignId('');
+                                                }}
+                                            >
+                                                <div className="flex flex-col items-center gap-1 text-gray-400 group-hover:text-primary">
+                                                    <Plus className="w-8 h-8" />
+                                                    <span className="text-xs font-bold">{t('addProduct.title')}</span>
+                                                </div>
+                                            </Card>
+                                        </DialogTrigger>
+                                        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                                            <DialogHeader>
+                                                <div className="flex items-center justify-between pr-8">
+                                                    <DialogTitle>{editingProduct ? t('editProduct.title') : t('addProduct.title')}</DialogTitle>
+
+                                                    {/* インポート */}
+                                                    {!editingProduct && (
+                                                        <Dialog open={isImportDialogOpen} onOpenChange={setIsImportDialogOpen}>
+                                                            <DialogTrigger asChild>
+                                                                <Button variant="outline" size="sm">{t('importProduct.button')}</Button>
+                                                            </DialogTrigger>
+                                                            <DialogContent>
+                                                                <DialogHeader>
+                                                                    <DialogTitle>{t('importProduct.dialogTitle')}</DialogTitle>
+                                                                    <DialogDescription>{t('importProduct.dialogDesc')}</DialogDescription>
+                                                                </DialogHeader>
+                                                                <div className="space-y-4 py-4">
+                                                                    <div className="space-y-2">
+                                                                        <Label htmlFor="importShop">{t('importProduct.selectShop')}</Label>
+                                                                        <select
+                                                                            id="importShop"
+                                                                            className="w-full p-2 border rounded-md"
+                                                                            value={selectedImportShopId}
+                                                                            onChange={(e) => setSelectedImportShopId(e.target.value)}
+                                                                        >
+                                                                            <option value="">{t('importProduct.placeholder')}</option>
+                                                                            {importShops.map(s => (
+                                                                                <option key={s.id} value={s.id}>{s.name || s.id}</option>
+                                                                            ))}
+                                                                        </select>
+                                                                    </div>
+                                                                </div>
+                                                                <DialogFooter>
+                                                                    <Button variant="ghost" onClick={() => setIsImportDialogOpen(false)} disabled={isImporting}>
+                                                                        {t('importProduct.cancel')}
+                                                                    </Button>
+                                                                    <Button onClick={handleImportProducts} disabled={isImporting || !selectedImportShopId}>
+                                                                        {isImporting ? t('linkQr.processing') : t('importProduct.submit')}
+                                                                    </Button>
+                                                                </DialogFooter>
+                                                            </DialogContent>
+                                                        </Dialog>
+                                                    )}
+                                                </div>
+                                            </DialogHeader>
+
+                                            <form key={editingProduct?.product_id || 'new'} onSubmit={handleCreateProduct} className="space-y-4 pt-4">
+                                                <div className="space-y-2">
+                                                    <Label htmlFor="name">{t('addProduct.name')}</Label>
+                                                    <Input id="name" name="name" defaultValue={editingProduct?.name} required />
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <Label htmlFor="description">{t('addProduct.description')}</Label>
+                                                    <Input id="description" name="description" defaultValue={editingProduct?.description} required />
+                                                </div>
+                                                <div className="grid grid-cols-2 gap-4">
+                                                    <div className="space-y-2">
+                                                        <Label htmlFor="price">{t('addProduct.price')}</Label>
+                                                        <Input id="price" name="price" type="number" min="0" defaultValue={editingProduct?.price} required />
+                                                    </div>
+                                                    <div className="space-y-2">
+                                                        <Label htmlFor="valid_days">{t('addProduct.validDays')}</Label>
+                                                        <Input id="valid_days" name="valid_days" type="number" defaultValue={editingProduct?.valid_days || APP_CONFIG.DEFAULT_VALID_DAYS} min={1} required />
+                                                    </div>
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <Label htmlFor="image">{t('addProduct.image') + (editingProduct ? ' (' + t('editProduct.ifChange') + ')' : '')}</Label>
+                                                    {editingProduct && <p className="text-xs text-gray-500">{t('editProduct.beforeImage')}</p>}
+                                                    {editingProduct && <img src={editingProduct?.image_url} className="w-full h-auto rounded-md border shadow-sm" />}
+                                                    <Input id="image" name="image" type="file" accept="image/png, image/jpeg, image/gif, image/webp" required={!editingProduct} />
+                                                    <p className="text-xs text-gray-500">{t('addProduct.imagePlaceholder')}</p>
+                                                </div>
+
+                                                {/* Card Design Selection */}
+                                                <div className="space-y-4 pt-4 border-t">
+                                                    <div className="flex items-center justify-between">
+                                                        <Label className="text-sm font-bold flex items-center gap-2">
+                                                            <div className="w-1 h-4 bg-primary rounded-full" />
+                                                            {t('addProduct.cardDesign')}
+                                                        </Label>
+                                                        {(!shop?.allowed_designs || shop.allowed_designs.length === 0) && (
+                                                            <span className="text-[10px] text-red-500 font-medium">
+                                                                {t('addProduct.noDesignsLinked')}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <div className="grid grid-cols-2 gap-3 max-h-[300px] overflow-y-auto p-1">
+                                                        {shop?.allowed_designs?.map((design: any) => (
+                                                            <div
+                                                                key={`${design.design_id}`}
+                                                                onClick={() => setSelectedCardDesignId(design.design_id)}
+                                                                className={`group relative aspect-[84/52] rounded-lg border-2 overflow-hidden cursor-pointer transition-all hover:shadow-md ${selectedCardDesignId === design.design_id
+                                                                    ? 'border-green-500 ring-2 ring-green-500/20 shadow-lg'
+                                                                    : 'border-gray-100 hover:border-primary/30'
+                                                                    }`}
+                                                            >
+                                                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                                                <img
+                                                                    src={design.thumbf || design.bgimgf}
+                                                                    alt={design.name}
+                                                                    className="w-full h-full object-cover"
+                                                                    crossOrigin="anonymous"
+                                                                />
+                                                                <div className={`absolute bottom-0 left-0 right-0 bg-black/60 p-1.5 transition-all duration-300 ${selectedCardDesignId === design.design_id ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+                                                                    }`}>
+                                                                    <p className="text-[10px] text-white truncate text-center font-bold">
+                                                                        {design.name}
+                                                                    </p>
+                                                                    {design.description && (
+                                                                        <p className="text-[8px] text-gray-200 line-clamp-2 text-center mt-0.5 leading-tight opacity-0 group-hover:opacity-100 transition-opacity duration-500">
+                                                                            {design.description}
+                                                                        </p>
+                                                                    )}
+                                                                </div>
+                                                                {selectedCardDesignId === design.design_id && (
+                                                                    <div className="absolute top-0 right-0">
+                                                                        <div className="bg-green-500 text-white text-[9px] font-bold px-2 py-0.5 rounded-bl shadow-sm flex items-center gap-1">
+                                                                            <Check className="w-2.5 h-2.5" />
+                                                                        </div>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+
+                                                <Button type="submit" className="w-full" disabled={isCreatingProduct || !selectedCardDesignId}>
+                                                    {isCreatingProduct ? t('linkQr.processing') : (editingProduct ? t('shopSettings.submit') : t('addProduct.submit'))}
+                                                </Button>
+                                            </form>
+                                        </DialogContent>
+                                    </Dialog>
                                 </div>
                             </div>
-                        </div>
-                    </CardContent>
-                </Card>
+                        </Card>
+
+
+
+
+
+
+
+
+
+                    </div>
+                )}
+
 
 
             </div>

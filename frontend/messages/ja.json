@@ -143,6 +143,11 @@
     "refresh": "更新",
     "incomingOrders": "発送待ち",
     "ordersDesc": "注文と発送を管理します。",
+    "tabs": {
+      "activation": "アクティベーション",
+      "shipping": "注文管理",
+      "products": "商品登録・カード発注"
+    },
     "orders": {
       "date": "更新日時",
       "recipient": "受取人",
