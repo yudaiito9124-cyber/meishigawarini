@@ -198,7 +198,10 @@
       "success": "Product created!",
       "failed": "Failed to create product",
       "error": "Error creating product",
-      "imageUploadFailed": "Failed to upload image"
+      "imageUploadFailed": "Failed to upload image",
+      "cardDesign": "Card Design (Required)",
+      "selectCardDesign": "Please select a card design",
+      "noDesignsLinked": "No card designs available. Please contact the system administrator."
     },
     "importProduct": {
       "button": "Bulk Import Products",

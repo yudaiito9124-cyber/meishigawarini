@@ -67,9 +67,12 @@ export default function ShopPage() {
     const [searchUuid, setSearchUuid] = useState('');
     const [shippingOrderId, setShippingOrderId] = useState<string | null>(null);
     const [isCreatingProduct, setIsCreatingProduct] = useState(false);
+    const [isAddProductDialogOpen, setIsAddProductDialogOpen] = useState(false);
     const [deletingProductId, setDeletingProductId] = useState<string | null>(null);
     const [togglingProductId, setTogglingProductId] = useState<string | null>(null);
     const [singleShopOwner, setSingleShopOwner] = useState<boolean>(true);
+    const [editingProduct, setEditingProduct] = useState<any | null>(null);
+    const [isDuplicateMode, setIsDuplicateMode] = useState(false);
 
     // Import Product State
     const [isImporting, setIsImporting] = useState(false);
@@ -85,6 +88,8 @@ export default function ShopPage() {
     const [copiedId, setCopiedId] = useState<string | null>(null);
     const [isAdmin, setIsAdmin] = useState(false);
     const [adminEmails, setAdminEmails] = useState<{ owner_email: string, manager_emails: string[] } | null>(null);
+
+    const [selectedCardDesignId, setSelectedCardDesignId] = useState<string>('');
 
     const checkAdminAuth = async () => {
         try {
@@ -340,7 +345,7 @@ export default function ShopPage() {
         const file = formData.get('image') as File;
 
         try {
-            let imageUrl = 'https://placehold.co/1280x720?text=No+Image';
+            let imageUrl = editingProduct?.image_url;
 
             // 1. Upload Image if exists
             if (file && file.size > 0) {
@@ -375,25 +380,63 @@ export default function ShopPage() {
                 imageUrl = publicUrl;
             }
 
-            // 2. Create Product
-            await shopApi.shop_products_create({
-                shopId: shopId!,
-                name: formData.get('name') as string,
-                description: formData.get('description') as string,
-                price: Number(formData.get('price')),
-                valid_days: Number(formData.get('valid_days')),
-                image_url: imageUrl,
-            });
+            if (editingProduct && !isDuplicateMode) {
+                // Update Product
+                await shopApi.shop_products_update({
+                    shopId: shopId!,
+                    product_id: editingProduct.product_id,
+                    name: formData.get('name') as string,
+                    description: formData.get('description') as string,
+                    price: Number(formData.get('price')),
+                    valid_days: Number(formData.get('valid_days')),
+                    image_url: imageUrl,
+                    card_design_id: selectedCardDesignId,
+                });
+                alert(t('editProduct.success'));
+            } else {
+                // Create Product (including Duplicate)
+                await shopApi.shop_products_create({
+                    shopId: shopId!,
+                    name: formData.get('name') as string,
+                    description: formData.get('description') as string,
+                    price: Number(formData.get('price')),
+                    valid_days: Number(formData.get('valid_days')),
+                    image_url: imageUrl || 'https://placehold.co/1280x720?text=No+Image',
+                    card_design_id: selectedCardDesignId,
+                });
+                alert(t('addProduct.success'));
+            }
 
-            alert(t('addProduct.success'));
             form.reset();
+            setSelectedCardDesignId('');
+            setEditingProduct(null);
+            setIsDuplicateMode(false);
+            setIsAddProductDialogOpen(false);
             fetchShopData(); // Refresh
         } catch (err) {
             // console.error(err);
-            alert(t('addProduct.error'));
+            if (editingProduct) {
+                alert(t('editProduct.error'));
+            } else {
+                alert(t('addProduct.error'));
+            }
         } finally {
             setIsCreatingProduct(false);
         }
+    };
+
+    const handleOpenEditDialog = (product: any) => {
+        setEditingProduct(product);
+        setIsDuplicateMode(false);
+        setSelectedCardDesignId(product.card_design_id || (product.design?.design_id) || '');
+        setIsAddProductDialogOpen(true);
+    };
+
+    const handleOpenDuplicateDialog = (product: any) => {
+        setEditingProduct(product);
+        setIsDuplicateMode(true);
+        setSelectedCardDesignId(product.card_design_id || (product.design?.design_id) || '');
+        setIsAddProductDialogOpen(true);
     };
 
     const handleLinkQr = async (e: React.FormEvent) => {
@@ -1555,43 +1598,44 @@ export default function ShopPage() {
                             ) : products.map((product) => (
                                 <Dialog key={product.product_id}>
                                     <DialogTrigger asChild>
-                                        <Card className="overflow-hidden cursor-pointer hover:ring-2 hover:ring-primary/50 transition-all">
-                                            <div className="w-full relative aspect-[16/9]">
+                                        <Card className="overflow-hidden cursor-pointer hover:ring-2 hover:ring-primary/50 transition-all relative aspect-[84/52]">
+                                            {/* 背景: カードデザイン */}
+                                            {product.design && (
                                                 <img
-                                                    src={product.image_url}
-                                                    alt={product.name}
-                                                    className="w-full aspect-video object-contain bg-gray-100"
+                                                    src={product.design.thumbf || product.design.bgimgf}
+                                                    alt={product.design.name}
+                                                    className="absolute inset-0 w-full h-full object-cover"
+                                                    crossOrigin="anonymous"
                                                 />
-                                                <div className="absolute top-2 right-2 flex gap-2">
-                                                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${product.status === 'ACTIVE' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                                                        }`}>
-                                                        {product.status}
-                                                    </span>
+                                            )}
+                                            {/* オーバーレイ */}
+                                            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+
+                                            {/* 商品画像 (小) */}
+                                            {product.image_url && (
+                                                <div className="absolute bottom-2 right-2 w-10 h-10 rounded-md overflow-hidden border border-white/50 shadow-md bg-white">
+                                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                                    <img
+                                                        src={product.image_url}
+                                                        alt={product.name}
+                                                        className="w-full h-full object-cover"
+                                                    />
                                                 </div>
+                                            )}
+
+                                            {/* 商品名と価格 */}
+                                            <div className="absolute bottom-0 left-0 right-0 p-2.5 text-white">
+                                                <h3 className="font-bold text-xs truncate drop-shadow-lg">{product.name}</h3>
+                                                {/* <p className="text-[10px] opacity-90 drop-shadow-md">¥{product.price ? Number(product.price).toLocaleString("ja-JP") : "0"}</p> */}
                                             </div>
-                                            <CardHeader className="px-3 pt-2 pb-1">
-                                                <CardTitle className="text-base truncate" title={product.name}>{product.name}</CardTitle>
-                                                <CardDescription className="line-clamp-1 text-xs">{product.description}</CardDescription>
-                                                <p className="text-xs text-gray-500 mt-0.5">
-                                                    {t('addProduct.validDays')}: {product.valid_days ? product.valid_days : APP_CONFIG.DEFAULT_VALID_DAYS}{t('productDetails.validDaysSuffix')}
-                                                </p>
-                                                <p className="text-[10px] text-gray-400 font-mono mt-1 truncate" title={product.product_id}>
-                                                    ID: {product.product_id}
-                                                </p>
-                                            </CardHeader>
-                                            <CardContent className="px-3 pb-2 pt-0 flex justify-between items-center">
-                                                <span className="font-bold text-sm">¥{product.price ? Number(product.price).toLocaleString("ja-JP") : "0"}</span>
-                                                <div className="flex gap-2">
-                                                    <Button variant="outline" size="sm" className="h-7 text-xs px-2" onClick={(e) => { e.stopPropagation(); handleToggleStatus(product.product_id, product.status); }} disabled={togglingProductId === product.product_id}>
-                                                        {togglingProductId === product.product_id ? t('linkQr.processing') : (product.status === 'ACTIVE' ? t('product.stop') : t('product.activate'))}
-                                                    </Button>
-                                                    {product.status !== 'ACTIVE' && (
-                                                        <Button variant="destructive" size="sm" className="h-7 text-xs px-2" onClick={(e) => { e.stopPropagation(); handleDeleteProduct(product.product_id, product.name); }} disabled={deletingProductId === product.product_id}>
-                                                            {deletingProductId === product.product_id ? t('linkQr.processing') : t('product.delete')}
-                                                        </Button>
-                                                    )}
-                                                </div>
-                                            </CardContent>
+
+                                            {/* ステータスバッジ */}
+                                            <div className="absolute top-2 left-2 flex gap-1">
+                                                <span className={`px-1.5 py-0.5 rounded text-[8px] font-bold backdrop-blur-sm ${product.status === 'ACTIVE' ? 'bg-green-500/80 text-white' : 'bg-red-500/80 text-white'
+                                                    }`}>
+                                                    {product.status}
+                                                </span>
+                                            </div>
                                         </Card>
                                     </DialogTrigger>
                                     <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -1609,6 +1653,10 @@ export default function ShopPage() {
                                                     <p className="text-xs text-gray-500 font-medium">{t('productDetails.name')}</p>
                                                     <p className="font-bold text-lg">{product.name}</p>
                                                 </div>
+                                                <div className="space-y-1 col-span-2">
+                                                    <p className="text-xs text-gray-500 font-medium">{t('productDetails.description')}</p>
+                                                    <p className="text-sm text-gray-700 whitespace-pre-wrap">{product.description || '-'}</p>
+                                                </div>
                                                 <div className="space-y-1">
                                                     <p className="text-xs text-gray-500 font-medium">{t('productDetails.price')}</p>
                                                     <p className="font-bold text-lg text-emerald-600">¥{Number(product.price || 0).toLocaleString()}</p>
@@ -1617,16 +1665,38 @@ export default function ShopPage() {
                                                     <p className="text-xs text-gray-500 font-medium">{t('productDetails.validDays')}</p>
                                                     <p className="font-medium">{product.valid_days || APP_CONFIG.DEFAULT_VALID_DAYS} {t('productDetails.validDaysSuffix')}</p>
                                                 </div>
-                                                <div className="space-y-1">
-                                                    <p className="text-xs text-gray-500 font-medium">ID</p>
-                                                    <p className="font-mono text-xs text-gray-400 break-all">{product.product_id}</p>
-                                                </div>
                                             </div>
 
-                                            <div className="space-y-1">
-                                                <p className="text-xs text-gray-500 font-medium">{t('productDetails.description')}</p>
-                                                <p className="text-sm text-gray-700 whitespace-pre-wrap">{product.description || '-'}</p>
-                                            </div>
+                                            {product.design && (
+                                                <div className="space-y-3 p-4 bg-gray-50 rounded-lg border border-gray-100">
+                                                    <div className="text-xs text-gray-500 font-bold flex items-center gap-2">
+                                                        <div className="w-1 h-3 bg-primary rounded-full" />
+                                                        {t('addProduct.cardDesign')}
+                                                    </div>
+                                                    <div className="flex flex-col sm:flex-row gap-4">
+                                                        <div className="flex flex-wrap gap-4 w-full sm:w-auto shrink-0">
+                                                            <div className="flex flex-col gap-1">
+                                                                <p className="text-[10px] text-gray-400 font-bold">{t('productDetails.front')}</p>
+                                                                <div className="w-full sm:w-48 aspect-[84/52] rounded-md border-2 border-white shadow-sm overflow-hidden bg-white">
+                                                                    <img src={product.design.thumbf} alt={product.design.name} className="w-full h-full object-cover" crossOrigin="anonymous" />
+                                                                </div>
+                                                            </div>
+                                                            {product.design.thumbb && (
+                                                                <div className="flex flex-col gap-1">
+                                                                    <p className="text-[10px] text-gray-400 font-bold">{t('productDetails.back')}</p>
+                                                                    <div className="w-full sm:w-48 aspect-[84/52] rounded-md border-2 border-white shadow-sm overflow-hidden bg-white">
+                                                                        <img src={product.design.thumbb} alt={product.design.name} className="w-full h-full object-cover" crossOrigin="anonymous" />
+                                                                    </div>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                        <div className="flex-1 space-y-1 py-1">
+                                                            <p className="font-bold text-gray-900">{product.design.name}</p>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )}
+
 
                                             {product.detail_html && (
                                                 <>
@@ -1676,99 +1746,196 @@ export default function ShopPage() {
                                                 // </div>
                                             )}
                                         </div>
-                                        <DialogFooter>
-                                            <DialogTrigger asChild>
-                                                <Button variant="outline">{t('productDetails.close')}</Button>
-                                            </DialogTrigger>
+                                        <div className="mt-8 pt-6 border-t border-dashed border-gray-100">
+                                            <div className="flex flex-col gap-1">
+                                                <p className="text-[9px] font-mono text-gray-400">Product ID: {product.product_id}</p>
+                                                <p className="text-[9px] font-mono text-gray-400">Design ID: {product.design.design_id}</p>
+                                            </div>
+                                        </div>
+                                        <DialogFooter className="mt-6">
+                                            <div className="flex w-full items-center justify-between">
+                                                <div className="flex gap-2">
+                                                    <Button variant="outline" size="sm" onClick={() => handleToggleStatus(product.product_id, product.status)} disabled={togglingProductId === product.product_id}>
+                                                        {togglingProductId === product.product_id ? t('linkQr.processing') : (product.status === 'ACTIVE' ? t('product.stop') : t('product.activate'))}
+                                                    </Button>
+                                                    <Button variant="outline" size="sm" onClick={() => handleOpenDuplicateDialog(product)}>
+                                                        <Copy className="w-4 h-4 mr-1" />
+                                                        {t('productDetails.duplicate')}
+                                                    </Button>
+                                                    <Button variant="outline" size="sm" onClick={() => handleOpenEditDialog(product)}>
+                                                        <Pencil className="w-4 h-4 mr-1" />
+                                                        {t('productDetails.edit')}
+                                                    </Button>
+                                                    {product.status !== 'ACTIVE' && (
+                                                        <Button variant="destructive" size="sm" onClick={() => handleDeleteProduct(product.product_id, product.name)} disabled={deletingProductId === product.product_id}>
+                                                            {deletingProductId === product.product_id ? t('linkQr.processing') : t('product.delete')}
+                                                        </Button>
+                                                    )}
+                                                </div>
+                                                <DialogTrigger asChild>
+                                                    <Button variant="outline" size="sm" className="px-4">{t('productDetails.close')}</Button>
+                                                </DialogTrigger>
+                                            </div>
                                         </DialogFooter>
                                     </DialogContent>
                                 </Dialog>
                             ))}
                             {/* 商品追加 */}
-                            <Card className="col-span-2 sm:col-span-2 md:col-span-2 lg:col-span-3 max-w-lg mx-auto mt-0 mb-0 w-full h-hul shadow-md">
-                                <CardHeader className="flex flex-row items-center justify-between">
-                                    <CardTitle>{t('addProduct.title')}</CardTitle>
+                            <Dialog open={isAddProductDialogOpen} onOpenChange={(open) => {
+                                setIsAddProductDialogOpen(open);
+                                if (!open) {
+                                    setEditingProduct(null);
+                                    setIsDuplicateMode(false);
+                                    setSelectedCardDesignId('');
+                                }
+                            }}>
+                                <DialogTrigger asChild>
+                                    <Card
+                                        className="overflow-hidden cursor-pointer hover:ring-2 hover:ring-primary/50 transition-all border-dashed border-2 flex flex-col items-center justify-center min-h-[120px] bg-gray-50/50 hover:bg-gray-50 aspect-[84/52]"
+                                        onClick={() => {
+                                            setEditingProduct(null);
+                                            setIsDuplicateMode(false);
+                                            setSelectedCardDesignId('');
+                                        }}
+                                    >
+                                        <div className="flex flex-col items-center gap-1 text-gray-400 group-hover:text-primary">
+                                            <Plus className="w-8 h-8" />
+                                            <span className="text-xs font-bold">{t('addProduct.title')}</span>
+                                        </div>
+                                    </Card>
+                                </DialogTrigger>
+                                <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                                    <DialogHeader>
+                                        <div className="flex items-center justify-between pr-8">
+                                            <DialogTitle>{editingProduct ? t('editProduct.title') : t('addProduct.title')}</DialogTitle>
 
-                                    {/* インポート */}
-                                    <Dialog open={isImportDialogOpen} onOpenChange={setIsImportDialogOpen}>
-                                        <DialogTrigger asChild>
-                                            <Button variant="outline" size="sm">{t('importProduct.button')}</Button>
-                                        </DialogTrigger>
-                                        <DialogContent>
-                                            <DialogHeader>
-                                                <DialogTitle>{t('importProduct.dialogTitle')}</DialogTitle>
-                                                <DialogDescription>{t('importProduct.dialogDesc')}</DialogDescription>
-                                            </DialogHeader>
-                                            <div className="space-y-4 py-4">
-                                                <div className="space-y-2">
-                                                    <Label htmlFor="importShop">{t('importProduct.selectShop')}</Label>
-                                                    <select
-                                                        id="importShop"
-                                                        className="w-full p-2 border rounded-md"
-                                                        value={selectedImportShopId}
-                                                        onChange={(e) => setSelectedImportShopId(e.target.value)}
-                                                    >
-                                                        <option value="">{t('importProduct.placeholder')}</option>
-                                                        {importShops.map(s => (
-                                                            <option key={s.id} value={s.id}>{s.name || s.id}</option>
-                                                        ))}
-                                                    </select>
-                                                </div>
-                                            </div>
-                                            <DialogFooter>
-                                                <Button variant="ghost" onClick={() => setIsImportDialogOpen(false)} disabled={isImporting}>
-                                                    {t('importProduct.cancel')}
-                                                </Button>
-                                                <Button onClick={handleImportProducts} disabled={isImporting || !selectedImportShopId}>
-                                                    {isImporting ? t('linkQr.processing') : t('importProduct.submit')}
-                                                </Button>
-                                            </DialogFooter>
-                                        </DialogContent>
-                                    </Dialog>
+                                            {/* インポート */}
+                                            {!editingProduct && (
+                                                <Dialog open={isImportDialogOpen} onOpenChange={setIsImportDialogOpen}>
+                                                    <DialogTrigger asChild>
+                                                        <Button variant="outline" size="sm">{t('importProduct.button')}</Button>
+                                                    </DialogTrigger>
+                                                    <DialogContent>
+                                                        <DialogHeader>
+                                                            <DialogTitle>{t('importProduct.dialogTitle')}</DialogTitle>
+                                                            <DialogDescription>{t('importProduct.dialogDesc')}</DialogDescription>
+                                                        </DialogHeader>
+                                                        <div className="space-y-4 py-4">
+                                                            <div className="space-y-2">
+                                                                <Label htmlFor="importShop">{t('importProduct.selectShop')}</Label>
+                                                                <select
+                                                                    id="importShop"
+                                                                    className="w-full p-2 border rounded-md"
+                                                                    value={selectedImportShopId}
+                                                                    onChange={(e) => setSelectedImportShopId(e.target.value)}
+                                                                >
+                                                                    <option value="">{t('importProduct.placeholder')}</option>
+                                                                    {importShops.map(s => (
+                                                                        <option key={s.id} value={s.id}>{s.name || s.id}</option>
+                                                                    ))}
+                                                                </select>
+                                                            </div>
+                                                        </div>
+                                                        <DialogFooter>
+                                                            <Button variant="ghost" onClick={() => setIsImportDialogOpen(false)} disabled={isImporting}>
+                                                                {t('importProduct.cancel')}
+                                                            </Button>
+                                                            <Button onClick={handleImportProducts} disabled={isImporting || !selectedImportShopId}>
+                                                                {isImporting ? t('linkQr.processing') : t('importProduct.submit')}
+                                                            </Button>
+                                                        </DialogFooter>
+                                                    </DialogContent>
+                                                </Dialog>
+                                            )}
+                                        </div>
+                                    </DialogHeader>
 
-                                </CardHeader>
-                                <CardContent>
-                                    <form onSubmit={handleCreateProduct} className="space-y-4">
+                                    <form key={editingProduct?.product_id || 'new'} onSubmit={handleCreateProduct} className="space-y-4 pt-4">
                                         <div className="space-y-2">
                                             <Label htmlFor="name">{t('addProduct.name')}</Label>
-                                            <Input id="name" name="name" required />
+                                            <Input id="name" name="name" defaultValue={editingProduct?.name} required />
                                         </div>
                                         <div className="space-y-2">
                                             <Label htmlFor="description">{t('addProduct.description')}</Label>
-                                            <Input id="description" name="description" required />
+                                            <Input id="description" name="description" defaultValue={editingProduct?.description} required />
                                         </div>
-                                        {/* 
-                                         <div className="space-y-2">
-                                             <Label htmlFor="detail_html">{t('addProduct.detailHtml')}</Label>
-                                             <textarea
-                                                 id="detail_html"
-                                                 name="detail_html"
-                                                 className="flex min-h-[120px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                                                 placeholder={t('addProduct.detailHtmlPlaceholder')}
-                                             />
-                                         </div>
-                                         */}
                                         <div className="grid grid-cols-2 gap-4">
                                             <div className="space-y-2">
                                                 <Label htmlFor="price">{t('addProduct.price')}</Label>
-                                                <Input id="price" name="price" type="number" min="0" required />
+                                                <Input id="price" name="price" type="number" min="0" defaultValue={editingProduct?.price} required />
                                             </div>
                                             <div className="space-y-2">
                                                 <Label htmlFor="valid_days">{t('addProduct.validDays')}</Label>
-                                                <Input id="valid_days" name="valid_days" type="number" defaultValue={APP_CONFIG.DEFAULT_VALID_DAYS} min={1} required />
+                                                <Input id="valid_days" name="valid_days" type="number" defaultValue={editingProduct?.valid_days || APP_CONFIG.DEFAULT_VALID_DAYS} min={1} required />
                                             </div>
                                         </div>
                                         <div className="space-y-2">
-                                            <Label htmlFor="image">{t('addProduct.image')}</Label>
-                                            <Input id="image" name="image" type="file" accept="image/png, image/jpeg, image/gif, image/webp" />
+                                            <Label htmlFor="image">{t('addProduct.image') + (editingProduct ? ' (' + t('editProduct.ifChange') + ')' : '')}</Label>
+                                            {editingProduct && <p className="text-xs text-gray-500">{t('editProduct.beforeImage')}</p>}
+                                            {editingProduct && <img src={editingProduct?.image_url} className="w-full h-auto rounded-md border shadow-sm" />}
+                                            <Input id="image" name="image" type="file" accept="image/png, image/jpeg, image/gif, image/webp" required={!editingProduct} />
                                             <p className="text-xs text-gray-500">{t('addProduct.imagePlaceholder')}</p>
                                         </div>
-                                        <Button type="submit" className="w-full" disabled={isCreatingProduct}>
-                                            {isCreatingProduct ? t('linkQr.processing') : t('addProduct.submit')}
+
+                                        {/* Card Design Selection */}
+                                        <div className="space-y-4 pt-4 border-t">
+                                            <div className="flex items-center justify-between">
+                                                <Label className="text-sm font-bold flex items-center gap-2">
+                                                    <div className="w-1 h-4 bg-primary rounded-full" />
+                                                    {t('addProduct.cardDesign')}
+                                                </Label>
+                                                {(!shop?.allowed_designs || shop.allowed_designs.length === 0) && (
+                                                    <span className="text-[10px] text-red-500 font-medium">
+                                                        {t('addProduct.noDesignsLinked')}
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-3 max-h-[300px] overflow-y-auto p-1">
+                                                {shop?.allowed_designs?.map((design: any) => (
+                                                    <div
+                                                        key={`${design.design_id}`}
+                                                        onClick={() => setSelectedCardDesignId(design.design_id)}
+                                                        className={`group relative aspect-[84/52] rounded-lg border-2 overflow-hidden cursor-pointer transition-all hover:shadow-md ${selectedCardDesignId === design.design_id
+                                                            ? 'border-green-500 ring-2 ring-green-500/20 shadow-lg'
+                                                            : 'border-gray-100 hover:border-primary/30'
+                                                            }`}
+                                                    >
+                                                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                                                        <img
+                                                            src={design.thumbf || design.bgimgf}
+                                                            alt={design.name}
+                                                            className="w-full h-full object-cover"
+                                                            crossOrigin="anonymous"
+                                                        />
+                                                        <div className={`absolute bottom-0 left-0 right-0 bg-black/60 p-1.5 transition-all duration-300 ${selectedCardDesignId === design.design_id ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+                                                            }`}>
+                                                            <p className="text-[10px] text-white truncate text-center font-bold">
+                                                                {design.name}
+                                                            </p>
+                                                            {design.description && (
+                                                                <p className="text-[8px] text-gray-200 line-clamp-2 text-center mt-0.5 leading-tight opacity-0 group-hover:opacity-100 transition-opacity duration-500">
+                                                                    {design.description}
+                                                                </p>
+                                                            )}
+                                                        </div>
+                                                        {selectedCardDesignId === design.design_id && (
+                                                            <div className="absolute top-0 right-0">
+                                                                <div className="bg-green-500 text-white text-[9px] font-bold px-2 py-0.5 rounded-bl shadow-sm flex items-center gap-1">
+                                                                    <Check className="w-2.5 h-2.5" />
+                                                                </div>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+
+                                        <Button type="submit" className="w-full" disabled={isCreatingProduct || !selectedCardDesignId}>
+                                            {isCreatingProduct ? t('linkQr.processing') : (editingProduct ? t('shopSettings.submit') : t('addProduct.submit'))}
                                         </Button>
                                     </form>
-                                </CardContent>
-                            </Card>
+                                </DialogContent>
+                            </Dialog>
                         </div>
                     </div>
                 </Card>

@@ -17,6 +17,7 @@ import { adminApi } from "@/lib/api/admin";
 interface CardDesign {
     design_id: string;
     SK?: string; // DynamoDB Sort Key
+    name: string;
     description: string;
     bgimgf: string;
     bgimgb: string;
@@ -63,7 +64,8 @@ export default function CardDesignEditor({ apiUrl }: { apiUrl: string }) {
         const id = generateId();
         const newDesign: CardDesign = {
             design_id: id,
-            description: "New Design",
+            name: "New Design",
+            description: "",
             bgimgf: "",
             bgimgb: "",
             width: 84,
@@ -231,8 +233,9 @@ export default function CardDesignEditor({ apiUrl }: { apiUrl: string }) {
                                     )}
                                 </div>
                                 <div className="p-3">
-                                    <h3 className="font-bold text-sm text-white truncate">{d.description}</h3>
-                                    <p className="text-[10px] text-mist-400 mt-1">ID: {d.design_id}</p>
+                                    <h3 className="font-bold text-sm text-white truncate">{d.name || "(No Name)"}</h3>
+                                    <p className="text-[10px] text-mist-400 mt-1 truncate">{d.description}</p>
+                                    <p className="text-[10px] text-mist-500 mt-0.5">ID: {d.design_id}</p>
                                     <div className="flex gap-2 mt-3">
                                         <Button variant="secondary" size="sm" className="flex-1 h-8 text-xs" onClick={() => setEditingDesign(d)}>Edit</Button>
                                         <Button variant="destructive" size="icon" className="h-8 w-8" onClick={() => handleDelete(d.SK || d.design_id)}><Trash2 className="w-4 h-4" /></Button>
@@ -253,11 +256,21 @@ export default function CardDesignEditor({ apiUrl }: { apiUrl: string }) {
                         <CardContent className="space-y-6">
                             <div className="grid gap-4">
                                 <div className="space-y-2">
+                                    <Label>Name</Label>
+                                    <Input
+                                        value={editingDesign.name}
+                                        onChange={e => setEditingDesign({ ...editingDesign, name: e.target.value })}
+                                        className="bg-mist-800 border-mist-700"
+                                        placeholder="Design Name (e.g. Classic Gold)"
+                                    />
+                                </div>
+                                <div className="space-y-2">
                                     <Label>Description</Label>
                                     <Input
                                         value={editingDesign.description}
                                         onChange={e => setEditingDesign({ ...editingDesign, description: e.target.value })}
                                         className="bg-mist-800 border-mist-700"
+                                        placeholder="Short description..."
                                     />
                                 </div>
 

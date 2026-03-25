@@ -13,9 +13,9 @@
  */
 import { APIGatewayProxyHandler } from 'aws-lambda';
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
-import { DynamoDBDocumentClient, UpdateCommand } from '@aws-sdk/lib-dynamodb';
+import { DynamoDBDocumentClient, UpdateCommand, BatchGetCommand } from '@aws-sdk/lib-dynamodb';
 import { checkShopOwnerOrGM } from './share/shop-auth';
-import { signUrlIfS3, stripSignature, signUrlsInHtml, deleteFileByUrl, stripSignaturesInHtml } from './utils/s3';
+import { signUrlsInHtml, signUrlIfS3, stripSignaturesInHtml, stripSignature, deleteFileByUrl } from './utils/s3';
 
 const client = new DynamoDBClient({});
 const ddb = DynamoDBDocumentClient.from(client);
@@ -71,6 +71,39 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                     result.html_image_urls.map((url: string) => signUrlIfS3(url, BUCKET_NAME))
                 );
             }
+
+            // Fetch metadata for linked card designs
+            if (result.card_designs && Array.isArray(result.card_designs) && result.card_designs.length > 0) {
+                const keys = result.card_designs.map((id: string) => ({ PK: 'CARD_DESIGN#METADATA', SK: id }));
+
+                // 【DB操作: BatchGetItem】
+                // - 目的: ショップに紐付けられたカードデザイン(CARD_DESIGN#METADATA)の情報を一括取得
+                // - テーブル: TABLE_NAME
+                // - キー: PK = "CARD_DESIGN#METADATA", SK = [カードデザインID]
+                // - 備考: DynamoDBのBatchGetItemには100件の制限があるが、このリストは通常十分に小さい
+                const batchRes = await ddb.send(new BatchGetCommand({
+                    RequestItems: {
+                        [TABLE_NAME]: {
+                            Keys: keys
+                        }
+                    }
+                }));
+
+                const rawDesigns = batchRes.Responses?.[TABLE_NAME] || [];
+
+                result.allowed_designs = await Promise.all(rawDesigns.map(async (d) => ({
+                    design_id: d.SK,
+                    name: d.name,
+                    description: d.description,
+                    thumbf: d.thumbf ? await signUrlIfS3(d.thumbf, BUCKET_NAME) : undefined,
+                    thumbb: d.thumbb ? await signUrlIfS3(d.thumbb, BUCKET_NAME) : undefined,
+                    bgimgf: d.bgimgf ? await signUrlIfS3(d.bgimgf, BUCKET_NAME) : undefined,
+                    bgimgb: d.bgimgb ? await signUrlIfS3(d.bgimgb, BUCKET_NAME) : undefined,
+                })));
+            } else {
+                result.allowed_designs = [];
+            }
+
             return { statusCode: 200, headers: corsHeaders, body: JSON.stringify(result) };
         }
 

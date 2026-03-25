@@ -78,8 +78,8 @@ type ShopApiSchema = {
     shop_orders_list: { shopId: string; uuid?: string };
     shop_orders_update: { shopId: string; qr_id: string; status?: string; delivery_company?: string; tracking_number?: string; memo_for_users?: string; memo_for_shop?: string };
     shop_products_list: { shopId: string };
-    shop_products_create: { shopId: string; name: string; description?: string; image_url?: string; price?: number; valid_days?: number; detail_html?: string };
-    shop_products_update: { shopId: string; product_id: string; status: "ACTIVE" | "STOPPED" };
+    shop_products_create: { shopId: string; name: string; description?: string; image_url?: string; price?: number; valid_days?: number; detail_html?: string; card_design_id: string };
+    shop_products_update: { shopId: string; product_id: string; status?: "ACTIVE" | "STOPPED"; name?: string; description?: string; image_url?: string; price?: number; valid_days?: number; detail_html?: string; card_design_id?: string };
     shop_products_delete: { shopId: string; product_id: string };
     shop_products_import_list: { shopId: string };
     shop_products_import_execute: { shopId: string; importShopId: string };

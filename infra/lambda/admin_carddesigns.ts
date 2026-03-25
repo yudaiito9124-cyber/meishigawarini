@@ -3,7 +3,7 @@
  * 詳細: デザインの一覧取得、新規作成、更新、削除、およびS3への画像アップロード用URLの生成を担当する。
  * エンドポイント:
  *  - POST /admin/carddesigns/list: 全デザインの一覧取得
- *  - POST /admin/carddesigns/create: 新規作成 (body: { design: { ... } })
+ *  - POST /admin/carddesigns/create: 新規作成 (body: { design: { name, description, ... } })
  *  - POST /admin/carddesigns/uploadurl: アップロードURL発行 (body: { filename, contentType, design_id })
  *  - POST /admin/carddesigns/update: 更新 (body: { design_id, design: { ... } })
  *  - POST /admin/carddesigns/delete: 削除 (body: { design_id })

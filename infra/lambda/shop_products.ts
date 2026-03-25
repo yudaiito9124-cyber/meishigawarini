@@ -23,7 +23,7 @@
  */
 import { APIGatewayProxyHandler } from 'aws-lambda';
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
-import { DynamoDBDocumentClient, PutCommand, QueryCommand, GetCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
+import { DynamoDBDocumentClient, PutCommand, QueryCommand, GetCommand, UpdateCommand, BatchGetCommand } from '@aws-sdk/lib-dynamodb';
 import { checkShopOwnerOrGM } from './share/shop-auth';
 import { generateId } from './utils/id';
 import { stripSignaturesInHtml, stripSignature, signUrlIfS3, signUrlsInHtml } from './utils/s3';
@@ -51,17 +51,17 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 
         const body = JSON.parse(event.body || '{}');
         const { shopId } = body;
-        
+
         // Determine action from path or body
         let action = body.action;
         const res = event.resource;
         if (res.endsWith('/list')) action = 'list';
         else if (res.endsWith('/create')) action = 'create';
-        else if (res.endsWith('/update')) action = 'update_status';
+        else if (res.endsWith('/update')) action = 'update';
         else if (res.endsWith('/delete')) action = 'delete';
 
         if (!shopId) return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Missing shopId' }) };
-        if (!action || !['create', 'list', 'update_status', 'delete'].includes(action)) {
+        if (!action || !['create', 'list', 'update', 'delete'].includes(action)) {
             return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Invalid action. Received: ' + action + ' for ' + res }) };
         }
 
@@ -71,8 +71,14 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         }
 
         if (action === 'create') {
-            const { name, description, image_url, price, valid_days, detail_html } = body;
+            const { name, description, image_url, price, valid_days, detail_html, card_design_id } = body;
             if (!name) return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Missing product name' }) };
+            if (!card_design_id) return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Missing card_design_id' }) };
+
+            // Validate that the design is allowed for this shop
+            if (!shopMetadata.card_designs || !Array.isArray(shopMetadata.card_designs) || !shopMetadata.card_designs.includes(card_design_id)) {
+                return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Invalid or disallowed card_design_id' }) };
+            }
 
             const productId = generateId();
             const validityPeriod = Math.min(valid_days ? parseInt(valid_days) : DEFAULT_VALID_DAYS, 180);
@@ -91,6 +97,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                     detail_html: stripSignaturesInHtml(detail_html || '', BUCKET_NAME),
                     image_url: stripSignature(image_url),
                     price, valid_days: validityPeriod,
+                    card_design_id, // 保存されたカードデザインID
                     status: 'ACTIVE',
                     GSI1_PK: 'PRODUCT#ACTIVE', GSI1_SK: now,
                     GSI2_PK: `PRODUCT#${productId}`, GSI2_SK: `SHOP#${shopId}`,
@@ -103,9 +110,6 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         if (action === 'list') {
             // 【DB操作: Query】
             // - 目的: 指定したショップに紐づく全商品の一覧取得
-            // - テーブル: TABLE_NAME
-            // - 検索条件: PK = `SHOP#${shopId}` AND begins_with(SK, 'PRODUCT#')
-            // - 取得カラム: ALL (プログラム側で後続処理にて status !== 'DELETED' をフィルタ)
             const res = await ddb.send(new QueryCommand({
                 TableName: TABLE_NAME,
                 KeyConditionExpression: 'PK = :pk AND begins_with(SK, :sk)',
@@ -115,33 +119,116 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 .filter(item => item.status !== 'DELETED')
                 .map(item => ({ ...item, product_id: item.SK.replace('PRODUCT#', '') }));
 
+            // Fetch metadata for card designs linked to these products
+            const cardDesignIds = Array.from(new Set(items.map(item => item.card_design_id).filter(id => !!id)));
+            const designMap: Record<string, any> = {};
+
+            if (cardDesignIds.length > 0) {
+                // 【DB操作: BatchGetItem】
+                // - 目的: 表示対象の商品に紐付けられたカードデザイン情報を一括取得
+                // - テーブル: TABLE_NAME
+                // - キー: PK = "CARD_DESIGN#METADATA", SK = [カードデザインID]
+                const batchRes = await ddb.send(new BatchGetCommand({
+                    RequestItems: {
+                        [TABLE_NAME]: {
+                            Keys: cardDesignIds.map(id => ({ PK: 'CARD_DESIGN#METADATA', SK: id }))
+                        }
+                    }
+                }));
+                const rawDesigns = batchRes.Responses?.[TABLE_NAME] || [];
+                for (const d of rawDesigns) {
+                    designMap[d.SK] = {
+                        design_id: d.SK,
+                        name: d.name,
+                        description: d.description,
+                        thumbf: d.thumbf ? await signUrlIfS3(d.thumbf, BUCKET_NAME) : undefined,
+                        thumbb: d.thumbb ? await signUrlIfS3(d.thumbb, BUCKET_NAME) : undefined,
+                        bgimgf: d.bgimgf ? await signUrlIfS3(d.bgimgf, BUCKET_NAME) : undefined,
+                        bgimgb: d.bgimgb ? await signUrlIfS3(d.bgimgb, BUCKET_NAME) : undefined,
+                    };
+                }
+            }
+
             for (const item of items) {
                 if (item.image_url) item.image_url = await signUrlIfS3(item.image_url, BUCKET_NAME);
                 if (item.detail_html) item.detail_html = await signUrlsInHtml(item.detail_html, BUCKET_NAME);
+                if (item.card_design_id && designMap[item.card_design_id]) {
+                    item.design = designMap[item.card_design_id];
+                }
             }
             return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ items }) };
         }
 
-        if (action === 'update_status') {
-            const { product_id, status } = body;
+        if (action === 'update') {
+            const { product_id, status, name, description, image_url, price, valid_days, detail_html, card_design_id } = body;
             if (!product_id) return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Missing product ID' }) };
-            if (!['ACTIVE', 'STOPPED'].includes(status)) {
-                return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Invalid status. Must be ACTIVE or STOPPED' }) };
+
+            const updateExpressions: string[] = [];
+            const expressionAttributeNames: Record<string, string> = {};
+            const expressionAttributeValues: Record<string, any> = {};
+
+            if (status) {
+                if (!['ACTIVE', 'STOPPED'].includes(status)) {
+                    return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Invalid status. Must be ACTIVE or STOPPED' }) };
+                }
+                updateExpressions.push('#status = :status');
+                updateExpressions.push('GSI1_PK = :gsi_pk');
+                expressionAttributeNames['#status'] = 'status';
+                expressionAttributeValues[':status'] = status;
+                expressionAttributeValues[':gsi_pk'] = `PRODUCT#${status}`;
             }
 
-            // 【DB操作: UpdateItem】
-            // - 目的: 商品のステータス(ACTIVE⇆STOPPED)の更新
-            // - テーブル: TABLE_NAME
-            // - リクエストキー: { PK: `SHOP#${shopId}`, SK: `PRODUCT#${product_id}` }
-            // - 更新カラム: status および GSI1_PK (QR一覧取得等のインデックスに連動させるため)
+            if (name) {
+                updateExpressions.push('#name = :name');
+                expressionAttributeNames['#name'] = 'name';
+                expressionAttributeValues[':name'] = name;
+            }
+
+            if (description !== undefined) {
+                updateExpressions.push('description = :description');
+                expressionAttributeValues[':description'] = description;
+            }
+
+            if (image_url !== undefined) {
+                updateExpressions.push('image_url = :image_url');
+                expressionAttributeValues[':image_url'] = stripSignature(image_url);
+            }
+
+            if (price !== undefined) {
+                updateExpressions.push('price = :price');
+                expressionAttributeValues[':price'] = price;
+            }
+
+            if (valid_days !== undefined) {
+                updateExpressions.push('valid_days = :valid_days');
+                expressionAttributeValues[':valid_days'] = Math.min(valid_days ? parseInt(valid_days) : DEFAULT_VALID_DAYS, 180);
+            }
+
+            if (detail_html !== undefined) {
+                updateExpressions.push('detail_html = :detail_html');
+                expressionAttributeValues[':detail_html'] = stripSignaturesInHtml(detail_html, BUCKET_NAME);
+            }
+
+            if (card_design_id) {
+                if (!shopMetadata.card_designs || !Array.isArray(shopMetadata.card_designs) || !shopMetadata.card_designs.includes(card_design_id)) {
+                    return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Invalid or disallowed card_design_id' }) };
+                }
+                updateExpressions.push('card_design_id = :card_design_id');
+                expressionAttributeValues[':card_design_id'] = card_design_id;
+            }
+
+            if (updateExpressions.length === 0) {
+                return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'No changes provided' }) };
+            }
+
             await ddb.send(new UpdateCommand({
                 TableName: TABLE_NAME,
                 Key: { PK: `SHOP#${shopId}`, SK: `PRODUCT#${product_id}` },
-                UpdateExpression: 'SET #status = :s, GSI1_PK = :gsi_pk',
-                ExpressionAttributeNames: { '#status': 'status' },
-                ExpressionAttributeValues: { ':s': status, ':gsi_pk': `PRODUCT#${status}` }
+                UpdateExpression: 'SET ' + updateExpressions.join(', '),
+                ExpressionAttributeNames: Object.keys(expressionAttributeNames).length > 0 ? expressionAttributeNames : undefined,
+                ExpressionAttributeValues: expressionAttributeValues
             }));
-            return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ message: 'Product status updated' }) };
+            return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ message: 'Product updated' }) };
         }
 
         if (action === 'delete') {
@@ -178,7 +265,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                     KeyConditionExpression: 'GSI1_PK = :pk', ExpressionAttributeValues: { ':pk': 'QR#ACTIVE' }
                 }))
             ]);
-            
+
             const activeOrUsedQRs = [...(usedRes.Items || []), ...(activeRes.Items || [])];
             const relatedQRs = activeOrUsedQRs.filter(item => item.product_id === product_id && item.shop_id === shopId);
             if (relatedQRs.length > 0) {

@@ -199,7 +199,18 @@
       "success": "商品を追加しました！",
       "failed": "商品の追加に失敗しました",
       "error": "商品の追加中にエラーが発生しました",
-      "imageUploadFailed": "画像のアップロードに失敗しました"
+      "imageUploadFailed": "画像のアップロードに失敗しました",
+      "cardDesign": "カードデザイン",
+      "selectCardDesign": "カードデザインを選択してください",
+      "noDesignsLinked": "利用可能なカードデザインがありません。システム管理者に連絡してください。"
+    },
+    "editProduct": {
+      "title": "商品編集",
+      "ifChange": "変更する場合のみ",
+      "beforeImage": "変更前の画像",
+      "success": "更新しました！",
+      "failed": "更新に失敗しました",
+      "error": "更新中にエラーが発生しました"
     },
     "importProduct": {
       "button": "商品を一括インポート",
@@ -308,6 +319,11 @@
       "validDaysSuffix": "日",
       "detailHtml": "紹介用HTML (プレビュー)",
       "rawDetailHtml": "紹介用HTML (ソースコード)",
+      "front": "表面",
+      "back": "裏面",
+      "edit": "編集",
+      "editTitle": "商品の編集",
+      "duplicate": "複製して追加",
       "close": "閉じる"
     }
   },
