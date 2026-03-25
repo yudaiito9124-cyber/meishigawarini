@@ -5,7 +5,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { RefreshCw, ArrowRight, HelpCircle, Camera, Settings, ShoppingBasket, Eye, Plus, Trash2, Copy, ImageIcon, Save, Loader2, Pencil, ChevronDown, Download, Check, QrCode, Package, Truck } from 'lucide-react';
+import { RefreshCw, ArrowRight, HelpCircle, Camera, Settings, ShoppingBasket, Eye, Plus, Trash2, Copy, ImageIcon, Save, Loader2, Pencil, ChevronDown, Download, Check, QrCode, Package, Truck, CreditCard, Gift } from 'lucide-react';
 import { notFound, useParams } from 'next/navigation';
 import { useRouter } from '@/i18n/routing';
 import { useTranslations } from 'next-intl';
@@ -67,6 +67,8 @@ export default function ShopPage() {
     const lastScannedTimeRef = useRef<Record<string, number>>({});
 
     const [searchUuid, setSearchUuid] = useState('');
+    const [orderStatusFilter, setOrderStatusFilter] = useState<string>('ALL');
+    const [orderProductFilter, setOrderProductFilter] = useState<string | null>(null);
     const [shippingOrderId, setShippingOrderId] = useState<string | null>(null);
     const [isCreatingProduct, setIsCreatingProduct] = useState(false);
     const [isAddProductDialogOpen, setIsAddProductDialogOpen] = useState(false);
@@ -993,7 +995,7 @@ export default function ShopPage() {
 
             </div>
             <div className="max-w-7xl mx-auto px-4 sm:px-8 py-4 sm:py-8 space-y-6">
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-2">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
                     <button
                         onClick={() => setActiveTab("activation")}
                         className={`flex flex-col items-center justify-center p-4 sm:p-6 rounded-2xl border-2 transition-all duration-200 cursor-pointer shadow-sm hover:shadow-md ${activeTab === "activation"
@@ -1002,7 +1004,7 @@ export default function ShopPage() {
                             }`}
                     >
                         <QrCode className={`w-8 h-8 sm:w-10 sm:h-10 mb-2 sm:mb-3 ${activeTab === "activation" ? "text-gray-900" : "text-gray-400"}`} />
-                        <span className="text-sm sm:text-lg font-bold">{t('tabs.activation') || "アクティベーション"}</span>
+                        <span className="text-sm sm:text-lg font-bold">{t('tabs.activation')}</span>
                     </button>
                     <button
                         onClick={() => setActiveTab("shipping")}
@@ -1012,7 +1014,7 @@ export default function ShopPage() {
                             }`}
                     >
                         <Truck className={`w-8 h-8 sm:w-10 sm:h-10 mb-2 sm:mb-3 ${activeTab === "shipping" ? "text-gray-900" : "text-gray-400"}`} />
-                        <span className="text-sm sm:text-lg font-bold">{t('tabs.shipping') || "発送管理"}</span>
+                        <span className="text-sm sm:text-lg font-bold">{t('tabs.shipping')}</span>
                     </button>
                     <button
                         onClick={() => setActiveTab("products")}
@@ -1021,8 +1023,18 @@ export default function ShopPage() {
                             : "bg-white border-gray-200 text-gray-500 hover:border-gray-300"
                             }`}
                     >
-                        <Package className={`w-8 h-8 sm:w-10 sm:h-10 mb-2 sm:mb-3 ${activeTab === "products" ? "text-gray-900" : "text-gray-400"}`} />
-                        <span className="text-sm sm:text-lg font-bold">{t('tabs.products') || "商品管理・card発行"}</span>
+                        <Gift className={`w-8 h-8 sm:w-10 sm:h-10 mb-2 sm:mb-3 ${activeTab === "products" ? "text-gray-900" : "text-gray-400"}`} />
+                        <span className="text-sm sm:text-lg font-bold">{t('tabs.products')}</span>
+                    </button>
+                    <button
+                        onClick={() => setActiveTab("orderCard")}
+                        className={`flex flex-col items-center justify-center p-4 sm:p-6 rounded-2xl border-2 transition-all duration-200 cursor-pointer shadow-sm hover:shadow-md ${activeTab === "orderCard"
+                            ? "bg-white border-white text-gray-900 ring-2 ring-gray-700 ring-offset-2"
+                            : "bg-white border-gray-200 text-gray-500 hover:border-gray-300"
+                            }`}
+                    >
+                        <CreditCard className={`w-8 h-8 sm:w-10 sm:h-10 mb-2 sm:mb-3 ${activeTab === "orderCard" ? "text-gray-900" : "text-gray-400"}`} />
+                        <span className="text-sm sm:text-lg font-bold">{t('tabs.orderCard')}</span>
                     </button>
                 </div>
 
@@ -1326,16 +1338,98 @@ export default function ShopPage() {
                 {/* --- Wrapper for Shipping --- */}
                 {activeTab === 'shipping' && (
                     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
+
+
                         {/* Incoming Orders */}
                         <Card>
                             <CardHeader>
-                                <div className="flex flex-col space-y-4 md:flex-row md:items-center md:justify-between md:space-y-0">
+                                <div className="flex flex-col space-y-4 ">
                                     <div>
                                         <CardTitle>{t('incomingOrders')}</CardTitle>
                                         <CardDescription>{t('ordersDesc')}</CardDescription>
+
                                     </div>
+                                    <Button variant="outline" size="sm" className="w-full shrink-0 md:w-auto" onClick={() => fetchShopData(true)} disabled={isRefreshing}>
+                                        <RefreshCw className={`mr-2 h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+                                        {t('refresh')}
+                                    </Button>
+
+
+
+
+                                    {/* Product Filter Grid */}
+                                    <div className="grid grid-cols-2 xs:grid-cols-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+                                        <Card
+                                            className={`overflow-hidden cursor-pointer transition-all relative aspect-[84/52] flex items-center justify-center bg-gray-50 border-2 ${orderProductFilter === null ? 'ring-2 ring-primary border-primary' : 'border-dashed border-gray-200 hover:bg-gray-100'}`}
+                                            onClick={() => setOrderProductFilter(null)}
+                                        >
+                                            <span className={`font-bold text-sm ${orderProductFilter === null ? 'text-primary' : 'text-gray-500'}`}>{tc('all')}</span>
+                                        </Card>
+                                        {products.map((product) => (
+                                            <Card
+                                                key={product.product_id}
+                                                className={`overflow-hidden cursor-pointer transition-all relative aspect-[84/52] ${orderProductFilter === product.product_id ? 'ring-2 ring-offset-2 ring-primary' : 'hover:ring-2 hover:ring-primary/50'}`}
+                                                onClick={() => setOrderProductFilter(orderProductFilter === product.product_id ? null : product.product_id)}
+                                            >
+                                                {/* 背景: カードデザイン */}
+                                                {product.design && (
+                                                    <img
+                                                        src={product.design.thumbf || product.design.bgimgf}
+                                                        alt={product.design.name}
+                                                        className="absolute inset-0 w-full h-full object-cover"
+                                                        crossOrigin="anonymous"
+                                                    />
+                                                )}
+                                                {/* オーバーレイ */}
+                                                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+
+                                                {/* 商品画像 (小) */}
+                                                {product.image_url && (
+                                                    <div className="absolute bottom-2 right-2 w-8 h-8 rounded-md overflow-hidden border border-white/50 shadow-md bg-white">
+                                                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                                                        <img
+                                                            src={product.image_url}
+                                                            alt={product.name}
+                                                            className="w-full h-full object-cover"
+                                                        />
+                                                    </div>
+                                                )}
+
+                                                {/* 商品名 */}
+                                                <div className="absolute bottom-0 left-0 right-0 p-2 text-white">
+                                                    <h3 className="font-bold text-[10px] truncate drop-shadow-lg">{product.name}</h3>
+                                                </div>
+
+                                                {/* 選択済みバッジ */}
+                                                {orderProductFilter === product.product_id && (
+                                                    <div className="absolute top-2 right-2 flex gap-1">
+                                                        <span className="bg-primary text-white rounded-full px-1.5 py-0.5 shadow-md flex items-center justify-center">
+                                                            <Check className="w-3 h-3" />
+                                                        </span>
+                                                    </div>
+                                                )}
+                                            </Card>
+                                        ))}
+                                    </div>
+
+                                    <div className="mt-4 flex flex-wrap gap-2">
+                                        {["ALL", "UNASSIGNED", "LINKED", "ACTIVE", "USED", "SHIPPED", "COMPLETED", "EXPIRED", "BANNED", "PROMOTION"].map((s) => (
+                                            <Button
+                                                key={s}
+                                                variant={orderStatusFilter === s ? "default" : "secondary"}
+                                                size="sm"
+                                                onClick={() => setOrderStatusFilter(s)}
+                                                className="text-xs"
+                                            >
+                                                {s === 'ALL' ? tc('all') : st(s.toLowerCase())}
+                                            </Button>
+                                        ))}
+                                    </div>
+
+
+                                    {/* filter by uuid */}
                                     <div className="flex flex-col w-full space-y-2 md:flex-row md:items-center md:space-x-2 md:space-y-0 md:w-auto">
-                                        <div className="flex w-full items-center space-x-2 md:max-w-sm">
+                                        <div className="flex w-full items-center space-x-2">
                                             <Input
                                                 placeholder={t('search.placeholder')}
                                                 value={searchUuid}
@@ -1348,11 +1442,8 @@ export default function ShopPage() {
                                                 </Button>
                                             )}
                                         </div>
-                                        <Button variant="outline" size="sm" className="w-full shrink-0 md:w-auto" onClick={() => fetchShopData(true)} disabled={isRefreshing}>
-                                            <RefreshCw className={`mr-2 h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-                                            {t('refresh')}
-                                        </Button>
                                     </div>
+
                                 </div>
                             </CardHeader>
                             <CardContent className="p-4 w-full">
@@ -1369,16 +1460,18 @@ export default function ShopPage() {
                                         {ordersLoading ? (
                                             <TableRow><TableCell colSpan={4} className="text-center py-4"><RefreshCw className="animate-spin h-5 w-5 mx-auto text-gray-400" /></TableCell></TableRow>
                                         ) : orders
-                                            .filter(o => ['USED'].includes(o.status))
+                                            .filter(o => orderStatusFilter === 'ALL' || o.status === orderStatusFilter)
+                                            .filter(o => !orderProductFilter || o.product_id === orderProductFilter)
                                             .filter(o => !searchUuid || (o.id || o.qr_id).includes(searchUuid))
                                             .length === 0 ? (
                                             <TableRow><TableCell colSpan={4} className="text-center">{t('orders.noOrders')}</TableCell></TableRow>
                                         ) : (
                                             orders
-                                                .filter(o => ['USED'].includes(o.status))
+                                                .filter(o => orderStatusFilter === 'ALL' || o.status === orderStatusFilter)
+                                                .filter(o => !orderProductFilter || o.product_id === orderProductFilter)
                                                 .filter(o => !searchUuid || (o.id || o.qr_id).includes(searchUuid))
                                                 .sort((a, b) => {
-                                                    const sortorder: { [name: string]: number } = { 'LINKED': 0, 'ACTIVE': 1, 'USED': 3, 'SHIPPED': 2 };
+                                                    const sortorder: { [name: string]: number } = { 'LINKED': 3, 'ACTIVE': 2, 'USED': 4, 'SHIPPED': 1, 'COMPLETED': 0, "EXPIRED": -1, "BANNED": -2 };
                                                     // 1. Status: compare
                                                     if (a.status !== b.status) return sortorder[b.status] - sortorder[a.status];
                                                     // 2. Date: Newest first
@@ -1632,298 +1725,6 @@ export default function ShopPage() {
 
 
 
-
-                        {/* Order History */}
-                        <Card>
-                            <CardHeader>
-                                <div className="flex flex-col space-y-4 md:flex-row md:items-center md:justify-between md:space-y-0">
-                                    <div>
-                                        <CardTitle>{t('history.title')}</CardTitle>
-                                    </div>
-                                    <div className="flex flex-col w-full space-y-2 md:flex-row md:items-center md:space-x-2 md:space-y-0 md:w-auto">
-                                        <div className="flex w-full items-center space-x-2 md:max-w-sm">
-                                            <Input
-                                                placeholder={t('search.placeholder')}
-                                                value={searchUuid}
-                                                onChange={(e) => setSearchUuid(e.target.value)}
-                                                className="w-full"
-                                            />
-                                            {searchUuid && (
-                                                <Button variant="ghost" onClick={() => setSearchUuid('')} className="shrink-0">
-                                                    {t('search.clear')}
-                                                </Button>
-                                            )}
-                                        </div>
-                                        <Button variant="outline" size="sm" className="w-full shrink-0 md:w-auto" onClick={() => fetchShopData(true)} disabled={isRefreshing}>
-                                            <RefreshCw className={`mr-2 h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-                                            {t('refresh')}
-                                        </Button>
-                                    </div>
-                                </div>
-                            </CardHeader>
-                            <CardContent className="p-4 w-full">
-                                <Table wrapperStyle={{ maxHeight: 'calc(100vh - 200px)' }}>
-                                    <TableHeader className="sticky top-0 bg-white z-10 drop-shadow-sm">
-                                        <TableRow>
-                                            <TableHead className="text-xs md:text-sm">{t('orders.date')}</TableHead>
-                                            <TableHead className="text-xs md:text-sm hidden sm:table-cell">{t('orders.productName')}</TableHead>
-                                            <TableHead className="text-xs md:text-sm">{t('orders.status')}</TableHead>
-                                            <TableHead className="text-xs md:text-sm hidden md:table-cell">{t('orders.shopMemo')}</TableHead>
-                                        </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                        {ordersLoading ? (
-                                            <TableRow><TableCell colSpan={4} className="text-center py-4"><RefreshCw className="animate-spin h-5 w-5 mx-auto text-gray-400" /></TableCell></TableRow>
-                                        ) : orders
-                                            .filter(o => ['LINKED', 'ACTIVE', 'SHIPPED', 'COMPLETED', 'EXPIRED', 'BANNED'].includes(o.status))
-                                            .filter(o => !searchUuid || (o.id || o.qr_id).includes(searchUuid))
-                                            .length === 0 ? (
-                                            <TableRow><TableCell colSpan={4} className="text-center">{t('orders.noOrders')}</TableCell></TableRow>
-                                        ) : (
-                                            orders
-                                                .filter(o => ['LINKED', 'ACTIVE', 'SHIPPED', 'COMPLETED', 'EXPIRED', 'BANNED'].includes(o.status))
-                                                .filter(o => !searchUuid || (o.id || o.qr_id).includes(searchUuid))
-                                                .sort((a, b) => {
-                                                    const sortorder: { [name: string]: number } = { 'LINKED': 3, 'ACTIVE': 2, 'SHIPPED': 0, 'COMPLETED': 1, 'EXPIRED': 4, 'BANNED': 5 };
-                                                    // 1. Status: compare
-                                                    if (a.status !== b.status) return sortorder[a.status] - sortorder[b.status];
-                                                    // Date: Newest first
-                                                    const dateA = new Date(a.ts_updated_at || a.ts_created_at).getTime();
-                                                    const dateB = new Date(b.ts_updated_at || b.ts_created_at).getTime();
-                                                    return dateB - dateA;
-                                                })
-                                                .map((order: any) => {
-                                                    const product = products.find(p => p.product_id === order.product_id);
-                                                    const uuid = order.id || order.qr_id.replace('QR#', '');
-
-                                                    return (
-                                                        <Dialog key={order.qr_id}>
-                                                            <DialogTrigger asChild>
-                                                                <TableRow className="cursor-pointer hover:bg-gray-100">
-                                                                    <TableCell className="text-xs md:text-sm">
-                                                                        {order.ts_updated_at ? (
-                                                                            <div className="flex flex-col">
-                                                                                <span className="whitespace-nowrap">{new Date(order.ts_updated_at).toLocaleDateString()}</span>
-                                                                                <span className="text-[10px] text-gray-500 whitespace-nowrap">{new Date(order.ts_updated_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                                                                            </div>
-                                                                        ) : "-"}
-                                                                    </TableCell>
-                                                                    <TableCell className="text-xs md:text-sm font-bold hidden md:table-cell">{product?.name || order.product_id}</TableCell>
-                                                                    <TableCell>
-                                                                        <span className={`px-2 py-1 rounded text-xs ${order.status === 'UNASSIGNED' ? 'bg-gray-100' :
-                                                                            order.status === 'LINKED' ? 'bg-emerald-100 text-emerald-800' :
-                                                                                order.status === 'ACTIVE' ? 'bg-yellow-100 text-yellow-800' :
-                                                                                    order.status === 'USED' ? 'bg-orange-100 text-orange-800' :
-                                                                                        order.status === 'SHIPPED' ? 'bg-indigo-100 text-indigo-800' :
-                                                                                            order.status === 'COMPLETED' ? 'bg-purple-100 text-purple-800' :
-                                                                                                order.status === 'EXPIRED' ? 'bg-gray-100 text-gray-800' :
-                                                                                                    order.status === 'BANNED' ? 'bg-red-100 text-red-800' :
-                                                                                                        'bg-green-100 text-green-800'
-                                                                            }`}>{st(order.status.toLowerCase())}</span>
-                                                                    </TableCell>
-                                                                    <TableCell className="font-medium hidden md:table-cell">{order.memo_for_shop}</TableCell>
-                                                                </TableRow>
-                                                            </DialogTrigger>
-                                                            <DialogContent className="max-w-md">
-                                                                <DialogHeader>
-                                                                    <DialogTitle>{t('orders.details')}</DialogTitle>
-                                                                    <DialogDescription className="font-mono text-xs text-gray-500 flex items-center gap-2">
-                                                                        ID: {uuid}
-                                                                        <Button
-                                                                            variant="ghost"
-                                                                            size="icon"
-                                                                            className="h-6 w-6"
-                                                                            onClick={(e) => { e.stopPropagation(); handleCopy(uuid); }}
-                                                                        >
-                                                                            {copiedId === uuid ? (
-                                                                                <Check className="h-3 w-3 text-green-500" />
-                                                                            ) : (
-                                                                                <Copy className="h-3 w-3" />
-                                                                            )}
-                                                                        </Button>
-                                                                    </DialogDescription>
-                                                                </DialogHeader>
-
-                                                                <div className="space-y-4 py-4 max-h-[70vh] overflow-y-auto">
-                                                                    {/* Product Info */}
-                                                                    <div>
-                                                                        <h4 className="text-sm font-semibold text-gray-500">{t('orders.productName')}</h4>
-                                                                        <p className="font-medium">{product?.name || order.product_id}</p>
-                                                                    </div>
-
-
-                                                                    {/* Status */}
-                                                                    <div>
-                                                                        <h4 className="text-sm font-semibold text-gray-500">{t('orders.status')}</h4>
-
-                                                                        <span className={`px-2 py-1 rounded text-xs ${order.status === 'UNASSIGNED' ? 'bg-gray-100' :
-                                                                            order.status === 'LINKED' ? 'bg-emerald-100 text-emerald-800' :
-                                                                                order.status === 'ACTIVE' ? 'bg-yellow-100 text-yellow-800' :
-                                                                                    order.status === 'USED' ? 'bg-orange-100 text-orange-800' :
-                                                                                        order.status === 'SHIPPED' ? 'bg-indigo-100 text-indigo-800' :
-                                                                                            order.status === 'COMPLETED' ? 'bg-purple-100 text-purple-800' :
-                                                                                                order.status === 'EXPIRED' ? 'bg-gray-100 text-gray-800' :
-                                                                                                    order.status === 'BANNED' ? 'bg-red-100 text-red-800' :
-                                                                                                        'bg-green-100 text-green-800'
-                                                                            }`}>{st(order.status.toLowerCase())}</span>
-                                                                    </div>
-
-                                                                    {/* Card Preview */}
-                                                                    {order.card_design && (
-                                                                        <div className="space-y-2">
-                                                                            <h4 className="text-sm font-semibold text-gray-500">{t('linkQr.cardDesign')}</h4>
-                                                                            {(order.thumbf || order.thumbb || cardformats[order.card_design]) && (
-                                                                                <div className="grid grid-cols-2 gap-2">
-                                                                                    <div className="space-y-1">
-                                                                                        <div className="aspect-[84/52] relative rounded shadow-sm overflow-hidden border border-gray-100 bg-white">
-                                                                                            <img
-                                                                                                src={order.thumbf || cardformats[order.card_design]?.bgimgf}
-                                                                                                alt="Front"
-                                                                                                className="w-full h-full object-cover"
-                                                                                                crossOrigin="anonymous"
-                                                                                            />
-                                                                                        </div>
-                                                                                    </div>
-                                                                                    <div className="space-y-1">
-                                                                                        <div className="aspect-[84/52] relative rounded shadow-sm overflow-hidden border border-gray-100 bg-white">
-                                                                                            <img
-                                                                                                src={order.thumbb || cardformats[order.card_design]?.bgimgb}
-                                                                                                alt="Back"
-                                                                                                className="w-full h-full object-cover"
-                                                                                                crossOrigin="anonymous"
-                                                                                            />
-                                                                                        </div>
-                                                                                    </div>
-                                                                                </div>
-                                                                            )}
-                                                                        </div>
-                                                                    )}
-
-                                                                    {/* Recipient Info */}
-                                                                    <div>
-                                                                        <h4 className="text-sm font-semibold text-gray-500">{t('orders.recipient')}</h4>
-                                                                        <p>{order.recipient_name}</p>
-                                                                    </div>
-                                                                    <div>
-                                                                        <h4 className="text-sm font-semibold text-gray-500">{t('orders.contact')}</h4>
-                                                                        <p className="break-all">{order.shipping_info?.email || '-'}</p>
-                                                                        <p className="text-sm mt-1">{order.shipping_info?.phone || '-'}</p>
-                                                                    </div>
-
-                                                                    <div>
-                                                                        <h4 className="text-sm font-semibold text-gray-500">{t('orders.address')}</h4>
-                                                                        {order.postal_code && <p className="text-sm">〒{order.postal_code}</p>}
-                                                                        <p className="whitespace-pre-wrap text-sm">{order.address}</p>
-                                                                    </div>
-
-                                                                    <div>
-                                                                        <h4 className="text-sm font-semibold text-gray-500">{t('orders.preferredDateTime')}</h4>
-                                                                        <p className="text-sm">{order.preferred_date ? order.preferred_date : '-'}  /  {order.preferred_time ? tt(order.preferred_time) : '-'}</p>
-                                                                    </div>
-
-                                                                    {/* Order Info */}
-                                                                    <div className="pt-2 space-y-4">
-                                                                        {/* Read-only view for SHIPPED, or we could allow edit. For now keeping read-only as per previous pattern but showing memos */}
-                                                                        {order.memo_for_users && (
-                                                                            <div>
-                                                                                <h4 className="text-sm font-semibold text-gray-500">{t('orders.userMessage')}</h4>
-                                                                                <p className="text-sm bg-blue-50 p-2 rounded">{order.memo_for_users}</p>
-                                                                            </div>
-                                                                        )}
-                                                                        {order.memo_for_shop && (
-                                                                            <div>
-                                                                                <h4 className="text-sm font-semibold text-gray-500">{t('orders.shopMemo')}</h4>
-                                                                                <p className="text-sm bg-gray-50 p-2 rounded">{order.memo_for_shop}</p>
-                                                                            </div>
-                                                                        )}
-                                                                        <div>
-                                                                            <h4 className="text-sm font-semibold text-gray-500">{t('orders.shipDialog.deliveryCompany')}</h4>
-                                                                            <p className="font-mono">{order.delivery_company || '-'}</p>
-                                                                        </div>
-                                                                        <div>
-                                                                            <h4 className="text-sm font-semibold text-gray-500">{t('orders.shipDialog.label')}</h4>
-                                                                            <p className="font-mono">{order.tracking_number || '-'}</p>
-                                                                        </div>
-                                                                    </div>
-
-                                                                    <div className="">
-                                                                        <div>
-                                                                            {/* Admin Meta Edit Section */}
-                                                                            <div className="pt-6 border-t border-dashed mt-6">
-                                                                                <h4 className="text-sm font-bold text-gray-900 mb-4 flex items-center gap-2">
-                                                                                    <Pencil className="w-4 h-4 text-gray-400" />
-                                                                                    {t('orders.updateMeta')}
-                                                                                </h4>
-                                                                                <form onSubmit={async (e) => {
-                                                                                    e.preventDefault();
-                                                                                    const fd = new FormData(e.currentTarget);
-                                                                                    await handleUpdateOrderMeta(
-                                                                                        uuid,
-                                                                                        undefined,
-                                                                                        undefined,
-                                                                                        fd.get('memo_for_users') as string,
-                                                                                        fd.get('memo_for_shop') as string
-                                                                                    );
-                                                                                }} className="space-y-4">
-
-                                                                                    <div className="space-y-2">
-                                                                                        <Label htmlFor={`m_u-${uuid}`} className="text-xs text-gray-500">{t('orders.userMessage')}</Label>
-                                                                                        <Textarea
-                                                                                            id={`m_u-${uuid}`}
-                                                                                            name="memo_for_users"
-                                                                                            defaultValue={order.memo_for_users || ""}
-                                                                                            disabled={['COMPLETED', 'EXPIRED', 'BANNED'].includes(order.status)}
-                                                                                            placeholder={['COMPLETED', 'EXPIRED', 'BANNED'].includes(order.status) ? t('orders.shipDialog.Completed-state messages cannot be updated') : ""}
-                                                                                            className="text-sm min-h-[60px]"
-                                                                                        />
-                                                                                    </div>
-
-                                                                                    <div className="space-y-2">
-                                                                                        <Label htmlFor={`m_s-${uuid}`} className="text-xs text-gray-500">{t('orders.shopMemo')}</Label>
-                                                                                        <Textarea
-                                                                                            id={`m_s-${uuid}`}
-                                                                                            name="memo_for_shop"
-                                                                                            defaultValue={order.memo_for_shop || ""}
-                                                                                            className="text-sm min-h-[60px]"
-                                                                                        />
-                                                                                    </div>
-
-                                                                                    <Button
-                                                                                        type="submit"
-                                                                                        className="w-full"
-                                                                                        disabled={shippingOrderId === uuid}
-                                                                                    >
-                                                                                        {shippingOrderId === uuid ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}
-                                                                                        {shippingOrderId === uuid ? t('orders.processing') : t('shopSettings.submit')}
-                                                                                    </Button>
-                                                                                </form>
-                                                                            </div>
-
-                                                                            <div className="pt-6 border-t mt-6">
-                                                                                <div>
-                                                                                    <h4 className="text-sm font-semibold text-gray-500 mb-2">{t('orders.timestamps')}</h4>
-                                                                                    <p className="text-sm">{ts('ts_updated_at') + ": " + (order.ts_updated_at ? new Date(order.ts_updated_at).toLocaleString() : "-")}</p>
-                                                                                    <p className="text-sm">{ts('ts_linked_at') + ": " + (order.ts_linked_at ? new Date(order.ts_linked_at).toLocaleString() : "-")}</p>
-                                                                                    <p className="text-sm">{ts('ts_activated_at') + ": " + (order.ts_activated_at ? new Date(order.ts_activated_at).toLocaleString() : "-")}</p>
-                                                                                    <p className="text-sm">{ts('ts_submitted_at') + ": " + (order.ts_submitted_at ? new Date(order.ts_submitted_at).toLocaleString() : "-")}</p>
-                                                                                    <p className="text-sm">{ts('ts_shipped_at') + ": " + (order.ts_shipped_at ? new Date(order.ts_shipped_at).toLocaleString() : "-")}</p>
-                                                                                    <p className="text-sm">{ts('ts_completed_at') + ": " + (order.ts_completed_at ? new Date(order.ts_completed_at).toLocaleString() : "-")}</p>
-                                                                                    <p className="text-sm">{ts('ts_expired_at') + ": " + (order.ts_expired_at ? new Date(order.ts_expired_at).toLocaleString() : "-")}</p>
-                                                                                    <p className="text-sm">{ts('ts_banned_at') + ": " + (order.ts_banned_at ? new Date(order.ts_banned_at).toLocaleString() : "-")}</p>
-                                                                                </div>
-                                                                            </div>
-                                                                        </div>
-                                                                    </div>
-                                                                </div>
-                                                            </DialogContent>
-                                                        </Dialog>
-                                                    );
-                                                })
-                                        )}
-                                    </TableBody>
-                                </Table>
-                            </CardContent>
-                        </Card>
 
                         {/* Status Guide */}
                         <Card>
@@ -2182,7 +1983,7 @@ export default function ShopPage() {
                                                 <div className="mt-8 pt-6 border-t border-dashed border-gray-100">
                                                     <div className="flex flex-col gap-1">
                                                         <p className="text-[9px] font-mono text-gray-400">Product ID: {product.product_id}</p>
-                                                        <p className="text-[9px] font-mono text-gray-400">Design ID: {product.design.design_id}</p>
+                                                        <p className="text-[9px] font-mono text-gray-400">Design ID: {product.design?.design_id}</p>
                                                     </div>
                                                 </div>
                                                 <DialogFooter className="mt-6">
@@ -2387,6 +2188,6 @@ export default function ShopPage() {
 
 
             </div>
-        </div>
+        </div >
     );
 }

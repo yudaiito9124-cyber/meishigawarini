@@ -2,7 +2,8 @@
   "Common": {
     "error": "エラー",
     "unknownError": "不明なエラー",
-    "failed": "失敗しました"
+    "failed": "失敗しました",
+    "all": "すべて"
   },
   "Site": {
     "name": "名刺代わりに。"
@@ -146,7 +147,8 @@
     "tabs": {
       "activation": "アクティベーション",
       "shipping": "注文管理",
-      "products": "商品登録・カード発注"
+      "products": "商品登録",
+      "orderCard": "カード発注"
     },
     "orders": {
       "date": "更新日時",

@@ -2,7 +2,8 @@
   "Common": {
     "error": "Error",
     "unknownError": "Unknown error",
-    "failed": "Failed"
+    "failed": "Failed",
+    "all": "All"
   },
   "Site": {
     "name": "Meishigawarini"
