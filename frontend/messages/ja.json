@@ -562,6 +562,8 @@
         "processing": "処理中"
       },
       "downloadPdf": "PDFダウンロード",
+      "downloadCsv": "CSV/画像一括ダウンロード",
+      "downloading": "ダウンロード準備中...",
       "table": {
         "uuid": "UUID",
         "pin": "PIN"

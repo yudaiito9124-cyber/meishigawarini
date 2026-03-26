@@ -16,6 +16,7 @@ import { APP_CONFIG } from "@/lib/config";
 import { generateId } from '@/lib/id';
 import { useTranslations } from 'next-intl';
 import { generatePDF, cardformats, paperformats } from '@/lib/generatePDF';
+import { generateCSVExport } from '@/lib/generateCSVExport';
 import { ExternalLink, Copy, Eye, QrCode, Store, Wrench, Layers, HelpCircle, Home, Trash2, RotateCcw, Loader2, Plus, X, Search, Save } from 'lucide-react';
 import CardDesignEditor from "@/components/admin/CardDesignEditor";
 const NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || "";
@@ -56,6 +57,7 @@ export default function AdminPage() {
     const [dbCardDesigns, setDbCardDesigns] = useState<any[]>([]);
     const [reloadDbCardDesigns, setReloadDbCardDesigns] = useState(true);
     const [isGenerating, setIsGenerating] = useState(false);
+    const [isExportingCsv, setIsExportingCsv] = useState<string | null>(null);
     const [activeTab, setActiveTab] = useState("qrcodes");
     const router = useRouter();
 
@@ -434,6 +436,30 @@ export default function AdminPage() {
                                                         const design = resolveDesign(batch.card_design);
                                                         generatePDF(batch, paperFormat, design);
                                                     }}>{t('batches.downloadPdf')}</Button>
+                                                    <Button className="ml-2" variant="outline" size="sm" disabled={isExportingCsv === batch.id} onClick={async () => {
+                                                        setIsExportingCsv(batch.id);
+                                                        try {
+                                                            const resolveDesign = (designId?: string) => {
+                                                                const targetId = designId || cardFormat;
+                                                                const dbDesign = dbCardDesigns.find(d => d.design_id === targetId);
+                                                                if (dbDesign) return dbDesign;
+                                                                if (cardformats[targetId]) return targetId;
+                                                                const globalDesign = dbCardDesigns.find(d => d.design_id === cardFormat);
+                                                                return globalDesign || cardFormat;
+                                                            };
+                                                            const design = resolveDesign(batch.card_design);
+                                                            await generateCSVExport(batch, design);
+                                                        } finally {
+                                                            setIsExportingCsv(null);
+                                                        }
+                                                    }}>
+                                                        {isExportingCsv === batch.id ? (
+                                                            <>
+                                                                <Loader2 className="w-3 h-3 animate-spin mr-1" />
+                                                                {t('batches.downloading')}
+                                                            </>
+                                                        ) : t('batches.downloadCsv')}
+                                                    </Button>
                                                 </div>
                                                 {/* Display Codes */}
                                                 <div className="mt-2 bg-gray-100 p-2 rounded text-xs font-mono overflow-auto max-h-40">

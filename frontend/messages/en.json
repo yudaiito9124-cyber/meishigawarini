@@ -536,6 +536,8 @@
         "processing": "Processing"
       },
       "downloadPdf": "Download PDF",
+      "downloadCsv": "Download CSV & Images",
+      "downloading": "Preparing download...",
       "table": {
         "uuid": "UUID",
         "pin": "PIN"
