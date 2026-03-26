@@ -161,12 +161,31 @@ export class InfraStack extends cdk.Stack {
       idTokenValidity: cdk.Duration.hours(1),       // IDトークン有効期限: 1時間
       accessTokenValidity: cdk.Duration.hours(1),   // アクセストークン有効期限: 1時間
       refreshTokenValidity: cdk.Duration.days(30),  // リフレッシュトークン有効期限: 30日
+      supportedIdentityProviders: [
+        cognito.UserPoolClientIdentityProvider.COGNITO,
+        cognito.UserPoolClientIdentityProvider.GOOGLE,
+        cognito.UserPoolClientIdentityProvider.AMAZON,
+      ],
       oAuth: {
         flows: {
           authorizationCodeGrant: true,
         },
-        callbackUrls: allowedOrigins.map(origin => `${origin}/`), // Add trailing slash for Cognito
-        logoutUrls: allowedOrigins.map(origin => `${origin}/`),
+        callbackUrls: [
+          ...allowedOrigins.map(origin => `${origin}/`),
+          ...allowedOrigins.map(origin => `${origin}/ja/`),
+          ...allowedOrigins.map(origin => `${origin}/en/`),
+          ...allowedOrigins.map(origin => `${origin}/login/`),
+          ...allowedOrigins.map(origin => `${origin}/ja/login/`),
+          ...allowedOrigins.map(origin => `${origin}/en/login/`),
+        ],
+        logoutUrls: [
+          ...allowedOrigins.map(origin => `${origin}/`),
+          ...allowedOrigins.map(origin => `${origin}/ja/`),
+          ...allowedOrigins.map(origin => `${origin}/en/`),
+          ...allowedOrigins.map(origin => `${origin}/login/`),
+          ...allowedOrigins.map(origin => `${origin}/ja/login/`),
+          ...allowedOrigins.map(origin => `${origin}/en/login/`),
+        ],
         scopes: [
           cognito.OAuthScope.EMAIL,
           cognito.OAuthScope.OPENID,

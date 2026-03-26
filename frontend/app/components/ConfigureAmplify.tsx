@@ -29,7 +29,16 @@ if (userPoolId && userPoolClientId) {
      * Cognito Hosted UI からのリダイレクト先を決定します。
      */
     const origin = typeof window !== 'undefined' ? window.location.origin : (process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000');
-    const origins = [origin, `${origin}/ja`, `${origin}/en`].map(o => o.endsWith('/') ? o : `${o}/`);
+    const signInOrigins = [
+        `${origin}/login/`,
+        `${origin}/ja/login/`,
+        `${origin}/en/login/`
+    ];
+    const signOutOrigins = [
+        `${origin}/`,
+        `${origin}/ja/`,
+        `${origin}/en/`
+    ];
 
     // Amplify SDK の設定。一度呼び出すと、アプリケーション全体で Auth モジュール等が利用可能になります。
     Amplify.configure({
@@ -41,8 +50,8 @@ if (userPoolId && userPoolClientId) {
                     oauth: {
                         domain: cognitoDomain || '',
                         scopes: ['email', 'openid', 'profile'],
-                        redirectSignIn: origins,
-                        redirectSignOut: origins,
+                        redirectSignIn: signInOrigins,
+                        redirectSignOut: signOutOrigins,
                         responseType: 'code',
                     }
                 }

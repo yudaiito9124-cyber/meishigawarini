@@ -93,7 +93,7 @@ export default function AdminLayout({
     }
 
     if (isAuthorized === false) {
-        notFound();
+        router.push('/login');
         return null;
     }
 

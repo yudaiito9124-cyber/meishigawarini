@@ -15,7 +15,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/componen
 import { Label } from "@/components/ui/label";
 import { cn } from '@/lib/utils';
 import { shopApi } from '@/lib/api/shop';
-import { HelpCircle, Crown, Store } from 'lucide-react';
+import { HelpCircle, Crown, Store, Loader2 } from 'lucide-react';
 
 export default function LoginPage() {
     const t = useTranslations('LoginPage');
@@ -25,7 +25,7 @@ export default function LoginPage() {
     const [mfaCode, setMfaCode] = useState('');
     const [showMfa, setShowMfa] = useState(false);
     const [error, setError] = useState('');
-    const [loading, setLoading] = useState(false);
+    const [loading, setLoading] = useState(true);
     const [isLoggedIn, setIsLoggedIn] = useState(false);
     const [userEmail, setUserEmail] = useState('');
     const [userInfo, setUserInfo] = useState('');
@@ -49,15 +49,25 @@ export default function LoginPage() {
                     setUserInfo(groups.join(" & "));
                     setUserEmail(session.tokens.idToken?.payload["email"] as string || "")
                     setSingleShopOwner(false);
+                    setLoading(false);
                     return; // ログインページに留まり、MFA設定リンクを踏めるようにする
                 }
 
                 setIsAdmin(isAdmin);
                 setIsLoggedIn(true);
                 await redirectShopPage();
+            } else {
+                // セッションがない場合はAWSログイン画面へ飛ばす
+                await signInWithRedirect();
             }
         } catch (e) {
-            // Not logged in
+            // エラー時（未ログイン含む）もAWSログイン画面へ飛ばす
+            try {
+                await signInWithRedirect();
+            } catch (err) {
+                console.error("Redirect to Hosted UI failed:", err);
+                setLoading(false);
+            }
         }
     };
 
@@ -203,7 +213,12 @@ export default function LoginPage() {
                             <CardTitle className="text-center text-2xl whitespace-pre-wrap break-all overflow-hidden">{isAdmin ? `Admin \n\n${userEmail}` : t('title')}</CardTitle>
                         </CardHeader>
                         <CardContent>
-                            {!isAdmin && (
+                            {loading ? (
+                                <div className="flex flex-col items-center justify-center py-12 gap-4">
+                                    <Loader2 className="w-10 h-10 animate-spin text-gray-400" />
+                                    <p className="text-sm text-gray-500">Checking session...</p>
+                                </div>
+                            ) : !isAdmin && (
 
                                 <form onSubmit={handleLogin} className="space-y-4">
                                     {!showMfa ? (
