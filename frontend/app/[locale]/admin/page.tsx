@@ -10,14 +10,14 @@ import { getCurrentUser, fetchAuthSession } from 'aws-amplify/auth';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { APP_CONFIG } from "@/lib/config";
 import { generateId } from '@/lib/id';
 import { useTranslations } from 'next-intl';
 import { generatePDF, cardformats, paperformats } from '@/lib/generatePDF';
 import { generateCSVExport } from '@/lib/generateCSVExport';
-import { ExternalLink, Copy, Eye, QrCode, Store, Wrench, Layers, HelpCircle, Home, Trash2, RotateCcw, Loader2, Plus, X, Search, Save } from 'lucide-react';
+import { ExternalLink, Copy, Eye, QrCode, Store, Wrench, Layers, HelpCircle, Home, Trash2, RotateCcw, Loader2, Plus, X, Search, Save, FileText, Download } from 'lucide-react';
 import CardDesignEditor from "@/components/admin/CardDesignEditor";
 const NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 const NEXT_PUBLIC_APP_URL = process.env.NEXT_PUBLIC_APP_URL || "";
@@ -126,9 +126,10 @@ export default function AdminPage() {
             };
             setGeneratedBatches([newBatch, ...generatedBatches]);
 
-            // Automatically download PDF
+            // Automatically download PDF and CSV
             const design = resolveDesign(cardFormat);
             await generatePDF(newBatch, paperFormat, design);
+            await generateCSVExport(newBatch, design);
         } catch (e: any) {
             const errData = e;
             alert((tb(errData?.message?.replace(/\./g, '_')) || errData?.message) || t('batches.alerts.failed') + (errData?.detail?.toString() || ''));
@@ -160,7 +161,7 @@ export default function AdminPage() {
                 </div>
 
 
-                <div className="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+                <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
                     <button
                         onClick={() => setActiveTab("qrcodes")}
                         className={cn(
@@ -221,7 +222,7 @@ export default function AdminPage() {
                             <CardContent className="space-y-4">
                                 <div className="flex flex-col w-full gap-1.5">
                                     <div className="grid w-full items-center gap-1.5">
-                                        <label htmlFor="count" className="text-sm font-medium">{t('generate.quantity')}</label>
+                                        <label htmlFor="count" className="text-lg font-bold mt-4">1. {t('generate.quantity')}</label>
                                         <Input
                                             id="count"
                                             type="number"
@@ -230,7 +231,61 @@ export default function AdminPage() {
                                         />
                                     </div>
 
-                                    <div className="flex items-center gap-2 mt-4">
+                                    <h3 className="text-lg font-bold mt-4">2. {t('generate.pdfOptions')}</h3>
+                                    <div className="space-y-4 rounded-xl bg-gray-100 border border-gray-200 border-dashed border-5 p-3 sm:p-4">
+                                        <div className="flex flex-col gap-3">
+
+                                            <div className="flex flex-col sm:flex-row w-full gap-1">
+                                                <label className="flex w-full sm:w-24 items-center text-[11px] sm:text-xs text-gray-700 font-medium">{t('generate.cardFormat')}</label>
+                                                <select
+                                                    className="flex-1 min-w-0 w-full rounded-md p-2 text-sm border border-gray-200 shadow-sm text-black bg-white"
+                                                    value={cardFormat}
+                                                    onChange={(e) => setCardFormat(e.target.value)}
+                                                >
+                                                    {Object.entries(cardformats).map(([key, value]: [string, any]) => (
+                                                        <option key={key} value={key}>{value.description || key} [System]</option>
+                                                    ))}
+                                                    {dbCardDesigns.map((d: any) => (
+                                                        <option key={d.design_id} value={d.design_id}>{d.description} [DB]</option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                        </div>
+
+                                        {/* Card Preview */}
+                                        <div className="w-full overflow-hidden">
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                                <div className="space-y-1 w-full">
+                                                    <div className="aspect-[84/52] w-full relative rounded shadow-lg overflow-hidden border border-gray-700 bg-white">
+                                                        <img
+                                                            src={(dbCardDesigns.find(d => d.design_id === cardFormat)?.thumbf || dbCardDesigns.find(d => d.design_id === cardFormat)?.bgimgf) || cardformats[cardFormat]?.bgimgf}
+                                                            alt={t('generate.frontPreview')}
+                                                            className="absolute inset-0 w-full h-full object-cover"
+                                                            crossOrigin="anonymous"
+                                                        />
+                                                    </div>
+                                                    <p className="text-[10px] text-gray-500 text-center uppercase tracking-wider">{t('generate.front')}</p>
+                                                </div>
+                                                <div className="space-y-1 w-full">
+                                                    <div className="aspect-[84/52] w-full relative rounded shadow-lg overflow-hidden border border-gray-700 bg-white">
+                                                        <img
+                                                            src={(dbCardDesigns.find(d => d.design_id === cardFormat)?.thumbb || dbCardDesigns.find(d => d.design_id === cardFormat)?.bgimgb) || cardformats[cardFormat]?.bgimgb}
+                                                            alt={t('generate.backPreview')}
+                                                            className="absolute inset-0 w-full h-full object-cover"
+                                                            crossOrigin="anonymous"
+                                                        />
+                                                    </div>
+                                                    <p className="text-[10px] text-gray-500 text-center uppercase tracking-wider">{t('generate.back')}</p>
+                                                </div>
+                                            </div>
+                                        </div>
+
+
+                                    </div>
+
+
+                                    <label htmlFor="shopId" className="text-lg font-bold mt-4">3. {t('generate.option')}</label>
+                                    <div className="flex items-center gap-2">
                                         <Switch
                                             id="useMetadataOptions"
                                             checked={useMetadataOptions}
@@ -241,7 +296,6 @@ export default function AdminPage() {
                                         </Label>
                                     </div>
 
-                                    <label htmlFor="shopId" className="text-sm font-medium mb-0 mt-2">{t('generate.option')}</label>
                                     <div className={cn(
                                         "grid w-full items-center gap-2 p-4 rounded-xl bg-gray-100 border border-gray-200 border-dashed border-5 transition-all duration-200",
                                         !useMetadataOptions && "opacity-50 grayscale pointer-events-none"
@@ -324,65 +378,17 @@ export default function AdminPage() {
                                         </div>
                                     </div>
 
-                                    <h3 className="text-sm font-semibold pt-8">{t('generate.pdfOptions')}</h3>
-                                    <div className="space-y-4 rounded-xl bg-gray-100 border border-gray-200 border-dashed border-5 p-3 sm:p-4">
-                                        <div className="flex flex-col gap-3">
-                                            <div className="flex flex-col sm:flex-row w-full gap-1">
-                                                <label className="flex w-full sm:w-24 items-center text-[11px] sm:text-xs text-gray-700 font-medium">{t('generate.paperFormat')}</label>
-                                                <select
-                                                    className="flex-1 min-w-0 w-full rounded-md p-2 text-sm border border-gray-200 shadow-sm text-black bg-white"
-                                                    value={paperFormat}
-                                                    onChange={(e) => setPaperFormat(e.target.value)}
-                                                >
-                                                    {Object.entries(paperformats).map(([key, value]: [string, any]) => (
-                                                        <option key={key} value={key}>{value.description || key}</option>
-                                                    ))}
-                                                </select>
-                                            </div>
-                                            <div className="flex flex-col sm:flex-row w-full gap-1">
-                                                <label className="flex w-full sm:w-24 items-center text-[11px] sm:text-xs text-gray-700 font-medium">{t('generate.cardFormat')}</label>
-                                                <select
-                                                    className="flex-1 min-w-0 w-full rounded-md p-2 text-sm border border-gray-200 shadow-sm text-black bg-white"
-                                                    value={cardFormat}
-                                                    onChange={(e) => setCardFormat(e.target.value)}
-                                                >
-                                                    {Object.entries(cardformats).map(([key, value]: [string, any]) => (
-                                                        <option key={key} value={key}>{value.description || key} [System]</option>
-                                                    ))}
-                                                    {dbCardDesigns.map((d: any) => (
-                                                        <option key={d.design_id} value={d.design_id}>{d.description} [DB]</option>
-                                                    ))}
-                                                </select>
-                                            </div>
-                                        </div>
-
-                                        {/* Card Preview */}
-                                        <div className="w-full overflow-hidden">
-                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                                <div className="space-y-1 w-full">
-                                                    <div className="aspect-[84/52] w-full relative rounded shadow-lg overflow-hidden border border-gray-700 bg-white">
-                                                        <img
-                                                            src={(dbCardDesigns.find(d => d.design_id === cardFormat)?.thumbf || dbCardDesigns.find(d => d.design_id === cardFormat)?.bgimgf) || cardformats[cardFormat]?.bgimgf}
-                                                            alt={t('generate.frontPreview')}
-                                                            className="absolute inset-0 w-full h-full object-cover"
-                                                            crossOrigin="anonymous"
-                                                        />
-                                                    </div>
-                                                    <p className="text-[10px] text-gray-500 text-center uppercase tracking-wider">{t('generate.front')}</p>
-                                                </div>
-                                                <div className="space-y-1 w-full">
-                                                    <div className="aspect-[84/52] w-full relative rounded shadow-lg overflow-hidden border border-gray-700 bg-white">
-                                                        <img
-                                                            src={(dbCardDesigns.find(d => d.design_id === cardFormat)?.thumbb || dbCardDesigns.find(d => d.design_id === cardFormat)?.bgimgb) || cardformats[cardFormat]?.bgimgb}
-                                                            alt={t('generate.backPreview')}
-                                                            className="absolute inset-0 w-full h-full object-cover"
-                                                            crossOrigin="anonymous"
-                                                        />
-                                                    </div>
-                                                    <p className="text-[10px] text-gray-500 text-center uppercase tracking-wider">{t('generate.back')}</p>
-                                                </div>
-                                            </div>
-                                        </div>
+                                    <div className="flex flex-col sm:flex-row w-full gap-1 border-t mt-4 mb-4">
+                                        <label className="mt-4 flex w-full sm:w-24 items-center text-[11px] sm:text-xs text-gray-700 font-medium">{t('generate.paperFormat')}</label>
+                                        <select
+                                            className="flex-1 min-w-0 w-full rounded-md p-2 text-sm border border-gray-200 shadow-sm text-black bg-white"
+                                            value={paperFormat}
+                                            onChange={(e) => setPaperFormat(e.target.value)}
+                                        >
+                                            {Object.entries(paperformats).map(([key, value]: [string, any]) => (
+                                                <option key={key} value={key}>{value.description || key}</option>
+                                            ))}
+                                        </select>
                                     </div>
 
                                     <div className="grid w-full items-center gap-1.5 mt-4">
@@ -403,9 +409,11 @@ export default function AdminPage() {
                                     </div>
                                 </div>
                             </CardContent>
+
+                            <CardFooter className="border-t">
+
+                            </CardFooter>
                         </Card>
-
-
                         {/* このページを開いてから生成したQRコードのバッチ一覧 */}
                         <Card>
                             <CardHeader>
@@ -425,17 +433,34 @@ export default function AdminPage() {
                                                         <p className="flex justify-center items-center text-sm bg-green-100 text-green-800 px-3 py-1 rounded-xl">{batch.status}</p>
                                                     </div>
                                                     <Button className="ml-auto" variant="outline" size="sm" onClick={() => {
-                                                        const resolveDesign = (designId?: string) => {
-                                                            const targetId = designId || cardFormat;
-                                                            const dbDesign = dbCardDesigns.find(d => d.design_id === targetId);
-                                                            if (dbDesign) return dbDesign;
-                                                            if (cardformats[targetId]) return targetId;
-                                                            const globalDesign = dbCardDesigns.find(d => d.design_id === cardFormat);
-                                                            return globalDesign || cardFormat;
-                                                        };
-                                                        const design = resolveDesign(batch.card_design);
-                                                        generatePDF(batch, paperFormat, design);
-                                                    }}>{t('batches.downloadPdf')}</Button>
+                                                        setIsExportingCsv(batch.id);
+                                                        try {
+                                                            const resolveDesign = (designId?: string) => {
+                                                                const targetId = designId || cardFormat;
+                                                                const dbDesign = dbCardDesigns.find(d => d.design_id === targetId);
+                                                                if (dbDesign) return dbDesign;
+                                                                if (cardformats[targetId]) return targetId;
+                                                                const globalDesign = dbCardDesigns.find(d => d.design_id === cardFormat);
+                                                                return globalDesign || cardFormat;
+                                                            };
+                                                            const design = resolveDesign(batch.card_design);
+                                                            generatePDF(batch, paperFormat, design);
+                                                        } finally {
+                                                            setIsExportingCsv(null);
+                                                        }
+                                                    }}>
+                                                        {isExportingCsv === batch.id ? (
+                                                            <>
+                                                                <Loader2 className="w-3 h-3 animate-spin mr-1" />
+                                                                {t('batches.downloading')}
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <FileText className="w-4 h-4 mr-2" />
+                                                                {t('batches.downloadPdf')}
+                                                            </>
+                                                        )}
+                                                    </Button>
                                                     <Button className="ml-2" variant="outline" size="sm" disabled={isExportingCsv === batch.id} onClick={async () => {
                                                         setIsExportingCsv(batch.id);
                                                         try {
@@ -458,7 +483,12 @@ export default function AdminPage() {
                                                                 <Loader2 className="w-3 h-3 animate-spin mr-1" />
                                                                 {t('batches.downloading')}
                                                             </>
-                                                        ) : t('batches.downloadCsv')}
+                                                        ) : (
+                                                            <>
+                                                                <Download className="w-4 h-4 mr-2" />
+                                                                {t('batches.downloadCsv')}
+                                                            </>
+                                                        )}
                                                     </Button>
                                                 </div>
                                                 {/* Display Codes */}
@@ -551,6 +581,8 @@ function QRCodeListSection({ apiUrl, onGeneratePDF, paperFormat, cardFormat, dbC
     const [loading, setLoading] = useState(false);
     const [isDenseAuto, setIsDenseAuto] = useState(false);
     const [isDenseManual, setIsDenseManual] = useState<boolean | null>(null);
+    // 取得したデータ以外にもまだ続きがあるかどうかを管理するフラグ（50件制限のため）
+    const [hasMore, setHasMore] = useState(false);
 
     const isDense = isDenseManual !== null ? isDenseManual : (codes.length > 30);
 
@@ -629,8 +661,11 @@ function QRCodeListSection({ apiUrl, onGeneratePDF, paperFormat, cardFormat, dbC
         setLoading(true);
         try {
             const currentStatus = targetStatus ?? status;
-            const data = await adminApi.admin_qr_list({ status: currentStatus, keyword });
+            // コスト削減のため、1回のリクエストで取得する件数を50件に制限
+            const data = await adminApi.admin_qr_list({ status: currentStatus, keyword, limit: 50 });
             setCodes(data.items || []);
+            // 続きのデータの有無をステートに保存
+            setHasMore(data.hasMore || false);
         } catch (error) {
             console.error(error);
         } finally {
@@ -722,11 +757,21 @@ function QRCodeListSection({ apiUrl, onGeneratePDF, paperFormat, cardFormat, dbC
                     </div>
                 </div>
 
-                <div className="bg-white border rounded-md p-4">
+                <div className="bg-white border rounded-md p-4 relative">
+                    {/* ローディングオーバーレイ: 通信中にリスト全体をグレーアウトしてスピナーを表示 */}
+                    {loading && (
+                        <div className="absolute inset-0 bg-white/50 backdrop-blur-[1px] z-20 flex items-center justify-center rounded-md">
+                            <div className="flex flex-col items-center gap-2">
+                                <Loader2 className="w-8 h-8 animate-spin text-mist-600" />
+                                <p className="text-sm font-medium text-mist-900">{t('list.loading')}</p>
+                            </div>
+                        </div>
+                    )}
                     <p className="text-sm text-gray-500 mb-2">
-                        {t('list.info', { status: t(`list.status.${status.toLowerCase()}`), count: codes.length })}
+                        {/* 続きがある場合は「50+」のように表示 */}
+                        {t('list.info', { status: t(`list.status.${status.toLowerCase()}`), count: hasMore ? `${codes.length}+` : codes.length })}
                     </p>
-                    <Table wrapperClassName="max-h-[70vh] overflow-auto" className="w-full table-fixed">
+                    <Table wrapperClassName="h-[70vh] overflow-auto" className="w-full table-fixed">
                         <TableHeader className="sticky top-0 bg-white z-10 shadow-sm">
                             <TableRow className={isDense ? "h-6" : "h-10"}>
                                 <TableHead className={cn("py-1 ", isDense ? "w-[90px] h-6 px-1 text-[9px]" : "w-[120px] h-8 px-2")}>{t('list.table.createdAt')}</TableHead>
@@ -1041,30 +1086,56 @@ function QRCodeRow({ item, apiUrl, onGeneratePDF, onRefresh, paperFormat, cardFo
                     </div>
                 )}
                 <DialogFooter className="flex flex-col sm:flex-row sm:justify-between gap-2 border-t p-6 shrink-0 bg-gray-50/50">
-                    <Button
-                        variant="outline"
-                        size="default"
-                        className="flex-1 sm:flex-none h-10"
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            const resolveDesign = (designId?: string) => {
-                                const targetId = item.card_design || cardFormat;
-                                const dbDesign = dbCardDesigns.find(d => d.design_id === targetId);
-                                if (dbDesign) return dbDesign;
-                                if (cardformats[targetId]) return targetId;
-                                const globalDesign = dbCardDesigns.find(d => d.design_id === cardFormat);
-                                return globalDesign || cardFormat;
-                            };
-                            const design = resolveDesign(item.card_design);
-                            onGeneratePDF({
-                                id: uuid,
-                                codes: [{ uuid, pin: item.pin }]
-                            }, paperFormat, design, Boolean(item.status === "PROMOTION"));
-                        }}
-                    >
-                        <QrCode className="mr-2 h-4 w-4" />
-                        {t('list.ban.pdf')}
-                    </Button>
+                    <div className="flex flex-wrap gap-2 flex-1 sm:flex-none">
+                        <Button
+                            variant="outline"
+                            size="default"
+                            className="flex-1 sm:flex-none h-10"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                const resolveDesign = (designId?: string) => {
+                                    const targetId = item.card_design || cardFormat;
+                                    const dbDesign = dbCardDesigns.find(d => d.design_id === targetId);
+                                    if (dbDesign) return dbDesign;
+                                    if (cardformats[targetId]) return targetId;
+                                    const globalDesign = dbCardDesigns.find(d => d.design_id === cardFormat);
+                                    return globalDesign || cardFormat;
+                                };
+                                const design = resolveDesign(item.card_design);
+                                onGeneratePDF({
+                                    id: uuid,
+                                    codes: [{ uuid, pin: item.pin }]
+                                }, paperFormat, design, Boolean(item.status === "PROMOTION"));
+                            }}
+                        >
+                            <FileText className="mr-2 h-4 w-4" />
+                            {t('list.ban.pdf')}
+                        </Button>
+                        <Button
+                            variant="outline"
+                            size="default"
+                            className="flex-1 sm:flex-none h-10"
+                            onClick={async (e) => {
+                                e.stopPropagation();
+                                const resolveDesign = (designId?: string) => {
+                                    const targetId = item.card_design || cardFormat;
+                                    const dbDesign = dbCardDesigns.find(d => d.design_id === targetId);
+                                    if (dbDesign) return dbDesign;
+                                    if (cardformats[targetId]) return targetId;
+                                    const globalDesign = dbCardDesigns.find(d => d.design_id === cardFormat);
+                                    return globalDesign || cardFormat;
+                                };
+                                const design = resolveDesign(item.card_design);
+                                await generateCSVExport({
+                                    id: uuid,
+                                    codes: [{ uuid, pin: item.pin }]
+                                }, design);
+                            }}
+                        >
+                            <Download className="mr-2 h-4 w-4" />
+                            {t('list.ban.image')}
+                        </Button>
+                    </div>
                     {item.status !== 'BANNED' ? (
                         <div className="flex-1 sm:flex-none">
                             <BanButton

@@ -38,23 +38,24 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 
         const body = JSON.parse(event.body || '{}');
         const status = body.status || 'UNASSIGNED';
+        // 取得件数の制限（デフォルト50件）。DynamoDBの読み取りコストを抑えるために使用。
+        const limit = Number(body.limit) || 50;
         const keyword = body.keyword || '';
 
         let result;
 
         if (status === 'SEARCH') {
             const trimmedKeyword = keyword.trim();
-            console.log(`Searching for keyword: "${trimmedKeyword}"`);
+            console.log(`Searching for keyword: "${trimmedKeyword}" (Limit: ${limit})`);
 
-            // UUIDs are lowercase, so let's search lowercased keyword against PK
-            // PIN is numeric string, acceptable to search as is (lowercase doesn't change digits)
-
-            // キーワード（UUIDの一部またはPIN）に一致するQRコードを全件スキャン
+            // キーワード（UUIDの一部またはPIN）に一致するQRコードをスキャン
             // - フィルタ条件:
             //   - PK がキーワードを含む OR PIN がキーワードを含む
             //   - PK が "QR#" で始まる
             //   - SK が "METADATA" である
+            // - 取得件数制限: limit (コスト削減のため)
             // - 取得カラム: 一致した項目の全属性
+            // 注意: Scanに対してLimitをかけると、フィルタ前の読み取り件数が制限されます。
             result = await ddb.send(new ScanCommand({
                 TableName: TABLE_NAME,
                 FilterExpression: '(contains(PK, :kw) OR contains(pin, :kw)) AND begins_with(PK, :prefix) AND SK = :sk',
@@ -62,13 +63,15 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                     ':kw': trimmedKeyword.toLowerCase(),
                     ':prefix': 'QR#',
                     ':sk': 'METADATA'
-                }
+                },
+                Limit: limit
             }));
         } else {
             // 特定ステータスのQRコードをインデックスから最新順に取得
             // - 検索条件: GSI1_PK = QR#{status}
             // - 取得カラム: ステータス別の全QR属性
             // - ソート: 作成日時の降順 (ScanIndexForward: false)
+            // - 取得件数制限: limit (大量のデータがあっても最初の50件のみを読み取り、コストを削減します)
             result = await ddb.send(new QueryCommand({
                 TableName: TABLE_NAME,
                 IndexName: INDEX_NAME,
@@ -76,8 +79,8 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 ExpressionAttributeValues: {
                     ':pk': `QR#${status}`
                 },
-                ScanIndexForward: false, // Descending by ts_created_at
-                // Limit: 50 // soft listing limit for now
+                ScanIndexForward: false, // 作成日時の降順
+                Limit: limit
             }));
         }
 
@@ -232,7 +235,8 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             headers: corsHeaders,
             body: JSON.stringify({
                 status,
-                count: result.Count,
+                count: result.Items?.length || 0, // 今回のレスポンスに含まれる件数
+                hasMore: !!result.LastEvaluatedKey, // Limitを超えるデータがまだ存在するかどうかのフラグ
                 items: enrichedItems
             })
         };

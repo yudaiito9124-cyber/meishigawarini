@@ -532,7 +532,7 @@
     },
     "AdminNeed2FA": "管理者は2段階認証が必要です",
     "generate": {
-      "title": "QRコード生成",
+      "title": "カード手動生成",
       "option": "オプション",
       "quantity": "生成数 (<100)",
       "shopId": "ショップID (任意, そのショップに限定)",
@@ -542,8 +542,8 @@
       "expiryDate": "使用期限 (任意, 指定しない場合は有効化した日付 + 商品ごとの有効期間 を足した日時)",
       "activateNow": "この場でアクティベートする (任意、ショップIDと商品IDの両方の指定が必要)",
       "useMetadata": "オプション情報を使用する",
-      "pdfOptions": "PDF形式設定",
-      "paperFormat": "用紙設定",
+      "pdfOptions": "カードデザイン",
+      "paperFormat": "PDF生成用の用紙設定(QRコード単体のPDFを出力する際にもここを変更してください)",
       "cardFormat": "カードデザイン",
       "cardPreview": "デザインプレビュー",
       "front": "表面",
@@ -561,8 +561,8 @@
         "ready": "準備完了",
         "processing": "処理中"
       },
-      "downloadPdf": "PDFダウンロード",
-      "downloadCsv": "CSV/画像一括ダウンロード",
+      "downloadPdf": "印刷用PDF",
+      "downloadCsv": "印刷用画像(カードプリンタ等)",
       "downloading": "ダウンロード準備中...",
       "table": {
         "uuid": "UUID",
@@ -610,7 +610,8 @@
         "success": "BANしました",
         "failed": "BANに失敗しました",
         "error": "エラーが発生しました",
-        "pdf": "PDF",
+        "pdf": "印刷用PDF",
+        "image": "印刷用画像",
         "reasonPlaceholder": "BANの理由を入力してください"
       },
       "restore": {

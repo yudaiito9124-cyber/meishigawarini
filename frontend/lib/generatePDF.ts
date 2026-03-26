@@ -465,5 +465,5 @@ export const generatePDF = async (batch: any, paperformat: string, cardformat: s
         }
     }
 
-    doc.save(`qrcodes-${batch.id}.pdf`);
+    doc.save(`card_${(batch.id || '') || `batch-` + Date.now()}.pdf`);
 };

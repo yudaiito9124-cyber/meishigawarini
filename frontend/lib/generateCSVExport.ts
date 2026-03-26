@@ -65,7 +65,7 @@ const genQRCanvas = async (code: string, size: number): Promise<HTMLCanvasElemen
 
 export const generateCSVExport = async (batch: any, cardformat: string | any) => {
     const zip = new JSZip();
-    const batchName = batch.id || `batch-${Date.now()}`;
+    const batchName = `card_${(batch.id || '') || `batch-` + Date.now()}`;
     const folder = zip.folder(batchName);
 
     const cf = typeof cardformat === 'string' ? cardformats[cardformat] : cardformat;

@@ -93,7 +93,7 @@ type AdminApiSchema = {
         activate_now?: boolean;
         card_design: string
     }; //QRコードを生成
-    admin_qr_list: { status: string, keyword?: string }; //QRコードのリストを取得
+    admin_qr_list: { status: string, keyword?: string, limit?: number }; //QRコードのリストを取得 (limit: 取得件数制限)
     // カードデザイン
     admin_carddesigns_list: {}; //カードデザインのリストを取得
     admin_carddesigns_create: { design_id: string; design: { [key: string]: any } }; //カードデザインを作成

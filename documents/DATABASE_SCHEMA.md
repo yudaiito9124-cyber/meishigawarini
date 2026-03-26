@@ -17,6 +17,8 @@
 | **QR Chat (チャット履歴)** | `QR#{uuid}` | `CHAT` |
 | **User (ユーザー情報 ショップのオーナー・管理者)** | `USER#{userId}` | `SHOP` |
 | **User (ユーザー情報 プレゼントを渡す人)** | `USER#{userId}` | `SENDER` |
+| **Card Design (カードデザイン情報)** | `CARD_DESIGN#METADATA` | `designId` |
+| **Card Order (カード発注情報)** | `CARD_ORDER#{shopId}` | `ORDER#{orderId}` |
 
 
 ---
@@ -90,7 +92,7 @@
 ### 2.4 Product (商品情報)
 各ショップに紐づく商品カタログ情報です。
 
-すでに有効化されたQRコードと紐づけられている商品などを変更すると混乱のもとになるため、基本的には作成した商品の変更操作は想定していません。また、同様の理由で、商品を削除する際には、statusがSTOPPED、かつすべての紐づけられたQRコードに対して発送されている必要があります(有効化済みでもなく発送待ちでもない)。
+すでに有効化されたQRコードと紐づけられている商品などを削除すると使用期限内のカードが使えなくなるため、商品を削除する際には、statusがSTOPPED、かつすべての紐づけられたQRコードに対して発送されている必要があります(有効化済みでもなく発送待ちでもない)。
 
 | 属性名 | 型 | 説明 |
 | --- | --- | --- |
@@ -105,6 +107,7 @@
 | `valid_days` | Number | QRコードの有効日数設定 （整数値、例: `90`, `180` など） |
 | `status` | String | 商品の販売状態 (`ACTIVE`, `STOPPED`, または `DELETED`) ※詳細は2.6章 |
 | `ts_created_at` | String | 作成日時 （ISO 8601形式のUTC日時文字列） |
+| `ts_updated_at` | String | 更新日時 （ISO 8601形式のUTC日時文字列） |
 | `GSI1_PK` | String | `PRODUCT#{status}` （アクティブな商品一覧取得用、例: `PRODUCT#ACTIVE`） |
 | `GSI1_SK` | String | 作成日時等のソートキー （ISO 8601形式のUTC日時文字列） |
 | `GSI2_PK` | String | `PRODUCT#{productId}` （UUIDからの逆引き用） |
@@ -181,7 +184,8 @@ QRコードのライフサイクルや注文ステータス、商品との紐付
 | `PK` | String | 常に固定値 `CARD_DESIGN#METADATA` |
 | `SK` | String | デザインID (例: `20240317...`) |
 | `design_id` | String | デザインID (SKと同じ値) |
-| `description` | String | デザイン名・説明 |
+| `name` | String | デザイン名 |
+| `description` | String | 説明 |
 | `bgimgf` | String | 表面背景画像URL (S3) |
 | `bgimgb` | String | 裏面背景画像URL (S3) |
 | `thumbf` | String | 表面サムネイル画像URL (WebP, S3) |
@@ -201,7 +205,30 @@ QRコードのライフサイクルや注文ステータス、商品との紐付
 | `ts_updated_at` | String | 更新日時 |
 
 ---
+### 2.9 Card Order (カード発注情報)
+各ショップに紐づくカード発注情報です。
 
+| 属性名 | 型 | 説明 |
+| --- | --- | --- |
+| `PK` | String | `CARD_ORDER#SHOP{shopId}` （`shopId` はUUID形式,いずれSHOP以外も？） |
+| `SK` | String | `ORDER#{orderId}` （`orderId` はUUID形式） |
+| `order_id` | String | 発注ID （UUID形式） |
+| `quantity` | Number | 発注枚数 |
+| `status` | String | 発注状態 (`ORDERED`, `CANCELLED`, `PRINTING`, `SHIPPED`, `COMPLETED`, `REJECTED`) | ショップからはORDEREDの時点でのみCANCELLEDに移行可能，システム管理者が生成した時点でPRINTINGに移行 |
+| `design_id` | String | デザインID （UUID形式） |
+| `product_id` | String | (オプション・制限) 商品ID （UUID形式） |
+| `shop_id` | String | (オプション・制限) ショップID （UUID形式） |
+| `shop_user_id` | String | (オプション・制限) そのユーザーIDが閲覧できるショップに限定 （UUID形式） |
+| `sender_user_id` | String | (オプション・制限) そのユーザーIDを送り主に設定 （UUID形式） |
+| `expiration_date` | String | (オプション・制限) 使用期限 （ISO 8601形式のUTC日時文字列） |
+| `activate_now` | Boolean | (オプション・制限) 生成と同時に有効化するか |
+| `ts_created_at` | String | 作成日時 （ISO 8601形式のUTC日時文字列） |
+| `ts_updated_at` | String | 更新日時 （ISO 8601形式のUTC日時文字列） |
+| `GSI1_PK` | String | `CARD_ORDER#{status}` （アクティブな商品一覧取得用、例: `CARD_ORDER#ORDERED`） |
+| `GSI1_SK` | String | 作成日時等のソートキー （ISO 8601形式のUTC日時文字列） |
+| `GSI2_PK` | String | `CARD_ORDER#{orderId}` （UUIDからの逆引き用） |
+| `GSI2_SK` | String | `SHOP#{orderId}` (旧データ：作成日時等のソートキー （ISO 8601形式のUTC日時文字列）) |
+ 欲しい？　印刷したユーザー名，手動で生成した場合もこのフォーマットでレコードを残す？
 
 ### 2.7 レコードが保持可能な状態 (ステータス) 一覧
 
