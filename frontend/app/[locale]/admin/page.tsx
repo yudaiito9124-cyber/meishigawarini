@@ -379,9 +379,9 @@ export default function AdminPage() {
                                     </div>
 
                                     <div className="flex flex-col sm:flex-row w-full gap-1 border-t mt-4 mb-4">
-                                        <label className="mt-4 flex w-full sm:w-24 items-center text-[11px] sm:text-xs text-gray-700 font-medium">{t('generate.paperFormat')}</label>
+                                        <label className="mt-4 w-full flex  items-center text-[11px] sm:text-xs text-gray-700 font-medium">{t('generate.paperFormat')}</label>
                                         <select
-                                            className="flex-1 min-w-0 w-full rounded-md p-2 text-sm border border-gray-200 shadow-sm text-black bg-white"
+                                            className="mt-4 flex-1 min-w-100 h-10 w-full rounded-md p-2 text-sm border border-gray-200 shadow-sm text-black bg-white"
                                             value={paperFormat}
                                             onChange={(e) => setPaperFormat(e.target.value)}
                                         >
