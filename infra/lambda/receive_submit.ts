@@ -15,6 +15,7 @@ import { CognitoIdentityProviderClient, AdminGetUserCommand } from '@aws-sdk/cli
 import { sendLocalizedEmail } from './templates/email';
 import { isLocked, getRateLimitUpdate } from './utils/rate-limit';
 import { checkAndExpire } from './utils/expiration';
+import { appendToHistory } from './utils/history';
 
 const client = new DynamoDBClient({});
 const cognito = new CognitoIdentityProviderClient({});
@@ -41,6 +42,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 
         const body = JSON.parse(event.body || '{}');
         const { qr_id, pin_code, shipping_info, password } = body;
+        const userId = event.requestContext?.authorizer?.userId;
 
         if (!qr_id || !pin_code || !shipping_info) {
             return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Missing required fields' }) };
@@ -180,6 +182,13 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                     });
                 }
             } catch (e) { console.error('Shop notification failed', e); }
+        }
+
+        // ログインしている場合は受け取り履歴に追加
+        if (userId) {
+            try {
+                await appendToHistory(ddb, TABLE_NAME, userId, 'RECEIVEDLOG', qr_id);
+            } catch (e) { console.error('History logging failed', e); }
         }
 
         return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ message: 'Address submitted successfully', order_id: `ORDER#${qr_id}` }) };

@@ -1,9 +1,22 @@
 import { APIGatewayAuthorizerResult, APIGatewayRequestAuthorizerEvent } from 'aws-lambda';
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, GetCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
+import { CognitoJwtVerifier } from 'aws-jwt-verify';
 import { isLocked, getRateLimitUpdate, getResetRateLimitUpdate } from './utils/rate-limit';
 
+const USER_POOL_ID = process.env.USER_POOL_ID || '';
+const CLIENT_ID = process.env.CLIENT_ID || '';
 const TABLE_NAME = process.env.TABLE_NAME || '';
+
+// JWT検証用の検証器 (オプションのユーザー識別用)
+let verifier: any = null;
+if (USER_POOL_ID && CLIENT_ID) {
+    verifier = CognitoJwtVerifier.create({
+        userPoolId: USER_POOL_ID,
+        tokenUse: 'id',
+        clientId: CLIENT_ID,
+    });
+}
 
 const client = new DynamoDBClient({});
 const ddb = DynamoDBDocumentClient.from(client, {
@@ -22,6 +35,20 @@ export const handler = async (event: APIGatewayRequestAuthorizerEvent): Promise<
             console.log('Missing UUID or PIN in headers');
             return generatePolicy('unidentified-receiver', 'Deny', event.methodArn);
         }
+
+        // --- オプションのJWT検証 (履歴記録等のためのユーザー識別用) ---
+        let userId: string | undefined = undefined;
+        const authHeader = event.headers?.['Authorization'] || event.headers?.['authorization'];
+        if (authHeader && verifier) {
+            try {
+                const token = authHeader.replace('Bearer ', '');
+                const payload = await verifier.verify(token);
+                userId = payload.sub;
+            } catch (err) {
+                console.log('Optional JWT verification failed, proceeding as guest', err);
+            }
+        }
+        // -------------------------------------------------------------
 
         const getRes = await ddb.send(new GetCommand({
             TableName: TABLE_NAME,
@@ -120,7 +147,8 @@ export const handler = async (event: APIGatewayRequestAuthorizerEvent): Promise<
             uuid: uuid,
             pin: pin,
             status: item.status,
-            shopId: item.shop_id
+            shopId: item.shop_id,
+            ...(userId ? { userId: userId } : {})
         });
 
     } catch (err) {

@@ -55,6 +55,19 @@
     "heroSubtitle": "心を贈ろう。",
     "description": "”名刺代わりに。” は出会いにちょっとした贈りものを添えるデジタルギフトサービス。 ギフトの送り先はQRコードから指定できます。"
   },
+  "UserProfilePage": {
+    "title": "マイページ",
+    "editProfile": "プロフィール情報の編集",
+    "editProfileDesc": "名刺代わりに渡す自分のプロフィール情報を編集します。",
+    "sendList": "送ったギフト一覧",
+    "sendListDesc": "これまでに送った・名刺交換したギフトを確認します。",
+    "receiveList": "もらったギフト一覧",
+    "receiveListDesc": "これまでに受け取ったギフトを確認します。",
+    "sendGift": "新しくギフトを送る",
+    "sendGiftDesc": "新しいギフトのQRコードをスキャンして送信履歴に登録します。",
+    "logout": "ログアウト",
+    "back": "戻る"
+  },
   "LoginPage": {
     "title": "ログイン",
     "email": "メールアドレス",
@@ -83,6 +96,8 @@
     "shopAdminPage": "ショップ管理者画面",
     "qrAdminPage": "システム管理者画面",
     "AdminNeed2FA": "管理者は2段階認証が必要です",
+    "selectionTitle": "操作を選択してください",
+    "userProfilePage": "プロフィール管理",
     "logout": "ログアウト",
     "helpAdminPage": "管理者ヘルプ(初期設定)",
     "signInWithAWS": "AWS標準画面でログイン",

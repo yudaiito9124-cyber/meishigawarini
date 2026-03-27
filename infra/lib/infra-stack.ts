@@ -10,6 +10,7 @@ import * as iam from 'aws-cdk-lib/aws-iam';
 import { AdminApi } from './constructs/admin-api';
 import { ShopApi } from './constructs/shop-api';
 import { ReceiveApi } from './constructs/receive-api';
+import { UserApi } from './constructs/user-api';
 
 const DEFAULT_VALID_DAYS = process.env.DEFAULT_VALID_DAYS || '1';
 
@@ -341,11 +342,23 @@ export class InfraStack extends cdk.Stack {
       grantTablePermissions,
     });
 
+    // User API
+    new UserApi(this, 'UserApiConstruct', {
+      table,
+      bucket,
+      userPool,
+      userPoolClient,
+      api,
+      commonProps,
+      grantTablePermissions,
+    });
+
     // Receive API
     new ReceiveApi(this, 'ReceiveApiConstruct', {
       table,
       bucket,
       userPool,
+      userPoolClient,
       api,
       commonProps,
       grantTablePermissions,

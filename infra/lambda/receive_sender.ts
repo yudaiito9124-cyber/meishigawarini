@@ -20,6 +20,7 @@ import { APIGatewayProxyHandler } from 'aws-lambda';
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, GetCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
 import { stripSignature, deleteFileByUrl, copyS3Object, signUrlIfS3, signUrlsInHtml, stripSignaturesInHtml } from './utils/s3';
+import { appendToHistory } from './utils/history';
 import { generateId } from './utils/id';
 
 const client = new DynamoDBClient({});
@@ -44,6 +45,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 
         const authorizer = event.requestContext.authorizer;
         const uuid = authorizer?.uuid || (event.headers['X-QR-UUID'] || event.headers['x-qr-uuid']);
+        const userId = authorizer?.userId; // Tokenから取得されたユーザーID (任意)
         if (!uuid) return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Missing UUID' }) };
 
         const body = JSON.parse(event.body || '{}');
@@ -133,6 +135,21 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 for (const url of deleted_html_image_urls) {
                     const cleanUrl = stripSignature(url);
                     if (cleanUrl && !toDelete.includes(cleanUrl)) await deleteFileByUrl(cleanUrl, BUCKET_NAME);
+                }
+            }
+
+            // ログイン済みの場合は送信履歴(SENDLOG)として記録し、CHATメタデータの送信者IDも更新する
+            if (userId) {
+                try {
+                    await ddb.send(new UpdateCommand({
+                        TableName: TABLE_NAME,
+                        Key: { PK: `QR#${uuid}`, SK: 'CHAT' },
+                        UpdateExpression: 'SET sender_id = :sid, ts_updated_at = :now',
+                        ExpressionAttributeValues: { ':sid': userId, ':now': new Date().toISOString() }
+                    }));
+                    await appendToHistory(ddb, TABLE_NAME, userId, 'SENDLOG', uuid);
+                } catch (e) {
+                    console.error('History logging failed', e);
                 }
             }
 

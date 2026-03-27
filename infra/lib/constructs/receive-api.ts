@@ -13,6 +13,7 @@ export interface ReceiveApiProps {
   table: dynamodb.ITable;
   bucket: s3.IBucket;
   userPool: cognito.IUserPool;
+  userPoolClient: cognito.IUserPoolClient;
   api: apigateway.RestApi;
   commonProps: any;
   grantTablePermissions: (fn: lambda.IFunction, write?: boolean) => void;
@@ -22,7 +23,7 @@ export class ReceiveApi extends Construct {
   constructor(scope: Construct, id: string, props: ReceiveApiProps) {
     super(scope, id);
 
-    const { table, bucket, userPool, api, commonProps, grantTablePermissions } = props;
+    const { table, bucket, userPool, userPoolClient, api, commonProps, grantTablePermissions } = props;
 
     // Helper for lambda paths
     const lampath = (name: string) => path.join(__dirname, `../../lambda/${name}.ts`);
@@ -32,6 +33,8 @@ export class ReceiveApi extends Construct {
       entry: lampath('receiveAuthorizer'),
       environment: {
         TABLE_NAME: table.tableName,
+        USER_POOL_ID: userPool.userPoolId,
+        CLIENT_ID: userPoolClient.userPoolClientId,
       },
     });
     grantTablePermissions(receive_authorizer_fn, true);
@@ -74,13 +77,25 @@ export class ReceiveApi extends Construct {
         ...fnProps.environment,
         SENDER_EMAIL: process.env.SENDER_EMAIL || '',
         USER_POOL_ID: userPool.userPoolId,
+        CLIENT_ID: userPoolClient.userPoolClientId,
       }
     });
 
     const receive_completed = new nodejs.NodejsFunction(this, 'receive_completed', { entry: lampath('receive_completed'), ...fnProps });
     const receive_chat = new nodejs.NodejsFunction(this, 'receive_chat', { entry: lampath('receive_chat'), ...fnProps });
     const receive_subscription = new nodejs.NodejsFunction(this, 'receive_subscription', { entry: lampath('receive_subscription'), ...fnProps });
-    const receive_sender = new nodejs.NodejsFunction(this, 'receive_sender', { entry: lampath('receive_sender'), ...fnProps });
+    
+    // Pass userPool details to receive_sender for history logging
+    const receive_sender = new nodejs.NodejsFunction(this, 'receive_sender', {
+      entry: lampath('receive_sender'),
+      ...fnProps,
+      environment: {
+        ...fnProps.environment,
+        USER_POOL_ID: userPool.userPoolId,
+        CLIENT_ID: userPoolClient.userPoolClientId,
+      }
+    });
+    
     const receive_upload_url = new nodejs.NodejsFunction(this, 'receive_upload_url', { entry: lampath('receive_upload_url'), ...fnProps });
 
     // Grant Permissions

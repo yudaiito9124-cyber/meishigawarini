@@ -15,7 +15,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/componen
 import { Label } from "@/components/ui/label";
 import { cn } from '@/lib/utils';
 import { shopApi } from '@/lib/api/shop';
-import { HelpCircle, Crown, Store, Loader2 } from 'lucide-react';
+import { HelpCircle, Crown, Store, Loader2, User } from 'lucide-react';
 
 export default function LoginPage() {
     const t = useTranslations('LoginPage');
@@ -28,6 +28,7 @@ export default function LoginPage() {
     const [loading, setLoading] = useState(true);
     const [isLoggedIn, setIsLoggedIn] = useState(false);
     const [userEmail, setUserEmail] = useState('');
+    const [userId, setUserId] = useState('');
     const [userInfo, setUserInfo] = useState('');
     const [singleShopOwner, setSingleShopOwner] = useState<boolean>(true);
     const [isAdmin, setIsAdmin] = useState(false);
@@ -39,35 +40,27 @@ export default function LoginPage() {
                 const groups = (session.tokens.idToken?.payload['cognito:groups'] as string[]) || [];
                 const amr = (session.tokens.idToken?.payload['amr'] as string[]) || [];
                 const isAdmin = groups.includes('Administrators') || groups.includes('GlobalAdmins');
-                const usedMfa = amr.includes('mfa') || amr.includes('software_token_mfa') || amr.includes('sms_mfa');
+                const sub = session.tokens.idToken?.payload['sub'] as string || "";
+                
+                setUserId(sub);
+                setIsAdmin(isAdmin);
+                setIsLoggedIn(true);
 
-                // 管理者でMFAがまだの場合、勝手に/shopに行かずにログインページに留まる（または案内を出す）
+                // 管理者でMFAがまだの場合
                 if (isAdmin) {
-                    // console.log("Logged in as admin but MFA is missing.");
-                    setIsLoggedIn(true);
-                    setIsAdmin(true);
                     setUserInfo(groups.join(" & "));
                     setUserEmail(session.tokens.idToken?.payload["email"] as string || "")
                     setSingleShopOwner(false);
                     setLoading(false);
-                    return; // ログインページに留まり、MFA設定リンクを踏めるようにする
+                    return; 
                 }
 
-                setIsAdmin(isAdmin);
-                setIsLoggedIn(true);
                 await redirectShopPage();
             } else {
-                // セッションがない場合はAWSログイン画面へ飛ばす
-                await signInWithRedirect();
-            }
-        } catch (e) {
-            // エラー時（未ログイン含む）もAWSログイン画面へ飛ばす
-            try {
-                await signInWithRedirect();
-            } catch (err) {
-                console.error("Redirect to Hosted UI failed:", err);
                 setLoading(false);
             }
+        } catch (e) {
+            setLoading(false);
         }
     };
 
@@ -77,17 +70,15 @@ export default function LoginPage() {
             const data = await shopApi.shop_list({});
             const shops = data.shops || [];
 
-            // Auto-redirect if SHOP_MANAGER and has exactly one shop
             if (shops.length === 1) {
                 setSingleShopOwner(true);
-                const shopId = shops[0].id;
-                router.push(`/shop/${shopId}`);
-                console.log("replace")
-                return;
+                // No longer pushing automatically
+                // const shopId = shops[0].id;
+                // router.push(`/shop/${shopId}`);
+            } else {
+                setSingleShopOwner(false);
+                // router.push('/shop');
             }
-            setSingleShopOwner(false);
-            router.push('/shop');
-            console.log("replace2")
         } catch (e) {
             // console.error(e);
         } finally {
@@ -218,8 +209,42 @@ export default function LoginPage() {
                                     <Loader2 className="w-10 h-10 animate-spin text-gray-400" />
                                     <p className="text-sm text-gray-500">Checking session...</p>
                                 </div>
+                            ) : isLoggedIn ? (
+                                <div className="space-y-8 flex flex-col items-center py-6 animate-in fade-in zoom-in-95 duration-500">
+                                    <h3 className="text-xl font-black text-gray-800 tracking-tight">{t('selectionTitle')}</h3>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 w-full max-w-lg">
+                                        <Button 
+                                            variant="default" 
+                                            className="h-40 flex flex-col items-center justify-center gap-4 rounded-[2rem] text-xl font-black shadow-lg shadow-blue-500/20 bg-gradient-to-br from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 transition-all hover:scale-105 active:scale-95" 
+                                            onClick={() => router.push('/shop')}
+                                        >
+                                            <div className="p-3 bg-white/20 rounded-2xl">
+                                                <Store className="w-8 h-8 text-white" />
+                                            </div>
+                                            {t('shopAdminPage')}
+                                        </Button>
+                                        <Button 
+                                            variant="outline" 
+                                            className="h-40 flex flex-col items-center justify-center gap-4 border-2 border-blue-100 hover:border-blue-300 hover:bg-blue-50/50 rounded-[2rem] text-xl font-black text-blue-600 transition-all hover:scale-105 active:scale-95" 
+                                            onClick={() => router.push(`/user/${userId}`)}
+                                        >
+                                            <div className="p-3 bg-blue-50 rounded-2xl">
+                                                <User className="w-8 h-8 text-blue-600" />
+                                            </div>
+                                            {t('userProfilePage')}
+                                        </Button>
+                                    </div>
+                                    
+                                    {isAdmin && (
+                                        <div className="pt-4 text-center">
+                                            <p className="text-xs text-mist-500 font-bold uppercase tracking-widest mb-2">Administrators</p>
+                                            <p className="text-sm text-gray-500 break-all px-4 bg-gray-50 py-2 rounded-xl">
+                                                {userInfo}
+                                            </p>
+                                        </div>
+                                    )}
+                                </div>
                             ) : !isAdmin && (
-
                                 <form onSubmit={handleLogin} className="space-y-4">
                                     {!showMfa ? (
                                         <>
@@ -269,51 +294,6 @@ export default function LoginPage() {
                                         {loading ? (showMfa ? t('verifyingMfa') : t('signingIn')) : (showMfa ? t('verifyAndSignIn') : t('signIn'))}
                                     </Button>
 
-                                    {/* 生体認証は一旦コメントアウト
-                        {!showMfa && (
-                            <div className="space-y-4 pt-2">
-                                <div className="relative">
-                                    <div className="absolute inset-0 flex items-center" aria-hidden="true">
-                                        <div className="w-full border-t border-gray-200"></div>
-                                    </div>
-                                    <div className="relative flex justify-center text-sm">
-                                        <span className="px-2 bg-white text-gray-500">または</span>
-                                    </div>
-                                </div>
-                                <Button 
-                                    type="button" 
-                                    variant="outline" 
-                                    className="w-full h-11 border-blue-600 text-blue-600 hover:bg-blue-50 font-bold"
-                                    onClick={async () => {
-                                        if (!email) {
-                                            setError("生体認証でのログインには、まずメールアドレスを入力してください。");
-                                            return;
-                                        }
-                                        setLoading(true);
-                                        setError('');
-                                        try {
-                                            const { signIn } = await import('aws-amplify/auth');
-                                            await signIn({
-                                                username: email,
-                                                options: {
-                                                    authFlowType: 'USER_AUTH',
-                                                    preferredChallenge: 'WEB_AUTHN',
-                                                },
-                                            });
-                                        } catch (err: any) {
-                                            console.error('Passkey sign-in failed', err);
-                                            setError("生体認証に失敗しました。デバイスが未登録か、非対応です。");
-                                        } finally {
-                                            setLoading(false);
-                                        }
-                                    }}
-                                    disabled={loading}
-                                >
-                                    顔認証・指紋認証でログイン
-                                </Button>
-                            </div>
-                        )}
-                        */}
                                     {showMfa && (
                                         <Button
                                             type="button"
@@ -358,14 +338,6 @@ export default function LoginPage() {
                                         </>
                                     )}
                                 </form>
-                            )}
-                            {isAdmin && (
-                                <>
-                                    <p className="text-sm text-gray-500 text-center break-all px-4">
-                                        Your roles : <br />
-                                        {userInfo}
-                                    </p>
-                                </>
                             )}
                         </CardContent>
                         <CardFooter className="flex-col gap-4">

@@ -52,6 +52,19 @@
     "heroSubtitle": "give a heart.",
     "description": "\"Meishigawarini\" is a digital gift service that adds a small gift to your encounter. You can specify the recipient of the gift from the QR code."
   },
+  "UserProfilePage": {
+    "title": "My Page",
+    "editProfile": "Edit Profile Information",
+    "editProfileDesc": "Edit the profile information you share instead of a business card.",
+    "sendList": "Sent Gifts",
+    "sendListDesc": "View the gifts you have sent or exchanged.",
+    "receiveList": "Received Gifts",
+    "receiveListDesc": "View the gifts you have received.",
+    "sendGift": "Send a New Gift",
+    "sendGiftDesc": "Scan a new gift's QR code to register it in your send history.",
+    "logout": "Logout",
+    "back": "Back"
+  },
   "LoginPage": {
     "title": "Sign In",
     "email": "Email",
@@ -80,6 +93,8 @@
     "shopAdminPage": "Shop Admin",
     "qrAdminPage": "QR Generation / Admin",
     "AdminNeed2FA": "Admin Required 2FA",
+    "selectionTitle": "Please select an action",
+    "userProfilePage": "Manage Profile",
     "logout": "Logout",
     "helpAdminPage": "Admin Help (Initial Setup)",
     "signInWithAWS": "Sign in with AWS (Standard)",
