@@ -93,7 +93,7 @@
     "biometricFailed": "生体認証に失敗しました。デバイスが未登録か、非対応です。",
     "signInWithBiometric": "顔認証・指紋認証でログイン",
     "back": "戻る",
-    "shopAdminPage": "ショップ管理者画面",
+    "shopAdminPage": "マイショップ",
     "qrAdminPage": "システム管理者画面",
     "AdminNeed2FA": "管理者は2段階認証が必要です",
     "selectionTitle": "操作を選択してください",

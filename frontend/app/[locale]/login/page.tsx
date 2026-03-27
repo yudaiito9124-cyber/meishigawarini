@@ -55,32 +55,34 @@ export default function LoginPage() {
                     return;
                 }
 
-                await redirectShopPage();
+                await redirectShopPage(sub);
             } else {
-                setLoading(false);
+                handleHostedUILogin();
             }
         } catch (e) {
-            setLoading(false);
+            handleHostedUILogin();
         }
     };
 
-    const redirectShopPage = async () => {
+    const redirectShopPage = async (sub: string) => {
         setLoading(true);
         try {
             const data = await shopApi.shop_list({});
             const shops = data.shops || [];
 
-            if (shops.length === 1) {
+            if (shops.length === 0) {
+                // Not a shop owner, redirect to user profile seamlessly
+                router.push(`/user/${sub}`);
+            } else if (shops.length === 1) {
                 setSingleShopOwner(true);
                 // No longer pushing automatically
-                // const shopId = shops[0].id;
-                // router.push(`/shop/${shopId}`);
             } else {
                 setSingleShopOwner(false);
                 // router.push('/shop');
             }
         } catch (e) {
-            // console.error(e);
+            // Error fetching shops, fallback redirect to user profile
+            router.push(`/user/${sub}`);
         } finally {
             setLoading(false);
         }
@@ -202,22 +204,20 @@ export default function LoginPage() {
                 )}
                 <div className="w-full flex-1 flex flex-col items-center justify-center min-h-[80vh] py-8 px-4">
 
-                    {loading ? (<Card className="w-full max-w-2xl shadow-xl border-mist-700/50 bg-white/95 backdrop-blur-sm">
-                        <CardHeader>
-                            <CardTitle className="text-center text-2xl whitespace-pre-wrap break-all overflow-hidden">{isAdmin ? `Admin \n\n${userEmail}` : t('title')}</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="flex flex-col items-center justify-center py-12 gap-4">
-                                <Loader2 className="w-10 h-10 animate-spin text-gray-400" />
-                                <p className="text-sm text-gray-500">Checking session...</p>
-                            </div>
-                        </CardContent>
-                    </Card>
+                    {loading ? (
+                        <Card className="w-full max-w-2xl shadow-xl border-mist-700/50 bg-white/95 backdrop-blur-sm">
+                            <CardContent>
+                                <div className="flex flex-col items-center justify-center py-12 gap-4">
+                                    <Loader2 className="w-10 h-10 animate-spin text-gray-400" />
+                                    <p className="text-sm text-gray-500">Checking session...</p>
+                                </div>
+                            </CardContent>
+                        </Card>
                     ) : isLoggedIn ? (
                         <Card className="w-full max-w-2xl shadow-xl border-mist-700/50 bg-white/95 backdrop-blur-sm">
-                            <CardHeader>
+                            {/* <CardHeader>
                                 <CardTitle className="text-xl font-black text-gray-800 tracking-tight text-center">{t('selectionTitle')}</CardTitle>
-                            </CardHeader>
+                            </CardHeader> */}
                             <CardContent>
                                 <div className="space-y-8 flex flex-col items-center py-6 animate-in fade-in zoom-in-95 duration-500">
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 w-full max-w-lg">

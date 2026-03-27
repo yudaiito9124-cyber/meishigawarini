@@ -4,7 +4,7 @@ import { useTranslations } from 'next-intl';
 import { useRouter, useParams } from 'next/navigation';
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { UserPen, Send, Inbox, QrCode, LogOut } from 'lucide-react';
+import { UserPen, Send, Inbox, QrCode, LogOut, ChevronDown } from 'lucide-react';
 import { SiteFooter } from '@/components/SiteFooter';
 import { signOut } from 'aws-amplify/auth';
 
@@ -67,16 +67,21 @@ export default function UserDashboardPage() {
             <main className="flex-1 max-w-4xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-8 pb-12 pt-12">
                 <div className="flex justify-between items-center mb-8">
                     <h1 className="text-3xl font-black text-gray-800 tracking-tight">{t('title')}</h1>
-                    <Button variant="ghost" className="text-mist-500 hover:text-mist-800" onClick={handleLogout}>
-                        <LogOut className="w-5 h-5 mr-2" />
-                        {t('logout')}
-                    </Button>
+                    <div>
+                        <Button variant="ghost" className="text-mist-500 hover:text-mist-800" onClick={handleLogout}>
+                            <ChevronDown className="h-4 w-4 mr-1 rotate-90" /> {t('back')}
+                        </Button>
+                        <Button variant="ghost" className="text-mist-500 hover:text-mist-800" onClick={handleLogout}>
+                            <LogOut className="w-5 h-5 mr-2" />
+                            {t('logout')}
+                        </Button>
+                    </div>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                     {navItems.map((item, idx) => (
-                        <Card 
-                            key={idx} 
+                        <Card
+                            key={idx}
                             onClick={() => router.push(item.href)}
                             className={`cursor-pointer transition-all hover:scale-105 active:scale-95 shadow-md border-2 ${item.border} rounded-3xl overflow-hidden`}
                         >
@@ -93,7 +98,9 @@ export default function UserDashboardPage() {
                     ))}
                 </div>
             </main>
-            <SiteFooter siteName="MeishiGawarini" />
+            <div className="flex justify-center p-4">
+                <Button className="w-full p-4 h-10 hover:bg-mist-500 hover:text-mist-50" variant="ghost" onClick={() => router.push('/shop')}>ショップを開設する</Button>
+            </div>
         </div>
     );
 }
