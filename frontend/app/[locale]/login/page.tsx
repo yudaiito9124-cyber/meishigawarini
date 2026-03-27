@@ -41,7 +41,7 @@ export default function LoginPage() {
                 const amr = (session.tokens.idToken?.payload['amr'] as string[]) || [];
                 const isAdmin = groups.includes('Administrators') || groups.includes('GlobalAdmins');
                 const sub = session.tokens.idToken?.payload['sub'] as string || "";
-                
+
                 setUserId(sub);
                 setIsAdmin(isAdmin);
                 setIsLoggedIn(true);
@@ -52,7 +52,7 @@ export default function LoginPage() {
                     setUserEmail(session.tokens.idToken?.payload["email"] as string || "")
                     setSingleShopOwner(false);
                     setLoading(false);
-                    return; 
+                    return;
                 }
 
                 await redirectShopPage();
@@ -177,7 +177,10 @@ export default function LoginPage() {
                         <div className="flex gap-2 flex-col items-start sm:items-end w-full sm:w-auto">
                             <Button
                                 variant="ghost"
-                                className="hover:bg-red-50 hover:text-red-600 cursor-pointer text-white w-full sm:w-40 justify-center h-10 "
+                                className={cn(
+                                    "hover:bg-red-50 hover:text-red-600 cursor-pointer w-full sm:w-40 justify-center h-10",
+                                    isAdmin ? "text-white" : "text-gray-700"
+                                )}
                                 onClick={async () => {
                                     await signOut();
                                     setIsLoggedIn(false);
@@ -186,36 +189,41 @@ export default function LoginPage() {
                             >
                                 {t('logout')}
                             </Button>
-                            {!singleShopOwner && (
+                            {/* {!singleShopOwner && (
                                 <Link href="/shop" className="w-full sm:w-auto">
                                     <Button variant="secondary" className="shadow-md cursor-pointer border border-gray-200 flex flex-col items-center gap-2 font-bold h-32 sm:h-40 px-4 w-full sm:w-40">
                                         <Store className="size-12 sm:size-18 drop-shadow-md stroke-[1.5]" />
                                         <div className='font-bold text-base sm:text-lg leading-tight text-center mt-1'>{t('shopAdminPage')}</div>
                                     </Button>
                                 </Link>
-                            )}
+                            )} */}
                         </div>
                     </div>
                 )}
                 <div className="w-full flex-1 flex flex-col items-center justify-center min-h-[80vh] py-8 px-4">
 
-                    <Card className="w-full max-w-2xl shadow-xl border-mist-700/50 bg-white/95 backdrop-blur-sm">
+                    {loading ? (<Card className="w-full max-w-2xl shadow-xl border-mist-700/50 bg-white/95 backdrop-blur-sm">
                         <CardHeader>
                             <CardTitle className="text-center text-2xl whitespace-pre-wrap break-all overflow-hidden">{isAdmin ? `Admin \n\n${userEmail}` : t('title')}</CardTitle>
                         </CardHeader>
                         <CardContent>
-                            {loading ? (
-                                <div className="flex flex-col items-center justify-center py-12 gap-4">
-                                    <Loader2 className="w-10 h-10 animate-spin text-gray-400" />
-                                    <p className="text-sm text-gray-500">Checking session...</p>
-                                </div>
-                            ) : isLoggedIn ? (
+                            <div className="flex flex-col items-center justify-center py-12 gap-4">
+                                <Loader2 className="w-10 h-10 animate-spin text-gray-400" />
+                                <p className="text-sm text-gray-500">Checking session...</p>
+                            </div>
+                        </CardContent>
+                    </Card>
+                    ) : isLoggedIn ? (
+                        <Card className="w-full max-w-2xl shadow-xl border-mist-700/50 bg-white/95 backdrop-blur-sm">
+                            <CardHeader>
+                                <CardTitle className="text-xl font-black text-gray-800 tracking-tight text-center">{t('selectionTitle')}</CardTitle>
+                            </CardHeader>
+                            <CardContent>
                                 <div className="space-y-8 flex flex-col items-center py-6 animate-in fade-in zoom-in-95 duration-500">
-                                    <h3 className="text-xl font-black text-gray-800 tracking-tight">{t('selectionTitle')}</h3>
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 w-full max-w-lg">
-                                        <Button 
-                                            variant="default" 
-                                            className="h-40 flex flex-col items-center justify-center gap-4 rounded-[2rem] text-xl font-black shadow-lg shadow-blue-500/20 bg-gradient-to-br from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 transition-all hover:scale-105 active:scale-95" 
+                                        <Button
+                                            variant="default"
+                                            className="h-40 flex flex-col items-center justify-center gap-4 rounded-[2rem] text-xl font-black shadow-lg shadow-blue-500/20 bg-gradient-to-br from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 transition-all hover:scale-105 active:scale-95"
                                             onClick={() => router.push('/shop')}
                                         >
                                             <div className="p-3 bg-white/20 rounded-2xl">
@@ -223,9 +231,9 @@ export default function LoginPage() {
                                             </div>
                                             {t('shopAdminPage')}
                                         </Button>
-                                        <Button 
-                                            variant="outline" 
-                                            className="h-40 flex flex-col items-center justify-center gap-4 border-2 border-blue-100 hover:border-blue-300 hover:bg-blue-50/50 rounded-[2rem] text-xl font-black text-blue-600 transition-all hover:scale-105 active:scale-95" 
+                                        <Button
+                                            variant="outline"
+                                            className="h-40 flex flex-col items-center justify-center gap-4 border-2 border-blue-100 hover:border-blue-300 hover:bg-blue-50/50 rounded-[2rem] text-xl font-black text-blue-600 transition-all hover:scale-105 active:scale-95"
                                             onClick={() => router.push(`/user/${userId}`)}
                                         >
                                             <div className="p-3 bg-blue-50 rounded-2xl">
@@ -234,7 +242,7 @@ export default function LoginPage() {
                                             {t('userProfilePage')}
                                         </Button>
                                     </div>
-                                    
+
                                     {isAdmin && (
                                         <div className="pt-4 text-center">
                                             <p className="text-xs text-mist-500 font-bold uppercase tracking-widest mb-2">Administrators</p>
@@ -244,7 +252,14 @@ export default function LoginPage() {
                                         </div>
                                     )}
                                 </div>
-                            ) : !isAdmin && (
+                            </CardContent>
+                        </Card>
+                    ) : !isAdmin && (
+                        <Card className="w-full max-w-2xl shadow-xl border-mist-700/50 bg-white/95 backdrop-blur-sm">
+                            <CardHeader>
+                                <CardTitle className="text-xl font-black text-gray-800 tracking-tight text-center">{t('selectionTitle')}</CardTitle>
+                            </CardHeader>
+                            <CardContent>
                                 <form onSubmit={handleLogin} className="space-y-4">
                                     {!showMfa ? (
                                         <>
@@ -338,8 +353,10 @@ export default function LoginPage() {
                                         </>
                                     )}
                                 </form>
-                            )}
-                        </CardContent>
+                            </CardContent>
+                        </Card>
+                    )}
+                    {/* <Card>
                         <CardFooter className="flex-col gap-4">
                             {!isAdmin && (
                                 <p className="text-sm text-gray-500">
@@ -354,7 +371,7 @@ export default function LoginPage() {
                                 </div>
                             )}
                         </CardFooter>
-                    </Card>
+                    </Card> */}
                 </div>
             </div>
         </div >

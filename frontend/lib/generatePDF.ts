@@ -223,12 +223,23 @@ export const generatePDF = async (batch: any, paperformat: string, cardformat: s
     });
 
     const pf = paperformats[paperformat];
-    const cf = typeof cardformat === 'string' ? cardformats[cardformat] : cardformat;
+    let cf = typeof cardformat === 'string' ? cardformats[cardformat] : cardformat;
 
     if (!pf || !cf) {
         console.error("Invalid format", { paperformat, cardformat });
         return;
     }
+
+    // Merge with default format to ensure no missing properties for DB designs
+    const defaultFormat = cardformats['gakuchousenbeiv1'];
+    cf = { ...defaultFormat, ...cf };
+    cf.qrpos = { ...defaultFormat.qrpos, ...(cf.qrpos || {}) };
+    cf.pinpos = { ...defaultFormat.pinpos, ...(cf.pinpos || {}) };
+    cf.codepos = { ...defaultFormat.codepos, ...(cf.codepos || {}) };
+
+    // Explicit numeric fallbacks in case DB has `0` values (width and height must be valid)
+    if (!cf.width || cf.width <= 0) cf.width = defaultFormat.width;
+    if (!cf.height || cf.height <= 0) cf.height = defaultFormat.height;
 
     // Background Image
     const bgImgf = new Image();
@@ -355,7 +366,7 @@ export const generatePDF = async (batch: any, paperformat: string, cardformat: s
             }
 
             // Draw QR
-            if (cf.isfront_qr) {
+            if (cf.isfront_qr && cf.qrsize && cf.qrsize > 0) {
                 const base64data = await genQR(code.uuid);
                 if (!base64data) continue;
                 const qrSize = cf.qrsize;
@@ -363,7 +374,7 @@ export const generatePDF = async (batch: any, paperformat: string, cardformat: s
             }
 
             // Draw PIN
-            if (cf.isfront_pin) {
+            if (cf.isfront_pin && cf.pinsize && cf.pinsize > 0) {
                 doc.setTextColor(0, 0, 0);
                 doc.setFontSize(cf.pinsize * pf.scale);
                 doc.setFont("helvetica", "bold");
@@ -375,7 +386,7 @@ export const generatePDF = async (batch: any, paperformat: string, cardformat: s
             }
 
             // Draw UUID head
-            if (cf.isfront_code) {
+            if (cf.isfront_code && cf.codesize && cf.codesize > 0) {
                 doc.setTextColor(0, 0, 0);
                 doc.setFontSize(cf.codesize * pf.scale);
                 doc.setFont("helvetica", "normal");
@@ -422,7 +433,7 @@ export const generatePDF = async (batch: any, paperformat: string, cardformat: s
             }
 
             // Draw QR
-            if (!cf.isfront_qr) {
+            if (!cf.isfront_qr && cf.qrsize && cf.qrsize > 0) {
                 const base64data = await genQR(code.uuid);
                 if (!base64data) continue;
                 const qrSize = cf.qrsize;
@@ -430,7 +441,7 @@ export const generatePDF = async (batch: any, paperformat: string, cardformat: s
             }
 
             // Draw PIN
-            if (!cf.isfront_pin) {
+            if (!cf.isfront_pin && cf.pinsize && cf.pinsize > 0) {
                 doc.setTextColor(0, 0, 0);
                 doc.setFontSize(cf.pinsize * pf.scale);
                 doc.setFont("helvetica", "bold");
@@ -442,7 +453,7 @@ export const generatePDF = async (batch: any, paperformat: string, cardformat: s
             }
 
             // Draw UUID head
-            if (!cf.isfront_code) {
+            if (!cf.isfront_code && cf.codesize && cf.codesize > 0) {
                 doc.setTextColor(0, 0, 0);
                 doc.setFontSize(cf.codesize * pf.scale);
                 doc.setFont("helvetica", "normal");

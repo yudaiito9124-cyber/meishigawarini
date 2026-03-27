@@ -142,7 +142,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             const updateRes = await ddb.send(new UpdateCommand({
                 TableName: TABLE_NAME,
                 Key: { PK: pk, SK: sk },
-                UpdateExpression: 'SET #ts_up = :now, #ts_cr = if_not_exists(#ts_cr, :now)' +
+                UpdateExpression: 'SET #ts_up = :now, #ts_cr = if_not_exists(#ts_cr, :now), ' +
                     keys.map((_, i) => `#f${i} = :v${i}`).join(', '),
                 ExpressionAttributeNames: {
                     '#ts_up': 'ts_updated_at',

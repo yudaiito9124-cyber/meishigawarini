@@ -50,7 +50,7 @@
   },
   "HomePage": {
     "title": "名刺代わりにへようこそ",
-    "shopAdmin": "ショップ管理者画面",
+    "shopAdmin": "ログイン",
     "heroTitle": "名刺代わりに、",
     "heroSubtitle": "心を贈ろう。",
     "description": "”名刺代わりに。” は出会いにちょっとした贈りものを添えるデジタルギフトサービス。 ギフトの送り先はQRコードから指定できます。"
@@ -97,7 +97,7 @@
     "qrAdminPage": "システム管理者画面",
     "AdminNeed2FA": "管理者は2段階認証が必要です",
     "selectionTitle": "操作を選択してください",
-    "userProfilePage": "プロフィール管理",
+    "userProfilePage": "マイページ",
     "logout": "ログアウト",
     "helpAdminPage": "管理者ヘルプ(初期設定)",
     "signInWithAWS": "AWS標準画面でログイン",

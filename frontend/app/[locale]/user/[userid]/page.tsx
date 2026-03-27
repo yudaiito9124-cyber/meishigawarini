@@ -1,17 +1,18 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
-import { useRouter } from 'next/navigation';
+import { useRouter, useParams } from 'next/navigation';
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { UserPen, Send, Inbox, QrCode, LogOut } from 'lucide-react';
 import { SiteFooter } from '@/components/SiteFooter';
 import { signOut } from 'aws-amplify/auth';
 
-export default function UserDashboardPage({ params }: { params: { locale: string, userid: string } }) {
+export default function UserDashboardPage() {
     const t = useTranslations('UserProfilePage');
     const router = useRouter();
-    const userId = params.userid;
+    const params = useParams();
+    const userId = params?.userid as string;
 
     const navItems = [
         {

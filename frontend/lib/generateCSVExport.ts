@@ -68,11 +68,22 @@ export const generateCSVExport = async (batch: any, cardformat: string | any) =>
     const batchName = `card_${(batch.id || '') || `batch-` + Date.now()}`;
     const folder = zip.folder(batchName);
 
-    const cf = typeof cardformat === 'string' ? cardformats[cardformat] : cardformat;
+    let cf = typeof cardformat === 'string' ? cardformats[cardformat] : cardformat;
     if (!cf) {
         console.error("Invalid card format", cardformat);
         return;
     }
+
+    // Merge with default format to ensure no missing properties for DB designs
+    const defaultFormat = cardformats['gakuchousenbeiv1'];
+    cf = { ...defaultFormat, ...cf };
+    cf.qrpos = { ...defaultFormat.qrpos, ...(cf.qrpos || {}) };
+    cf.pinpos = { ...defaultFormat.pinpos, ...(cf.pinpos || {}) };
+    cf.codepos = { ...defaultFormat.codepos, ...(cf.codepos || {}) };
+
+    // Explicit numeric fallbacks in case DB has `0` values (width and height must be valid)
+    if (!cf.width || cf.width <= 0) cf.width = defaultFormat.width;
+    if (!cf.height || cf.height <= 0) cf.height = defaultFormat.height;
 
     // Load Background Images
     const loadImg = (url: string): Promise<HTMLImageElement | null> => {
@@ -111,7 +122,7 @@ export const generateCSVExport = async (batch: any, cardformat: string | any) =>
             }
 
             // QR
-            if (cf.isfront_qr) {
+            if (cf.isfront_qr && cf.qrsize && cf.qrsize > 0) {
                 const qrCanvas = await genQRCanvas(uuid, cf.qrsize);
                 if (qrCanvas) {
                     ctxF.drawImage(qrCanvas, cf.qrpos.x * CANVAS_SCALE, cf.qrpos.y * CANVAS_SCALE, cf.qrsize * CANVAS_SCALE, cf.qrsize * CANVAS_SCALE);
@@ -119,7 +130,7 @@ export const generateCSVExport = async (batch: any, cardformat: string | any) =>
             }
 
             // PIN
-            if (cf.isfront_pin) {
+            if (cf.isfront_pin && cf.pinsize && cf.pinsize > 0) {
                 ctxF.fillStyle = "black";
                 ctxF.font = `bold ${cf.pinsize * 0.3527 * CANVAS_SCALE}px Helvetica`;
                 ctxF.textAlign = "center";
@@ -128,7 +139,7 @@ export const generateCSVExport = async (batch: any, cardformat: string | any) =>
             }
 
             // UUID
-            if (cf.isfront_code) {
+            if (cf.isfront_code && cf.codesize && cf.codesize > 0) {
                 ctxF.fillStyle = "black";
                 ctxF.font = `${cf.codesize * 0.3527 * CANVAS_SCALE}px Helvetica`;
                 ctxF.textAlign = "center";
@@ -150,7 +161,7 @@ export const generateCSVExport = async (batch: any, cardformat: string | any) =>
             }
 
             // QR (if on back)
-            if (!cf.isfront_qr) {
+            if (!cf.isfront_qr && cf.qrsize && cf.qrsize > 0) {
                 const qrCanvas = await genQRCanvas(uuid, cf.qrsize);
                 if (qrCanvas) {
                     ctxB.drawImage(qrCanvas, cf.qrpos.x * CANVAS_SCALE, cf.qrpos.y * CANVAS_SCALE, cf.qrsize * CANVAS_SCALE, cf.qrsize * CANVAS_SCALE);
@@ -158,7 +169,7 @@ export const generateCSVExport = async (batch: any, cardformat: string | any) =>
             }
 
             // PIN (if on back)
-            if (!cf.isfront_pin) {
+            if (!cf.isfront_pin && cf.pinsize && cf.pinsize > 0) {
                 ctxB.fillStyle = "black";
                 ctxB.font = `bold ${cf.pinsize * 0.3527 * CANVAS_SCALE}px Helvetica`;
                 ctxB.textAlign = "center";
@@ -167,7 +178,7 @@ export const generateCSVExport = async (batch: any, cardformat: string | any) =>
             }
 
             // UUID (if on back)
-            if (!cf.isfront_code) {
+            if (!cf.isfront_code && cf.codesize && cf.codesize > 0) {
                 ctxB.fillStyle = "black";
                 ctxB.font = `${cf.codesize * 0.3527 * CANVAS_SCALE}px Helvetica`;
                 ctxB.textAlign = "center";
