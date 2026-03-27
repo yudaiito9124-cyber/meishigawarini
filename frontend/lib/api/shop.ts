@@ -88,4 +88,8 @@ type ShopApiSchema = {
     shop_qr_link: { shopId: string; qr_id: string; product_id: string; activate_now?: boolean; memo_for_users?: string; memo_for_shop?: string };
     shop_qr_activate: { shopId: string; qr_id: string };
     shop_qrcodecheck: { shopId: string; qr_id: string };
+    shop_card_orders_create: { shopId: string; quantity: number; design_id: string; product_id?: string; shop_user_id?: string; sender_user_id?: string; expiration_date?: string; activate_now?: boolean };
+    shop_card_orders_list: { shopId: string };
+    shop_card_orders_cancel: { shopId: string; order_id: string };
+    shop_card_orders_complete: { shopId: string; order_id: string };
 };

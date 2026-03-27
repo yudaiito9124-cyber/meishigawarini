@@ -64,11 +64,13 @@ export class ShopApi extends Construct {
     const shop_admins = new nodejs.NodejsFunction(this, 'shop_admins', { entry: lampath('shop_admins'), ...fnProps });
     const shop_delete_images = new nodejs.NodejsFunction(this, 'shop_delete_images', { entry: lampath('shop_delete_images'), ...fnProps });
     const shop_orders = new nodejs.NodejsFunction(this, 'shop_orders', { entry: lampath('shop_orders'), ...fnProps });
+    const shop_card_orders = new nodejs.NodejsFunction(this, 'shop_card_orders', { entry: lampath('shop_card_orders'), ...fnProps });
 
     // Grant Permissions
     const allShopLambdas = [
       shop_list, shop_details, shop_products, shop_products_import,
-      shop_products_uploadurl, shop_qr, shop_admins, shop_delete_images, shop_orders
+      shop_products_uploadurl, shop_qr, shop_admins, shop_delete_images, shop_orders,
+      shop_card_orders
     ];
     allShopLambdas.forEach(fn => {
       grantTablePermissions(fn, true);
@@ -118,6 +120,13 @@ export class ShopApi extends Construct {
     const ordersResource = shopResource.addResource('orders');
     ordersResource.addResource('list').addMethod('POST', new apigateway.LambdaIntegration(shop_orders), routeOptions);
     ordersResource.addResource('update').addMethod('POST', new apigateway.LambdaIntegration(shop_orders), routeOptions);
+
+    // /shop/card/orders
+    const cardOrdersResource = shopResource.addResource('card').addResource('orders');
+    cardOrdersResource.addResource('create').addMethod('POST', new apigateway.LambdaIntegration(shop_card_orders), routeOptions);
+    cardOrdersResource.addResource('list').addMethod('POST', new apigateway.LambdaIntegration(shop_card_orders), routeOptions);
+    cardOrdersResource.addResource('cancel').addMethod('POST', new apigateway.LambdaIntegration(shop_card_orders), routeOptions);
+    cardOrdersResource.addResource('complete').addMethod('POST', new apigateway.LambdaIntegration(shop_card_orders), routeOptions);
 
   }
 }

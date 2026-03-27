@@ -162,6 +162,12 @@ export class AdminApi extends Construct {
     });
     grantTablePermissions(admin_shop_carddesign_link, true);
 
+    const admin_card_orders = new nodejs.NodejsFunction(this, 'admin_card_orders', {
+      entry: lampath('admin_card_orders'),
+      ...commonProps,
+    });
+    grantTablePermissions(admin_card_orders, true);
+
 
 
     ////////////////////////////////////////////////////////////////////////////////
@@ -192,11 +198,16 @@ export class AdminApi extends Construct {
     // /admin/shop
     const shopResource = adminResource.addResource('shop');
     shopResource.addResource('create').addMethod('POST', new apigateway.LambdaIntegration(admin_shop_create), { authorizer: authorizerOfAdmin, });
-    
+
     // /admin/shop/carddesign/link
     const cardDesignLinkResource = shopResource.addResource('carddesign').addResource('link');
     cardDesignLinkResource.addResource('get').addMethod('POST', new apigateway.LambdaIntegration(admin_shop_carddesign_link), { authorizer: authorizerOfAdmin, });
     cardDesignLinkResource.addResource('update').addMethod('POST', new apigateway.LambdaIntegration(admin_shop_carddesign_link), { authorizer: authorizerOfAdmin, });
+
+    // /admin/card/orders
+    const adminCardOrdersResource = adminResource.addResource('card').addResource('orders');
+    adminCardOrdersResource.addResource('list').addMethod('POST', new apigateway.LambdaIntegration(admin_card_orders), { authorizer: authorizerOfAdmin, });
+    adminCardOrdersResource.addResource('update').addMethod('POST', new apigateway.LambdaIntegration(admin_card_orders), { authorizer: authorizerOfAdmin, });
 
   }
 }

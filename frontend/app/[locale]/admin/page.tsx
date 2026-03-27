@@ -17,7 +17,7 @@ import { generateId } from '@/lib/id';
 import { useTranslations } from 'next-intl';
 import { generatePDF, cardformats, paperformats } from '@/lib/generatePDF';
 import { generateCSVExport } from '@/lib/generateCSVExport';
-import { ExternalLink, Copy, Eye, QrCode, Store, Wrench, Layers, HelpCircle, Home, Trash2, RotateCcw, Loader2, Plus, X, Search, Save, FileText, Download } from 'lucide-react';
+import { ExternalLink, Copy, Eye, QrCode, Store, Wrench, Layers, HelpCircle, Home, Trash2, RotateCcw, Loader2, Plus, X, Search, Save, FileText, Download, CreditCard, Printer, Paintbrush } from 'lucide-react';
 import CardDesignEditor from "@/components/admin/CardDesignEditor";
 const NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 const NEXT_PUBLIC_APP_URL = process.env.NEXT_PUBLIC_APP_URL || "";
@@ -59,6 +59,10 @@ export default function AdminPage() {
     const [isGenerating, setIsGenerating] = useState(false);
     const [isExportingCsv, setIsExportingCsv] = useState<string | null>(null);
     const [activeTab, setActiveTab] = useState("qrcodes");
+    const [cardOrders, setCardOrders] = useState<any[]>([]);
+    const [cardOrdersLoading, setCardOrdersLoading] = useState(false);
+    const [cardOrderFilterStatus, setCardOrderFilterStatus] = useState("ORDERED");
+    const [cardOrderFilterShopId, setCardOrderFilterShopId] = useState("");
     const router = useRouter();
 
     const fetchDbCardDesigns = async () => {
@@ -78,7 +82,38 @@ export default function AdminPage() {
         if (activeTab === "designs") {
             setReloadDbCardDesigns(true);
         }
-    }, [activeTab, reloadDbCardDesigns]);
+        if (activeTab === "cardorders") {
+            fetchCardOrders();
+        }
+    }, [activeTab, reloadDbCardDesigns, cardOrderFilterStatus]);
+
+    const fetchCardOrders = async () => {
+        setCardOrdersLoading(true);
+        try {
+            const data = await adminApi.admin_card_orders_list({
+                status: cardOrderFilterStatus,
+                limit: 50
+            });
+            setCardOrders(data.items || []);
+        } catch (e) {
+            console.error("Failed to fetch card orders", e);
+        } finally {
+            setCardOrdersLoading(false);
+        }
+    };
+
+    const handleUpdateCardOrderStatus = async (shopId: string, orderId: string, status: string) => {
+        try {
+            await adminApi.admin_card_orders_update({
+                shopId,
+                order_id: orderId,
+                status
+            });
+            fetchCardOrders();
+        } catch (e) {
+            alert(tb('Internal Server Error'));
+        }
+    };
 
     //Note: Authentication check is now handled by AdminLayout
 
@@ -161,7 +196,7 @@ export default function AdminPage() {
                 </div>
 
 
-                <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-8">
                     <button
                         onClick={() => setActiveTab("qrcodes")}
                         className={cn(
@@ -171,8 +206,20 @@ export default function AdminPage() {
                                 : "bg-mist-800 border-mist-700 text-mist-300 hover:border-mist-600 hover:bg-mist-700/50"
                         )}
                     >
-                        <QrCode className={cn("w-12 h-12 mb-3", activeTab === "qrcodes" ? "text-mist-900" : "text-mist-400")} />
+                        <CreditCard className={cn("w-12 h-12 mb-3", activeTab === "qrcodes" ? "text-mist-900" : "text-mist-400")} />
                         <span className="text-lg font-bold">{t('tabs.qrcodes')}</span>
+                    </button>
+                    <button
+                        onClick={() => setActiveTab("cardorders")}
+                        className={cn(
+                            "flex flex-col items-center justify-center p-6 rounded-2xl border-2 transition-all duration-200 cursor-pointer shadow-sm hover:shadow-md",
+                            activeTab === "cardorders"
+                                ? "bg-white border-white text-mist-900 ring-2 ring-mist-700 ring-offset-2 ring-offset-mist-900"
+                                : "bg-mist-800 border-mist-700 text-mist-300 hover:border-mist-600 hover:bg-mist-700/50"
+                        )}
+                    >
+                        <Printer className={cn("w-12 h-12 mb-3", activeTab === "cardorders" ? "text-mist-900" : "text-mist-400")} />
+                        <span className="text-lg font-bold">{t('tabs.cardorders')}</span>
                     </button>
                     <button
                         onClick={() => setActiveTab("designs")}
@@ -183,7 +230,7 @@ export default function AdminPage() {
                                 : "bg-mist-800 border-mist-700 text-mist-300 hover:border-mist-600 hover:bg-mist-700/50"
                         )}
                     >
-                        <Layers className={cn("w-12 h-12 mb-3", activeTab === "designs" ? "text-mist-900" : "text-mist-400")} />
+                        <Paintbrush className={cn("w-12 h-12 mb-3", activeTab === "designs" ? "text-mist-900" : "text-mist-400")} />
                         <span className="text-lg font-bold">{t('tabs.designs')}</span>
                     </button>
                     <button
@@ -214,6 +261,33 @@ export default function AdminPage() {
 
                 {activeTab === "qrcodes" && (
                     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
+
+
+                        {/* すべてのQRコード一覧 */}
+                        <QRCodeListSection
+                            apiUrl={NEXT_PUBLIC_API_URL}
+                            onGeneratePDF={generatePDF}
+                            paperFormat={paperFormat}
+                            cardFormat={cardFormat}
+                            dbCardDesigns={dbCardDesigns}
+                        />
+                    </div>
+                )}
+                {activeTab === "cardorders" && (
+                    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                        <CardOrderListSection
+                            orders={cardOrders}
+                            loading={cardOrdersLoading}
+                            statusFilter={cardOrderFilterStatus}
+                            setStatusFilter={setCardOrderFilterStatus}
+                            shopIdFilter={cardOrderFilterShopId}
+                            setShopIdFilter={setCardOrderFilterShopId}
+                            onUpdateStatus={handleUpdateCardOrderStatus}
+                            onRefresh={fetchCardOrders}
+                            dbCardDesigns={dbCardDesigns}
+                            paperFormat={paperFormat}
+                            cardFormat={cardFormat}
+                        />
                         {/* QRコード生成 */}
                         <Card>
                             <CardHeader>
@@ -378,10 +452,10 @@ export default function AdminPage() {
                                         </div>
                                     </div>
 
-                                    <div className="flex flex-col sm:flex-row w-full gap-1 border-t mt-4 mb-4">
+                                    <div className="flex flex-col w-full gap-1 border-t mt-4 mb-2">
                                         <label className="mt-4 w-full flex  items-center text-[11px] sm:text-xs text-gray-700 font-medium">{t('generate.paperFormat')}</label>
                                         <select
-                                            className="mt-4 flex-1 min-w-100 h-10 w-full rounded-md p-2 text-sm border border-gray-200 shadow-sm text-black bg-white"
+                                            className="w-full rounded-md p-2 text-sm border border-gray-200 shadow-sm text-black bg-white"
                                             value={paperFormat}
                                             onChange={(e) => setPaperFormat(e.target.value)}
                                         >
@@ -409,18 +483,12 @@ export default function AdminPage() {
                                     </div>
                                 </div>
                             </CardContent>
-
+                            {/* このページを開いてから生成したQRコードのバッチ一覧 */}
                             <CardFooter className="border-t">
 
-                            </CardFooter>
-                        </Card>
-                        {/* このページを開いてから生成したQRコードのバッチ一覧 */}
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>{t('batches.title')}</CardTitle>
-                            </CardHeader>
-                            <CardContent>
+
                                 <div className="space-y-4">
+                                    <CardTitle>{t('batches.title')}</CardTitle>
                                     {generatedBatches.length === 0 ? <p className="text-gray-500">{t('batches.noBatches')}</p> : (
                                         generatedBatches.map(batch => (
                                             <div key={batch.id} className="bg-white border p-4 rounded-md">
@@ -514,18 +582,9 @@ export default function AdminPage() {
                                         ))
                                     )}
                                 </div>
-                            </CardContent>
+                            </CardFooter>
                         </Card>
 
-
-                        {/* すべてのQRコード一覧 */}
-                        <QRCodeListSection
-                            apiUrl={NEXT_PUBLIC_API_URL}
-                            onGeneratePDF={generatePDF}
-                            paperFormat={paperFormat}
-                            cardFormat={cardFormat}
-                            dbCardDesigns={dbCardDesigns}
-                        />
                     </div>
                 )}
 
@@ -581,7 +640,7 @@ function QRCodeListSection({ apiUrl, onGeneratePDF, paperFormat, cardFormat, dbC
     const [loading, setLoading] = useState(false);
     const [isDenseAuto, setIsDenseAuto] = useState(false);
     const [isDenseManual, setIsDenseManual] = useState<boolean | null>(null);
-    // 取得したデータ以外にもまだ続きがあるかどうかを管理するフラグ（50件制限のため）
+    // データ取得制限（50件）を超えてまだデータがあるかどうかを管理するフラグ
     const [hasMore, setHasMore] = useState(false);
 
     const isDense = isDenseManual !== null ? isDenseManual : (codes.length > 30);
@@ -661,10 +720,14 @@ function QRCodeListSection({ apiUrl, onGeneratePDF, paperFormat, cardFormat, dbC
         setLoading(true);
         try {
             const currentStatus = targetStatus ?? status;
-            // コスト削減のため、1回のリクエストで取得する件数を50件に制限
-            const data = await adminApi.admin_qr_list({ status: currentStatus, keyword, limit: 50 });
+            // 【コスト最適化】バックエンドでの取得件数を最大50件に制限します。
+            const data = await adminApi.admin_qr_list({
+                status: currentStatus,
+                keyword,
+                limit: 50 // フロントエンドでの表示上限に合わせて50件を指定
+            });
             setCodes(data.items || []);
-            // 続きのデータの有無をステートに保存
+            // 続きのデータが存在するかどうかのフラグを保存
             setHasMore(data.hasMore || false);
         } catch (error) {
             console.error(error);
@@ -768,8 +831,11 @@ function QRCodeListSection({ apiUrl, onGeneratePDF, paperFormat, cardFormat, dbC
                         </div>
                     )}
                     <p className="text-sm text-gray-500 mb-2">
-                        {/* 続きがある場合は「50+」のように表示 */}
-                        {t('list.info', { status: t(`list.status.${status.toLowerCase()}`), count: hasMore ? `${codes.length}+` : codes.length })}
+                        {/* 50件を超えてデータがある場合は「50+ 件」のように表示してユーザーに伝えます */}
+                        {t('list.info', {
+                            status: t(`list.status.${status.toLowerCase()}`),
+                            count: hasMore ? `${codes.length}+` : codes.length
+                        })}
                     </p>
                     <Table wrapperClassName="h-[70vh] overflow-auto" className="w-full table-fixed">
                         <TableHeader className="sticky top-0 bg-white z-10 shadow-sm">
@@ -1845,6 +1911,259 @@ function AdminShopCardDesignLinkSection({ apiUrl, dbCardDesigns }: { apiUrl: str
                         </Button>
                     </div>
                 )}
+            </CardContent>
+        </Card>
+    );
+}
+
+function CardOrderListSection({
+    orders,
+    loading,
+    statusFilter,
+    setStatusFilter,
+    shopIdFilter,
+    setShopIdFilter,
+    onUpdateStatus,
+    onRefresh,
+    dbCardDesigns,
+    paperFormat,
+    cardFormat
+}: {
+    orders: any[],
+    loading: boolean,
+    statusFilter: string,
+    setStatusFilter: (s: string) => void,
+    shopIdFilter: string,
+    setShopIdFilter: (s: string) => void,
+    onUpdateStatus: (shopId: string, orderId: string, status: string) => Promise<void>,
+    onRefresh: () => void,
+    dbCardDesigns: any[],
+    paperFormat: string,
+    cardFormat: string
+}) {
+    const t = useTranslations('AdminPage');
+    const tc = useTranslations('AdminPage.cardOrders');
+    const st = useTranslations('Status');
+    const ts = useTranslations('Timestamp');
+    const [isProcessing, setIsProcessing] = useState<string | null>(null);
+
+    const filteredOrders = orders.filter(o =>
+        !shopIdFilter || (o.shop_id && o.shop_id.toLowerCase().includes(shopIdFilter.toLowerCase())) || (o.shop_name && o.shop_name.toLowerCase().includes(shopIdFilter.toLowerCase()))
+    );
+
+    const handleExport = async (order: any, type: 'pdf' | 'csv') => {
+        setIsProcessing(order.order_id);
+        try {
+            // 1. Generate QR codes for this order
+            // Note: In a real system, we might want to ensure these are unique and saved.
+            // For now, we generate a fresh batch.
+            const data = await adminApi.admin_qr_generate({
+                count: order.quantity,
+                shopId: order.shop_id,
+                productId: order.product_id,
+                card_design: order.card_design || cardFormat,
+                activate_now: false
+            });
+
+            // 2. Transition status to PRINTING if it was ORDERED
+            if (order.status === 'ORDERED') {
+                await onUpdateStatus(order.shop_id, order.order_id, 'PRINTING');
+            }
+
+            // 3. Trigger download
+            const batch = {
+                id: `batch-${data.batch_id}`,
+                count: data.count,
+                codes: data.data,
+                date: new Date().toLocaleString()
+            };
+
+            const resolveDesign = (designId?: string) => {
+                const targetId = designId || cardFormat;
+                const dbDesign = dbCardDesigns.find(d => d.design_id === targetId);
+                if (dbDesign) return dbDesign;
+                if (cardformats[targetId]) return targetId;
+                const globalDesign = dbCardDesigns.find(d => d.design_id === cardFormat);
+                return globalDesign || cardFormat;
+            };
+            const design = resolveDesign(order.card_design);
+
+            if (type === 'pdf') {
+                await generatePDF(batch, paperFormat, design);
+            } else {
+                await generateCSVExport(batch, design);
+            }
+        } catch (e) {
+            console.error("Export failed", e);
+            alert("Export failed. Please check if the design and shop are correct.");
+        } finally {
+            setIsProcessing(null);
+        }
+    };
+
+    return (
+        <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+                <div>
+                    <CardTitle>{tc('title')}</CardTitle>
+                </div>
+                <Button variant="outline" size="sm" onClick={onRefresh} disabled={loading}>
+                    <RotateCcw className={cn("h-4 w-4 mr-2", loading && "animate-spin")} />
+                    {t('list.refresh')}
+                </Button>
+            </CardHeader>
+            <CardContent>
+                <div className="space-y-4">
+                    <div className="flex flex-wrap gap-4 items-end">
+                        <div className="flex flex-wrap gap-1">
+                            {['ORDERED', 'PRINTING', 'SHIPPED', 'COMPLETED', `CANCELLED`, 'REJECTED'].map((s) => (
+                                <Button
+                                    key={s}
+                                    variant={statusFilter === s ? "default" : "outline"}
+                                    size="sm"
+                                    onClick={() => setStatusFilter(s)}
+                                    className="text-xs"
+                                >
+                                    {st(s.toLowerCase())}
+                                </Button>
+                            ))}
+                        </div>
+                        <div className="flex-1 min-w-[200px]">
+                            <Label htmlFor="orderShopFilter" className="text-xs text-gray-500 mb-1 block">
+                                {tc('shopIdFilter')}
+                            </Label>
+                            <div className="relative">
+                                <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                                <Input
+                                    id="orderShopFilter"
+                                    placeholder="Shop ID or Name..."
+                                    value={shopIdFilter}
+                                    onChange={(e) => setShopIdFilter(e.target.value)}
+                                    className="pl-8 h-9 text-black"
+                                />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="rounded-md border border-gray-200 overflow-hidden">
+                        <Table>
+                            <TableHeader className="bg-gray-50">
+                                <TableRow>
+                                    <TableHead className="w-[150px]">{tc('table.date')}</TableHead>
+                                    <TableHead>{tc('table.shop')}</TableHead>
+                                    <TableHead className="text-right">{tc('table.quantity')}</TableHead>
+                                    <TableHead className="text-center">{tc('table.status')}</TableHead>
+                                    <TableHead className="text-right">Actions</TableHead>
+                                    <TableHead className="w-[150px]">{tc('table.dateupdated')}</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {loading ? (
+                                    <TableRow>
+                                        <TableCell colSpan={6} className="h-24 text-center">
+                                            <Loader2 className="h-6 w-6 animate-spin mx-auto text-gray-400" />
+                                        </TableCell>
+                                    </TableRow>
+                                ) : filteredOrders.length === 0 ? (
+                                    <TableRow>
+                                        <TableCell colSpan={6} className="h-24 text-center text-gray-500">
+                                            No orders found.
+                                        </TableCell>
+                                    </TableRow>
+                                ) : (
+                                    filteredOrders.map((order) => (
+                                        <TableRow key={order.order_id} className="text-black hover:bg-gray-50 transition-colors">
+                                            <TableCell className="text-xs text-gray-500">
+                                                {new Date(order.ts_created_at).toLocaleString()}
+                                            </TableCell>
+                                            <TableCell>
+                                                <div className="font-medium leading-none mb-1">{order.shop_name || '-'}</div>
+                                                {order.shop_owner_email && (
+                                                    <div className="text-[10px] text-green-700 font-medium truncate max-w-[150px] mb-0.5">
+                                                        {order.shop_owner_email}
+                                                    </div>
+                                                )}
+                                                <div className="text-[9px] text-gray-400 font-mono leading-none">{order.shop_id}</div>
+                                            </TableCell>
+                                            <TableCell className="text-right font-bold">
+                                                {order.quantity}
+                                            </TableCell>
+                                            <TableCell className="text-center">
+                                                <span className={cn(
+                                                    "px-2 py-1 rounded text-[11px] font-bold inline-block min-w-[80px]",
+                                                    order.status === 'ORDERED' ? 'bg-blue-100 text-blue-800' :
+                                                        order.status === 'PRINTING' ? 'bg-yellow-100 text-yellow-800' :
+                                                            order.status === 'SHIPPED' ? 'bg-indigo-100 text-indigo-800' :
+                                                                order.status === 'COMPLETED' ? 'bg-green-100 text-green-800' :
+                                                                    order.status === 'REJECTED' ? 'bg-red-100 text-red-800' :
+                                                                        'bg-gray-100 text-gray-800'
+                                                )}>
+                                                    {st(order.status.toLowerCase())}
+                                                </span>
+                                            </TableCell>
+                                            <TableCell className="text-right">
+                                                <div className="flex justify-end gap-2">
+                                                    {(order.status === 'ORDERED' || order.status === 'PRINTING') && (
+                                                        <>
+                                                            <Button
+                                                                variant="outline"
+                                                                size="sm"
+                                                                className="h-8 text-xs bg-white text-black"
+                                                                onClick={() => handleExport(order, 'pdf')}
+                                                                disabled={!!isProcessing}
+                                                            >
+                                                                {isProcessing === order.order_id ? <Loader2 className="w-3 h-3 animate-spin" /> : <FileText className="w-3 h-3 mr-1" />}
+                                                                PDF
+                                                            </Button>
+                                                            <Button
+                                                                variant="outline"
+                                                                size="sm"
+                                                                className="h-8 text-xs bg-white text-black"
+                                                                onClick={() => handleExport(order, 'csv')}
+                                                                disabled={!!isProcessing}
+                                                            >
+                                                                {isProcessing === order.order_id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3 mr-1" />}
+                                                                CSV
+                                                            </Button>
+                                                        </>
+                                                    )}
+                                                    {order.status === 'PRINTING' && (
+                                                        <Button
+                                                            variant="default"
+                                                            size="sm"
+                                                            className="h-8 text-xs bg-indigo-600 hover:bg-indigo-700"
+                                                            onClick={() => onUpdateStatus(order.shop_id, order.order_id, 'SHIPPED')}
+                                                        >
+                                                            {tc('markAsShipped')}
+                                                        </Button>
+                                                    )}
+                                                    {(order.status === 'ORDERED' || order.status === 'PRINTING') && (
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            className="h-8 w-8 p-0 text-red-500 hover:text-red-700 hover:bg-red-50 mr-1"
+                                                            onClick={() => {
+                                                                if (window.confirm(tc('rejectConfirm'))) {
+                                                                    onUpdateStatus(order.shop_id, order.order_id, 'REJECTED');
+                                                                }
+                                                            }}
+                                                            title={tc('rejectOrder')}
+                                                        >
+                                                            <X className="w-4 h-4" />
+                                                        </Button>
+                                                    )}
+                                                </div>
+                                            </TableCell>
+                                            <TableCell className="text-xs text-gray-500">
+                                                {new Date(order.ts_updated_at).toLocaleString()}
+                                            </TableCell>
+                                        </TableRow>
+                                    ))
+                                )}
+                            </TableBody>
+                        </Table>
+                    </div>
+                </div>
             </CardContent>
         </Card>
     );

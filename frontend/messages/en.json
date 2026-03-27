@@ -40,7 +40,10 @@
     "shipped": "SHIPPED",
     "completed": "COMPLETED",
     "expired": "EXPIRED",
-    "banned": "BANNED"
+    "banned": "BANNED",
+    "ordered": "ORDERED",
+    "printing": "PRINTING",
+    "rejected": "REJECTED"
   },
   "HomePage": {
     "title": "Welcome to meishigawarini",
@@ -143,6 +146,34 @@
     "refresh": "Refresh",
     "incomingOrders": "Incoming Orders",
     "ordersDesc": "Manage your orders and shipments.",
+    "tabs": {
+      "activation": "Activation",
+      "shipping": "Orders",
+      "products": "Products",
+      "orderCard": "Order Cards"
+    },
+    "cardOrder": {
+      "title": "Order Cards",
+      "subtitle": "Order physical shop cards (business cards with QR code).",
+      "selectProduct": "Select Product",
+      "selectProductDesc": "Please select the card design (product) to order.",
+      "quantity": "Quantity",
+      "placeOrder": "Place Order",
+      "confirmTitle": "Confirm Order",
+      "confirmDesc": "Are you sure you want to order {quantity} cards of {product}?",
+      "historyTitle": "Order History",
+      "noOrders": "No order history found.",
+      "cancel": "Cancel",
+      "received": "Mark as Received",
+      "status": {
+        "ordered": "Ordered",
+        "printing": "Printing",
+        "shipped": "Shipped",
+        "completed": "Completed",
+        "cancelled": "Cancelled",
+        "rejected": "Rejected"
+      }
+    },
     "orders": {
       "date": "Last Updated Date Time",
       "recipient": "Recipient",
@@ -502,6 +533,7 @@
       "qrcodes": "QR Codes",
       "shops": "Shop Management",
       "tools": "Tools",
+      "cardorders": "Card Orders",
       "designs": "Design Settings"
     },
     "AdminNeed2FA": "Admin Required 2FA",
@@ -671,6 +703,22 @@
       "id": "Shop ID",
       "name": "Shop Name",
       "contact": "Contact"
+    },
+    "cardOrders": {
+      "title": "Global Card Order Management",
+      "shopIdFilter": "Filter by Shop ID",
+      "preparePrinting": "Prepare Printing (PDF/CSV)",
+      "markAsShipped": "Mark as Shipped",
+      "markAsCompleted": "Mark as Completed",
+      "rejectOrder": "Reject order",
+      "rejectConfirm": "Are you sure you want to reject this order? This action cannot be undone.",
+      "table": {
+        "shop": "Shop",
+        "product": "Product",
+        "quantity": "Qty",
+        "status": "Status",
+        "date": "Order Date"
+      }
     }
   },
   "VerifyPage": {

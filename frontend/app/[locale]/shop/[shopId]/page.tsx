@@ -92,6 +92,12 @@ export default function ShopPage() {
     const [copiedId, setCopiedId] = useState<string | null>(null);
     const [isAdmin, setIsAdmin] = useState(false);
     const [adminEmails, setAdminEmails] = useState<{ owner_email: string, manager_emails: string[] } | null>(null);
+    const [cardOrders, setCardOrders] = useState<any[]>([]);
+    const [cardOrdersLoading, setCardOrdersLoading] = useState(false);
+    const [selectedOrderProduct, setSelectedOrderProduct] = useState<any | null>(null);
+    const [orderQuantity, setOrderQuantity] = useState<number>(100);
+    const [isCreatingCardOrder, setIsCreatingCardOrder] = useState(false);
+    const [isConfirmOrderDialogOpen, setIsConfirmOrderDialogOpen] = useState(false);
 
     const [selectedCardDesignId, setSelectedCardDesignId] = useState<string>('');
 
@@ -221,10 +227,32 @@ export default function ShopPage() {
                 fetchQRCodes(),
                 fetchOrders()
             ]);
+            if (activeTab === 'orderCard') {
+                fetchCardOrders();
+            }
         } finally {
             if (refresh) setIsRefreshing(false);
         }
     };
+
+    const fetchCardOrders = async () => {
+        if (!shopId) return;
+        setCardOrdersLoading(true);
+        try {
+            const data = await shopApi.shop_card_orders_list({ shopId: shopId as string });
+            setCardOrders(data.items || []);
+        } catch (e) {
+            // console.error(e);
+        } finally {
+            setCardOrdersLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        if (activeTab === 'orderCard') {
+            fetchCardOrders();
+        }
+    }, [activeTab]);
 
     const fetchImportShops = async () => {
         try {
@@ -555,12 +583,6 @@ export default function ShopPage() {
     const handleUpdateOrderMeta = async (qrId: string, deliveryCompany?: string, trackingNumber?: string, memoForUsers?: string, memoForShop?: string) => {
         setShippingOrderId(qrId);
         try {
-            const body: any = {};
-            if (deliveryCompany !== undefined) body.delivery_company = deliveryCompany;
-            if (trackingNumber !== undefined) body.tracking_number = trackingNumber;
-            if (memoForUsers !== undefined) body.memo_for_users = memoForUsers;
-            if (memoForShop !== undefined) body.memo_for_shop = memoForShop;
-
             await shopApi.shop_orders_update({
                 shopId: shopId!,
                 qr_id: qrId,
@@ -572,9 +594,49 @@ export default function ShopPage() {
             fetchShopData();
         } catch (e: any) {
             // console.error(e);
-            alert(t('orders.updateError') + ': ' + (tb(e.message.replace(/\./g, '_')) || e.message || String(e)));
+            alert(t('orders.updateError') + ': ' + (tb(e.message?.replace(/\./g, '_')) || e.message || String(e)));
         } finally {
             setShippingOrderId(null);
+        }
+    };
+
+    const handleCreateCardOrder = async () => {
+        if (!selectedOrderProduct || isCreatingCardOrder) return;
+        setIsCreatingCardOrder(true);
+        try {
+            await shopApi.shop_card_orders_create({
+                shopId: shopId as string,
+                quantity: orderQuantity,
+                design_id: selectedOrderProduct.card_design_id || selectedOrderProduct.design?.design_id,
+                product_id: selectedOrderProduct.product_id,
+                activate_now: true
+            });
+            setIsConfirmOrderDialogOpen(false);
+            setSelectedOrderProduct(null);
+            fetchCardOrders();
+        } catch (e: any) {
+            alert(tb(e.message?.replace(/\./g, '_')) || e.message);
+        } finally {
+            setIsCreatingCardOrder(false);
+        }
+    };
+
+    const handleCancelCardOrder = async (orderId: string) => {
+        if (!confirm(t('cardOrder.cancel') + '?')) return;
+        try {
+            await shopApi.shop_card_orders_cancel({ shopId: shopId as string, order_id: orderId });
+            fetchCardOrders();
+        } catch (e: any) {
+            alert(tb(e.message?.replace(/\./g, '_')) || e.message);
+        }
+    };
+
+    const handleCompleteCardOrder = async (orderId: string) => {
+        try {
+            await shopApi.shop_card_orders_complete({ shopId: shopId as string, order_id: orderId });
+            fetchCardOrders();
+        } catch (e: any) {
+            alert(tb(e.message?.replace(/\./g, '_')) || e.message);
         }
     };
 
@@ -2187,6 +2249,307 @@ export default function ShopPage() {
 
 
 
+                {/* --- Wrapper for Card Ordering --- */}
+                {activeTab === 'orderCard' && (
+                    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                        {/* Product Selection */}
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>{t('cardOrder.title')}</CardTitle>
+                                <CardDescription>{t('cardOrder.subtitle')}</CardDescription>
+                            </CardHeader>
+                            <CardContent className="space-y-6">
+                                <div className="space-y-4">
+                                    <div className="flex items-center justify-between">
+                                        <Label className="text-sm font-bold flex items-center gap-2">
+                                            <div className="w-1 h-4 bg-primary rounded-full" />
+                                            {t('cardOrder.selectProduct')}
+                                        </Label>
+                                    </div>
+                                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+                                        {products.filter(p => p.status === 'ACTIVE').map((product) => (
+                                            <div
+                                                key={product.product_id}
+                                                onClick={() => setSelectedOrderProduct(product)}
+                                                className={`group relative aspect-[84/52] rounded-xl border-2 overflow-hidden cursor-pointer transition-all hover:shadow-lg ${selectedOrderProduct?.product_id === product.product_id
+                                                    ? 'border-primary ring-4 ring-primary/10 shadow-xl scale-[1.02]'
+                                                    : 'border-gray-100 hover:border-primary/30'
+                                                    }`}
+                                            >
+                                                {(product.design || cardformats[product.card_design_id]) && (
+                                                    <img
+                                                        src={product.design?.thumbf || product.design?.bgimgf || cardformats[product.card_design_id]?.bgimgf}
+                                                        alt={product.name}
+                                                        className="absolute inset-0 w-full h-full object-cover"
+                                                        crossOrigin="anonymous"
+                                                    />
+                                                )}
+                                                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-80" />
+
+                                                {/* 商品画像 (小) */}
+                                                {product.image_url && (
+                                                    <div className="absolute bottom-2 right-2 w-8 h-8 rounded-md overflow-hidden border border-white/50 shadow-md bg-white">
+                                                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                                                        <img
+                                                            src={product.image_url}
+                                                            alt={product.name}
+                                                            className="w-full h-full object-cover"
+                                                        />
+                                                    </div>
+                                                )}
+
+                                                <div className="absolute bottom-0 left-0 right-0 p-3 text-white">
+                                                    <p className="font-bold text-xs truncate drop-shadow-md">{product.name}</p>
+                                                </div>
+                                                {selectedOrderProduct?.product_id === product.product_id && (
+                                                    <div className="absolute top-2 right-2 bg-primary text-white rounded-full p-1 shadow-lg">
+                                                        <Check className="w-4 h-4" />
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {selectedOrderProduct && (
+                                    <div className="space-y-8 pt-6 border-t animate-in fade-in slide-in-from-top-2 duration-300">
+                                        {/* Comprehensive Preview Section */}
+                                        <div className="bg-gray-50/50 rounded-2xl p-6 border border-gray-100 shadow-inner">
+                                            <div className="flex flex-col md:flex-row gap-8">
+                                                {/* Left side: Info & Balanced Thumbnail */}
+                                                <div className="flex-1 space-y-6">
+                                                    <div className="space-y-2">
+                                                        <h3 className="text-3xl font-black text-gray-900 tracking-tight">{selectedOrderProduct.name}</h3>
+                                                        <p className="text-sm text-gray-500 leading-relaxed max-w-md">
+                                                            {selectedOrderProduct.description || "No description provided."}
+                                                        </p>
+                                                    </div>
+
+                                                    {selectedOrderProduct.image_url && (
+                                                        <div className="rounded-2xl overflow-hidden border-2 border-white shadow-lg bg-white max-w-[200px] animate-in zoom-in fade-in duration-700">
+                                                            <img
+                                                                src={selectedOrderProduct.image_url}
+                                                                alt={selectedOrderProduct.name}
+                                                                className="w-full h-auto object-contain"
+                                                            />
+                                                        </div>
+                                                    )}
+                                                </div>
+
+                                                {/* Right side: Much Larger Front/Back Preview */}
+                                                <div className="flex-[3] space-y-4">
+                                                    <Label className="text-xs font-black text-gray-400 uppercase tracking-widest block mb-1">{t('linkQr.cardDesign')}</Label>
+                                                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                                        {/* Front */}
+                                                        <div className="space-y-2">
+                                                            <div className="aspect-[84/52] relative rounded-2xl border-4 border-white shadow-2xl overflow-hidden group ring-1 ring-gray-200/50">
+                                                                {(selectedOrderProduct.design || cardformats[selectedOrderProduct.card_design_id]) ? (
+                                                                    <img
+                                                                        src={selectedOrderProduct.design?.thumbf || selectedOrderProduct.design?.bgimgf || cardformats[selectedOrderProduct.card_design_id]?.bgimgf}
+                                                                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                                                                        crossOrigin="anonymous"
+                                                                    />
+                                                                ) : (
+                                                                    <div className="w-full h-full bg-gray-200 flex items-center justify-center"><ImageIcon className="w-12 h-12 text-gray-300" /></div>
+                                                                )}
+                                                                <div className="absolute top-3 left-3 px-3 py-1 bg-black/60 backdrop-blur-md text-[10px] font-black text-white rounded-full uppercase tracking-widest shadow-lg">Front View</div>
+                                                            </div>
+                                                        </div>
+                                                        {/* Back */}
+                                                        <div className="space-y-2">
+                                                            <div className="aspect-[84/52] relative rounded-2xl border-4 border-white shadow-2xl overflow-hidden group ring-1 ring-gray-200/50">
+                                                                {(selectedOrderProduct.design || cardformats[selectedOrderProduct.card_design_id]) ? (
+                                                                    <img
+                                                                        src={selectedOrderProduct.design?.thumbb || selectedOrderProduct.design?.bgimgb || cardformats[selectedOrderProduct.card_design_id]?.bgimgb}
+                                                                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                                                                        crossOrigin="anonymous"
+                                                                    />
+                                                                ) : (
+                                                                    <div className="w-full h-full bg-gray-200 flex items-center justify-center"><ImageIcon className="w-12 h-12 text-gray-300" /></div>
+                                                                )}
+                                                                <div className="absolute top-3 left-3 px-3 py-1 bg-black/60 backdrop-blur-md text-[10px] font-black text-white rounded-full uppercase tracking-widest shadow-lg">Back View</div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-end">
+                                            <div className="space-y-4">
+                                                <Label htmlFor="order-quantity" className="text-sm font-bold block">{t('cardOrder.quantity')}</Label>
+                                                <div className="flex items-center gap-4">
+                                                    <Input
+                                                        id="order-quantity"
+                                                        type="number"
+                                                        min={100}
+                                                        step={100}
+                                                        value={orderQuantity}
+                                                        onChange={(e) => setOrderQuantity(Number(e.target.value))}
+                                                        className="max-w-[200px] h-12 text-lg font-bold"
+                                                    />
+                                                    <span className="text-gray-500 font-medium">枚</span>
+                                                </div>
+                                            </div>
+                                            <Dialog open={isConfirmOrderDialogOpen} onOpenChange={setIsConfirmOrderDialogOpen}>
+                                                <DialogTrigger asChild>
+                                                    <Button className="h-12 px-8 text-lg font-bold shadow-xl hover:shadow-2xl transition-all active:scale-[0.98]">
+                                                        <ShoppingBasket className="w-5 h-5 mr-3" />
+                                                        {t('cardOrder.placeOrder')}
+                                                    </Button>
+                                                </DialogTrigger>
+                                                <DialogContent>
+                                                    <DialogHeader>
+                                                        <DialogTitle>{t('cardOrder.confirmTitle')}</DialogTitle>
+                                                        <DialogDescription>
+                                                            {t('cardOrder.confirmDesc', {
+                                                                product: selectedOrderProduct.name,
+                                                                quantity: orderQuantity.toLocaleString()
+                                                            })}
+                                                        </DialogDescription>
+                                                    </DialogHeader>
+                                                    <div className="py-6 flex flex-col items-center gap-4">
+                                                        <div className="w-full max-w-[300px] aspect-[84/52] relative rounded-xl border shadow-2xl overflow-hidden ring-4 ring-primary/5">
+                                                            {(selectedOrderProduct.design || cardformats[selectedOrderProduct.card_design_id]) ? (
+                                                                <img
+                                                                    src={selectedOrderProduct.design?.thumbf || selectedOrderProduct.design?.bgimgf || cardformats[selectedOrderProduct.card_design_id]?.bgimgf}
+                                                                    alt="Confirm Preview"
+                                                                    className="w-full h-full object-cover"
+                                                                    crossOrigin="anonymous"
+                                                                />
+                                                            ) : (
+                                                                <div className="w-full h-full bg-gray-200 flex items-center justify-center">
+                                                                    <ImageIcon className="w-12 h-12 text-gray-400" />
+                                                                </div>
+                                                            )}
+
+                                                            {/* 商品画像 (小) */}
+                                                            {selectedOrderProduct.image_url && (
+                                                                <div className="absolute bottom-3 right-3 w-12 h-12 rounded-lg overflow-hidden border-2 border-white shadow-xl bg-white animate-in zoom-in fade-in duration-500 delay-200">
+                                                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                                                    <img
+                                                                        src={selectedOrderProduct.image_url}
+                                                                        alt={selectedOrderProduct.name}
+                                                                        className="w-full h-full object-cover"
+                                                                    />
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                        <div className="text-center">
+                                                            <p className="text-2xl font-black text-primary">{orderQuantity.toLocaleString()} <span className="text-sm">枚</span></p>
+                                                        </div>
+                                                    </div>
+                                                    <DialogFooter className="gap-2 sm:gap-2">
+                                                        <Button variant="outline" onClick={() => setIsConfirmOrderDialogOpen(false)} disabled={isCreatingCardOrder}>
+                                                            {tc('cancel')}
+                                                        </Button>
+                                                        <Button onClick={handleCreateCardOrder} disabled={isCreatingCardOrder} className="bg-primary hover:bg-primary/90 min-w-[120px]">
+                                                            {isCreatingCardOrder ? <Loader2 className="w-4 h-4 animate-spin" /> : t('cardOrder.placeOrder')}
+                                                        </Button>
+                                                    </DialogFooter>
+                                                </DialogContent>
+                                            </Dialog>
+                                        </div>
+                                    </div>
+                                )}
+                            </CardContent>
+                        </Card>
+
+                        {/* Order History */}
+                        <Card>
+                            <CardHeader className="flex flex-row items-center justify-between">
+                                <div>
+                                    <CardTitle>{t('cardOrder.historyTitle')}</CardTitle>
+                                </div>
+                                <Button variant="ghost" size="sm" onClick={fetchCardOrders} disabled={cardOrdersLoading}>
+                                    <RefreshCw className={`w-4 h-4 mr-2 ${cardOrdersLoading ? 'animate-spin' : ''}`} />
+                                    {t('refresh')}
+                                </Button>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="border rounded-xl bg-white overflow-hidden shadow-sm">
+                                    <Table>
+                                        <TableHeader className="bg-gray-50/50">
+                                            <TableRow>
+                                                <TableHead className="w-[120px] font-bold">{t('cardOrder.table.date')}</TableHead>
+                                                <TableHead className="font-bold">{t('cardOrder.table.product')}</TableHead>
+                                                <TableHead className="w-[80px] font-bold text-right">{t('cardOrder.table.quantity')}</TableHead>
+                                                <TableHead className="w-[120px] font-bold text-center">{t('cardOrder.table.status')}</TableHead>
+                                                <TableHead className="w-[150px] font-bold text-right"></TableHead>
+                                            </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {cardOrdersLoading && cardOrders.length === 0 ? (
+                                                <TableRow>
+                                                    <TableCell colSpan={5} className="h-32 text-center">
+                                                        <Loader2 className="w-8 h-8 animate-spin mx-auto text-gray-300" />
+                                                    </TableCell>
+                                                </TableRow>
+                                            ) : cardOrders.length === 0 ? (
+                                                <TableRow>
+                                                    <TableCell colSpan={5} className="h-32 text-center text-gray-400 font-medium">
+                                                        {t('cardOrder.noOrders')}
+                                                    </TableCell>
+                                                </TableRow>
+                                            ) : cardOrders.map((order) => {
+                                                const product = products.find(p => p.product_id === order.product_id);
+                                                return (
+                                                    <TableRow key={order.order_id} className="group hover:bg-gray-50/50 transition-colors">
+                                                        <TableCell className="text-xs font-medium text-gray-500">
+                                                            {new Date(order.ts_created_at).toLocaleDateString()}
+                                                        </TableCell>
+                                                        <TableCell className="font-semibold">
+                                                            {product?.name || order.product_id || order.design_id}
+                                                        </TableCell>
+                                                        <TableCell className="text-right font-mono font-bold">
+                                                            {(order.quantity || 0).toLocaleString()}
+                                                        </TableCell>
+                                                        <TableCell className="text-center">
+                                                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold ring-1 ring-inset ${order.status === 'ORDERED' ? 'bg-blue-50 text-blue-700 ring-blue-700/10' :
+                                                                order.status === 'PRINTING' ? 'bg-amber-50 text-amber-700 ring-amber-700/10' :
+                                                                    order.status === 'SHIPPED' ? 'bg-indigo-50 text-indigo-700 ring-indigo-700/10' :
+                                                                        order.status === 'COMPLETED' ? 'bg-emerald-50 text-emerald-700 ring-emerald-700/10' :
+                                                                            order.status === 'CANCELLED' ? 'bg-gray-50 text-gray-600 ring-gray-600/10' :
+                                                                                'bg-red-50 text-red-700 ring-red-700/10'
+                                                                }`}>
+                                                                {t(`cardOrder.status.${order.status.toLowerCase()}`)}
+                                                            </span>
+                                                        </TableCell>
+                                                        <TableCell className="text-right">
+                                                            <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                                {order.status === 'ORDERED' && (
+                                                                    <Button
+                                                                        variant="ghost"
+                                                                        size="sm"
+                                                                        className="text-red-600 hover:text-red-700 hover:bg-red-50 h-8 font-bold"
+                                                                        onClick={() => handleCancelCardOrder(order.order_id)}
+                                                                    >
+                                                                        {t('cardOrder.cancel')}
+                                                                    </Button>
+                                                                )}
+                                                                {order.status === 'SHIPPED' && (
+                                                                    <Button
+                                                                        variant="outline"
+                                                                        size="sm"
+                                                                        className="border-emerald-200 text-emerald-700 hover:bg-emerald-50 h-8 font-bold"
+                                                                        onClick={() => handleCompleteCardOrder(order.order_id)}
+                                                                    >
+                                                                        <Check className="w-3 h-3 mr-1" />
+                                                                        {t('cardOrder.received')}
+                                                                    </Button>
+                                                                )}
+                                                            </div>
+                                                        </TableCell>
+                                                    </TableRow>
+                                                );
+                                            })}
+                                        </TableBody>
+                                    </Table>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </div>
+                )}
             </div>
         </div >
     );

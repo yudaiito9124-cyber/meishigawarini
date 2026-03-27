@@ -3,7 +3,8 @@
     "error": "エラー",
     "unknownError": "不明なエラー",
     "failed": "失敗しました",
-    "all": "すべて"
+    "all": "すべて",
+    "cancel": "キャンセル"
   },
   "Site": {
     "name": "名刺代わりに。"
@@ -28,7 +29,11 @@
     "completed": "受取り完了",
     "expired": "期限切れ",
     "banned": "BAN済み",
-    "promotion": "プロモーション"
+    "promotion": "プロモーション",
+    "ordered": "発注済み",
+    "printing": "印刷中",
+    "rejected": "却下",
+    "cancelled": "キャンセル済み"
   },
   "Time": {
     "timeMorning": "午前中",
@@ -150,6 +155,35 @@
       "products": "商品登録",
       "orderCard": "カード発注"
     },
+    "cardOrder": {
+      "title": "カードの発注",
+      "subtitle": "カード（QR付きカード）の発注を行います。",
+      "selectProduct": "カードデザイン（商品）を選択",
+      "selectProductDesc": "発注するカードのデザインを選択してください。",
+      "quantity": "発注枚数",
+      "placeOrder": "この内容で発注する",
+      "confirmTitle": "発注の最終確認",
+      "confirmDesc": "{product} を {quantity} 枚発注します。よろしいですか？",
+      "historyTitle": "発注履歴",
+      "noOrders": "発注履歴はありません。",
+      "cancel": "キャンセル",
+      "received": "受け取り完了",
+      "status": {
+        "ordered": "発注済み",
+        "printing": "印刷中",
+        "shipped": "発送済み",
+        "completed": "完了",
+        "cancelled": "キャンセル済み",
+        "rejected": "却下"
+      },
+      "table": {
+        "date": "注文日時",
+        "product": "商品",
+        "quantity": "数量",
+        "status": "ステータス",
+        "dateupdated": "更新日時"
+      }
+    },
     "orders": {
       "date": "更新日時",
       "recipient": "受取人",
@@ -262,16 +296,16 @@
         "apply": "適用",
         "cancel": "キャンセル"
       },
-      "success": "QRコードが連携され有効化されました！",
+      "success": "カードが連携され有効化されました！",
       "error": "エラー"
     },
     "linkedQr": {
-      "title": "連携済みQRコード",
+      "title": "連携済みカード",
       "id": "QR ID",
       "product": "商品",
       "status": "ステータス",
       "activatedAt": "有効化日時",
-      "noLinks": "連携済みのQRコードはありません"
+      "noLinks": "連携済みのカードはありません"
     },
     "history": {
       "title": "発注待ち以外のカード",
@@ -287,7 +321,7 @@
       "flow": "注文の流れ",
       "list": "ステータス詳細",
       "statuses": {
-        "unassigned": "QRコードが生成されましたが、まだショップや商品と紐付けられていません。",
+        "unassigned": "カードが印刷されましたが、まだショップや商品と紐付けられていません。",
         "linked": "ショップや商品と紐付けられましたが、まだ使用できるように有効化されていません。",
         "active": "有効化されており、ギフトとして贈ることができる状態です。",
         "used": "受取人が住所を入力し、発送待ちの状態です（ショップ側で発送作業が必要です）。",
@@ -525,8 +559,9 @@
     "qrAdminLoginPage": "ログイン画面",
     "helpButton": "ヘルプ",
     "tabs": {
-      "qrcodes": "QRコード",
+      "qrcodes": "カード一覧",
       "shops": "ショップ管理",
+      "cardorders": "カード印刷",
       "tools": "ツール",
       "designs": "デザイン設定"
     },
@@ -543,7 +578,7 @@
       "activateNow": "この場でアクティベートする (任意、ショップIDと商品IDの両方の指定が必要)",
       "useMetadata": "オプション情報を使用する",
       "pdfOptions": "カードデザイン",
-      "paperFormat": "PDF生成用の用紙設定(QRコード単体のPDFを出力する際にもここを変更してください)",
+      "paperFormat": "PDF生成用の用紙設定(カード単体のPDFを出力する際にもここを変更してください)",
       "cardFormat": "カードデザイン",
       "cardPreview": "デザインプレビュー",
       "front": "表面",
@@ -553,7 +588,7 @@
       "button": "生成"
     },
     "batches": {
-      "title": "現在生成したQRコード",
+      "title": "現在手動生成したカード",
       "noBatches": "まだバッチが生成されていません。",
       "batchId": "バッチ: {id}",
       "info": "{count} 件 • {date}",
@@ -569,13 +604,13 @@
         "pin": "PIN"
       },
       "alerts": {
-        "success": "QRコードの生成に成功しました",
-        "failed": "QRコードの生成に失敗しました",
+        "success": "カードの生成に成功しました",
+        "failed": "カードの生成に失敗しました",
         "error": "エラーが発生しました"
       }
     },
     "list": {
-      "title": "全QRコード",
+      "title": "全カード",
       "refresh": "更新",
       "loading": "読み込み中...",
       "deleteAllBanned": "BAN済みを全て削除",
@@ -595,18 +630,18 @@
         "promotion": "プロモーション",
         "undefined": "不明な状態"
       },
-      "info": "ステータス: {status} • 件数: {count}",
+      "info": "ステータス: {status} • 件数: {count}  (最大最新50件まで)",
       "table": {
         "uuid": "UUID",
         "pin": "PIN",
         "status": "ステータス",
         "createdAt": "更新日時",
         "actions": "操作",
-        "noCodes": "コードが見つかりません。更新ボタンを押してください。"
+        "noCodes": "カードが見つかりません。更新ボタンを押してください。"
       },
       "ban": {
         "button": "BAN",
-        "confirm": "本当にこのQRコードをBANしますか？この操作で即座に無効化されます。",
+        "confirm": "本当にこのカードをBANしますか？この操作で即座に無効化されます。",
         "success": "BANしました",
         "failed": "BANに失敗しました",
         "error": "エラーが発生しました",
@@ -616,13 +651,13 @@
       },
       "restore": {
         "button": "元に戻す",
-        "confirm": "このQRコードの利用停止を解除して元に戻しますか？",
+        "confirm": "このカードの利用停止を解除して元に戻しますか？",
         "success": "復元しました",
         "failed": "復元に失敗しました"
       },
       "deleteBanned": {
-        "confirm": "本当に全てのBAN済みコードを削除しますか？この操作は元に戻せません。",
-        "success": "BAN済みコードを {count} 件削除しました。",
+        "confirm": "本当に全てのBAN済みカードを削除しますか？この操作は元に戻せません。",
+        "success": "BAN済みカードを {count} 件削除しました。",
         "failed": "削除に失敗しました",
         "error": "削除中にエラーが発生しました"
       },
@@ -708,6 +743,23 @@
       "id": "ショップID",
       "name": "ショップ名",
       "contact": "連絡先"
+    },
+    "cardOrders": {
+      "title": "全ショップからのカード発注管理",
+      "shopIdFilter": "ショップIDで絞り込み",
+      "preparePrinting": "印刷準備 (PDF/CSV)",
+      "markAsShipped": "発送済みにする",
+      "markAsCompleted": "完了にする",
+      "rejectOrder": "発注を却下する",
+      "rejectConfirm": "本当にこの発注を却下しますか？この操作は元に戻せません。",
+      "table": {
+        "shop": "ショップ",
+        "product": "商品",
+        "quantity": "数量",
+        "status": "状態",
+        "date": "注文日時",
+        "dateupdated": "更新日時"
+      }
     }
   },
   "VerifyPage": {

@@ -100,6 +100,8 @@ type AdminApiSchema = {
     admin_carddesigns_update: { design_id: string; design: { [key: string]: any } }; //カードデザインを更新
     admin_carddesigns_delete: { design_id: string }; //カードデザインを削除
     admin_carddesigns_uploadurl: { filename: string; contentType: string; design_id: string }; //カードデザインのアップロードURLを取得
+    admin_card_orders_list: { status?: string; limit?: number }; //カード発注のリストを取得
+    admin_card_orders_update: { shopId: string; order_id: string; status: string }; //カード発注のステータスを更新
 };
 
 
