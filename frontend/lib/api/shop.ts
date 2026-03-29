@@ -70,7 +70,7 @@ export const shopApi = createShopApi<ShopApiSchema>(shopApiBase);
  * _ は / に置換されます
  */
 type ShopApiSchema = {
-    shop_list: {};
+    shop_list: { noCreate?: boolean };
     shop_details_get: { shopId: string };
     shop_details_update: { shopId: string; name?: string; description?: string; detail_html?: string; html_image_urls?: string[]; deleted_html_image_urls?: string[] };
     shop_admins: { shopId: string };

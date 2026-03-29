@@ -49,7 +49,7 @@ if (userPoolId && userPoolClientId) {
                 loginWith: {
                     oauth: {
                         domain: cognitoDomain || '',
-                        scopes: ['email', 'openid', 'profile'],
+                        scopes: ['email', 'openid', 'profile', 'aws.cognito.signin.user.admin'],
                         redirectSignIn: signInOrigins,
                         redirectSignOut: signOutOrigins,
                         responseType: 'code',

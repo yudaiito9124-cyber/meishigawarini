@@ -8,6 +8,7 @@ import { useState, useEffect } from 'react';
 import { Link, useRouter } from '@/i18n/routing';
 import { useTranslations } from 'next-intl';
 import { fetchAuthSession, getCurrentUser, signOut } from 'aws-amplify/auth';
+import { RefreshCw, ArrowRight, HelpCircle, Camera, Settings, ShoppingBasket, Eye, Plus, Trash2, Copy, ImageIcon, Save, Loader2, Pencil, ChevronDown, Download, Check, QrCode, Package, Truck, CreditCard, Gift, LogOut } from 'lucide-react';
 import { Badge } from "lucide-react";
 import { shopApi } from '@/lib/api/shop';
 import { adminApi } from '@/lib/api/admin';
@@ -137,14 +138,13 @@ export default function ShopListPage() {
                         {userId && <p className="text-xs text-gray-400 mt-1">{t('userId', { id: userId })}</p>}
                     </div>
                     <div className="flex flex-row flex-wrap items-center justify-center mr-0">
-                        {isAdmin && (
-                            <Link href="/login">
-                                <Button variant="destructive" className="shadow-md cursor-pointer border border-red-900">
-                                    {t('qrAdminLoginPage')}
-                                </Button>
-                            </Link>
-                        )}
-                        <Button variant="ghost" size="lg" className="hover:bg-red-50 hover:text-red-600 cursor-pointer" onClick={handleLogout}>{t('logout')}</Button>
+                        <Button variant="ghost" className="text-mist-500 hover:text-mist-800" onClick={() => router.push('/login')}>
+                            <ChevronDown className="h-4 w-4 mr-1 rotate-90" /> {t('movetologin')}
+                        </Button>
+                        <Button variant="ghost" className="text-mist-500 hover:text-mist-800" onClick={handleLogout}>
+                            <LogOut className="w-5 h-5 mr-2" />
+                            {t('logout')}
+                        </Button>
                     </div>
                 </div>
 

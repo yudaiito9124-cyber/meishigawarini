@@ -63,7 +63,8 @@
     "sendGift": "Send a New Gift",
     "sendGiftDesc": "Scan a new gift's QR code to register it in your send history.",
     "logout": "Logout",
-    "back": "Back"
+    "back": "Back",
+    "userId": "User ID"
   },
   "LoginPage": {
     "title": "Sign In",
@@ -98,7 +99,8 @@
     "logout": "Logout",
     "helpAdminPage": "Admin Help (Initial Setup)",
     "signInWithAWS": "Sign in with AWS (Standard)",
-    "forgotPassword": "Forgot your password?"
+    "forgotPassword": "Forgot your password?",
+    "userId": "User ID"
   },
   "RegisterPage": {
     "title": "Create Account",

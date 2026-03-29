@@ -15,7 +15,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/componen
 import { Label } from "@/components/ui/label";
 import { cn } from '@/lib/utils';
 import { shopApi } from '@/lib/api/shop';
-import { HelpCircle, Crown, Store, Loader2, User } from 'lucide-react';
+import { HelpCircle, Crown, Store, Loader2, User, LogOut } from 'lucide-react';
 
 export default function LoginPage() {
     const t = useTranslations('LoginPage');
@@ -37,24 +37,20 @@ export default function LoginPage() {
         try {
             const session = await fetchAuthSession();
             if (session.tokens) {
-                const groups = (session.tokens.idToken?.payload['cognito:groups'] as string[]) || [];
-                const amr = (session.tokens.idToken?.payload['amr'] as string[]) || [];
+                const payload = session.tokens.idToken?.payload || {};
+                const groups = (payload['cognito:groups'] as string[]) || [];
                 const isAdmin = groups.includes('Administrators') || groups.includes('GlobalAdmins');
-                const sub = session.tokens.idToken?.payload['sub'] as string || "";
+                const sub = payload['sub'] as string || "";
 
                 setUserId(sub);
+                setUserEmail(payload["email"] as string || "")
                 setIsAdmin(isAdmin);
-                setIsLoggedIn(true);
-
-                // 管理者でMFAがまだの場合
                 if (isAdmin) {
                     setUserInfo(groups.join(" & "));
-                    setUserEmail(session.tokens.idToken?.payload["email"] as string || "")
-                    setSingleShopOwner(false);
-                    setLoading(false);
-                    return;
                 }
+                setIsLoggedIn(true);
 
+                // APIを叩いてショップ情報を取得（自動作成を回避）
                 await redirectShopPage(sub);
             } else {
                 handleHostedUILogin();
@@ -65,23 +61,29 @@ export default function LoginPage() {
     };
 
     const redirectShopPage = async (sub: string) => {
+
         setLoading(true);
         try {
-            const data = await shopApi.shop_list({});
+            if (isAdmin) {
+                return;
+            }
+            const data = await shopApi.shop_list({ noCreate: true });
             const shops = data.shops || [];
 
+            console.log("shops: " + shops)
+            console.log("data: " + data)
             if (shops.length === 0) {
-                // Not a shop owner, redirect to user profile seamlessly
+                // ショップを持たないユーザーはプロフィールへ
+                console.log("onshops");
                 router.push(`/user/${sub}`);
-            } else if (shops.length === 1) {
-                setSingleShopOwner(true);
-                // No longer pushing automatically
             } else {
-                setSingleShopOwner(false);
-                // router.push('/shop');
+                console.log("any shops");
+
+                setSingleShopOwner(shops.length === 1);
+                // ショップ選択UIに留まる (ショップリストがあれば、そこで選択可能)
             }
         } catch (e) {
-            // Error fetching shops, fallback redirect to user profile
+            // エラー時はプロフィールへフォールバック
             router.push(`/user/${sub}`);
         } finally {
             setLoading(false);
@@ -157,7 +159,7 @@ export default function LoginPage() {
         <div className={cn("flex flex-col items-center justify-center bg-gray-100 p-4 pt-16 sm:pt-4", isAdmin && "bg-mist-900")}>
             <div className="w-full min-h-screen">
                 {isLoggedIn && (
-                    <div className="w-full pt-0 flex flex-wrap justify-between items-start gap-4">
+                    <div className={cn("w-full pt-0 flex flex-wrap gap-4", (isAdmin ? "justify-between" : "justify-end"))}>
                         {isAdmin && (
                             <div className="flex gap-2 flex-col items-start w-full sm:w-auto">
                                 <Link href="/help/admin" className="w-full sm:w-auto">
@@ -180,15 +182,17 @@ export default function LoginPage() {
                             <Button
                                 variant="ghost"
                                 className={cn(
-                                    "hover:bg-red-50 hover:text-red-600 cursor-pointer w-full sm:w-40 justify-center h-10",
-                                    isAdmin ? "text-white" : "text-gray-700"
+                                    "cursor-pointer w-full sm:w-40 justify-center h-10",
+                                    isAdmin ? "text-white hover:bg-mist-700 hover:text-white" : "text-mist-500 hover:text-mist-800"
                                 )}
                                 onClick={async () => {
                                     await signOut();
                                     setIsLoggedIn(false);
                                     setIsAdmin(false);
+                                    router.push(`/`);
                                 }}
                             >
+                                <LogOut className="w-5 h-5 mr-2" />
                                 {t('logout')}
                             </Button>
                             {/* {!singleShopOwner && (
@@ -241,6 +245,16 @@ export default function LoginPage() {
                                             </div>
                                             {t('userProfilePage')}
                                         </Button>
+                                    </div>
+                                    <div className="text-center space-y-1">
+                                        <p className="text-xs text-gray-400 font-medium">
+                                            {t('userId')}: {userId}
+                                        </p>
+                                        {userEmail && (
+                                            <p className="text-xs text-gray-400 font-medium">
+                                                {t('email')}: {userEmail}
+                                            </p>
+                                        )}
                                     </div>
 
                                     {isAdmin && (

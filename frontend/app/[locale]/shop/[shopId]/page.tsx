@@ -5,7 +5,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { RefreshCw, ArrowRight, HelpCircle, Camera, Settings, ShoppingBasket, Eye, Plus, Trash2, Copy, ImageIcon, Save, Loader2, Pencil, ChevronDown, Download, Check, QrCode, Package, Truck, CreditCard, Gift } from 'lucide-react';
+import { RefreshCw, ArrowRight, HelpCircle, Camera, Settings, ShoppingBasket, Eye, Plus, Trash2, Copy, ImageIcon, Save, Loader2, Pencil, ChevronDown, Download, Check, QrCode, Package, Truck, CreditCard, Gift, LogOut } from 'lucide-react';
 import { notFound, useParams } from 'next/navigation';
 import { useRouter } from '@/i18n/routing';
 import { useTranslations } from 'next-intl';
@@ -362,6 +362,14 @@ export default function ShopPage() {
     const handleShops = async () => {
         try {
             router.push('/shop');
+        } catch (error) {
+            // console.error('Error move to shops: ', error);
+        }
+    };
+
+    const handleLogin = async () => {
+        try {
+            router.push('/login');
         } catch (error) {
             // console.error('Error move to shops: ', error);
         }
@@ -1041,15 +1049,24 @@ export default function ShopPage() {
                             <DialogFooter>
                             </DialogFooter>
                         </Dialog>
-                        {(!singleShopOwner || isAdmin) && <Button variant="secondary" className="shadow-md cursor-pointer border border-gray-200" onClick={handleShops}>{t('movetoshops')}</Button>}
+                        {(!singleShopOwner || isAdmin) &&
+                            <Button variant="ghost" className="text-mist-500 hover:text-mist-800" onClick={handleShops}>
+                                <ChevronDown className="h-4 w-4 mr-1 rotate-90" /> {t('movetoshops')}
+                            </Button>}
+                        {(singleShopOwner && !isAdmin) &&
+                            <Button variant="ghost" className="text-mist-500 hover:text-mist-800" onClick={handleLogin}>
+                                <ChevronDown className="h-4 w-4 mr-1 rotate-90" /> {t('movetologin')}
+                            </Button>
+                        }
                         <Button
                             variant="ghost"
-                            className="hover:bg-red-50 hover:text-red-600 cursor-pointer"
+                            className="text-mist-500 hover:text-mist-800"
                             onClick={async () => {
                                 await signOut();
                                 router.push('/login');
                             }}
                         >
+                            <LogOut className="w-5 h-5 mr-2" />
                             {t('logout')}
                         </Button>
                     </div>

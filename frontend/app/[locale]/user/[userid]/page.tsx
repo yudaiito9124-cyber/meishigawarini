@@ -13,6 +13,7 @@ export default function UserDashboardPage() {
     const router = useRouter();
     const params = useParams();
     const userId = params?.userid as string;
+    console.log(params);
 
     const navItems = [
         {
@@ -56,19 +57,33 @@ export default function UserDashboardPage() {
     const handleLogout = async () => {
         try {
             await signOut();
-            router.push('/login');
+            router.push('/');
         } catch (error) {
             console.error('Error signing out: ', error);
         }
     };
 
+    const handleCreatesop = async () => {
+        try {
+            if (confirm(t("createMyShopConfirm"))) {
+                router.push("/shop")
+            }
+        } catch (error) {
+            console.error("failed to move to /shop page", error);
+        }
+
+    }
+
     return (
         <div className="flex flex-col min-h-screen bg-mist-50 font-sans">
             <main className="flex-1 max-w-4xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-8 pb-12 pt-12">
                 <div className="flex justify-between items-center mb-8">
-                    <h1 className="text-3xl font-black text-gray-800 tracking-tight">{t('title')}</h1>
                     <div>
-                        <Button variant="ghost" className="text-mist-500 hover:text-mist-800" onClick={handleLogout}>
+                        <h1 className="text-3xl font-black text-gray-800 tracking-tight">{t('title')}</h1>
+                        <p className="text-xs text-gray-400 font-medium mt-1">{t('userId')} : {userId}</p>
+                    </div>
+                    <div>
+                        <Button variant="ghost" className="text-mist-500 hover:text-mist-800" onClick={() => router.push('/login')}>
                             <ChevronDown className="h-4 w-4 mr-1 rotate-90" /> {t('back')}
                         </Button>
                         <Button variant="ghost" className="text-mist-500 hover:text-mist-800" onClick={handleLogout}>
@@ -99,7 +114,7 @@ export default function UserDashboardPage() {
                 </div>
             </main>
             <div className="flex justify-center p-4">
-                <Button className="w-full p-4 h-10 hover:bg-mist-500 hover:text-mist-50" variant="ghost" onClick={() => router.push('/shop')}>ショップを開設する</Button>
+                <Button className=" p-4 h-10 hover:bg-red-500 hover:text-mist-50" variant="ghost" onClick={handleCreatesop}>{t("createMyShop")}</Button>
             </div>
         </div>
     );

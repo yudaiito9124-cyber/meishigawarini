@@ -28,9 +28,12 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         const claims = authorizer;
         if (!userId) return { statusCode: 401, headers: corsHeaders, body: JSON.stringify({ message: 'Unauthorized' }) };
 
-        let roles = [];
-        let owner_shop_ids = [];
-        let gm_shop_ids = [];
+        const body = JSON.parse(event.body || '{}');
+        const noCreate = body?.noCreate === true;
+
+        let roles: string[] = [];
+        let owner_shop_ids: string[] = [];
+        let gm_shop_ids: string[] = [];
 
         // 【DB操作: GetItem】
         // - 目的: アクセスしたユーザーの所持するロールやショップ権限情報の取得
@@ -79,7 +82,19 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             }
         }
 
-        if (!userRes?.Item && owner_shop_ids.length === 0) {
+        // 既存のユーザー情報を変数に反映
+        if (userRes?.Item) {
+            roles = userRes.Item.roles || [];
+            owner_shop_ids = userRes.Item.owner_shop_ids || [];
+            gm_shop_ids = userRes.Item.gm_shop_ids || [];
+        }
+
+        // 【ショップ作成判定】
+        // - 条件: 管理・所属しているショップが1つも存在しない場合
+        if (owner_shop_ids.length === 0 && gm_shop_ids.length === 0) {
+            if (noCreate) {
+                return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ shops: [], roles, owner_shop_ids, gm_shop_ids }) };
+            }
             const newShopId = generateId();
             const now = new Date().toISOString();
             const email = claims?.email;
@@ -114,10 +129,6 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             roles = ['SHOP_MANAGER'];
             owner_shop_ids = [newShopId];
             gm_shop_ids = [];
-        } else if (userRes?.Item) {
-            roles = userRes?.Item?.roles;
-            owner_shop_ids = userRes?.Item?.owner_shop_ids || [];
-            gm_shop_ids = userRes?.Item?.gm_shop_ids || [];
         }
 
         let shops = Array.from(new Set([...owner_shop_ids, ...gm_shop_ids]));
