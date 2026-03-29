@@ -14,13 +14,15 @@ export interface ReceiveApiProps {
   bucket: s3.IBucket;
   userPool: cognito.IUserPool;
   userPoolClient: cognito.IUserPoolClient;
-  api: apigateway.RestApi;
+  api: apigateway.IRestApi;
   commonProps: any;
   grantTablePermissions: (fn: lambda.IFunction, write?: boolean) => void;
 }
 
-export class ReceiveApi extends Construct {
-  constructor(scope: Construct, id: string, props: ReceiveApiProps) {
+export class ReceiveApi extends cdk.NestedStack {
+  public readonly receiveResource: apigateway.Resource;
+
+  constructor(scope: cdk.Stack, id: string, props: ReceiveApiProps) {
     super(scope, id);
 
     const { table, bucket, userPool, userPoolClient, api, commonProps, grantTablePermissions } = props;
@@ -112,24 +114,34 @@ export class ReceiveApi extends Construct {
     });
 
     // --- Routes ---
-    const receiveRes = api.root.addResource('receive');
+    // Helper to add resource
+    const addResourceWithCors = (parent: apigateway.IResource, pathPart: string): apigateway.Resource => {
+      return parent.addResource(pathPart) as apigateway.Resource;
+    };
+
+    this.receiveResource = new apigateway.Resource(this, 'ReceiveTopResource', {
+      parent: api.root,
+      pathPart: 'receive'
+    });
+
     const routeOptions = { authorizer, authorizationType: apigateway.AuthorizationType.CUSTOM };
 
-    receiveRes.addResource('verify').addMethod('POST', new apigateway.LambdaIntegration(receive_verify));
-    receiveRes.addResource('submit').addMethod('POST', new apigateway.LambdaIntegration(receive_submit), routeOptions);
-    receiveRes.addResource('completed').addMethod('POST', new apigateway.LambdaIntegration(receive_completed), routeOptions);
+    addResourceWithCors(this.receiveResource, 'verify').addMethod('POST', new apigateway.LambdaIntegration(receive_verify));
+    addResourceWithCors(this.receiveResource, 'submit').addMethod('POST', new apigateway.LambdaIntegration(receive_submit), routeOptions);
+    addResourceWithCors(this.receiveResource, 'completed').addMethod('POST', new apigateway.LambdaIntegration(receive_completed), routeOptions);
 
-    const chatRes = receiveRes.addResource('chat');
-    chatRes.addResource('get').addMethod('POST', new apigateway.LambdaIntegration(receive_chat), routeOptions);
-    chatRes.addResource('send').addMethod('POST', new apigateway.LambdaIntegration(receive_chat), routeOptions);
+    const chatRes = addResourceWithCors(this.receiveResource, 'chat');
+    addResourceWithCors(chatRes, 'get').addMethod('POST', new apigateway.LambdaIntegration(receive_chat), routeOptions);
+    addResourceWithCors(chatRes, 'send').addMethod('POST', new apigateway.LambdaIntegration(receive_chat), routeOptions);
 
-    receiveRes.addResource('subscription').addMethod('POST', new apigateway.LambdaIntegration(receive_subscription), routeOptions);
+    addResourceWithCors(this.receiveResource, 'subscription').addMethod('POST', new apigateway.LambdaIntegration(receive_subscription), routeOptions);
 
-    const senderRes = receiveRes.addResource('sender');
-    senderRes.addResource('update').addMethod('POST', new apigateway.LambdaIntegration(receive_sender), routeOptions);
-    senderRes.addResource('load').addMethod('POST', new apigateway.LambdaIntegration(receive_sender), routeOptions);
-    senderRes.addResource('save').addMethod('POST', new apigateway.LambdaIntegration(receive_sender), routeOptions);
+    const senderRes = addResourceWithCors(this.receiveResource, 'sender');
+    addResourceWithCors(senderRes, 'update').addMethod('POST', new apigateway.LambdaIntegration(receive_sender), routeOptions);
+    addResourceWithCors(senderRes, 'load').addMethod('POST', new apigateway.LambdaIntegration(receive_sender), routeOptions);
+    addResourceWithCors(senderRes, 'save').addMethod('POST', new apigateway.LambdaIntegration(receive_sender), routeOptions);
 
-    receiveRes.addResource('uploadurl').addResource('get').addMethod('POST', new apigateway.LambdaIntegration(receive_upload_url), routeOptions);
+    const uploadUrlRoot = addResourceWithCors(this.receiveResource, 'uploadurl');
+    addResourceWithCors(uploadUrlRoot, 'get').addMethod('POST', new apigateway.LambdaIntegration(receive_upload_url), routeOptions);
   }
 }

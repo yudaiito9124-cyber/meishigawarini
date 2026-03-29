@@ -21,6 +21,8 @@ import confetti from "canvas-confetti";
 import { resizeImage } from "@/lib/image-utils";
 import { generateId } from "@/lib/id";
 import { receiveApi } from "@/lib/api/receive";
+import { fetchAuthSession } from "aws-amplify/auth";
+import { userApi } from "@/lib/api/user";
 
 
 const NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || "";
@@ -444,6 +446,32 @@ export default function ReceivePage() {
             loadMessages();
         }
     }, [step, hasLoadedChat, pin, loadMessages]);
+    
+    // Pre-fill receiver info if logged in (only when moving to FORM step)
+    useEffect(() => {
+        if (step === "FORM") {
+            const prefillInfo = async () => {
+                try {
+                    const session = await fetchAuthSession();
+                    if (session.tokens?.idToken) {
+                        const data = await userApi.user_receiver_get({});
+                        if (data.receiver_info) {
+                            // Only pre-fill if current value is empty to avoid overwriting user edits
+                            setName(prev => prev || data.receiver_info.name || '');
+                            setZipCode(prev => prev || data.receiver_info.zipCode || '');
+                            setAddress(prev => prev || data.receiver_info.address || '');
+                            setPhone(prev => prev || data.receiver_info.phone || '');
+                            setEmail(prev => prev || data.receiver_info.email || '');
+                            setEmail2(prev => prev || data.receiver_info.email || '');
+                        }
+                    }
+                } catch (e) {
+                    // Silently fail if not logged in or error
+                }
+            };
+            prefillInfo();
+        }
+    }, [step]);
 
 
 

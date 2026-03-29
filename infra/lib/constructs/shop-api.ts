@@ -13,13 +13,15 @@ export interface ShopApiProps {
   bucket: s3.IBucket;
   userPool: cognito.IUserPool;
   userPoolClient: cognito.IUserPoolClient;
-  api: apigateway.RestApi;
+  api: apigateway.IRestApi;
   commonProps: any;
   grantTablePermissions: (fn: lambda.IFunction, write?: boolean) => void;
 }
 
-export class ShopApi extends Construct {
-  constructor(scope: Construct, id: string, props: ShopApiProps) {
+export class ShopApi extends cdk.NestedStack {
+  public readonly shopResource: apigateway.Resource;
+
+  constructor(scope: cdk.Stack, id: string, props: ShopApiProps) {
     super(scope, id);
 
     const { table, bucket, userPool, userPoolClient, api, commonProps, grantTablePermissions } = props;
@@ -79,54 +81,64 @@ export class ShopApi extends Construct {
       bucket.grantDelete(fn);
     });
 
+    // Helper to add resource
+    const addResourceWithCors = (parent: apigateway.IResource, pathPart: string): apigateway.Resource => {
+      return parent.addResource(pathPart) as apigateway.Resource;
+    };
+
     // Shop Routes
-    const shopResource = api.root.addResource('shop');
+    this.shopResource = new apigateway.Resource(this, 'ShopTopResource', {
+      parent: api.root,
+      pathPart: 'shop'
+    });
+
     const routeOptions = { authorizer, authorizationType: apigateway.AuthorizationType.CUSTOM };
 
     // Action-based POST Routes (Standard)
-    shopResource.addResource('list').addMethod('POST', new apigateway.LambdaIntegration(shop_list), routeOptions);
+    addResourceWithCors(this.shopResource, 'list').addMethod('POST', new apigateway.LambdaIntegration(shop_list), routeOptions);
 
-    const detailsRes = shopResource.addResource('details');
-    detailsRes.addResource('get').addMethod('POST', new apigateway.LambdaIntegration(shop_details), routeOptions);
-    detailsRes.addResource('update').addMethod('POST', new apigateway.LambdaIntegration(shop_details), routeOptions);
+    const detailsRes = addResourceWithCors(this.shopResource, 'details');
+    addResourceWithCors(detailsRes, 'get').addMethod('POST', new apigateway.LambdaIntegration(shop_details), routeOptions);
+    addResourceWithCors(detailsRes, 'update').addMethod('POST', new apigateway.LambdaIntegration(shop_details), routeOptions);
 
-    shopResource.addResource('admins').addMethod('POST', new apigateway.LambdaIntegration(shop_admins), routeOptions);
-    shopResource.addResource('delete').addResource('images').addMethod('POST', new apigateway.LambdaIntegration(shop_delete_images), routeOptions);
-
+    addResourceWithCors(this.shopResource, 'admins').addMethod('POST', new apigateway.LambdaIntegration(shop_admins), routeOptions);
+    const deleteRes = addResourceWithCors(this.shopResource, 'delete');
+    addResourceWithCors(deleteRes, 'images').addMethod('POST', new apigateway.LambdaIntegration(shop_delete_images), routeOptions);
 
     // /shop/products
-    const productsResource = shopResource.addResource('products');
-    productsResource.addResource('list').addMethod('POST', new apigateway.LambdaIntegration(shop_products), routeOptions);
-    productsResource.addResource('create').addMethod('POST', new apigateway.LambdaIntegration(shop_products), routeOptions);
-    productsResource.addResource('update').addMethod('POST', new apigateway.LambdaIntegration(shop_products), routeOptions);
-    productsResource.addResource('delete').addMethod('POST', new apigateway.LambdaIntegration(shop_products), routeOptions);
+    const productsResource = addResourceWithCors(this.shopResource, 'products');
+    addResourceWithCors(productsResource, 'list').addMethod('POST', new apigateway.LambdaIntegration(shop_products), routeOptions);
+    addResourceWithCors(productsResource, 'create').addMethod('POST', new apigateway.LambdaIntegration(shop_products), routeOptions);
+    addResourceWithCors(productsResource, 'update').addMethod('POST', new apigateway.LambdaIntegration(shop_products), routeOptions);
+    addResourceWithCors(productsResource, 'delete').addMethod('POST', new apigateway.LambdaIntegration(shop_products), routeOptions);
 
-    const importRes = productsResource.addResource('import');
-    importRes.addResource('list').addMethod('POST', new apigateway.LambdaIntegration(shop_products_import), routeOptions);
-    importRes.addResource('execute').addMethod('POST', new apigateway.LambdaIntegration(shop_products_import), routeOptions);
-    productsResource.addResource('uploadurl').addMethod('POST', new apigateway.LambdaIntegration(shop_products_uploadurl), routeOptions);
+    const importRes = addResourceWithCors(productsResource, 'import');
+    addResourceWithCors(importRes, 'list').addMethod('POST', new apigateway.LambdaIntegration(shop_products_import), routeOptions);
+    addResourceWithCors(importRes, 'execute').addMethod('POST', new apigateway.LambdaIntegration(shop_products_import), routeOptions);
+    addResourceWithCors(productsResource, 'uploadurl').addMethod('POST', new apigateway.LambdaIntegration(shop_products_uploadurl), routeOptions);
 
     // /shop/qr
-    const qrResource = shopResource.addResource('qr');
-    qrResource.addResource('list').addMethod('POST', new apigateway.LambdaIntegration(shop_qr), routeOptions);
-    qrResource.addResource('link').addMethod('POST', new apigateway.LambdaIntegration(shop_qr), routeOptions);
-    qrResource.addResource('unlink').addMethod('POST', new apigateway.LambdaIntegration(shop_qr), routeOptions);
-    qrResource.addResource('activate').addMethod('POST', new apigateway.LambdaIntegration(shop_qr), routeOptions);
-    qrResource.addResource('deactivate').addMethod('POST', new apigateway.LambdaIntegration(shop_qr), routeOptions);
+    const qrResource = addResourceWithCors(this.shopResource, 'qr');
+    addResourceWithCors(qrResource, 'list').addMethod('POST', new apigateway.LambdaIntegration(shop_qr), routeOptions);
+    addResourceWithCors(qrResource, 'link').addMethod('POST', new apigateway.LambdaIntegration(shop_qr), routeOptions);
+    addResourceWithCors(qrResource, 'unlink').addMethod('POST', new apigateway.LambdaIntegration(shop_qr), routeOptions);
+    addResourceWithCors(qrResource, 'activate').addMethod('POST', new apigateway.LambdaIntegration(shop_qr), routeOptions);
+    addResourceWithCors(qrResource, 'deactivate').addMethod('POST', new apigateway.LambdaIntegration(shop_qr), routeOptions);
 
-    shopResource.addResource('qrcodecheck').addMethod('POST', new apigateway.LambdaIntegration(shop_qr), routeOptions);
+    addResourceWithCors(this.shopResource, 'qrcodecheck').addMethod('POST', new apigateway.LambdaIntegration(shop_qr), routeOptions);
 
     // /shop/orders
-    const ordersResource = shopResource.addResource('orders');
-    ordersResource.addResource('list').addMethod('POST', new apigateway.LambdaIntegration(shop_orders), routeOptions);
-    ordersResource.addResource('update').addMethod('POST', new apigateway.LambdaIntegration(shop_orders), routeOptions);
+    const ordersResource = addResourceWithCors(this.shopResource, 'orders');
+    addResourceWithCors(ordersResource, 'list').addMethod('POST', new apigateway.LambdaIntegration(shop_orders), routeOptions);
+    addResourceWithCors(ordersResource, 'update').addMethod('POST', new apigateway.LambdaIntegration(shop_orders), routeOptions);
 
     // /shop/card/orders
-    const cardOrdersResource = shopResource.addResource('card').addResource('orders');
-    cardOrdersResource.addResource('create').addMethod('POST', new apigateway.LambdaIntegration(shop_card_orders), routeOptions);
-    cardOrdersResource.addResource('list').addMethod('POST', new apigateway.LambdaIntegration(shop_card_orders), routeOptions);
-    cardOrdersResource.addResource('cancel').addMethod('POST', new apigateway.LambdaIntegration(shop_card_orders), routeOptions);
-    cardOrdersResource.addResource('complete').addMethod('POST', new apigateway.LambdaIntegration(shop_card_orders), routeOptions);
+    const cardRes = addResourceWithCors(this.shopResource, 'card');
+    const cardOrdersResource = addResourceWithCors(cardRes, 'orders');
+    addResourceWithCors(cardOrdersResource, 'create').addMethod('POST', new apigateway.LambdaIntegration(shop_card_orders), routeOptions);
+    addResourceWithCors(cardOrdersResource, 'list').addMethod('POST', new apigateway.LambdaIntegration(shop_card_orders), routeOptions);
+    addResourceWithCors(cardOrdersResource, 'cancel').addMethod('POST', new apigateway.LambdaIntegration(shop_card_orders), routeOptions);
+    addResourceWithCors(cardOrdersResource, 'complete').addMethod('POST', new apigateway.LambdaIntegration(shop_card_orders), routeOptions);
 
   }
 }

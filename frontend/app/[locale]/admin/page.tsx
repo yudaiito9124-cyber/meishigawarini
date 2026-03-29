@@ -17,7 +17,7 @@ import { generateId } from '@/lib/id';
 import { useTranslations } from 'next-intl';
 import { generatePDF, cardformats, paperformats } from '@/lib/generatePDF';
 import { generateCSVExport } from '@/lib/generateCSVExport';
-import { ExternalLink, Copy, Eye, QrCode, Store, Wrench, Layers, HelpCircle, Home, Trash2, RotateCcw, Loader2, Plus, X, Search, Save, FileText, Download, CreditCard, Printer, Paintbrush } from 'lucide-react';
+import { ExternalLink, Copy, Eye, QrCode, Store, Wrench, Layers, HelpCircle, Home, Trash2, RotateCcw, Loader2, Plus, X, Search, Save, FileText, Download, CreditCard, Printer, Paintbrush, ChevronDown } from 'lucide-react';
 import CardDesignEditor from "@/components/admin/CardDesignEditor";
 const NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 const NEXT_PUBLIC_APP_URL = process.env.NEXT_PUBLIC_APP_URL || "";
@@ -187,11 +187,15 @@ export default function AdminPage() {
                                 {t('helpButton') || "Help"}
                             </Button>
                         </Link>
-                        <Link href="/login" className="w-full sm:w-auto">
+                        {/* <Link href="/login" className="w-full sm:w-auto">
                             <Button variant="destructive" className="shadow-md cursor-pointer border border-red-900 w-full sm:w-auto">
                                 {t('qrAdminLoginPage')}
                             </Button>
-                        </Link>
+                        </Link> */}
+
+                        <Button variant="ghost" className="text-mist-500 hover:text-mist-800" onClick={() => router.push('/login')}>
+                            <ChevronDown className="h-4 w-4 mr-1 rotate-90" /> {t('back')}
+                        </Button>
                     </div>
                 </div>
 

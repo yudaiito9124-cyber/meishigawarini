@@ -10,20 +10,21 @@ import * as iam from 'aws-cdk-lib/aws-iam';
 import * as path from 'path';
 
 export interface AdminApiProps {
-  table: dynamodb.ITable;
   bucket: s3.IBucket;
   userPool: cognito.IUserPool;
   userPoolClient: cognito.IUserPoolClient;
-  api: apigateway.RestApi;
+  api: apigateway.IRestApi;
   commonProps: any;
   grantTablePermissions: (fn: lambda.IFunction, write?: boolean) => void;
 }
 
-export class AdminApi extends Construct {
-  constructor(scope: Construct, id: string, props: AdminApiProps) {
+export class AdminApi extends cdk.NestedStack {
+  public readonly adminResource: apigateway.Resource;
+
+  constructor(scope: cdk.Stack, id: string, props: AdminApiProps) {
     super(scope, id);
 
-    const { table, bucket, userPool, userPoolClient, api, commonProps, grantTablePermissions } = props;
+    const { bucket, userPool, userPoolClient, api, commonProps, grantTablePermissions } = props;
 
 
     ////////////////////////////////////////////////////////////////////////////////
@@ -173,41 +174,52 @@ export class AdminApi extends Construct {
     ////////////////////////////////////////////////////////////////////////////////
     // URLに対するLambdaの紐づけ
 
+    // Helper to add resource
+    const addResourceWithCors = (parent: apigateway.IResource, pathPart: string): apigateway.Resource => {
+      return parent.addResource(pathPart) as apigateway.Resource;
+    };
+
     // /admin
-    const adminResource = api.root.addResource('admin');
-    adminResource.addMethod('GET', new apigateway.LambdaIntegration(admin_check), { authorizer: authorizerOfAdmin, });
-    adminResource.addResource('dump').addMethod('POST', new apigateway.LambdaIntegration(admin_dump), { authorizer: authorizerOfAdmin, });
-    adminResource.addResource('links').addMethod('POST', new apigateway.LambdaIntegration(admin_links), { authorizer: authorizerOfAdmin, });
-    adminResource.addResource('changeowner').addMethod('POST', new apigateway.LambdaIntegration(admin_changeowner), { authorizer: authorizerOfAdmin, });
+    this.adminResource = new apigateway.Resource(this, 'AdminTopResource', {
+      parent: api.root,
+      pathPart: 'admin'
+    });
+
+    this.adminResource.addMethod('GET', new apigateway.LambdaIntegration(admin_check), { authorizer: authorizerOfAdmin, });
+    addResourceWithCors(this.adminResource, 'dump').addMethod('POST', new apigateway.LambdaIntegration(admin_dump), { authorizer: authorizerOfAdmin, });
+    addResourceWithCors(this.adminResource, 'links').addMethod('POST', new apigateway.LambdaIntegration(admin_links), { authorizer: authorizerOfAdmin, });
+    addResourceWithCors(this.adminResource, 'changeowner').addMethod('POST', new apigateway.LambdaIntegration(admin_changeowner), { authorizer: authorizerOfAdmin, });
 
     // /admin/qr
-    const qrResource = adminResource.addResource('qr');
-    qrResource.addResource('list').addMethod('POST', new apigateway.LambdaIntegration(admin_qr_list), { authorizer: authorizerOfAdmin, });
-    qrResource.addResource('generate').addMethod('POST', new apigateway.LambdaIntegration(admin_qr_generate), { authorizer: authorizerOfAdmin, });
-    qrResource.addResource('ban').addMethod('POST', new apigateway.LambdaIntegration(admin_qr_ban), { authorizer: authorizerOfAdmin, });
-    qrResource.addResource('deleteban').addMethod('POST', new apigateway.LambdaIntegration(admin_qr_deleteban), { authorizer: authorizerOfAdmin, });
+    const qrResource = addResourceWithCors(this.adminResource, 'qr');
+    addResourceWithCors(qrResource, 'list').addMethod('POST', new apigateway.LambdaIntegration(admin_qr_list), { authorizer: authorizerOfAdmin, });
+    addResourceWithCors(qrResource, 'generate').addMethod('POST', new apigateway.LambdaIntegration(admin_qr_generate), { authorizer: authorizerOfAdmin, });
+    addResourceWithCors(qrResource, 'ban').addMethod('POST', new apigateway.LambdaIntegration(admin_qr_ban), { authorizer: authorizerOfAdmin, });
+    addResourceWithCors(qrResource, 'deleteban').addMethod('POST', new apigateway.LambdaIntegration(admin_qr_deleteban), { authorizer: authorizerOfAdmin, });
 
     // /admin/carddesigns
-    const cardDesignsResource = adminResource.addResource('carddesigns');
-    cardDesignsResource.addResource('list').addMethod('POST', new apigateway.LambdaIntegration(admin_carddesigns), { authorizer: authorizerOfAdmin, });
-    cardDesignsResource.addResource('create').addMethod('POST', new apigateway.LambdaIntegration(admin_carddesigns), { authorizer: authorizerOfAdmin, });
-    cardDesignsResource.addResource('uploadurl').addMethod('POST', new apigateway.LambdaIntegration(admin_carddesigns), { authorizer: authorizerOfAdmin, });
-    cardDesignsResource.addResource('update').addMethod('POST', new apigateway.LambdaIntegration(admin_carddesigns), { authorizer: authorizerOfAdmin, });
-    cardDesignsResource.addResource('delete').addMethod('POST', new apigateway.LambdaIntegration(admin_carddesigns), { authorizer: authorizerOfAdmin, });
+    const cardDesignsResource = addResourceWithCors(this.adminResource, 'carddesigns');
+    addResourceWithCors(cardDesignsResource, 'list').addMethod('POST', new apigateway.LambdaIntegration(admin_carddesigns), { authorizer: authorizerOfAdmin, });
+    addResourceWithCors(cardDesignsResource, 'create').addMethod('POST', new apigateway.LambdaIntegration(admin_carddesigns), { authorizer: authorizerOfAdmin, });
+    addResourceWithCors(cardDesignsResource, 'uploadurl').addMethod('POST', new apigateway.LambdaIntegration(admin_carddesigns), { authorizer: authorizerOfAdmin, });
+    addResourceWithCors(cardDesignsResource, 'update').addMethod('POST', new apigateway.LambdaIntegration(admin_carddesigns), { authorizer: authorizerOfAdmin, });
+    addResourceWithCors(cardDesignsResource, 'delete').addMethod('POST', new apigateway.LambdaIntegration(admin_carddesigns), { authorizer: authorizerOfAdmin, });
 
     // /admin/shop
-    const shopResource = adminResource.addResource('shop');
-    shopResource.addResource('create').addMethod('POST', new apigateway.LambdaIntegration(admin_shop_create), { authorizer: authorizerOfAdmin, });
+    const shopResource = addResourceWithCors(this.adminResource, 'shop');
+    addResourceWithCors(shopResource, 'create').addMethod('POST', new apigateway.LambdaIntegration(admin_shop_create), { authorizer: authorizerOfAdmin, });
 
     // /admin/shop/carddesign/link
-    const cardDesignLinkResource = shopResource.addResource('carddesign').addResource('link');
-    cardDesignLinkResource.addResource('get').addMethod('POST', new apigateway.LambdaIntegration(admin_shop_carddesign_link), { authorizer: authorizerOfAdmin, });
-    cardDesignLinkResource.addResource('update').addMethod('POST', new apigateway.LambdaIntegration(admin_shop_carddesign_link), { authorizer: authorizerOfAdmin, });
+    const cardRes = addResourceWithCors(shopResource, 'carddesign');
+    const cardDesignLinkResource = addResourceWithCors(cardRes, 'link');
+    addResourceWithCors(cardDesignLinkResource, 'get').addMethod('POST', new apigateway.LambdaIntegration(admin_shop_carddesign_link), { authorizer: authorizerOfAdmin, });
+    addResourceWithCors(cardDesignLinkResource, 'update').addMethod('POST', new apigateway.LambdaIntegration(admin_shop_carddesign_link), { authorizer: authorizerOfAdmin, });
 
     // /admin/card/orders
-    const adminCardOrdersResource = adminResource.addResource('card').addResource('orders');
-    adminCardOrdersResource.addResource('list').addMethod('POST', new apigateway.LambdaIntegration(admin_card_orders), { authorizer: authorizerOfAdmin, });
-    adminCardOrdersResource.addResource('update').addMethod('POST', new apigateway.LambdaIntegration(admin_card_orders), { authorizer: authorizerOfAdmin, });
+    const cardOrderRoot = addResourceWithCors(this.adminResource, 'card');
+    const adminCardOrdersResource = addResourceWithCors(cardOrderRoot, 'orders');
+    addResourceWithCors(adminCardOrdersResource, 'list').addMethod('POST', new apigateway.LambdaIntegration(admin_card_orders), { authorizer: authorizerOfAdmin, });
+    addResourceWithCors(adminCardOrdersResource, 'update').addMethod('POST', new apigateway.LambdaIntegration(admin_card_orders), { authorizer: authorizerOfAdmin, });
 
   }
 }

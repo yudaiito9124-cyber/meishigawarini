@@ -213,7 +213,8 @@ export class InfraStack extends cdk.Stack {
     const apiId = `MeishiGawariniApi${suffix}`;
     const api = new apigateway.RestApi(this, apiId, {
       restApiName: `MeishiGawarini Service${suffix}`,
-      description: `Backend API for MeishiGawarini (Deployment ID: ${Date.now()})`, // Forces stage redeployment
+      description: `Backend API for MeishiGawarini`,
+      deploy: false, // Disabling auto-deployment to resolve circular dependency with NestedStacks
       defaultCorsPreflightOptions: {
         allowOrigins: allowedOrigins,
         allowMethods: apigateway.Cors.ALL_METHODS,
@@ -247,6 +248,20 @@ export class InfraStack extends cdk.Stack {
       },
       templates: {
         'application/json': '{"message": "Not Found."}'
+      }
+    } as any);
+
+    // --- エンドポイント未定義エラー(403)を 404 に偽装しつつ CORS を許可 ---
+    api.addGatewayResponse('DefaultMissingAuthTokenResponse', {
+      type: apigateway.ResponseType.MISSING_AUTHENTICATION_TOKEN,
+      statusCode: '404',
+      responseParameters: {
+        'gatewayresponse.header.Access-Control-Allow-Origin': "'*'",
+        'gatewayresponse.header.Access-Control-Allow-Headers': "'*'",
+        'gatewayresponse.header.Access-Control-Allow-Methods': "'GET,POST,PUT,DELETE,OPTIONS,PATCH'",
+      },
+      templates: {
+        'application/json': '{"message": "Not Found (Missing Auth Token). Check Deployment."}'
       }
     } as any);
 
@@ -319,11 +334,9 @@ export class InfraStack extends cdk.Stack {
 
 
 
-    ////////////////////////////////////////////////////////////////////////////////
     // 各APIの設定(LambdaとURL、権限の紐づけ)
     // Admin API
-    new AdminApi(this, 'AdminApiConstruct', {
-      table,
+    const adminApi = new AdminApi(this, 'AdminApiConstruct', {
       bucket,
       userPool,
       userPoolClient,
@@ -333,7 +346,7 @@ export class InfraStack extends cdk.Stack {
     });
 
     // Shop API
-    new ShopApi(this, 'ShopApiConstruct', {
+    const shopApi = new ShopApi(this, 'ShopApiConstruct', {
       table,
       bucket,
       userPool,
@@ -344,7 +357,7 @@ export class InfraStack extends cdk.Stack {
     });
 
     // User API
-    new UserApi(this, 'UserApiConstruct', {
+    const userApi = new UserApi(this, 'UserApiConstruct', {
       table,
       bucket,
       userPool,
@@ -355,7 +368,7 @@ export class InfraStack extends cdk.Stack {
     });
 
     // Receive API
-    new ReceiveApi(this, 'ReceiveApiConstruct', {
+    const receiveApi = new ReceiveApi(this, 'ReceiveApiConstruct', {
       table,
       bucket,
       userPool,
@@ -365,9 +378,28 @@ export class InfraStack extends cdk.Stack {
       grantTablePermissions,
     });
 
+    // --- Manual Deployment to resolve circular dependency ---
+    // Change the Logical ID by adding a timestamp to force a new Deployment resource in CloudFormation.
+    // Also reference the Resource IDs from the NestedStacks to ensure they are included in the deployment.
+    const deployment = new apigateway.Deployment(this, `ApiDeployment-${new Date().getTime()}`, {
+      api: api,
+      description: `Comprehensive CORS fix - Refs: ${adminApi.adminResource.resourceId}, ${shopApi.shopResource.resourceId}, ${userApi.userResource.resourceId}, ${receiveApi.receiveResource.resourceId}`,
+    });
+    deployment.node.addDependency(adminApi);
+    deployment.node.addDependency(shopApi);
+    deployment.node.addDependency(userApi);
+    deployment.node.addDependency(receiveApi);
+
+    // NOTE: 'prod' は CDK API Gateway のデフォルトのステージ名です。
+    // 各環境（stg/prod）のスタック内で独立しており、他の環境に影響を与えることはありません。
+    const apiStage = new apigateway.Stage(this, 'ApiStage', {
+      deployment,
+      stageName: 'prod',
+    });
+
 
     // Outputs
-    new cdk.CfnOutput(this, 'ApiUrl', { value: api.url });
+    new cdk.CfnOutput(this, 'ApiUrl', { value: apiStage.urlForPath() });
     new cdk.CfnOutput(this, 'UserPoolId', { value: userPool.userPoolId });
     new cdk.CfnOutput(this, 'UserPoolClientId', { value: userPoolClient.userPoolClientId });
     new cdk.CfnOutput(this, 'CognitoDomain', { value: `meishigawarini${suffix}.auth.${this.region}.amazoncognito.com` });

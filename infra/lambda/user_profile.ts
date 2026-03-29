@@ -58,6 +58,9 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         if (resPath.includes('/history')) {
             if (resPath.endsWith('/get')) action = 'history_get';
             else if (resPath.endsWith('/sendgift')) action = 'history_sendgift';
+        } else if (resPath.includes('/receiver')) {
+            if (resPath.endsWith('/get')) action = 'receiver_get';
+            else if (resPath.endsWith('/update')) action = 'receiver_update';
         } else {
             if (resPath.endsWith('/get')) action = 'get';
             else if (resPath.endsWith('/update')) action = 'update';
@@ -72,9 +75,12 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             const sk = 'SENDER';
 
             // 【DB操作: GetItem】
-            // - 目的: ログイン中のユーザーIDに紐づくプロフィール情報を取得
-            // - テーブル: TABLE_NAME
-            // - キー: { PK: `USER#${userId}`, SK: 'SENDER' }
+            // - 目的: ログイン中のユーザーIDに紐づく「送り主」(SENDER) プロフィール情報を取得
+            // - テーブル: TABLE_NAME (DynamoDB)
+            // - キー構成:
+            //   - PK: `USER#${userId}` (CognitoのサブID)
+            //   - SK: 'SENDER' (送り主情報の固定SK)
+            // - 取得項目: プロフィール全項目 (name, job_title, company, card_image_url, detail_html, など)
             const getRes = await ddb.send(new GetCommand({
                 TableName: TABLE_NAME,
                 Key: { PK: pk, SK: sk }
@@ -134,11 +140,16 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             };
 
             // 【DB操作: UpdateItem】
-            // - 目的: ユーザーのプロフィール情報を部分更新
-            // - テーブル: TABLE_NAME
-            // - キー: { PK: `USER#${userId}`, SK: 'SENDER' }
-            // - 更新内容: ts_updated_at の更新と、提供された全フィールドの書き込み
-            // - ReturnValues: 'ALL_OLD' (更新前の値を取得し、S3画像の削除判定に使用)
+            // - 目的: ユーザーの「送り主」(SENDER) プロフィール情報を保存・部分更新
+            // - テーブル: TABLE_NAME (DynamoDB)
+            // - キー構成:
+            //   - PK: `USER#${userId}` (ユーザーID)
+            //   - SK: 'SENDER' (送り主情報の固定SK)
+            // - 更新内容: 
+            //   - ts_updated_at: 現在日時をセット
+            //   - ts_created_at: 存在しない場合のみ現在日時をセット (if_not_exists)
+            //   - #f{i}: profileオブジェクトに含まれる各フィールド (card_image_url, detail_html, html_image_urls 等)
+            // - 更新戦略: 部分更新 (Upsert)。ReturnValues: 'ALL_OLD' を指定し、更新前の画像URLを取得してS3のクリーンアップに利用。
             const updateRes = await ddb.send(new UpdateCommand({
                 TableName: TABLE_NAME,
                 Key: { PK: pk, SK: sk },
@@ -219,6 +230,87 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 body: JSON.stringify({ uploadUrl, publicUrl })
             };
         }
+        
+        // ====================================================================
+        // ACTION: receiver_get (配送先デフォルト情報の取得)
+        // ====================================================================
+        if (action === 'receiver_get') {
+            const pk = `USER#${userId}`;
+            const sk = 'RECEIVER';
+
+            // 【DB操作: GetItem】
+            // - 目的: ログイン中のユーザーIDに紐づく配送先デフォルト情報を取得
+            // - テーブル: TABLE_NAME (DynamoDB)
+            // - キー構成:
+            //   - PK: `USER#${userId}` (ユーザーID)
+            //   - SK: 'RECEIVER' (配送先情報レコードの固定SK)
+            // - 取得項目: レコードに含まれるすべての属性 (name, zipCode, address, phone, email, ts_created_at, ts_updated_at)
+            const getRes = await ddb.send(new GetCommand({
+                TableName: TABLE_NAME,
+                Key: { PK: pk, SK: sk }
+            }));
+
+            if (!getRes.Item) {
+                return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ receiver_info: null }) };
+            }
+
+            const receiver_info = { ...getRes.Item };
+            delete receiver_info.PK;
+            delete receiver_info.SK;
+
+            return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ receiver_info }) };
+        }
+
+        // ====================================================================
+        // ACTION: receiver_update (配送先デフォルト情報の更新)
+        // ====================================================================
+        if (action === 'receiver_update') {
+            const { receiver_info } = body;
+            if (!receiver_info) {
+                return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Missing receiver_info data' }) };
+            }
+
+            const pk = `USER#${userId}`;
+            const sk = 'RECEIVER';
+
+            // 更新対象のキーを除去
+            const restrictedKeys = ['ts_created_at', 'ts_updated_at', 'PK', 'SK'];
+            const keys = Object.keys(receiver_info).filter(k => !restrictedKeys.includes(k));
+
+            if (keys.length === 0) {
+                return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'No valid fields to update' }) };
+            }
+
+            // 【DB操作: UpdateItem】
+            // - 目的: ログイン中のユーザーIDに紐づく配送先デフォルト情報を保存・更新
+            // - テーブル: TABLE_NAME (DynamoDB)
+            // - キー構成:
+            //   - PK: `USER#${userId}` (ユーザーID)
+            //   - SK: 'RECEIVER' (配送先情報レコードの固定SK)
+            // - 更新内容:
+            //   - ts_updated_at: 現在の日時をセット
+            //   - ts_created_at: レコードがない場合、現在の日時をセット
+            //   - #f{i}: receiver_info オブジェクトから渡された各属性 (name, zipCode, address, phone, email など)
+            // - 更新戦略: 既存レコードがある場合は指定されたフィールドのみ更新、ない場合は新規作成 (Upsert)。
+            //   restrictedKeys (ts_created_at, ts_updated_at, PK, SK) は意図せぬ変更を防ぐため除外。
+            await ddb.send(new UpdateCommand({
+                TableName: TABLE_NAME,
+                Key: { PK: pk, SK: sk },
+                UpdateExpression: 'SET #ts_up = :now, #ts_cr = if_not_exists(#ts_cr, :now), ' +
+                    keys.map((_, i) => `#f${i} = :v${i}`).join(', '),
+                ExpressionAttributeNames: {
+                    '#ts_up': 'ts_updated_at',
+                    '#ts_cr': 'ts_created_at',
+                    ...keys.reduce((acc, k, i) => ({ ...acc, [`#f${i}`]: k }), {})
+                },
+                ExpressionAttributeValues: {
+                    ':now': new Date().toISOString(),
+                    ...keys.reduce((acc, k, i) => ({ ...acc, [`:v${i}`]: receiver_info[k] }), {})
+                }
+            }));
+
+            return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ message: 'Receiver info updated successfully' }) };
+        }
 
         // ====================================================================
         // ACTION: history_get (送信履歴と受信履歴の取得)
@@ -226,8 +318,13 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         if (action === 'history_get') {
             const pk = `USER#${userId}`;
 
-            // SENDLOG と RECEIVEDLOG をまとめてQueryする (begins_with) は使えないので、それぞれのPrefixに対してQueryする。
-            // 実際はメタデータとログエントリを取得。
+            // 【DB操作: Query】
+            // - 目的: 特定のログタイプ (SENDLOG / RECEIVEDLOG) の履歴データをすべて取得
+            // - テーブル: TABLE_NAME (DynamoDB)
+            // - キー条件:
+            //   - PK: `USER#${userId}`
+            //   - SK Prefix: `${logType}#` (例: SENDLOG#0, SENDLOG#1 ...)
+            // - 処理内容: クエリ結果から 'logs' 配列を抽出し、一つのリストに統合。
             const fetchLogs = async (logType: string) => {
                 const queryRes = await ddb.send(new QueryCommand({
                     TableName: TABLE_NAME,
@@ -263,7 +360,11 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             const { uuid, pin } = body;
             if (!uuid || !pin) return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Missing uuid or pin' }) };
 
-            // 1. PINコード検証
+            // 【DB操作: GetItem】
+            // - 目的: 送信しようとしているQRコード(ギフト)の存在確認とPINコード照合
+            // - テーブル: TABLE_NAME (DynamoDB)
+            // - キー: { PK: `QR#${uuid}`, SK: 'METADATA' }
+            // - 検証項目: PINコードの一致
             const getRes = await ddb.send(new GetCommand({
                 TableName: TABLE_NAME,
                 Key: { PK: `QR#${uuid}`, SK: 'METADATA' }
@@ -273,7 +374,12 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 return { statusCode: 403, headers: corsHeaders, body: JSON.stringify({ message: 'Invalid PIN or QR not found' }) };
             }
 
-            // 2. CHATレコードに自分を送信者として紐付ける
+            // 【DB操作: UpdateItem】
+            // - 目的: チャットレコード(CHAT)に送信者(送り主)のユーザーIDを紐づける
+            // - テーブル: TABLE_NAME (DynamoDB)
+            // - キー: { PK: `QR#${uuid}`, SK: 'CHAT' }
+            // - 更新内容: sender_id に userId をセットし、ts_updated_at を更新。
+            // - 補足: これにより受取人がギフトを見た際、誰からのプレゼントかが識別可能になる。
             await ddb.send(new UpdateCommand({
                 TableName: TABLE_NAME,
                 Key: { PK: `QR#${uuid}`, SK: 'CHAT' },

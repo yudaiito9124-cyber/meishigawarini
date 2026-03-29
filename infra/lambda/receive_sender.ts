@@ -67,9 +67,10 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 
             // 【DB操作: UpdateItem】
             // - 目的: チャット画面に表示される送り主のプロフィール情報(名称, メアド, HTML詳細等)を更新
-            // - テーブル: TABLE_NAME
-            // - リクエストキー: { PK: `QR#${uuid}`, SK: 'CHAT' }
-            // - 更新内容: sender_info 属性を丸ごと更新 (ReturnValues: 'ALL_OLD' を使用して旧画像削除に備える)
+            // - テーブル: TABLE_NAME (DynamoDB)
+            // - キー構成: { PK: `QR#${uuid}`, SK: 'CHAT' }
+            // - 更新内容: sender_info 属性全体を更新。S3署名パラメータは除去して保存。
+            // - 更新戦略: 部分更新。ReturnValues: 'ALL_OLD' を使用して、更新前に設定されていた画像URLを特定し、S3からの物理削除に利用。
             const res = await ddb.send(new UpdateCommand({
                 TableName: TABLE_NAME,
                 Key: { PK: `QR#${uuid}`, SK: 'CHAT' },
@@ -91,7 +92,10 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             if (oldEmail !== newEmail) {
                 if (oldEmail) {
                     // 【DB操作: UpdateItem】
-                    // - 目的: メーリングリスト(notification_emails)から旧メールアドレスを削除
+                    // - 目的: 送信者メールアドレス変更に伴い、メーリングリスト(notification_emails)から旧メールアドレスを削除
+                    // - テーブル: TABLE_NAME (DynamoDB)
+                    // - キー構成: { PK: `QR#${uuid}`, SK: 'CHAT' }
+                    // - 更新内容: notification_emails (SS型) から値を削除し、email_preferences (Map型) からキーを削除
                     await ddb.send(new UpdateCommand({
                         TableName: TABLE_NAME,
                         Key: { PK: `QR#${uuid}`, SK: 'CHAT' },
@@ -102,8 +106,9 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 }
                 if (newEmail) {
                     // 【DB操作: UpdateItem】
-                    // - 目的: メーリングリスト(notification_emails)に新メールアドレスを追加し言語設定を保存
-                    const lang = locale === 'ja' ? 'ja' : 'en';
+                    // - 目的: メーリングリスト(notification_emails)に新メールアドレスを追加
+                    // - テーブル: TABLE_NAME (DynamoDB)
+                    // - キー構成: { PK: `QR#${uuid}`, SK: 'CHAT' }
                     await ddb.send(new UpdateCommand({
                         TableName: TABLE_NAME,
                         Key: { PK: `QR#${uuid}`, SK: 'CHAT' },
@@ -111,6 +116,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                         ExpressionAttributeValues: { ':new_email': new Set([newEmail]), ':empty_map': {} }
                     })).catch(e => console.error("Sync failed (add new email):", e));
                     
+                    const lang = locale === 'ja' ? 'ja' : 'en';
                     await ddb.send(new UpdateCommand({
                         TableName: TABLE_NAME,
                         Key: { PK: `QR#${uuid}`, SK: 'CHAT' },
@@ -141,6 +147,11 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             // ログイン済みの場合は送信履歴(SENDLOG)として記録し、CHATメタデータの送信者IDも更新する
             if (userId) {
                 try {
+                    // 【DB操作: UpdateItem】
+                    // - 目的: チャットレコード(CHAT)に送信者(送り主)のユーザーIDを紐づける
+                    // - テーブル: TABLE_NAME (DynamoDB)
+                    // - キー構成: { PK: `QR#${uuid}`, SK: 'CHAT' }
+                    // - 更新内容: sender_id に現在のログインユーザーIDをセットし、更新日時を記録
                     await ddb.send(new UpdateCommand({
                         TableName: TABLE_NAME,
                         Key: { PK: `QR#${uuid}`, SK: 'CHAT' },
@@ -197,9 +208,12 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 
             // 【DB操作: UpdateItem】
             // - 目的: 送り手ユーザー本人としてのプロフィールテンプレートを保存
-            // - テーブル: TABLE_NAME
-            // - リクエストキー: { PK: `USER#${userid}`, SK: 'SENDER' }
-            // - 更新内容: ts_created_at/ts_updated_at のタイムスタンプ管理および全プロフィール属性の保存
+            // - テーブル: TABLE_NAME (DynamoDB)
+            // - キー構成:
+            //   - PK: `USER#${userid}` (Cognito ID またはランダム生成ID)
+            //   - SK: 'SENDER' (ユーザープロフィールの固定SK)
+            // - 更新内容: タイムスタンプ管理、および全プロフィール属性の上書き保存
+            // - 更新戦略: Upsert (存在しない場合は新規作成、ある場合は各属性を上書き)
             await ddb.send(new UpdateCommand({
                 TableName: TABLE_NAME,
                 Key: { PK: `USER#${userid}`, SK: 'SENDER' },
@@ -230,8 +244,11 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 
             // 【DB操作: GetItem】
             // - 目的: 指定されたユーザーIDのプロフィールテンプレート情報を取得
-            // - テーブル: TABLE_NAME
-            // - リクエストキー: { PK: pk, SK: 'SENDER' }
+            // - テーブル: TABLE_NAME (DynamoDB)
+            // - キー構成:
+            //   - PK: `USER#${trimid}`
+            //   - SK: 'SENDER'
+            // - 取得項目: プロフィールの全属性。PK, SK は除外してクライアントへ。
             const getRes = await ddb.send(new GetCommand({ TableName: TABLE_NAME, Key: { PK: pk, SK: 'SENDER' } }));
             if (!getRes.Item) return { statusCode: 404, headers: corsHeaders, body: JSON.stringify({ message: 'User data not found' }) };
 
@@ -246,9 +263,10 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             }
 
             // 【DB操作: UpdateItem】
-            // - 目的: このチャット(QR)がどのユーザーテンプレートに紐づいているかの参照IDを更新
-            // - テーブル: TABLE_NAME
-            // - リクエストキー: { PK: `QR#${uuid}`, SK: 'CHAT' }
+            // - 目的: このチャット(QR)がどのユーザーテンプレートに紐づいているかの参照ID(sender_id)を更新
+            // - テーブル: TABLE_NAME (DynamoDB)
+            // - キー構成: { PK: `QR#${uuid}`, SK: 'CHAT' }
+            // - 更新内容: sender_id に対象ユーザーIDをセット。これにより次回以降もこのIDが参照される。
             await ddb.send(new UpdateCommand({
                 TableName: TABLE_NAME,
                 Key: { PK: `QR#${uuid}`, SK: 'CHAT' },

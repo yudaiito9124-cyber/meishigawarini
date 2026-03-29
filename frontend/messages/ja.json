@@ -57,6 +57,8 @@
   },
   "UserProfilePage": {
     "title": "マイページ",
+    "save": "保存する",
+    "deliverySettingsSuccess": "配送先情報の既定値を保存しました。",
     "editProfile": "プロフィール情報の編集",
     "editProfileDesc": "名刺代わりに渡す自分のプロフィール情報を編集します。",
     "sendList": "送ったギフト一覧",
@@ -65,6 +67,8 @@
     "receiveListDesc": "これまでに受け取ったギフトを確認します。",
     "sendGift": "新しくギフトを送る",
     "sendGiftDesc": "新しいギフトのQRコードをスキャンして送信履歴に登録します。",
+    "deliverySettings": "配送先情報の既定値設定",
+    "deliverySettingsDesc": "ギフトを受け取るときの既定の配送先情報を設定・保存します。",
     "logout": "ログアウト",
     "back": "戻る",
     "userId": "ユーザーID",
@@ -579,6 +583,7 @@
     "title": "管理ダッシュボード",
     "qrAdminLoginPage": "ログイン画面",
     "helpButton": "ヘルプ",
+    "back": "戻る",
     "tabs": {
       "qrcodes": "カード一覧",
       "shops": "ショップ管理",

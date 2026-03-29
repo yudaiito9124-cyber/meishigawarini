@@ -4,7 +4,7 @@ import { useTranslations } from 'next-intl';
 import { useRouter, useParams } from 'next/navigation';
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { UserPen, Send, Inbox, QrCode, LogOut, ChevronDown } from 'lucide-react';
+import { UserPen, Send, Inbox, QrCode, LogOut, ChevronDown, Truck } from 'lucide-react';
 import { SiteFooter } from '@/components/SiteFooter';
 import { signOut } from 'aws-amplify/auth';
 
@@ -51,6 +51,15 @@ export default function UserDashboardPage() {
             color: "text-orange-600",
             bg: "bg-orange-50",
             border: "border-orange-100 hover:border-orange-300 hover:bg-orange-50/50"
+        },
+        {
+            title: t('deliverySettings'),
+            desc: t('deliverySettingsDesc'),
+            icon: Truck,
+            href: `/user/${userId}/delivery`,
+            color: "text-rose-600",
+            bg: "bg-rose-50",
+            border: "border-rose-100 hover:border-rose-300 hover:bg-rose-50/50"
         }
     ];
 

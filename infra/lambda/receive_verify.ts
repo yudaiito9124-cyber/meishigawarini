@@ -50,9 +50,11 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 
         // 【DB操作: GetItem】
         // - 目的: 入力されたUUIDに基づくQRコード自体の存在確認と状態(メタデータ)取得
-        // - テーブル: TABLE_NAME
-        // - リクエストキー: { PK: `QR#${uuid}`, SK: 'METADATA' }
-        // - 取得カラム: ALL (状態, PIN, 失敗回数等を後続で検証)
+        // - テーブル: TABLE_NAME (DynamoDB)
+        // - キー構成:
+        //   - PK: `QR#${uuid}` (QRコードUUID)
+        //   - SK: 'METADATA' (QRメタデータの固定SK)
+        // - 取得項目: status, pin, failed_attempts, ts_expired_at 等
         const getRes = await ddb.send(new GetCommand({
             TableName: TABLE_NAME,
             Key: { PK: `QR#${uuid}`, SK: 'METADATA' }
@@ -69,6 +71,9 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             const { UpdateExpression, ExpressionAttributeValues, ExpressionAttributeNames } = getRateLimitUpdate(item);
             // 【DB操作: UpdateItem】
             // - 目的: PIN入力失敗回数のインクリメント、および上限到達時のロック(レートリミット)処理
+            // - テーブル: TABLE_NAME (DynamoDB)
+            // - キー構成: { PK: `QR#${uuid}`, SK: 'METADATA' }
+            // - 更新内容: failed_attempts のインクリメント、必要に応じて locked_until のセット
             await ddb.send(new UpdateCommand({
                 TableName: TABLE_NAME, Key: { PK: `QR#${uuid}`, SK: 'METADATA' },
                 UpdateExpression, ExpressionAttributeValues, ExpressionAttributeNames
@@ -106,7 +111,11 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         let product = null;
         if (shop_id && product_id) {
             // 【DB操作: GetItem】
-            // - 目的: QRコードに紐付いている具体的な商品(PRODUCT)の情報を取得
+            // - 目的: QRコードに紐付いている具体的な商品(PRODUCT)の詳細情報を取得
+            // - テーブル: TABLE_NAME (DynamoDB)
+            // - キー構成:
+            //   - PK: `SHOP#${shop_id}`
+            //   - SK: `PRODUCT#${product_id}`
             const prodRes = await ddb.send(new GetCommand({ TableName: TABLE_NAME, Key: { PK: `SHOP#${shop_id}`, SK: `PRODUCT#${product_id}` } }));
             product = prodRes.Item;
             if (product) {
@@ -119,7 +128,9 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         let shop_email = undefined, shop_name = undefined, shop_detail_html = undefined;
         if (shop_id && isAuthorizedByPassword) {
             // 【DB操作: GetItem】
-            // - 目的: 提供元ショップのメタデータを取得
+            // - 目的: ギフトの提供元ショップのメタデータ(名称, 連絡先メール等)を取得
+            // - テーブル: TABLE_NAME (DynamoDB)
+            // - キー構成: { PK: `SHOP#${shop_id}`, SK: 'METADATA' }
             const shopRes = await ddb.send(new GetCommand({ TableName: TABLE_NAME, Key: { PK: `SHOP#${shop_id}`, SK: 'METADATA' } }));
             if (shopRes.Item) {
                 shop_email = shopRes.Item.email;
@@ -138,7 +149,9 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         let delivery_company = undefined, tracking_number = undefined;
         if (isAuthorizedByPassword && status === 'SHIPPED') {
             // 【DB操作: GetItem】
-            // - 目的: 発送済み(SHIPPED)の場合、配送情報を取得
+            // - 目的: 発送済み(SHIPPED)の場合、登録されている配送情報(配送会社, 追跡番号)を取得
+            // - テーブル: TABLE_NAME (DynamoDB)
+            // - キー構成: { PK: `QR#${uuid}`, SK: 'ORDER' }
             const orderRes = await ddb.send(new GetCommand({ TableName: TABLE_NAME, Key: { PK: `QR#${uuid}`, SK: 'ORDER' } }));
             if (orderRes.Item) {
                 delivery_company = orderRes.Item.delivery_company;
