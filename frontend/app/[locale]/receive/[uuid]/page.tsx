@@ -22,7 +22,7 @@ import { resizeImage } from "@/lib/image-utils";
 import { generateId } from "@/lib/id";
 import { useRouter } from "@/i18n/routing";
 import { receiveApi } from "@/lib/api/receive";
-import { fetchAuthSession } from "aws-amplify/auth";
+import { fetchAuthSession, getCurrentUser } from "aws-amplify/auth";
 import { userApi } from "@/lib/api/user";
 
 
@@ -266,6 +266,8 @@ export default function ReceivePage() {
 
             // Start expansion animation after successful verification
             setIsExpanding(true);
+            setHasLoadedChat(true);
+            loadMessages(); // Start fetching in background during animation
             await new Promise(resolve => setTimeout(resolve, 800)); // Wait for expansion
 
             setGift(data);
@@ -288,12 +290,9 @@ export default function ReceivePage() {
                 } else if (data.status === 'SHIPPED') {
                     setStep("SHIPPED");
                 } else if (data.status === 'ACTIVE') {
-                    if (isLoggedIn) {
-                        setShowRoleSelection(true);
-                        setStep("FORM");
-                    } else {
+                    setStep("FORM");
+                    if (!isLoggedIn) {
                         setUserRole('receiver');
-                        setStep("FORM");
                     }
                 } else if (data.status === 'EXPIRED') {
                     setStep("EXPIRED");
@@ -322,6 +321,8 @@ export default function ReceivePage() {
             if (data.is_authorized) {
                 // Start expansion animation after successful verification
                 setIsExpanding(true);
+                setHasLoadedChat(true);
+                loadMessages(); // Start fetching in background during animation
                 await new Promise(resolve => setTimeout(resolve, 800)); // Wait for expansion
 
                 setGift(data);
@@ -339,12 +340,9 @@ export default function ReceivePage() {
                 } else if (data.status === 'SHIPPED') {
                     setStep("SHIPPED");
                 } else if (data.status === 'ACTIVE') {
-                    if (isLoggedIn) {
-                        setShowRoleSelection(true);
-                        setStep("FORM");
-                    } else {
+                    setStep("FORM");
+                    if (!isLoggedIn) {
                         setUserRole('receiver');
-                        setStep("FORM");
                     }
                 } else if (data.status === 'EXPIRED') {
                     setStep("EXPIRED");
@@ -437,15 +435,38 @@ export default function ReceivePage() {
         }
     };
 
-    // Load messages and sender info when step is not PIN (i.e. logged in)
     const loadMessages = useCallback(async () => {
         try {
-            const data = await receiveApi.receive_chat_get(uuid, pin, {});
+            const [data, authUser, receiverData] = await Promise.all([
+                receiveApi.receive_chat_get(uuid, pin, {}),
+                getCurrentUser().catch(() => null),
+                userApi.user_receiver_get({}).catch(() => null)
+            ]);
+
             setMessages(data.messages || []);
             setTotalSizeInfo(data.total_size_bytes || 0);
 
+            // Pre-fill receiver info immediately if available
+            if (receiverData?.receiver_info) {
+                setName(prev => prev || receiverData.receiver_info.name || '');
+                setZipCode(prev => prev || receiverData.receiver_info.zipCode || '');
+                setAddress(prev => prev || receiverData.receiver_info.address || '');
+                setPhone(prev => prev || receiverData.receiver_info.phone || '');
+                setEmail(prev => prev || receiverData.receiver_info.email || '');
+                setEmail2(prev => prev || receiverData.receiver_info.email || '');
+            }
+
             if (data.sender_id) {
+                // Restoration/Auto-assign logic:
+                if (authUser && authUser.userId === data.sender_id) {
+                    setUserRole('sender');
+                } else if (authUser) {
+                    // If someone else is the sender, the logged-in user is automatically the receiver
+                    setUserRole('receiver');
+                }
+
                 // Prioritize top-level sender_id
+                setShowRoleSelection(false);
                 handleImportFromId(data.sender_id, true);
             } else if (data.sender_info) {
                 setHtmlImageUrls(data.sender_info.html_image_urls || []);
@@ -454,19 +475,78 @@ export default function ReceivePage() {
                 Object.keys(sanitizedInfo).forEach(key => {
                     if (sanitizedInfo[key] === null) sanitizedInfo[key] = "";
                 });
-                setSenderForm(prev => ({
-                    ...prev,
-                    ...sanitizedInfo
-                }));
                 // Set senderInfo for display
-                setSenderInfo(sanitizedInfo);
+                setSenderInfo({ ...sanitizedInfo, sender_id: data.sender_id });
+                setShowRoleSelection(false);
             } else {
                 setSenderInfo(null);
+                // Only show role selection if no sender data at all
+                if (authUser) {
+                    setShowRoleSelection(true);
+                }
+            }
+
+            // If sender_id exists, we definitely hide selection and editing
+            if (data.sender_id) {
+                setShowRoleSelection(false);
+                setIsEditingSender(false);
             }
         } catch (e: any) {
             // console.error(e);
         }
     }, [uuid, pin, handleImportFromId]);
+
+    const handleSenderRoleSelect = async () => {
+        if (!window.confirm(t('roleSelection.confirmSender'))) return;
+
+        setLoading(true);
+        try {
+            // Get user profile info
+            const profileData = await userApi.user_profile_get({});
+            if (profileData.user_id) {
+                const fullImportId = `USER#${profileData.user_id}`;
+                // Register this user as the sender and update history (SENDLOG)
+                await userApi.user_history_sendgift({ uuid, pin });
+
+                // Load the profile info from the template to display it in the UI
+                await handleImportFromId(fullImportId, true);
+                setUserRole('sender');
+                setShowRoleSelection(false);
+                // Scroll to sender section
+                setTimeout(() => {
+                    const el = document.getElementById('sender-info-section');
+                    if (el) el.scrollIntoView({ behavior: 'smooth' });
+                }, 100);
+            }
+        } catch (e: any) {
+            alert(t('roleSelection.senderError'));
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleReceiverRoleSelect = async () => {
+        if (!window.confirm(t('roleSelection.confirmReceiver'))) return;
+
+        setLoading(true);
+        try {
+            const data = await userApi.user_receiver_get({});
+            if (data.receiver_info) {
+                setName(data.receiver_info.name || '');
+                setZipCode(data.receiver_info.zipCode || '');
+                setAddress(data.receiver_info.address || '');
+                setPhone(data.receiver_info.phone || '');
+                setEmail(data.receiver_info.email || '');
+                setEmail2(data.receiver_info.email || '');
+            }
+            setUserRole('receiver');
+        } catch (e: any) {
+            // Silently fail or simple alert
+            setUserRole('receiver');
+        } finally {
+            setLoading(false);
+        }
+    };
 
     // Toggle chat loading state if needed, or just effect.
     // Effect to reload when step changes to something other than PIN
@@ -478,58 +558,8 @@ export default function ReceivePage() {
             loadMessages();
         }
     }, [step, hasLoadedChat, pin, loadMessages]);
-    
-    // Pre-fill receiver info if logged in (only when moving to FORM step)
-    useEffect(() => {
-        if (step === "FORM") {
-            const prefillInfo = async () => {
-                try {
-                    const session = await fetchAuthSession();
-                    if (session.tokens?.idToken) {
-                        const data = await userApi.user_receiver_get({});
-                        if (data.receiver_info) {
-                            // Only pre-fill if current value is empty to avoid overwriting user edits
-                            setName(prev => prev || data.receiver_info.name || '');
-                            setZipCode(prev => prev || data.receiver_info.zipCode || '');
-                            setAddress(prev => prev || data.receiver_info.address || '');
-                            setPhone(prev => prev || data.receiver_info.phone || '');
-                            setEmail(prev => prev || data.receiver_info.email || '');
-                            setEmail2(prev => prev || data.receiver_info.email || '');
-                        }
-                    }
-                } catch (e) {
-                    // Silently fail if not logged in or error
-                }
-            };
-            prefillInfo();
-        }
-    }, [step]);
 
-    // Pre-fill receiver info if logged in (only when moving to FORM step and role is receiver AND senderInfo is present)
-    useEffect(() => {
-        if (step === "FORM" && userRole === 'receiver' && !EmptySenderInfo(senderInfo)) {
-            const prefillInfo = async () => {
-                try {
-                    const session = await fetchAuthSession();
-                    if (session.tokens?.idToken) {
-                        const data = await userApi.user_receiver_get({});
-                        if (data.receiver_info) {
-                            // Only pre-fill if current value is empty to avoid overwriting user edits
-                            setName(prev => prev || data.receiver_info.name || '');
-                            setZipCode(prev => prev || data.receiver_info.zipCode || '');
-                            setAddress(prev => prev || data.receiver_info.address || '');
-                            setPhone(prev => prev || data.receiver_info.phone || '');
-                            setEmail(prev => prev || data.receiver_info.email || '');
-                            setEmail2(prev => prev || data.receiver_info.email || '');
-                        }
-                    }
-                } catch (e) {
-                    // Silently fail if not logged in or error
-                }
-            };
-            prefillInfo();
-        }
-    }, [step, userRole, senderInfo]);
+    // (No longer needed: prefilled in loadMessages)
 
 
 
@@ -987,8 +1017,7 @@ export default function ReceivePage() {
                 <CardHeader>
                     <CardTitle className="text-xl text-center">
                         {step === "PIN" ? t('titles.pin') :
-                            step === "RESTRICTED" ? tst(gift?.status?.toLowerCase() || 'active') :
-                                showRoleSelection ? t('titles.selectRole') : ""}
+                            step === "RESTRICTED" ? tst(gift?.status?.toLowerCase() || 'active') : ""}
                     </CardTitle>
                 </CardHeader>
                 <CardContent className={cn("relative min-h-[300px] flex flex-col justify-center transition-colors duration-1000", step !== "PIN" && "bg-gradient-to-b from-white to-amber-50/20")}>
@@ -1145,65 +1174,89 @@ export default function ReceivePage() {
                             </div>
                         </form>
                     )}
+                    {/* 有効期限 */}
+                    {!loading && step !== "PIN" && gift && gift.product && (
+                        <div className="pr-8 pl-8">
+                            {/* Remaining Days for Active Gift */}
+                            {step === "FORM" && gift.ts_expired_at && (
+                                <div className="border border-red-400 bg-orange-50 p-3 rounded text-center rounded-xl border-dashed border-2">
+                                    <p className="text-sm font-semibold text-red-600 ">
+                                        {t('daysRemaining', getRemainingTime(gift.ts_expired_at)!)}
+                                    </p>
+                                    <p className="text-sm text-center text-gray-500 mt-1">
+                                        {t('limitdatetime', { datetime: new Date(gift.ts_expired_at).toLocaleString() })}
+                                    </p>
+                                </div>
+                            )}
 
-                    {showRoleSelection && (
-                        <div className="p-4 space-y-6 animate-in fade-in slide-in-from-bottom-4">
-                            <p className="text-center text-sm text-gray-500">{t('roleSelection.description')}</p>
-                            <div className="grid grid-cols-1 gap-4">
-                                <Button
-                                    variant="outline"
-                                    className="h-20 flex flex-col gap-1 border-2 border-gray-100 hover:border-black hover:bg-white transition-all"
-                                    onClick={() => {
-                                        setUserRole('sender');
-                                        setShowRoleSelection(false);
-                                        // Scroll to sender info after a short delay
-                                        setTimeout(() => {
-                                            const el = document.getElementById('sender-info-section');
-                                            if (el) el.scrollIntoView({ behavior: 'smooth' });
-                                            setIsEditingSender(true);
-                                        }, 100);
-                                    }}
-                                >
-                                    <div className="flex items-center gap-2">
-                                        <Package className="w-5 h-5 text-black" />
-                                        <span className="font-bold text-lg">{t('roleSelection.sender')}</span>
-                                    </div>
-                                    <span className="text-[10px] text-gray-400">{t('roleSelection.senderDescription')}</span>
-                                </Button>
-
-                                <Button
-                                    variant="outline"
-                                    className="h-20 flex flex-col gap-1 border-2 border-gray-100 hover:border-black hover:bg-white transition-all font-bold"
-                                    onClick={() => {
-                                        setUserRole('receiver');
-                                        setShowRoleSelection(false);
-                                    }}
-                                >
-                                    <div className="flex items-center gap-2">
-                                        <Truck className="w-5 h-5 text-black" />
-                                        <span className="font-bold text-lg">{t('roleSelection.receiver')}</span>
-                                    </div>
-                                    <span className="text-[10px] text-gray-400">{t('roleSelection.receiverDescription')}</span>
-                                </Button>
-                            </div>
+                            {/* Expired Message */}
+                            {step === "EXPIRED" && (
+                                <div className="mt-6 p-4 bg-red-50 border border-red-200 rounded-xl text-center">
+                                    <p className="text-red-600 font-bold">{t('expiredStep.message')}</p>
+                                    <p className="text-red-500 text-sm mt-1">{t('expiredStep.subMessage', { date: new Date(gift.ts_expired_at).toLocaleDateString() })}</p>
+                                </div>
+                            )}
                         </div>
                     )}
                 </CardContent>
             </Card>
 
+            {/* Role Selection Card */}
+            {showRoleSelection && step === "FORM" && (
+                <Card className="w-full max-w-xl mt-20 border-2 border-dashed border-gray-200">
+                    <CardHeader className="pb-2">
+                        <CardTitle className="text-lg text-center flex items-center justify-center gap-2">
+                            <Sparkles className="w-4 h-4 text-amber-500" />
+                            {t('titles.selectRole')}
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-4 space-y-6 animate-in fade-in slide-in-from-bottom-4">
+                        <p className="text-center text-[10px] text-gray-500">{t('roleSelection.description')}</p>
+                        <div className="grid grid-cols-2 gap-4">
+                            <Button
+                                variant="outline"
+                                className={cn(
+                                    "h-24 flex flex-col gap-1 border-2 transition-all",
+                                    userRole === 'sender' ? "border-black bg-gray-50" : "border-gray-100 hover:border-gray-300 bg-white"
+                                )}
+                                onClick={handleSenderRoleSelect}
+                                disabled={loading}
+                            >
+                                <Package className={cn("w-5 h-5", userRole === 'sender' ? "text-black" : "text-gray-400")} />
+                                <span className={cn("font-bold text-sm", userRole === 'sender' ? "text-black" : "text-gray-500")}>
+                                    {t('roleSelection.sender')}
+                                </span>
+                                <span className="text-[8px] text-gray-400 leading-tight">{t('roleSelection.senderDescription')}</span>
+                            </Button>
+
+                            <Button
+                                variant="outline"
+                                className={cn(
+                                    "h-24 flex flex-col gap-1 border-2 transition-all font-bold",
+                                    userRole === 'receiver' ? "border-black bg-gray-50" : "border-gray-100 hover:border-gray-300 bg-white"
+                                )}
+                                onClick={handleReceiverRoleSelect}
+                                disabled={loading}
+                            >
+                                <Truck className={cn("w-5 h-5", userRole === 'receiver' ? "text-black" : "text-gray-400")} />
+                                <span className={cn("font-bold text-sm", userRole === 'receiver' ? "text-black" : "text-gray-500")}>
+                                    {t('roleSelection.receiver')}
+                                </span>
+                                <span className="text-[8px] text-gray-400 leading-tight">{t('roleSelection.receiverDescription')}</span>
+                            </Button>
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
+
             {/* --- Form / notification Section --- */}
-            {(["FORM", "SUCCESS", "SHIPPED", "EXPIRED", "RESTRICTED", "PROMOTION"].includes(step)) && (
+            {(["FORM", "PROMOTION"].includes(step)) && (
                 <Card className="w-full max-w-xl mt-20">
                     <CardHeader>
                         <CardTitle className="text-xl text-center">
                             {/* <Label className="text-xl text-center flex flex-col text-gray-500"> */}
                             {
-                                step === "FORM" || step === "PROMOTION" ? t('titles.form') + (step === "PROMOTION" ? " (sample)" : "") :
-                                    step === "SUCCESS" ? t('titles.success') :
-                                        step === "SHIPPED" ? t('titles.shipped') :
-                                            step === "EXPIRED" ? t('titles.expired') :
-                                                step === "COMPLETED" ? t('titles.completed') :
-                                                    ""}
+                                step === "FORM" || step === "PROMOTION" ? t('titles.form') + (step === "PROMOTION" ? " (sample)" : "") : ""}
                             {/* </Label>
                             {step === "PIN" ? t('titles.pin') :
                                 step === "RESTRICTED" ? tst(gift.status.toLowerCase()) : ""} */}
@@ -1211,58 +1264,8 @@ export default function ReceivePage() {
                     </CardHeader>
                     <CardContent>
 
-                        {/* 有効期限 */}
-                        {!loading && step !== "PIN" && gift && gift.product && (
-                            <div className="pr-8 pl-8">
-                                {/* Remaining Days for Active Gift */}
-                                {step === "FORM" && gift.ts_expired_at && (
-                                    <div className="border border-red-400 bg-orange-50 p-3 rounded text-center rounded-xl border-dashed border-2">
-                                        <p className="text-sm font-semibold text-red-600 ">
-                                            {t('daysRemaining', getRemainingTime(gift.ts_expired_at)!)}
-                                        </p>
-                                        <p className="text-sm text-center text-gray-500 mt-1">
-                                            {t('limitdatetime', { datetime: new Date(gift.ts_expired_at).toLocaleString() })}
-                                        </p>
-                                    </div>
-                                )}
 
-                                {/* Expired Message */}
-                                {step === "EXPIRED" && (
-                                    <div className="mt-6 p-4 bg-red-50 border border-red-200 rounded-xl text-center">
-                                        <p className="text-red-600 font-bold">{t('expiredStep.message')}</p>
-                                        <p className="text-red-500 text-sm mt-1">{t('expiredStep.subMessage', { date: new Date(gift.ts_expired_at).toLocaleDateString() })}</p>
-                                    </div>
-                                )}
-                            </div>
-                        )}
-
-                        {/* パスワード設定時のパスワード入力フォーム */}
-                        {step === "RESTRICTED" && !gift?.product && (
-                            <div className={cn("space-y-6 border-t mt-4 transition-opacity", loading && "opacity-50 pointer-events-none")}>
-                                <div className="text-center space-y-2 mt-4">
-                                    <p className="text-yellow-600 font-medium">{t('restrictedStep.title')}</p>
-                                    <p className="text-sm text-gray-500">{t('restrictedStep.message')}</p>
-                                </div>
-                                <form onSubmit={handleUnlock} className="space-y-4">
-                                    <div className="space-y-2">
-                                        <Label htmlFor="unlockPassword">{t('restrictedStep.passwordLabel')}</Label>
-                                        <Input
-                                            id="unlockPassword"
-                                            type="password"
-                                            value={unlockPassword}
-                                            disabled={loading}
-                                            onChange={(e) => setUnlockPassword(e.target.value)}
-                                            required
-                                        />
-                                    </div>
-                                    <Button type="submit" className="w-full" disabled={loading}>
-                                        {loading ? t('restrictedStep.verifying') : t('restrictedStep.unlock')}
-                                    </Button>
-                                </form>
-                            </div>
-                        )}
-
-                        {(step === "FORM" || step === "PROMOTION") && userRole === 'receiver' && (
+                        {(step === "FORM" || step === "PROMOTION") && (
                             <form onSubmit={handleAddressSubmit} className="space-y-6 space-y-4 p-8">
                                 {/* <Label className="font-semibold">{t('formStep.title')}</Label> */}
                                 <div className="space-y-2">
@@ -1430,6 +1433,58 @@ export default function ReceivePage() {
                             </form>
                         )}
 
+                    </CardContent>
+                </Card>
+            )
+            }
+
+            {/* --- Form / notification Section --- */}
+            {(["SUCCESS", "SHIPPED", "EXPIRED", "RESTRICTED"].includes(step)) && (
+                <Card className="w-full max-w-xl mt-20">
+                    <CardHeader>
+                        <CardTitle className="text-xl text-center">
+                            {/* <Label className="text-xl text-center flex flex-col text-gray-500"> */}
+                            {
+                                step === "SUCCESS" ? t('titles.success') :
+                                    step === "SHIPPED" ? t('titles.shipped') :
+                                        step === "EXPIRED" ? t('titles.expired') :
+                                            step === "COMPLETED" ? t('titles.completed') :
+                                                ""}
+                            {/* </Label>
+                            {step === "PIN" ? t('titles.pin') :
+                                step === "RESTRICTED" ? tst(gift.status.toLowerCase()) : ""} */}
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+
+
+
+                        {/* パスワード設定時のパスワード入力フォーム */}
+                        {step === "RESTRICTED" && !gift?.product && (
+                            <div className={cn("space-y-6 border-t mt-4 transition-opacity", loading && "opacity-50 pointer-events-none")}>
+                                <div className="text-center space-y-2 mt-4">
+                                    <p className="text-yellow-600 font-medium">{t('restrictedStep.title')}</p>
+                                    <p className="text-sm text-gray-500">{t('restrictedStep.message')}</p>
+                                </div>
+                                <form onSubmit={handleUnlock} className="space-y-4">
+                                    <div className="space-y-2">
+                                        <Label htmlFor="unlockPassword">{t('restrictedStep.passwordLabel')}</Label>
+                                        <Input
+                                            id="unlockPassword"
+                                            type="password"
+                                            value={unlockPassword}
+                                            disabled={loading}
+                                            onChange={(e) => setUnlockPassword(e.target.value)}
+                                            required
+                                        />
+                                    </div>
+                                    <Button type="submit" className="w-full" disabled={loading}>
+                                        {loading ? t('restrictedStep.verifying') : t('restrictedStep.unlock')}
+                                    </Button>
+                                </form>
+                            </div>
+                        )}
+
                         {step === "SUCCESS" && (
                             <div className="text-center py-6 space-y-4">
                                 {/* <p className="text-green-600 font-medium">{t('successStep.message')}</p> */}
@@ -1518,7 +1573,7 @@ export default function ReceivePage() {
             {/* Sender Info Section */}
             {
                 // 送り主情報を追加するボタン
-                (step === "FORM" && !isEditingSender && EmptySenderInfo(senderInfo)) && (
+                (step === "FORM" && !isLoggedIn && !isEditingSender && EmptySenderInfo(senderInfo)) && (
                     <div>
                         <Card className="w-full max-w-xl mt-20 flex flex-col items-center justify-center cursor-pointer p-6 border-3 border-dashed border-black-100 rounded-xl bg-gray-50/50 hover:bg-blue-200/50  hover:border-blue-200 transition-colors"
                             onClick={() => setIsEditingSender(!isEditingSender)}

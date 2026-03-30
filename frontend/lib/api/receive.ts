@@ -1,3 +1,5 @@
+import { fetchAuthSession } from 'aws-amplify/auth';
+
 const NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
 /**
@@ -9,8 +11,13 @@ export const receiveApiBase = {
      * 基本となる fetch ラッパー
      */
     async fetch(path: string, uuid: string, pin: string, options: RequestInit = {}) {
+        const idToken = await fetchAuthSession()
+            .then(session => session.tokens?.idToken?.toString())
+            .catch(() => undefined);
+
         const headers = {
             ...options.headers,
+            ...(idToken && { "Authorization": `Bearer ${idToken}` }),
             "X-QR-UUID": uuid,
             "X-QR-PIN": pin,
             "Content-Type": options.body ? "application/json" : (options.headers as any)?.["Content-Type"] || undefined,

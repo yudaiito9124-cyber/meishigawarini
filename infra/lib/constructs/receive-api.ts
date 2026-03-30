@@ -46,6 +46,7 @@ export class ReceiveApi extends cdk.NestedStack {
       identitySources: [
         apigateway.IdentitySource.header('X-QR-UUID'),
         apigateway.IdentitySource.header('X-QR-PIN'),
+        apigateway.IdentitySource.header('Authorization'),
       ],
       resultsCacheTtl: cdk.Duration.minutes(5),
     });

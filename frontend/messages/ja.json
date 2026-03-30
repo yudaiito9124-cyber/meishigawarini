@@ -507,8 +507,11 @@
       "description": "ログイン中のため、役割を選択できます。",
       "sender": "送り主として利用",
       "senderDescription": "自分の名刺情報などを登録・編集します。",
+      "confirmSender": "送り主として登録しますか？あなたのプロフィール情報がこのギフトに紐付けられます。この操作は取り消せません。",
+      "senderError": "送り主情報の登録に失敗しました。",
       "receiver": "受け取り主として利用",
-      "receiverDescription": "ギフトを受け取るための住所を入力します。"
+      "receiverDescription": "ギフトを受け取るための住所を入力します。",
+      "confirmReceiver": "受け取り主として進みますか？登録されている配送先情報を自動入力します。"
     },
     "shopMessage": "ショップからのメッセージ",
     "contactInfo": {

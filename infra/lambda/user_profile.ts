@@ -87,7 +87,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             }));
 
             if (!getRes.Item) {
-                return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ profile: null }) };
+                return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ profile: null, user_id: userId }) };
             }
 
             const profile = { ...getRes.Item };
@@ -108,7 +108,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 );
             }
 
-            return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ profile }) };
+            return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ profile, user_id: userId }) };
         }
 
         // ====================================================================

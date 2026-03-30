@@ -90,5 +90,6 @@ export class UserApi extends cdk.NestedStack {
 
     const historyResource = addResourceWithCors(this.userResource, 'history');
     addResourceWithCors(historyResource, 'get').addMethod('POST', new apigateway.LambdaIntegration(user_profile), routeOptions);
+    addResourceWithCors(historyResource, 'sendgift').addMethod('POST', new apigateway.LambdaIntegration(user_profile), routeOptions);
   }
 }

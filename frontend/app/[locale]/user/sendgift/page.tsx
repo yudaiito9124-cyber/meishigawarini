@@ -20,8 +20,6 @@ export default function SendGiftPage() {
     const [successMsg, setSuccessMsg] = useState("");
     const [errorMsg, setErrorMsg] = useState("");
 
-    const NEXT_PUBLIC_BASE_URL = process.env.NEXT_PUBLIC_APP_URL || (typeof window !== 'undefined' ? window.location.origin : '');
-
     useEffect(() => {
         if (!isScanning) return;
 

@@ -5,7 +5,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { notFound } from "next/navigation";
+import { notFound, useParams } from "next/navigation";
 import { getCurrentUser, fetchAuthSession } from 'aws-amplify/auth';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -949,6 +949,8 @@ function QRCodeRow({ item, apiUrl, onGeneratePDF, onRefresh, paperFormat, cardFo
     const ts = useTranslations('Timestamp');
     const st = useTranslations('Status');
     const tt = useTranslations('Time');
+    const params = useParams();
+    const locale = params?.locale as string;
     const [open, setOpen] = useState(false);
     const [copiedId, setCopiedId] = useState<string | null>(null);
 
@@ -1012,7 +1014,7 @@ function QRCodeRow({ item, apiUrl, onGeneratePDF, onRefresh, paperFormat, cardFo
                                         <Copy className="h-3 w-3" />
                                     )}
                                 </Button>
-                                <ExternalLink className="cursor-pointer w-4 h-4 shrink-0" onClick={() => window.open(`${NEXT_PUBLIC_APP_URL}/receive/${uuid}`, '_blank')} />
+                                <ExternalLink className="cursor-pointer w-4 h-4 shrink-0" onClick={() => window.open(`/${locale}/receive/${uuid}`, '_blank')} />
                                 {uuid}
                             </div>
                             <div className="flex items-center gap-2">

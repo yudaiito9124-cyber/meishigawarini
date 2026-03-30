@@ -16,7 +16,7 @@ export function middleware(request: NextRequest) {
 
     // 1. ドメインリダイレクト判定 (i18n処理の前に実行)
     // 旧ドメイン（amplifyapp.com）からのアクセスの場合は、新ドメインへ301転送
-    if (host && host.includes(NEXT_PUBLIC_APP_URL_ORIGIN)) {
+    if (host && host.includes(NEXT_PUBLIC_APP_URL_ORIGIN) && !host.includes('localhost')) {
         const url = request.nextUrl.clone();
         url.host = NEXT_PUBLIC_APP_URL;
         url.protocol = 'https';
