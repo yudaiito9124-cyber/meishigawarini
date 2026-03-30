@@ -13,14 +13,17 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card";
 import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { MessageCircleQuestion, Paperclip, X, FileText, File as FileIcon, Loader2, Save, SendHorizontal, Pencil, UserPlus, Globe, Gift, User, MessagesSquare, Heart, Sparkles, Calendar, Clock, ShoppingBasket, Plus, Copy, Trash2, ChevronDown, ImageIcon, Import, Download } from "lucide-react";
+import { MessageCircleQuestion, Paperclip, X, FileText, File as FileIcon, Loader2, Save, SendHorizontal, Pencil, UserPlus, Globe, Gift, User, MessagesSquare, Heart, Sparkles, Calendar, Clock, ShoppingBasket, Plus, Copy, Trash2, ChevronDown, ImageIcon, Import, Download, Package, Truck } from "lucide-react";
 import { SiFacebook, SiInstagram, SiThreads, SiX, SiYoutube, SiLine, SiTiktok, SiLinktree, SiEight } from "@icons-pack/react-simple-icons";
 import SandboxedHtml from "@/components/SandboxedHtml";
 import { cn } from "@/lib/utils";
 import confetti from "canvas-confetti";
 import { resizeImage } from "@/lib/image-utils";
 import { generateId } from "@/lib/id";
+import { useRouter } from "@/i18n/routing";
 import { receiveApi } from "@/lib/api/receive";
+import { fetchAuthSession } from "aws-amplify/auth";
+import { userApi } from "@/lib/api/user";
 
 
 const NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || "";
@@ -102,6 +105,7 @@ export default function ReceivePage() {
     const tst = useTranslations('Status');
     const tb = useTranslations('Backend');
     const params = useParams();
+    const router = useRouter();
     const uuid = params?.uuid as string;
     const locale = params?.locale as string;
 
@@ -137,6 +141,11 @@ export default function ReceivePage() {
     const [subscribing, setSubscribing] = useState(false);
     const [showWhiteFade, setShowWhiteFade] = useState(false);
     const [isExpanding, setIsExpanding] = useState(false);
+
+    // Auth & Role state
+    const [isLoggedIn, setIsLoggedIn] = useState(false);
+    const [userRole, setUserRole] = useState<'sender' | 'receiver' | null>(null);
+    const [showRoleSelection, setShowRoleSelection] = useState(false);
 
     // Sender Info State
     const [senderInfo, setSenderInfo] = useState<any>(null);
@@ -232,6 +241,19 @@ export default function ReceivePage() {
     const [error, setError] = useState<string | null>(null);
     const [pinError, setPinError] = useState("");
 
+    // Check auth status
+    useEffect(() => {
+        const checkAuth = async () => {
+            try {
+                const session = await fetchAuthSession();
+                setIsLoggedIn(!!session.tokens?.idToken);
+            } catch (e) {
+                setIsLoggedIn(false);
+            }
+        };
+        checkAuth();
+    }, []);
+
     const handleVerifyPin = async (e: React.FormEvent) => {
         window.scrollTo(0, 0);
         e.preventDefault();
@@ -266,7 +288,13 @@ export default function ReceivePage() {
                 } else if (data.status === 'SHIPPED') {
                     setStep("SHIPPED");
                 } else if (data.status === 'ACTIVE') {
-                    setStep("FORM");
+                    if (isLoggedIn) {
+                        setShowRoleSelection(true);
+                        setStep("FORM");
+                    } else {
+                        setUserRole('receiver');
+                        setStep("FORM");
+                    }
                 } else if (data.status === 'EXPIRED') {
                     setStep("EXPIRED");
                 } else if (data.status === 'PROMOTION') {
@@ -311,7 +339,13 @@ export default function ReceivePage() {
                 } else if (data.status === 'SHIPPED') {
                     setStep("SHIPPED");
                 } else if (data.status === 'ACTIVE') {
-                    setStep("FORM");
+                    if (isLoggedIn) {
+                        setShowRoleSelection(true);
+                        setStep("FORM");
+                    } else {
+                        setUserRole('receiver');
+                        setStep("FORM");
+                    }
                 } else if (data.status === 'EXPIRED') {
                     setStep("EXPIRED");
                 }
@@ -444,6 +478,32 @@ export default function ReceivePage() {
             loadMessages();
         }
     }, [step, hasLoadedChat, pin, loadMessages]);
+
+    // Pre-fill receiver info if logged in (only when moving to FORM step and role is receiver AND senderInfo is present)
+    useEffect(() => {
+        if (step === "FORM" && userRole === 'receiver' && !EmptySenderInfo(senderInfo)) {
+            const prefillInfo = async () => {
+                try {
+                    const session = await fetchAuthSession();
+                    if (session.tokens?.idToken) {
+                        const data = await userApi.user_receiver_get({});
+                        if (data.receiver_info) {
+                            // Only pre-fill if current value is empty to avoid overwriting user edits
+                            setName(prev => prev || data.receiver_info.name || '');
+                            setZipCode(prev => prev || data.receiver_info.zipCode || '');
+                            setAddress(prev => prev || data.receiver_info.address || '');
+                            setPhone(prev => prev || data.receiver_info.phone || '');
+                            setEmail(prev => prev || data.receiver_info.email || '');
+                            setEmail2(prev => prev || data.receiver_info.email || '');
+                        }
+                    }
+                } catch (e) {
+                    // Silently fail if not logged in or error
+                }
+            };
+            prefillInfo();
+        }
+    }, [step, userRole, senderInfo]);
 
 
 
@@ -789,6 +849,32 @@ export default function ReceivePage() {
                 />
             )}
 
+            {/* Login Encouragement Banner */}
+            {!isLoggedIn && (step === "PIN" || step === "FORM") && (
+                <div className="w-full max-w-xl mb-6">
+                    <Card className="bg-blue-50 border-blue-200 shadow-sm border-dashed">
+                        <CardContent className="p-4 py-3 flex items-center justify-between gap-4">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 bg-white rounded-full">
+                                    <UserPlus className="w-4 h-4 text-blue-500" />
+                                </div>
+                                <p className="text-xs text-blue-700 font-medium">
+                                    {t('loginEncouragement')}
+                                </p>
+                            </div>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-8 text-xs bg-white text-blue-600 border-blue-200 hover:bg-blue-100"
+                                onClick={() => router.push('/login')}
+                            >
+                                {t('loginEncouragementButton')}
+                            </Button>
+                        </CardContent>
+                    </Card>
+                </div>
+            )}
+
 
 
 
@@ -875,7 +961,8 @@ export default function ReceivePage() {
                 <CardHeader>
                     <CardTitle className="text-xl text-center">
                         {step === "PIN" ? t('titles.pin') :
-                            step === "RESTRICTED" ? tst(gift.status.toLowerCase()) : ""}
+                            step === "RESTRICTED" ? tst(gift?.status?.toLowerCase() || 'active') :
+                                showRoleSelection ? t('titles.selectRole') : ""}
                     </CardTitle>
                 </CardHeader>
                 <CardContent className={cn("relative min-h-[300px] flex flex-col justify-center transition-colors duration-1000", step !== "PIN" && "bg-gradient-to-b from-white to-amber-50/20")}>
@@ -1032,6 +1119,49 @@ export default function ReceivePage() {
                             </div>
                         </form>
                     )}
+
+                    {showRoleSelection && (
+                        <div className="p-4 space-y-6 animate-in fade-in slide-in-from-bottom-4">
+                            <p className="text-center text-sm text-gray-500">{t('roleSelection.description')}</p>
+                            <div className="grid grid-cols-1 gap-4">
+                                <Button
+                                    variant="outline"
+                                    className="h-20 flex flex-col gap-1 border-2 border-gray-100 hover:border-black hover:bg-white transition-all"
+                                    onClick={() => {
+                                        setUserRole('sender');
+                                        setShowRoleSelection(false);
+                                        // Scroll to sender info after a short delay
+                                        setTimeout(() => {
+                                            const el = document.getElementById('sender-info-section');
+                                            if (el) el.scrollIntoView({ behavior: 'smooth' });
+                                            setIsEditingSender(true);
+                                        }, 100);
+                                    }}
+                                >
+                                    <div className="flex items-center gap-2">
+                                        <Package className="w-5 h-5 text-black" />
+                                        <span className="font-bold text-lg">{t('roleSelection.sender')}</span>
+                                    </div>
+                                    <span className="text-[10px] text-gray-400">{t('roleSelection.senderDescription')}</span>
+                                </Button>
+
+                                <Button
+                                    variant="outline"
+                                    className="h-20 flex flex-col gap-1 border-2 border-gray-100 hover:border-black hover:bg-white transition-all font-bold"
+                                    onClick={() => {
+                                        setUserRole('receiver');
+                                        setShowRoleSelection(false);
+                                    }}
+                                >
+                                    <div className="flex items-center gap-2">
+                                        <Truck className="w-5 h-5 text-black" />
+                                        <span className="font-bold text-lg">{t('roleSelection.receiver')}</span>
+                                    </div>
+                                    <span className="text-[10px] text-gray-400">{t('roleSelection.receiverDescription')}</span>
+                                </Button>
+                            </div>
+                        </div>
+                    )}
                 </CardContent>
             </Card>
 
@@ -1106,7 +1236,7 @@ export default function ReceivePage() {
                             </div>
                         )}
 
-                        {(step === "FORM" || step === "PROMOTION") && (
+                        {(step === "FORM" || step === "PROMOTION") && userRole === 'receiver' && (
                             <form onSubmit={handleAddressSubmit} className="space-y-6 space-y-4 p-8">
                                 {/* <Label className="font-semibold">{t('formStep.title')}</Label> */}
                                 <div className="space-y-2">
@@ -1380,7 +1510,7 @@ export default function ReceivePage() {
             {
                 // 送り主情報を閲覧・編集
                 (isEditingSender || !EmptySenderInfo(senderInfo)) ? (
-                    <Card className="w-full max-w-xl mt-20 flex flex-col">
+                    <Card id="sender-info-section" className="w-full max-w-xl mt-20 flex flex-col">
                         <CardHeader className="flex justify-between items-center">
                             <CardTitle className="text-xl text-center flex items-center justify-left gap-2">
                                 <User className="w-5 h-5 text-gray-600" />

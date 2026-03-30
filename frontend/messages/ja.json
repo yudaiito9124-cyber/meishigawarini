@@ -396,7 +396,8 @@
       "success": "配送先情報が送信されました",
       "shipped": "ギフトが発送されました",
       "expired": "使用期限が切れています",
-      "completed": "ギフトをお楽しみください"
+      "completed": "ギフトをお楽しみください",
+      "selectRole": "どちらとして利用しますか？"
     },
     "pinStep": {
       "label": "カード裏の数字 (5回間違えると一定時間ロックされます)",
@@ -494,6 +495,15 @@
         "deliveryCompleted": "ギフトの受け取りが完了しました。"
       },
       "sendFailed": "メッセージの送信に失敗しました: "
+    },
+    "loginEncouragement": "ログインまたはアカウント作成をして、住所を自動入力したり、ギフトの履歴を保存しましょう。",
+    "loginEncouragementButton": "ログイン / 新規登録",
+    "roleSelection": {
+      "description": "ログイン中のため、役割を選択できます。",
+      "sender": "送り主として利用",
+      "senderDescription": "自分の名刺情報などを登録・編集します。",
+      "receiver": "受け取り主として利用",
+      "receiverDescription": "ギフトを受け取るための住所を入力します。"
     },
     "shopMessage": "ショップからのメッセージ",
     "contactInfo": {
