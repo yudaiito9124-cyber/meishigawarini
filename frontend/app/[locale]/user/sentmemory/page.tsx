@@ -5,7 +5,7 @@ import { useTranslations } from "next-intl";
 import { useParams, useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Loader2, Send, ChevronDown, ExternalLink } from "lucide-react";
+import { Loader2, Send, ChevronDown, ExternalLink, Copy, Check } from "lucide-react";
 import { userApi } from "@/lib/api/user";
 
 export default function SendHistoryPage() {
@@ -13,7 +13,22 @@ export default function SendHistoryPage() {
     const router = useRouter();
 
     const [loading, setLoading] = useState(true);
-    const [history, setHistory] = useState<Array<{ uuid: string, timestamp: string }>>([]);
+    const [history, setHistory] = useState<Array<{ 
+        uuid: string, 
+        timestamp: string,
+        pin?: string,
+        product_name?: string,
+        product_image_url?: string,
+        card_design_thumbf?: string,
+        shop_name?: string
+    }>>([]);
+    const [copiedId, setCopiedId] = useState<string | null>(null);
+
+    const handleCopy = (text: string) => {
+        navigator.clipboard.writeText(text);
+        setCopiedId(text);
+        setTimeout(() => setCopiedId(null), 2000);
+    };
 
     const fetchHistory = useCallback(async () => {
         setLoading(true);
@@ -32,7 +47,7 @@ export default function SendHistoryPage() {
     }, [fetchHistory]);
 
     return (
-        <div className="min-h-screen bg-mist-50 flex flex-col items-center py-12 px-4">
+        <div className="min-h-screen bg-mist-50 flex flex-col items-center py-12 px-4 text-gray-900">
             <Card className="w-full max-w-2xl shadow-xl border-none bg-white/80 backdrop-blur-md rounded-3xl overflow-hidden">
                 <CardHeader className="bg-gradient-to-r from-green-500 to-emerald-600 p-8 text-white flex flex-col gap-4">
                     <div className="flex justify-between items-start">
@@ -68,22 +83,83 @@ export default function SendHistoryPage() {
                     ) : (
                         <div className="divide-y divide-gray-100">
                             {history.map((item, idx) => (
-                                <div key={`${item.uuid}-${idx}`} className="p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-gray-50 transition-colors">
-                                    <div>
-                                        <p className="font-mono text-sm text-gray-500 bg-gray-100 px-2 py-1 rounded inline-block mb-2">
-                                            UUID: {item.uuid}
+                                <div key={`${item.uuid}-${idx}`} className="p-4 sm:p-6 flex flex-col sm:flex-row items-start sm:items-center gap-4 hover:bg-gray-50 transition-colors">
+                                    {/* Combined Image Section */}
+                                    <div className="relative w-full sm:w-32 aspect-[84/52] rounded-xl overflow-hidden shadow-md border border-gray-100 bg-gray-50 shrink-0">
+                                        {item.card_design_thumbf ? (
+                                            <img
+                                                src={item.card_design_thumbf}
+                                                alt="Card Design"
+                                                className="absolute inset-0 w-full h-full object-cover"
+                                                crossOrigin="anonymous"
+                                            />
+                                        ) : (
+                                            <div className="absolute inset-0 bg-gray-100 flex items-center justify-center">
+                                                <Send className="w-6 h-6 text-gray-300" />
+                                            </div>
+                                        )}
+                                        {/* Gradient Overlay */}
+                                        <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
+                                        
+                                        {/* Product Image Inset */}
+                                        {item.product_image_url && (
+                                            <div className="absolute bottom-1 right-1 w-8 h-8 rounded-md overflow-hidden border border-white/50 shadow-sm bg-white">
+                                                <img
+                                                    src={item.product_image_url}
+                                                    alt={item.product_name || "Product"}
+                                                    className="w-full h-full object-cover"
+                                                />
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Info Section */}
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex flex-col gap-0.5 mb-2">
+                                            {item.product_name && (
+                                                <h3 className="font-bold text-gray-900 truncate">{item.product_name}</h3>
+                                            )}
+                                            {item.shop_name && (
+                                                <p className="text-xs text-gray-500 font-medium">@{item.shop_name}</p>
+                                            )}
+                                        </div>
+                                        <p className="text-[10px] font-mono text-gray-400 truncate mb-1">
+                                            {item.uuid}
                                         </p>
-                                        <p className="text-sm font-medium text-gray-600">
+                                        <p className="text-[10px] text-gray-500">
                                             {new Date(item.timestamp).toLocaleString()}
                                         </p>
                                     </div>
-                                    <Button 
-                                        variant="outline" 
-                                        className="gap-2 sm:ms-auto rounded-xl border-green-200 text-green-700 hover:bg-green-50"
-                                        onClick={() => window.open(`/receive/${item.uuid}`, '_blank')}
-                                    >
-                                        ギフト詳細 <ExternalLink className="w-4 h-4" />
-                                    </Button>
+
+                                    {/* PIN and Actions Section */}
+                                    <div className="flex sm:flex-col items-center sm:items-end justify-between w-full sm:w-auto gap-3">
+                                        {item.pin && (
+                                            <div className="flex items-center gap-1.5 bg-gray-100 px-3 py-1.5 rounded-xl border border-gray-200">
+                                                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">PIN</span>
+                                                <span className="font-mono font-bold text-sm text-gray-700 tracking-wider">{item.pin}</span>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="h-6 w-6 ml-1 text-gray-400 hover:text-gray-900"
+                                                    onClick={() => handleCopy(item.pin!)}
+                                                >
+                                                    {copiedId === item.pin ? (
+                                                        <Check className="h-3 w-3 text-green-500" />
+                                                    ) : (
+                                                        <Copy className="h-3 w-3" />
+                                                    )}
+                                                </Button>
+                                            </div>
+                                        )}
+                                        <Button 
+                                            variant="outline" 
+                                            size="sm"
+                                            className="gap-1.5 rounded-xl border-green-200 text-green-700 hover:bg-green-50 text-xs h-9 px-4 shrink-0"
+                                            onClick={() => window.open(`/receive/${item.uuid}`, '_blank')}
+                                        >
+                                            詳細 <ExternalLink className="w-3.5 h-3.5" />
+                                        </Button>
+                                    </div>
                                 </div>
                             ))}
                         </div>

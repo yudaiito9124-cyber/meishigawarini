@@ -345,12 +345,9 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             const pk = `USER#${userId}`;
 
             // 【DB操作: Query】
-            // - 目的: 特定のログタイプ (SENDLOG / RECEIVEDLOG) の履歴データをすべて取得
-            // - テーブル: TABLE_NAME (DynamoDB)
-            // - キー条件:
-            //   - PK: `USER#${userId}`
-            //   - SK Prefix: `${logType}#` (例: SENDLOG#0, SENDLOG#1 ...)
-            // - 処理内容: クエリ結果から 'logs' 配列を抽出し、一つのリストに統合。
+            // - 目的: ログイン中のユーザーIDに紐づく全ての履歴ログ(SENDLOG / RECEIVEDLOG)を取得します。
+            // - 特徴: 履歴はページング(SENDLOG#0, #1...)されている可能性があるため、前方一致検索(begins_with)で全件取得します。
+            // - ソート: 各ログ内のタイムスタンプに基づいて降順に並べ替えます。
             const fetchLogs = async (logType: string) => {
                 const queryRes = await ddb.send(new QueryCommand({
                     TableName: TABLE_NAME,
@@ -366,17 +363,171 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                         allUuids.push(...item.logs);
                     }
                 }
-                // Timestamp降順でソート
+                // 最新順にソート
                 allUuids.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
                 return allUuids;
             };
 
-            const [sentUuids, receivedUuids] = await Promise.all([
+            const [sentLogs, receivedLogs] = await Promise.all([
                 fetchLogs('SENDLOG'),
                 fetchLogs('RECEIVEDLOG')
             ]);
 
-            return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ sent: sentUuids, received: receivedUuids }) };
+            // === データ拡充処理 (Enrichment) ===
+            // 履歴に含まれるUUIDから、PINコードや商品画像などの詳細情報を取得します。
+            const allLogs = [...sentLogs, ...receivedLogs];
+            const uniqueUuids = [...new Set(allLogs.map(l => l.uuid))];
+            
+            if (uniqueUuids.length > 0) {
+                // 1. 【DB操作: BatchGetItem (QR METADATA)】
+                // - 目的: 履歴にある各QRコードの基本設定(PIN, 紐付くショップ・商品・デザインID)を一括取得します。
+                // - 制約対応: BatchGetItemの1回あたりの上限(100件)に合わせて分割実行します。
+                const metadataMap = new Map<string, any>();
+                const chunkedUuids = [];
+                for (let i = 0; i < uniqueUuids.length; i += 100) {
+                    chunkedUuids.push(uniqueUuids.slice(i, i + 100));
+                }
+
+                for (const chunk of chunkedUuids) {
+                    const batchRes = await ddb.send(new BatchGetCommand({
+                        RequestItems: {
+                            [TABLE_NAME]: {
+                                Keys: chunk.map(uuid => ({ PK: `QR#${uuid}`, SK: 'METADATA' }))
+                            }
+                        }
+                    }));
+                    if (batchRes.Responses && batchRes.Responses[TABLE_NAME]) {
+                        for (const item of batchRes.Responses[TABLE_NAME]) {
+                            const uuid = item.PK.replace('QR#', '');
+                            metadataMap.set(uuid, item);
+                        }
+                    }
+                }
+
+                // 2. 【DB操作: BatchGetItem (PRODUCT)】
+                // - 目的: ショップ・商品IDの組み合わせから、商品名と商品画像URLを取得します。
+                // - 最適化: ProjectionExpression を使用し、必要な項目のみを読み取ることでコストを抑えます。
+                const productMap = new Map<string, any>();
+                const productKeys = Array.from(metadataMap.values())
+                    .filter(m => m.shop_id && m.product_id)
+                    .map(m => ({ PK: `SHOP#${m.shop_id}`, SK: `PRODUCT#${m.product_id}` }));
+                
+                const uniqueProductKeys = Array.from(new Set(productKeys.map(k => JSON.stringify(k)))).map(s => JSON.parse(s));
+
+                if (uniqueProductKeys.length > 0) {
+                    const chunkedProductKeys = [];
+                    for (let i = 0; i < uniqueProductKeys.length; i += 100) {
+                        chunkedProductKeys.push(uniqueProductKeys.slice(i, i + 100));
+                    }
+                    for (const chunk of chunkedProductKeys) {
+                        const batchRes = await ddb.send(new BatchGetCommand({
+                            RequestItems: {
+                                [TABLE_NAME]: {
+                                    Keys: chunk,
+                                    ProjectionExpression: 'PK, SK, #name, image_url',
+                                    ExpressionAttributeNames: { '#name': 'name' }
+                                }
+                            }
+                        }));
+                        if (batchRes.Responses && batchRes.Responses[TABLE_NAME]) {
+                            for (const item of batchRes.Responses[TABLE_NAME]) {
+                                const key = `${item.PK}_${item.SK}`;
+                                // S3URLに署名を付与（プライベートバケットの画像を表示可能にする）
+                                if (item.image_url) {
+                                    item.image_url = await signUrlIfS3(item.image_url, BUCKET_NAME);
+                                }
+                                productMap.set(key, item);
+                            }
+                        }
+                    }
+                }
+
+                // 3. 【DB操作: BatchGetItem (CARD_DESIGN)】
+                // - 目的: デザインIDからカードの表面サムネイルURLを取得します。
+                const designMap = new Map<string, any>();
+                const designIds = [...new Set(Array.from(metadataMap.values()).map(m => m.card_design).filter(Boolean))];
+                if (designIds.length > 0) {
+                    const chunkedDesignIds = [];
+                    for (let i = 0; i < designIds.length; i += 100) {
+                        chunkedDesignIds.push(designIds.slice(i, i + 100));
+                    }
+                    for (const chunk of chunkedDesignIds) {
+                        const batchRes = await ddb.send(new BatchGetCommand({
+                            RequestItems: {
+                                [TABLE_NAME]: {
+                                    Keys: chunk.map(id => ({ PK: 'CARD_DESIGN#METADATA', SK: id })),
+                                    ProjectionExpression: 'SK, thumbf'
+                                }
+                            }
+                        }));
+                        if (batchRes.Responses && batchRes.Responses[TABLE_NAME]) {
+                            for (const item of batchRes.Responses[TABLE_NAME]) {
+                                if (item.thumbf) {
+                                    item.thumbf = await signUrlIfS3(item.thumbf, BUCKET_NAME);
+                                }
+                                designMap.set(item.SK, item);
+                            }
+                        }
+                    }
+                }
+
+                // 4. 【DB操作: BatchGetItem (SHOP)】
+                // - 目的: ショップIDからショップ名を取得します。
+                const shopMap = new Map<string, any>();
+                const shopIds = [...new Set(Array.from(metadataMap.values()).map(m => m.shop_id).filter(Boolean))];
+                if (shopIds.length > 0) {
+                    const chunkedShopIds = [];
+                    for (let i = 0; i < shopIds.length; i += 100) {
+                        chunkedShopIds.push(shopIds.slice(i, i + 100));
+                    }
+                    for (const chunk of chunkedShopIds) {
+                        const batchRes = await ddb.send(new BatchGetCommand({
+                            RequestItems: {
+                                [TABLE_NAME]: {
+                                    Keys: chunk.map(id => ({ PK: `SHOP#${id}`, SK: 'METADATA' })),
+                                    ProjectionExpression: 'PK, #name',
+                                    ExpressionAttributeNames: { '#name': 'name' }
+                                }
+                            }
+                        }));
+                        if (batchRes.Responses && batchRes.Responses[TABLE_NAME]) {
+                            for (const item of batchRes.Responses[TABLE_NAME]) {
+                                const sid = item.PK.replace('SHOP#', '');
+                                shopMap.set(sid, item);
+                            }
+                        }
+                    }
+                }
+
+                /**
+                 * 取得した各マスターデータを用いてログ項目を拡充します。
+                 */
+                const enrich = (log: { uuid: string, timestamp: string }) => {
+                    const meta = metadataMap.get(log.uuid);
+                    if (!meta) return log;
+
+                    const prodKey = `SHOP#${meta.shop_id}_PRODUCT#${meta.product_id}`;
+                    const product = productMap.get(prodKey);
+                    const design = designMap.get(meta.card_design);
+                    const shop = shopMap.get(meta.shop_id);
+
+                    return {
+                        ...log,
+                        pin: meta.pin,
+                        product_name: product?.name,
+                        product_image_url: product?.image_url,
+                        card_design_thumbf: design?.thumbf,
+                        shop_name: shop?.name
+                    };
+                };
+
+                const enrichedSent = sentLogs.map(enrich);
+                const enrichedReceived = receivedLogs.map(enrich);
+
+                return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ sent: enrichedSent, received: enrichedReceived }) };
+            }
+
+            return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ sent: sentLogs, received: receivedLogs }) };
         }
 
         // ====================================================================
@@ -387,10 +538,8 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             if (!uuid || !pin) return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Missing uuid or pin' }) };
 
             // 【DB操作: GetItem】
-            // - 目的: 送信しようとしているQRコード(ギフト)の存在確認とPINコード照合
-            // - テーブル: TABLE_NAME (DynamoDB)
-            // - キー: { PK: `QR#${uuid}`, SK: 'METADATA' }
-            // - 検証項目: PINコードの一致
+            // - 目的: スキャンされたQRコード(ギフト)が実在し、入力されたPINコードと一致するか検証します。
+            // - キー: PK=`QR#${uuid}`, SK='METADATA'
             const getRes = await ddb.send(new GetCommand({
                 TableName: TABLE_NAME,
                 Key: { PK: `QR#${uuid}`, SK: 'METADATA' }
@@ -401,11 +550,9 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             }
 
             // 【DB操作: UpdateItem】
-            // - 目的: チャットレコード(CHAT)に送信者(送り主)のユーザーIDを紐づける
-            // - テーブル: TABLE_NAME (DynamoDB)
-            // - キー: { PK: `QR#${uuid}`, SK: 'CHAT' }
-            // - 更新内容: sender_id に userId をセットし、ts_updated_at を更新。
-            // - 補足: これにより受取人がギフトを見た際、誰からのプレゼントかが識別可能になる。
+            // - 目的: チャット管理レコード(CHAT)に送信者のユーザーIDを永続化します。
+            // - 背景: ギフトの受取人は、このsender_idを通じて送り主のプロフィール情報(SENDER)を参照可能になります。
+            // - キー: PK=`QR#${uuid}`, SK='CHAT'
             await ddb.send(new UpdateCommand({
                 TableName: TABLE_NAME,
                 Key: { PK: `QR#${uuid}`, SK: 'CHAT' },
@@ -413,7 +560,9 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 ExpressionAttributeValues: { ':sid': userId, ':now': new Date().toISOString() }
             }));
 
-            // 3. SENDLOG に追記する
+            // 【DB操作: 内部関数 appendToHistory 呼び出し】
+            // - 目的: ユーザーの送信履歴(SENDLOG)に今回のギフトUUIDを追記します。
+            // - 処理内容: SENDLOGレコード内の配列(logs)に、timestamp付きで新しいエントリをPUSHします。
             await appendToHistory(ddb, TABLE_NAME, userId, 'SENDLOG', uuid);
 
             return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ message: 'Gift successfully linked to your sender profile' }) };
