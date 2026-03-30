@@ -75,7 +75,7 @@ export default function LoginPage() {
             if (shops.length === 0) {
                 // ショップを持たないユーザーはプロフィールへ
                 console.log("onshops");
-                router.push(`/user/${sub}`);
+                router.push(`/user`);
             } else {
                 console.log("any shops");
 
@@ -84,7 +84,7 @@ export default function LoginPage() {
             }
         } catch (e) {
             // エラー時はプロフィールへフォールバック
-            router.push(`/user/${sub}`);
+            router.push(`/user`);
         } finally {
             setLoading(false);
         }
@@ -238,7 +238,7 @@ export default function LoginPage() {
                                         <Button
                                             variant="outline"
                                             className="h-40 flex flex-col items-center justify-center gap-4 border-2 border-blue-100 hover:border-blue-300 hover:bg-blue-50/50 rounded-[2rem] text-xl font-black text-blue-600 transition-all hover:scale-105 active:scale-95"
-                                            onClick={() => router.push(`/user/${userId}`)}
+                                            onClick={() => router.push(`/user`)}
                                         >
                                             <div className="p-3 bg-blue-50 rounded-2xl">
                                                 <User className="w-8 h-8 text-blue-600" />

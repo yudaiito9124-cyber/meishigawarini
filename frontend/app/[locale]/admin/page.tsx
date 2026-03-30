@@ -17,7 +17,7 @@ import { generateId } from '@/lib/id';
 import { useTranslations } from 'next-intl';
 import { generatePDF, cardformats, paperformats } from '@/lib/generatePDF';
 import { generateCSVExport } from '@/lib/generateCSVExport';
-import { ExternalLink, Copy, Eye, QrCode, Store, Wrench, Layers, HelpCircle, Home, Trash2, RotateCcw, Loader2, Plus, X, Search, Save, FileText, Download, CreditCard, Printer, Paintbrush } from 'lucide-react';
+import { ExternalLink, Copy, Check, Eye, QrCode, Store, Wrench, Layers, HelpCircle, Home, Trash2, RotateCcw, Loader2, Plus, X, Search, Save, FileText, Download, CreditCard, Printer, Paintbrush, ChevronDown } from 'lucide-react';
 import CardDesignEditor from "@/components/admin/CardDesignEditor";
 const NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 const NEXT_PUBLIC_APP_URL = process.env.NEXT_PUBLIC_APP_URL || "";
@@ -64,6 +64,14 @@ export default function AdminPage() {
     const [cardOrderFilterStatus, setCardOrderFilterStatus] = useState("ORDERED");
     const [cardOrderFilterShopId, setCardOrderFilterShopId] = useState("");
     const router = useRouter();
+    const [copiedId, setCopiedId] = useState<string | null>(null);
+
+    const handleCopy = (id: string) => {
+        navigator.clipboard.writeText(id).then(() => {
+            setCopiedId(id);
+            setTimeout(() => setCopiedId(null), 2000);
+        });
+    };
 
     const fetchDbCardDesigns = async () => {
         try {
@@ -187,11 +195,15 @@ export default function AdminPage() {
                                 {t('helpButton') || "Help"}
                             </Button>
                         </Link>
-                        <Link href="/login" className="w-full sm:w-auto">
+                        {/* <Link href="/login" className="w-full sm:w-auto">
                             <Button variant="destructive" className="shadow-md cursor-pointer border border-red-900 w-full sm:w-auto">
                                 {t('qrAdminLoginPage')}
                             </Button>
-                        </Link>
+                        </Link> */}
+
+                        <Button variant="ghost" className="text-mist-500 hover:text-mist-800" onClick={() => router.push('/login')}>
+                            <ChevronDown className="h-4 w-4 mr-1 rotate-90" /> {t('back')}
+                        </Button>
                     </div>
                 </div>
 
@@ -495,7 +507,21 @@ export default function AdminPage() {
                                                 <div className="flex flex-wrap items-center mb-2">
                                                     <div className="flex gap-2 flex-wrap flex-rows items-center">
                                                         <div>
+                                                        <div className="flex items-center gap-1">
                                                             <p className="font-medium">{t('batches.batchId', { id: batch.id })}</p>
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="icon"
+                                                                className="h-4 w-4"
+                                                                onClick={() => handleCopy(batch.id)}
+                                                            >
+                                                                {copiedId === batch.id ? (
+                                                                    <Check className="h-3 w-3 text-green-500" />
+                                                                ) : (
+                                                                    <Copy className="h-3 w-3" />
+                                                                )}
+                                                            </Button>
+                                                        </div>
                                                             <p className="text-sm text-gray-500">{t('batches.info', { count: batch.count, date: batch.date })}</p>
                                                         </div>
                                                         <p className="flex justify-center items-center text-sm bg-green-100 text-green-800 px-3 py-1 rounded-xl">{batch.status}</p>
@@ -570,9 +596,41 @@ export default function AdminPage() {
                                                         </thead>
                                                         <tbody>
                                                             {batch.codes?.map((code: any) => (
-                                                                <tr key={code.uuid} className="border-b border-gray-200 last:border-0">
-                                                                    <td className="pr-4 py-0.5 select-all text-[10px] break-all">{code.uuid}</td>
-                                                                    <td className="py-0.5 select-all text-[10px] break-all">{code.pin}</td>
+                                                                <tr key={code.uuid} className="border-b border-gray-200 last:border-0 group">
+                                                                    <td className="pr-4 py-0.5 select-all text-[10px] break-all">
+                                                                        <div className="flex items-center gap-1">
+                                                                            {code.uuid}
+                                                                            <Button
+                                                                                variant="ghost"
+                                                                                size="icon"
+                                                                                className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                                                onClick={() => handleCopy(code.uuid)}
+                                                                            >
+                                                                                {copiedId === code.uuid ? (
+                                                                                    <Check className="h-2 w-2 text-green-500" />
+                                                                                ) : (
+                                                                                    <Copy className="h-2 w-2" />
+                                                                                )}
+                                                                            </Button>
+                                                                        </div>
+                                                                    </td>
+                                                                    <td className="py-0.5 select-all text-[10px] break-all">
+                                                                        <div className="flex items-center gap-1">
+                                                                            {code.pin}
+                                                                            <Button
+                                                                                variant="ghost"
+                                                                                size="icon"
+                                                                                className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                                                onClick={() => handleCopy(code.pin)}
+                                                                            >
+                                                                                {copiedId === code.pin ? (
+                                                                                    <Check className="h-2 w-2 text-green-500" />
+                                                                                ) : (
+                                                                                    <Copy className="h-2 w-2" />
+                                                                                )}
+                                                                            </Button>
+                                                                        </div>
+                                                                    </td>
                                                                 </tr>
                                                             ))}
                                                         </tbody>
@@ -892,6 +950,15 @@ function QRCodeRow({ item, apiUrl, onGeneratePDF, onRefresh, paperFormat, cardFo
     const st = useTranslations('Status');
     const tt = useTranslations('Time');
     const [open, setOpen] = useState(false);
+    const [copiedId, setCopiedId] = useState<string | null>(null);
+
+    const handleCopy = (id: string) => {
+        navigator.clipboard.writeText(id).then(() => {
+            setCopiedId(id);
+            setTimeout(() => setCopiedId(null), 2000);
+        });
+    };
+
     const uuid = item.PK.replace('QR#', '');
 
     const statusColor = (
@@ -933,13 +1000,35 @@ function QRCodeRow({ item, apiUrl, onGeneratePDF, onRefresh, paperFormat, cardFo
                         <div className="font-mono text-sm text-gray-500 w-full flex flex-col gap-0 text-left mt-4 text-center sm:text-left">
                             <div className="flex items-center gap-2">
                                 ID:
-                                <Copy className="cursor-pointer w-4 h-4 shrink-0" onClick={() => navigator.clipboard.writeText(uuid)} />
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-6 w-6"
+                                    onClick={() => handleCopy(uuid)}
+                                >
+                                    {copiedId === uuid ? (
+                                        <Check className="h-3 w-3 text-green-500" />
+                                    ) : (
+                                        <Copy className="h-3 w-3" />
+                                    )}
+                                </Button>
                                 <ExternalLink className="cursor-pointer w-4 h-4 shrink-0" onClick={() => window.open(`${NEXT_PUBLIC_APP_URL}/receive/${uuid}`, '_blank')} />
                                 {uuid}
                             </div>
                             <div className="flex items-center gap-2">
                                 PIN:
-                                <Copy className="cursor-pointer w-4 h-4 shrink-0" onClick={() => navigator.clipboard.writeText(item.pin)} />
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-6 w-6"
+                                    onClick={() => handleCopy(item.pin)}
+                                >
+                                    {copiedId === item.pin ? (
+                                        <Check className="h-3 w-3 text-green-500" />
+                                    ) : (
+                                        <Copy className="h-3 w-3" />
+                                    )}
+                                </Button>
                                 {item.pin}
                             </div>
                         </div>
@@ -963,7 +1052,18 @@ function QRCodeRow({ item, apiUrl, onGeneratePDF, onRefresh, paperFormat, cardFo
                                     <span className="font-mono text-xs text-gray-600 truncate">{item.shop_id || '-'}</span>
                                     {item.shop_id && (
                                         <>
-                                            <Copy className="cursor-pointer w-3 h-3 text-mist-500 hover:text-mist-900 shrink-0" onClick={() => navigator.clipboard.writeText(item.shop_id)} />
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                className="h-4 w-4"
+                                                onClick={() => handleCopy(item.shop_id)}
+                                            >
+                                                {copiedId === item.shop_id ? (
+                                                    <Check className="h-3 w-3 text-green-500" />
+                                                ) : (
+                                                    <Copy className="h-3 w-3" />
+                                                )}
+                                            </Button>
                                             <Link href={`/shop/${item.shop_id}`}>
                                                 <ExternalLink className="w-3 h-3 text-mist-500 hover:text-mist-900 cursor-pointer shrink-0" />
                                             </Link>

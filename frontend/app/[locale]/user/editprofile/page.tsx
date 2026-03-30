@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useTranslations } from "next-intl";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { Card, CardContent, CardTitle, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -46,8 +46,7 @@ function resizeImage(file: File, maxWidth = 1000): Promise<File | Blob> {
 export default function UserProfilePage() {
     const t = useTranslations('ReceivePage');
     const tUser = useTranslations('UserProfilePage');
-    const params = useParams();
-    const userid = params?.userid as string;
+    const router = useRouter();
 
     const [loading, setLoading] = useState(true);
     const [senderInfo, setSenderInfo] = useState<any>(null);
@@ -92,12 +91,18 @@ export default function UserProfilePage() {
                 html_image_urls: htmlImageUrls
             };
 
-            await userApi.user_profile_update({
+            const result = await userApi.user_profile_update({
                 profile: updatedSenderInfo,
                 deleted_html_image_urls: deletedHtmlUrls
             });
 
-            setSenderInfo(updatedSenderInfo);
+            if (result && result.profile) {
+                setSenderInfo(result.profile);
+                setSenderForm(result.profile);
+                setHtmlImageUrls(result.profile.html_image_urls || []);
+            } else {
+                setSenderInfo(updatedSenderInfo);
+            }
             setDeletedHtmlUrls([]);
             setIsEditingSender(false);
         } catch (e: any) {
@@ -237,7 +242,7 @@ export default function UserProfilePage() {
                     variant="ghost" 
                     size="sm" 
                     className="text-gray-500 hover:text-gray-800 -ml-2 h-8"
-                    onClick={() => window.location.href = `/user/${userid}`}
+                    onClick={() => router.push('/user')}
                  >
                     <ChevronDown className="h-4 w-4 mr-1 rotate-90" /> {tUser('back')}
                  </Button>

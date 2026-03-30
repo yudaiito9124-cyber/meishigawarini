@@ -54,10 +54,10 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         }
 
         // 【DB操作: GetItem】
-        // - 目的: UUIDに基づくQRコードの状態取得。本当にACTIVE(受取可能)状態であるか、PINが一致するかを最終確認する
-        // - テーブル: TABLE_NAME
-        // - リクエストキー: { PK: `QR#${qr_id}`, SK: 'METADATA' }
-        // - 取得カラム: ALL (status, pin, failed_attempts, ts_expired_at, shop_id, product_id 等)
+        // - 目的: 入力されたUUIDに基づくQRコードの状態(メタデータ)取得。
+        // - テーブル: TABLE_NAME (DynamoDB)
+        // - キー構成: { PK: `QR#${qr_id}`, SK: 'METADATA' }
+        // - 取得項目: status, pin, failed_attempts, ts_expired_at 等を後続で検証するために取得
         const getRes = await ddb.send(new GetCommand({
             TableName: TABLE_NAME,
             Key: { PK: `QR#${qr_id}`, SK: 'METADATA' }
@@ -104,11 +104,12 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         const now = new Date();
         const nowIso = now.toISOString();
 
-        // 【DB操作: TransactWriteItems】
-        // - 目的: QRコードのステータス更新(USEDへの遷移)と、配送先情報の登録をアトミックに実行
-        // - テーブル: TABLE_NAME
-        // - 処理1(Update): METADATAに対し status='USED', GSIキー更新, PIN失敗カウントのクリア
-        // - 処理2(Put):    SK='ORDER' に対してユーザーが入力した配送情報を新規保存
+        // 【DB操作: TransactWriteItems (アトミック書き込み)】
+        // - 目的: QRコードのステータス遷移(ACTIVE -> USED)と配送先情報の登録を同一トランザクションで確実に実行
+        // - テーブル: TABLE_NAME (DynamoDB)
+        // - 処理内容:
+        //   1. Update (METADATA): statusを 'USED' に変更し、GSIキー (GSI1_PK) を更新。PIN失敗回数をクリア。有効期限等のバリデーションを含む。
+        //   2. Put (ORDER): SK='ORDER' として、受取人が入力した配送先情報を新規作成・保存。
         await ddb.send(new TransactWriteCommand({
             TransactItems: [
                 {
@@ -134,7 +135,11 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         if (shipping_info.email) {
             try {
                 // 【DB操作: UpdateItem x 2】
-                // - 目的: チャットメーリングリスト(CHATレコード)に受取人のメアドを追加登録
+                // - 目的: チャットレコード(CHAT)の通知設定(メーリングリスト)に受取人のメールアドレスを追加
+                // - テーブル: TABLE_NAME (DynamoDB)
+                // - キー構成: { PK: `QR#${qr_id}`, SK: 'CHAT' }
+                // - 更新内容1: notification_emails (SS型) にメールアドレスを追加
+                // - 更新内容2: email_preferences (Map型) に言語設定('ja')を保存
                 await ddb.send(new UpdateCommand({
                     TableName: TABLE_NAME, Key: { PK: `QR#${qr_id}`, SK: 'CHAT' },
                     UpdateExpression: 'ADD notification_emails :new_email SET email_preferences = if_not_exists(email_preferences, :empty_map)',
@@ -157,7 +162,10 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         if (shopId) {
             try {
                 // 【DB操作: GetItem x 2】
-                // - 目的: ショップ情報と商品名を取得し、管理者に通知メールを送信
+                // - 目的: 通知メール送信のため、ショップの基本情報と商品名を取得
+                // - テーブル: TABLE_NAME (DynamoDB)
+                // - キー構成1: { PK: `SHOP#${shopId}`, SK: 'METADATA' }
+                // - キー構成2: { PK: `SHOP#${shopId}`, SK: `PRODUCT#${productId}` }
                 const [shopRes, productRes] = await Promise.all([
                     ddb.send(new GetCommand({ TableName: TABLE_NAME, Key: { PK: `SHOP#${shopId}`, SK: 'METADATA' } })),
                     productId ? ddb.send(new GetCommand({ TableName: TABLE_NAME, Key: { PK: `SHOP#${shopId}`, SK: `PRODUCT#${productId}` } })) : { Item: undefined }

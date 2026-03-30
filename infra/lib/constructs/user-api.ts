@@ -13,13 +13,15 @@ export interface UserApiProps {
   bucket: s3.IBucket;
   userPool: cognito.IUserPool;
   userPoolClient: cognito.IUserPoolClient;
-  api: apigateway.RestApi;
+  api: apigateway.IRestApi;
   commonProps: any;
   grantTablePermissions: (fn: lambda.IFunction, write?: boolean) => void;
 }
 
-export class UserApi extends Construct {
-  constructor(scope: Construct, id: string, props: UserApiProps) {
+export class UserApi extends cdk.NestedStack {
+  public readonly userResource: apigateway.Resource;
+
+  constructor(scope: cdk.Stack, id: string, props: UserApiProps) {
     super(scope, id);
 
     const { table, bucket, userPool, userPoolClient, api, commonProps, grantTablePermissions } = props;
@@ -64,16 +66,29 @@ export class UserApi extends Construct {
     bucket.grantRead(user_profile);
     bucket.grantDelete(user_profile);
 
+    // Helper to add resource
+    const addResourceWithCors = (parent: apigateway.IResource, pathPart: string): apigateway.Resource => {
+      return parent.addResource(pathPart) as apigateway.Resource;
+    };
+
     // Routes
-    const userResource = api.root.addResource('user');
+    this.userResource = new apigateway.Resource(this, 'UserTopResource', {
+      parent: api.root,
+      pathPart: 'user'
+    });
+
     const routeOptions = { authorizer, authorizationType: apigateway.AuthorizationType.CUSTOM };
 
-    const profileResource = userResource.addResource('profile');
-    profileResource.addResource('get').addMethod('POST', new apigateway.LambdaIntegration(user_profile), routeOptions);
-    profileResource.addResource('update').addMethod('POST', new apigateway.LambdaIntegration(user_profile), routeOptions);
-    profileResource.addResource('uploadurl').addMethod('POST', new apigateway.LambdaIntegration(user_profile), routeOptions);
+    const profileResource = addResourceWithCors(this.userResource, 'profile');
+    addResourceWithCors(profileResource, 'get').addMethod('POST', new apigateway.LambdaIntegration(user_profile), routeOptions);
+    addResourceWithCors(profileResource, 'update').addMethod('POST', new apigateway.LambdaIntegration(user_profile), routeOptions);
+    addResourceWithCors(profileResource, 'uploadurl').addMethod('POST', new apigateway.LambdaIntegration(user_profile), routeOptions);
 
-    const historyResource = userResource.addResource('history');
-    historyResource.addResource('get').addMethod('POST', new apigateway.LambdaIntegration(user_profile), routeOptions);
+    const receiverResource = addResourceWithCors(this.userResource, 'receiver');
+    addResourceWithCors(receiverResource, 'get').addMethod('POST', new apigateway.LambdaIntegration(user_profile), routeOptions);
+    addResourceWithCors(receiverResource, 'update').addMethod('POST', new apigateway.LambdaIntegration(user_profile), routeOptions);
+
+    const historyResource = addResourceWithCors(this.userResource, 'history');
+    addResourceWithCors(historyResource, 'get').addMethod('POST', new apigateway.LambdaIntegration(user_profile), routeOptions);
   }
 }

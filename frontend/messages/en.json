@@ -64,7 +64,8 @@
     "sendGiftDesc": "Scan a new gift's QR code to register it in your send history.",
     "logout": "Logout",
     "back": "Back",
-    "userId": "User ID"
+    "userId": "User ID",
+    "userEmail": "Email Address"
   },
   "LoginPage": {
     "title": "Sign In",

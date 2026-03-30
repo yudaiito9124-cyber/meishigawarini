@@ -798,7 +798,22 @@ export default function ShopPage() {
                         <h1 className="text-2xl font-bold text-gray-900">
                             {shopLoading ? <RefreshCw className="h-5 w-5 animate-spin text-gray-400 inline-block" /> : (shop?.name || t('title'))}
                         </h1>
-                        <p className="text-xs text-gray-500">{t('shopId')} :  {shopId}</p>
+                        <div className="flex items-center gap-1">
+                            <p className="text-xs text-gray-500">{t('shopId')} :  {shopId}</p>
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="h-4 w-4 text-gray-400 hover:text-gray-600"
+                                onClick={() => handleCopy(shopId as string)}
+                            >
+                                {copiedId === shopId ? (
+                                    <Check className="h-3 w-3 text-green-500" />
+                                ) : (
+                                    <Copy className="h-3 w-3" />
+                                )}
+                            </Button>
+                        </div>
                     </div>
 
                     <div className="flex items-center space-x-2">
@@ -1043,7 +1058,22 @@ export default function ShopPage() {
                                 <div className="y-gap-0 border-t">
                                     <p className="text-xs text-gray-500">{t('userId')} :  {userId}</p>
                                     <p className="text-xs text-gray-500">{t('ownerId')} :  {shop?.owner_id}</p>
-                                    <p className="text-xs text-gray-500">{t('shopId')} :  {shopId}</p>
+                                    <div className="flex items-center gap-1">
+                                        <p className="text-xs text-gray-500">{t('shopId')} :  {shopId}</p>
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-4 w-4 text-gray-400 hover:text-gray-600"
+                                            onClick={() => handleCopy(shopId as string)}
+                                        >
+                                            {copiedId === shopId ? (
+                                                <Check className="h-3 w-3 text-green-500" />
+                                            ) : (
+                                                <Copy className="h-3 w-3" />
+                                            )}
+                                        </Button>
+                                    </div>
                                 </div>
                             </DialogContent>
                             <DialogFooter>
@@ -1213,6 +1243,7 @@ export default function ShopPage() {
                                                                                             <div className="flex items-center gap-1 min-w-0 flex-1 overflow-hidden">
                                                                                                 <span className="truncate opacity-70 text-[10px] leading-tight block w-0 flex-1">{i + 1}. {item.uuid}</span>
                                                                                                 <Button
+                                                                                                    type="button"
                                                                                                     variant="ghost"
                                                                                                     size="icon"
                                                                                                     className="h-3.5 w-3.5 shrink-0 opacity-50 hover:opacity-100"
@@ -1298,6 +1329,7 @@ export default function ShopPage() {
                                                                         <div className="flex items-center gap-2">
                                                                             <span className="font-mono text-xs">{item.uuid}</span>
                                                                             <Button
+                                                                                type="button"
                                                                                 variant="ghost"
                                                                                 size="icon"
                                                                                 className="h-4 w-4"
@@ -1331,6 +1363,7 @@ export default function ShopPage() {
                                                                     <div key={item.uuid} className="p-3 bg-white/40 flex items-center gap-2">
                                                                         <span className="font-mono text-xs">{item.uuid}</span>
                                                                         <Button
+                                                                            type="button"
                                                                             variant="ghost"
                                                                             size="icon"
                                                                             className="h-4 w-4"
@@ -1352,18 +1385,20 @@ export default function ShopPage() {
                                                 {/* Unified Action Area */}
                                                 <div className="space-y-4 pt-4 border-t border-gray-100">
                                                     <div className="space-y-4 bg-gray-50 p-4 rounded-xl border-dashed border-2">
-                                                        <select
-                                                            id="product_id"
-                                                            name="product_id"
-                                                            className="flex h-12 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                                                            required={scannedUuids.some(item => item.status && !item.status.product_linked)}
-                                                            defaultValue=""
-                                                        >
-                                                            <option value="" disabled>{t('linkQr.selectPlaceholder')}</option>
-                                                            {products.filter(p => p.status === 'ACTIVE').map(p => (
-                                                                <option key={p.product_id} value={p.product_id}>{p.name}</option>
-                                                            ))}
-                                                        </select>
+                                                        {scannedUuids.some(item => item.status && !item.status.product_linked) && (
+                                                            <select
+                                                                id="product_id"
+                                                                name="product_id"
+                                                                className="flex h-12 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                                                required={scannedUuids.some(item => item.status && !item.status.product_linked)}
+                                                                defaultValue=""
+                                                            >
+                                                                <option value="" disabled>{t('linkQr.selectPlaceholder')}</option>
+                                                                {products.filter(p => p.status === 'ACTIVE').map(p => (
+                                                                    <option key={p.product_id} value={p.product_id}>{p.name}</option>
+                                                                ))}
+                                                            </select>
+                                                        )}
 
                                                         {showOptions ? (
                                                             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -1597,6 +1632,7 @@ export default function ShopPage() {
                                                                     <DialogDescription className="font-mono text-xs text-gray-500 flex items-center gap-2">
                                                                         ID: {uuid}
                                                                         <Button
+                                                                            type="button"
                                                                             variant="ghost"
                                                                             size="icon"
                                                                             className="h-6 w-6"
@@ -1986,6 +2022,10 @@ export default function ShopPage() {
                                                                 <div className="w-1 h-3 bg-primary rounded-full" />
                                                                 {t('addProduct.cardDesign')}
                                                             </div>
+                                                            <div className="flex-1 space-y-1 py-1">
+                                                                <p className="font-bold text-gray-900">{product.design.name}</p>
+                                                                <p className="text-xs text-gray-500">{product.design.description}</p>
+                                                            </div>
                                                             <div className="flex flex-col sm:flex-row gap-4">
                                                                 <div className="flex flex-wrap gap-4 w-full sm:w-auto shrink-0">
                                                                     <div className="flex flex-col gap-1">
@@ -2002,9 +2042,6 @@ export default function ShopPage() {
                                                                             </div>
                                                                         </div>
                                                                     )}
-                                                                </div>
-                                                                <div className="flex-1 space-y-1 py-1">
-                                                                    <p className="font-bold text-gray-900">{product.design.name}</p>
                                                                 </div>
                                                             </div>
                                                         </div>
@@ -2061,8 +2098,40 @@ export default function ShopPage() {
                                                 </div>
                                                 <div className="mt-8 pt-6 border-t border-dashed border-gray-100">
                                                     <div className="flex flex-col gap-1">
-                                                        <p className="text-[9px] font-mono text-gray-400">Product ID: {product.product_id}</p>
-                                                        <p className="text-[9px] font-mono text-gray-400">Design ID: {product.design?.design_id}</p>
+                                                        <div className="flex items-center gap-1">
+                                                            <p className="text-[9px] font-mono text-gray-400">Product ID: {product.product_id}</p>
+                                                            <Button
+                                                                type="button"
+                                                                variant="ghost"
+                                                                size="icon"
+                                                                className="h-3 w-3 text-gray-400 hover:text-gray-600"
+                                                                onClick={() => handleCopy(product.product_id)}
+                                                            >
+                                                                {copiedId === product.product_id ? (
+                                                                    <Check className="h-2 w-2 text-green-500" />
+                                                                ) : (
+                                                                    <Copy className="h-2 w-2" />
+                                                                )}
+                                                            </Button>
+                                                        </div>
+                                                        <div className="flex items-center gap-1">
+                                                            <p className="text-[9px] font-mono text-gray-400">Design ID: {product.design?.design_id}</p>
+                                                            {product.design?.design_id && (
+                                                                <Button
+                                                                    type="button"
+                                                                    variant="ghost"
+                                                                    size="icon"
+                                                                    className="h-3 w-3 text-gray-400 hover:text-gray-600"
+                                                                    onClick={() => handleCopy(product.design.design_id)}
+                                                                >
+                                                                    {copiedId === product.design.design_id ? (
+                                                                        <Check className="h-2 w-2 text-green-500" />
+                                                                    ) : (
+                                                                        <Copy className="h-2 w-2" />
+                                                                    )}
+                                                                </Button>
+                                                            )}
+                                                        </div>
                                                     </div>
                                                 </div>
                                                 <DialogFooter className="mt-6">

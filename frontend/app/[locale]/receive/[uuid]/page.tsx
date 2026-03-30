@@ -478,6 +478,32 @@ export default function ReceivePage() {
             loadMessages();
         }
     }, [step, hasLoadedChat, pin, loadMessages]);
+    
+    // Pre-fill receiver info if logged in (only when moving to FORM step)
+    useEffect(() => {
+        if (step === "FORM") {
+            const prefillInfo = async () => {
+                try {
+                    const session = await fetchAuthSession();
+                    if (session.tokens?.idToken) {
+                        const data = await userApi.user_receiver_get({});
+                        if (data.receiver_info) {
+                            // Only pre-fill if current value is empty to avoid overwriting user edits
+                            setName(prev => prev || data.receiver_info.name || '');
+                            setZipCode(prev => prev || data.receiver_info.zipCode || '');
+                            setAddress(prev => prev || data.receiver_info.address || '');
+                            setPhone(prev => prev || data.receiver_info.phone || '');
+                            setEmail(prev => prev || data.receiver_info.email || '');
+                            setEmail2(prev => prev || data.receiver_info.email || '');
+                        }
+                    }
+                } catch (e) {
+                    // Silently fail if not logged in or error
+                }
+            };
+            prefillInfo();
+        }
+    }, [step]);
 
     // Pre-fill receiver info if logged in (only when moving to FORM step and role is receiver AND senderInfo is present)
     useEffect(() => {

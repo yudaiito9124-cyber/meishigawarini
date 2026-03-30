@@ -62,7 +62,7 @@ export default async function RootLayout({
   const ts = await getTranslations('Site');
 
   return (
-    <html lang={locale} className="scroll-smooth" suppressHydrationWarning={true}>
+    <html lang={locale} className="scroll-smooth" data-scroll-behavior="smooth" suppressHydrationWarning={true}>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >

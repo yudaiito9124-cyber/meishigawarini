@@ -223,10 +223,16 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             console.error('Failed to send notification emails:', e);
         }
 
+        // フロントエンドでの即時表示用に署名を付与
+        const responseData = { ...newMessage };
+        if (responseData.file_url) {
+            responseData.file_url = await signUrlIfS3(responseData.file_url, BUCKET_NAME);
+        }
+
         return {
             statusCode: 200,
             headers: corsHeaders,
-            body: JSON.stringify({ message: 'Message posted', data: newMessage })
+            body: JSON.stringify({ message: 'Message posted', data: responseData })
         };
 
     } catch (error: any) {
