@@ -1,67 +1,47 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { useTranslations } from 'next-intl';
-import { useRouter, useParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { UserPen, Send, Inbox, QrCode, LogOut, ChevronDown, Truck } from 'lucide-react';
-import { SiteFooter } from '@/components/SiteFooter';
-import { signOut } from 'aws-amplify/auth';
+import { UserPen, Send, Inbox, QrCode, LogOut, ChevronDown, Truck, Copy, Check } from 'lucide-react';
+import { signOut, fetchUserAttributes, getCurrentUser } from 'aws-amplify/auth';
 
 export default function UserDashboardPage() {
     const t = useTranslations('UserProfilePage');
     const router = useRouter();
-    const params = useParams();
-    const userId = params?.userid as string;
-    console.log(params);
+    const [userEmail, setUserEmail] = useState<string>('');
+    const [userId, setUserId] = useState<string>('');
+    const [copiedId, setCopiedId] = useState<string | null>(null);
 
-    const navItems = [
-        {
-            title: t('editProfile'),
-            desc: t('editProfileDesc'),
-            icon: UserPen,
-            href: `/user/${userId}/editprofile`,
-            color: "text-blue-600",
-            bg: "bg-blue-50",
-            border: "border-blue-100 hover:border-blue-300 hover:bg-blue-50/50"
-        },
-        {
-            title: t('sendList'),
-            desc: t('sendListDesc'),
-            icon: Send,
-            href: `/user/${userId}/send`,
-            color: "text-green-600",
-            bg: "bg-green-50",
-            border: "border-green-100 hover:border-green-300 hover:bg-green-50/50"
-        },
-        {
-            title: t('receiveList'),
-            desc: t('receiveListDesc'),
-            icon: Inbox,
-            href: `/user/${userId}/receivedgift`,
-            color: "text-purple-600",
-            bg: "bg-purple-50",
-            border: "border-purple-100 hover:border-purple-300 hover:bg-purple-50/50"
-        },
-        {
-            title: t('sendGift'),
-            desc: t('sendGiftDesc'),
-            icon: QrCode,
-            href: `/user/${userId}/sendgift`,
-            color: "text-orange-600",
-            bg: "bg-orange-50",
-            border: "border-orange-100 hover:border-orange-300 hover:bg-orange-50/50"
-        },
-        {
-            title: t('deliverySettings'),
-            desc: t('deliverySettingsDesc'),
-            icon: Truck,
-            href: `/user/${userId}/delivery`,
-            color: "text-rose-600",
-            bg: "bg-rose-50",
-            border: "border-rose-100 hover:border-rose-300 hover:bg-rose-50/50"
-        }
-    ];
+    const handleCopy = (id: string) => {
+        navigator.clipboard.writeText(id).then(() => {
+            setCopiedId(id);
+            setTimeout(() => setCopiedId(null), 2000);
+        });
+    };
+
+    useEffect(() => {
+        const fetchUserData = async () => {
+            try {
+                const [attributes, user] = await Promise.all([
+                    fetchUserAttributes(),
+                    getCurrentUser()
+                ]);
+
+                if (attributes.email) {
+                    setUserEmail(attributes.email);
+                }
+                if (user.userId) {
+                    setUserId(user.userId);
+                }
+            } catch (error) {
+                console.error('Error fetching user data:', error);
+            }
+        };
+        fetchUserData();
+    }, []);
 
     const handleLogout = async () => {
         try {
@@ -83,13 +63,80 @@ export default function UserDashboardPage() {
 
     }
 
+    const navItems = [
+        {
+            title: t('editProfile'),
+            desc: t('editProfileDesc'),
+            icon: UserPen,
+            href: `/user/editprofile`,
+            color: "text-blue-600",
+            bg: "bg-blue-50",
+            border: "border-blue-100 hover:border-blue-300 hover:bg-blue-50/50"
+        },
+        {
+            title: t('sendGift'),
+            desc: t('sendGiftDesc'),
+            icon: QrCode,
+            href: `/user/sendgift`,
+            color: "text-orange-600",
+            bg: "bg-orange-50",
+            border: "border-orange-100 hover:border-orange-300 hover:bg-orange-50/50"
+        },
+        {
+            title: t('sendList'),
+            desc: t('sendListDesc'),
+            icon: Send,
+            href: `/user/sentmemory`,
+            color: "text-green-600",
+            bg: "bg-green-50",
+            border: "border-green-100 hover:border-green-300 hover:bg-green-50/50"
+        },
+        {
+            title: t('receiveList'),
+            desc: t('receiveListDesc'),
+            icon: Inbox,
+            href: `/user/receivedmemory`,
+            color: "text-purple-600",
+            bg: "bg-purple-50",
+            border: "border-purple-100 hover:border-purple-300 hover:bg-purple-50/50"
+        },
+        {
+            title: t('deliverySettings'),
+            desc: t('deliverySettingsDesc'),
+            icon: Truck,
+            href: `/user/editdelivery`,
+            color: "text-rose-600",
+            bg: "bg-rose-50",
+            border: "border-rose-100 hover:border-rose-300 hover:bg-rose-50/50"
+        }
+    ];
+
     return (
         <div className="flex flex-col min-h-screen bg-mist-50 font-sans">
             <main className="flex-1 max-w-4xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-8 pb-12 pt-12">
                 <div className="flex justify-between items-center mb-8">
                     <div>
                         <h1 className="text-3xl font-black text-gray-800 tracking-tight">{t('title')}</h1>
-                        <p className="text-xs text-gray-400 font-medium mt-1">{t('userId')} : {userId}</p>
+                        <div className="mt-1 space-y-0.5">
+                            <div className="flex items-center gap-2">
+                                <p className="text-xs text-gray-400 font-medium">{t('userId')} : {userId ? userId : ""}</p>
+                                {userId && (
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-4 w-4 text-gray-400 hover:text-gray-600"
+                                        onClick={() => handleCopy(userId)}
+                                    >
+                                        {copiedId === userId ? (
+                                            <Check className="h-3 w-3 text-green-500" />
+                                        ) : (
+                                            <Copy className="h-3 w-3" />
+                                        )}
+                                    </Button>
+                                )}
+                            </div>
+                            <p className="text-xs text-gray-400 font-medium">{t('userEmail')} : {userEmail ? userEmail : ""}</p>
+                        </div>
                     </div>
                     <div>
                         <Button variant="ghost" className="text-mist-500 hover:text-mist-800" onClick={() => router.push('/login')}>

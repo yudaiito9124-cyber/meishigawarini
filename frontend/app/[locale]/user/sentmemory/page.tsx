@@ -10,9 +10,7 @@ import { userApi } from "@/lib/api/user";
 
 export default function SendHistoryPage() {
     const t = useTranslations('UserProfilePage');
-    const params = useParams();
     const router = useRouter();
-    const userId = params?.userid as string;
 
     const [loading, setLoading] = useState(true);
     const [history, setHistory] = useState<Array<{ uuid: string, timestamp: string }>>([]);
@@ -42,7 +40,7 @@ export default function SendHistoryPage() {
                             variant="ghost" 
                             size="sm" 
                             className="text-white hover:bg-white/20 -ml-2 h-8"
-                            onClick={() => window.location.href = `/user/${userId}`}
+                            onClick={() => router.push('/user')}
                         >
                             <ChevronDown className="h-4 w-4 mr-1 rotate-90" /> {t('back')}
                         </Button>

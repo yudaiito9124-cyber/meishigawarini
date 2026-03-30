@@ -164,7 +164,15 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 }
             }
 
-            return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ message: 'Sender info updated', data: sender_info }) };
+            // 更新後の情報を署名付きで返す
+            const signedSenderInfo = { ...sender_info };
+            if (signedSenderInfo.card_image_url) signedSenderInfo.card_image_url = await signUrlIfS3(signedSenderInfo.card_image_url, BUCKET_NAME);
+            if (signedSenderInfo.detail_html) signedSenderInfo.detail_html = await signUrlsInHtml(signedSenderInfo.detail_html, BUCKET_NAME);
+            if (signedSenderInfo.html_image_urls && Array.isArray(signedSenderInfo.html_image_urls)) {
+                signedSenderInfo.html_image_urls = await Promise.all(signedSenderInfo.html_image_urls.map((url: string) => signUrlIfS3(url, BUCKET_NAME)));
+            }
+
+            return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ message: 'Sender info updated', data: signedSenderInfo }) };
         }
 
         // ====================================================================

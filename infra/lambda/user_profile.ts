@@ -192,7 +192,30 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 }
             }
 
-            return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ message: 'Profile updated successfully' }) };
+            // 更新後のプロフィールを再取得して署名付きで返す (フロントエンドの整合性のため)
+            const getRes = await ddb.send(new GetCommand({
+                TableName: TABLE_NAME,
+                Key: { PK: pk, SK: sk }
+            }));
+
+            let finalProfile = getRes.Item ? { ...getRes.Item } : profile;
+            delete finalProfile.PK;
+            delete finalProfile.SK;
+
+            // S3画像に署名付きURLを付与
+            if (finalProfile.card_image_url) {
+                finalProfile.card_image_url = await signUrlIfS3(finalProfile.card_image_url, BUCKET_NAME);
+            }
+            if (finalProfile.detail_html) {
+                finalProfile.detail_html = await signUrlsInHtml(finalProfile.detail_html, BUCKET_NAME);
+            }
+            if (finalProfile.html_image_urls && Array.isArray(finalProfile.html_image_urls)) {
+                finalProfile.html_image_urls = await Promise.all(
+                    finalProfile.html_image_urls.map((url: string) => signUrlIfS3(url, BUCKET_NAME))
+                );
+            }
+
+            return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ message: 'Profile updated successfully', profile: finalProfile }) };
         }
 
         // ====================================================================
@@ -224,10 +247,13 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             const region = process.env.AWS_REGION || 'ap-northeast-1';
             const publicUrl = `https://${BUCKET_NAME}.s3.${region}.amazonaws.com/${key}`;
 
+            // フロントエンドでの即時プレビュー用に署名を付与 (読み取り用)
+            const signedPublicUrl = await signUrlIfS3(publicUrl, BUCKET_NAME);
+
             return {
                 statusCode: 200,
                 headers: corsHeaders,
-                body: JSON.stringify({ uploadUrl, publicUrl })
+                body: JSON.stringify({ uploadUrl, publicUrl: signedPublicUrl, signedUrl: signedPublicUrl })
             };
         }
         

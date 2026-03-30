@@ -14,8 +14,6 @@ export default function DeliverySettingsPage() {
     const t = useTranslations('ReceivePage.formStep');
     const tp = useTranslations('UserProfilePage');
     const router = useRouter();
-    const params = useParams();
-    const userId = params?.userid as string;
 
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
@@ -97,7 +95,7 @@ export default function DeliverySettingsPage() {
     return (
         <div className="min-h-screen bg-mist-50 py-12 px-4 shadow-[inset_0_0_100px_rgba(0,0,0,0.05)]">
             <div className="max-w-2xl mx-auto space-y-6">
-                <Button variant="ghost" className="mb-4 text-mist-600 hover:text-mist-900 transition-colors" onClick={() => router.back()}>
+                <Button variant="ghost" className="mb-4 text-mist-600 hover:text-mist-900 transition-colors" onClick={() => router.push('/user')}>
                     <ChevronLeft className="w-4 h-4 mr-2" />
                     {tp('back')}
                 </Button>
@@ -172,7 +170,7 @@ export default function DeliverySettingsPage() {
                             type="submit"
                             form="delivery-form"
                             disabled={saving}
-                            className="rounded-full px-12 py-7 bg-rose-600 hover:bg-rose-700 text-white font-black text-xl transition-all shadow-xl hover:shadow-rose-200 active:scale-95 disabled:opacity-50 h-auto"
+                            className="rounded-full px-12 py-7 bg-rose-600 hover:bg-rose-700 text-white font-black text-xl transition-all shadow-xl hover:shadow-rose-200 active:scale-95 disabled:opacity-50 h-10"
                         >
                             {saving ? (
                                 <><Loader2 className="w-6 h-6 mr-3 animate-spin" /> 保存中...</>

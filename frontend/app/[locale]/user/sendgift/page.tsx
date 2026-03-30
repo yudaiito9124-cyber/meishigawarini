@@ -12,9 +12,7 @@ import { userApi } from "@/lib/api/user";
 
 export default function SendGiftPage() {
     const t = useTranslations('UserProfilePage');
-    const params = useParams();
     const router = useRouter();
-    const userId = params?.userid as string;
 
     const [isScanning, setIsScanning] = useState(false);
     const [scannedUrl, setScannedUrl] = useState("");
@@ -115,7 +113,7 @@ export default function SendGiftPage() {
                             variant="ghost" 
                             size="sm" 
                             className="text-white hover:bg-white/20 -ml-2 h-8"
-                            onClick={() => window.location.href = `/user/${userId}`}
+                            onClick={() => router.push('/user')}
                         >
                             <ChevronDown className="h-4 w-4 mr-1 rotate-90" /> {t('back')}
                         </Button>
