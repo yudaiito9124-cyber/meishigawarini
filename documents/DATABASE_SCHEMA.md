@@ -167,6 +167,7 @@ QRコードのライフサイクルや注文ステータス、商品との紐付
 | `product_id` | String | 紐付け先の商品ID （未連携時は存在しないか空） |
 | `batch_id` | String | QRコード生成時のバッチID（同じタイミングで生成されたQRは同じIDを持つ） |
 | `owner_id` | String | (QR生成時オプション)QRコードを扱えるショップの制限用、ユーザーID(そのユーザーがshop/画面で見れるショップに制限) （UUID形式の `sub` 属性） |
+| `card_design` | String | カードデザインID |
 | `memo_for_users` | String | ショップからの受取人向けメッセージ （任意の文字列） |
 | `memo_for_shop` | String | ショップ自身の検索・管理用メモ欄 （任意の文字列） |
 | `password_hash` | String | ユーザー設定の追加パスワードハッシュ値 (現在パスワード機能は設定画面をコメントアウトして無効化中) |

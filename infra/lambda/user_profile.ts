@@ -19,6 +19,7 @@ import { DynamoDBDocumentClient, GetCommand, UpdateCommand, QueryCommand, BatchG
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { stripSignature, deleteFileByUrl, signUrlIfS3, signUrlsInHtml, stripSignaturesInHtml } from './utils/s3';
+import { getSystemDesign } from './utils/designs';
 import { appendToHistory } from './utils/history';
 
 const client = new DynamoDBClient({});
@@ -445,7 +446,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 // 3. 【DB操作: BatchGetItem (CARD_DESIGN)】
                 // - 目的: デザインIDからカードの表面サムネイルURLを取得します。
                 const designMap = new Map<string, any>();
-                const designIds = [...new Set(Array.from(metadataMap.values()).map(m => m.card_design).filter(Boolean))];
+                const designIds = [...new Set(Array.from(metadataMap.values()).map(m => m.card_design || m.design_id).filter(Boolean))];
                 if (designIds.length > 0) {
                     const chunkedDesignIds = [];
                     for (let i = 0; i < designIds.length; i += 100) {
@@ -508,7 +509,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 
                     const prodKey = `SHOP#${meta.shop_id}_PRODUCT#${meta.product_id}`;
                     const product = productMap.get(prodKey);
-                    const design = designMap.get(meta.card_design);
+                    const design = designMap.get(meta.card_design || meta.design_id) || getSystemDesign(meta.card_design || meta.design_id);
                     const shop = shopMap.get(meta.shop_id);
 
                     return {

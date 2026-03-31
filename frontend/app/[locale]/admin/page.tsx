@@ -15,7 +15,8 @@ import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, Tabl
 import { APP_CONFIG } from "@/lib/config";
 import { generateId } from '@/lib/id';
 import { useTranslations } from 'next-intl';
-import { generatePDF, cardformats, paperformats } from '@/lib/generatePDF';
+import { generatePDF } from '@/lib/generatePDF';
+import { cardformats, paperformats } from '@/lib/constants/designs';
 import { generateCSVExport } from '@/lib/generateCSVExport';
 import { ExternalLink, Copy, Check, Eye, QrCode, Store, Wrench, Layers, HelpCircle, Home, Trash2, RotateCcw, Loader2, Plus, X, Search, Save, FileText, Download, CreditCard, Printer, Paintbrush, ChevronDown } from 'lucide-react';
 import CardDesignEditor from "@/components/admin/CardDesignEditor";

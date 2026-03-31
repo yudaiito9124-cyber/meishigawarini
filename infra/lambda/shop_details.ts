@@ -16,6 +16,7 @@ import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, UpdateCommand, BatchGetCommand } from '@aws-sdk/lib-dynamodb';
 import { checkShopOwnerOrGM } from './share/shop-auth';
 import { signUrlsInHtml, signUrlIfS3, stripSignaturesInHtml, stripSignature, deleteFileByUrl } from './utils/s3';
+import { getSystemDesign } from './utils/designs';
 
 const client = new DynamoDBClient({});
 const ddb = DynamoDBDocumentClient.from(client);
@@ -90,8 +91,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 }));
 
                 const rawDesigns = batchRes.Responses?.[TABLE_NAME] || [];
-
-                result.allowed_designs = await Promise.all(rawDesigns.map(async (d) => ({
+                const designList = await Promise.all(rawDesigns.map(async (d) => ({
                     design_id: d.SK,
                     name: d.name,
                     description: d.description,
@@ -100,6 +100,24 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                     bgimgf: d.bgimgf ? await signUrlIfS3(d.bgimgf, BUCKET_NAME) : undefined,
                     bgimgb: d.bgimgb ? await signUrlIfS3(d.bgimgb, BUCKET_NAME) : undefined,
                 })));
+                
+                // Add system designs if they were in the card_designs list
+                for (const id of result.card_designs) {
+                    const systemDesign = getSystemDesign(id);
+                    if (systemDesign && !designList.find(d => d.design_id === id)) {
+                        designList.push({
+                            design_id: id,
+                            name: id,
+                            description: "System Design",
+                            thumbf: systemDesign.thumbf,
+                            thumbb: systemDesign.thumbb,
+                            bgimgf: systemDesign.thumbf,
+                            bgimgb: systemDesign.thumbb
+                        } as any);
+                    }
+                }
+                
+                result.allowed_designs = designList;
             } else {
                 result.allowed_designs = [];
             }

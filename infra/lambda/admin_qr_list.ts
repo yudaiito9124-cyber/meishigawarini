@@ -12,6 +12,7 @@ import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, QueryCommand, ScanCommand, BatchGetCommand, GetCommand } from '@aws-sdk/lib-dynamodb';
 import { CognitoIdentityProviderClient, AdminGetUserCommand } from '@aws-sdk/client-cognito-identity-provider';
 import { signUrlIfS3 } from './utils/s3';
+import { getSystemDesign } from './utils/designs';
 
 const client = new DynamoDBClient({});
 const ddb = DynamoDBDocumentClient.from(client);
@@ -283,7 +284,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         const enrichedItems = items.map((item: any) => {
             const shop = item.shop_id ? shopMap.get(item.shop_id) : null;
             const order = orderMap.get(item.PK);
-            const design = item.card_design ? designMap.get(item.card_design) : null;
+            const design = item.card_design ? (designMap.get(item.card_design) || getSystemDesign(item.card_design)) : null;
 
             return {
                 ...item,

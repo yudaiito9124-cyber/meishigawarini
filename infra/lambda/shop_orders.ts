@@ -21,6 +21,7 @@ import { DynamoDBDocumentClient, QueryCommand, BatchGetCommand, UpdateCommand, G
 import { sendLocalizedEmail } from './templates/email';
 import { checkShopOwnerOrGM } from './share/shop-auth';
 import { signUrlIfS3 } from './utils/s3';
+import { getSystemDesign } from './utils/designs';
 
 const client = new DynamoDBClient({});
 const ddb = DynamoDBDocumentClient.from(client);
@@ -137,14 +138,28 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 for (let i = 0; i < designIds.length; i += 100) {
                     const chunk = designIds.slice(i, i + 100);
                     const keys = chunk.map(id => ({ PK: 'CARD_DESIGN#METADATA', SK: id as string }));
-                    const batchRes = await ddb.send(new BatchGetCommand({
-                        RequestItems: { [TABLE_NAME]: { Keys: keys, ProjectionExpression: 'SK, thumbf, thumbb' } }
-                    }));
-                    if (batchRes.Responses?.[TABLE_NAME]) {
-                        for (const design of batchRes.Responses[TABLE_NAME]) {
-                            if (design.thumbf) design.thumbf = await signUrlIfS3(design.thumbf, BUCKET_NAME);
-                            if (design.thumbb) design.thumbb = await signUrlIfS3(design.thumbb, BUCKET_NAME);
-                            designMap.set(design.SK, design);
+                    // Also filter out system designs from DB lookup as we know they are not there
+                    const dbKeys = keys.filter(k => !getSystemDesign(k.SK));
+                    
+                    if (dbKeys.length > 0) {
+                        const batchRes = await ddb.send(new BatchGetCommand({
+                            RequestItems: { [TABLE_NAME]: { Keys: dbKeys, ProjectionExpression: 'SK, thumbf, thumbb' } }
+                        }));
+                        if (batchRes.Responses?.[TABLE_NAME]) {
+                            for (const design of batchRes.Responses[TABLE_NAME]) {
+                                if (design.thumbf) design.thumbf = await signUrlIfS3(design.thumbf, BUCKET_NAME);
+                                if (design.thumbb) design.thumbb = await signUrlIfS3(design.thumbb, BUCKET_NAME);
+                                designMap.set(design.SK, design);
+                            }
+                        }
+                    }
+                    
+                    // Add system designs to maps
+                    for (const id of chunk) {
+                        const systemDesign = getSystemDesign(id);
+                        if (systemDesign && !designMap.has(id)) {
+                            // Note: these are already paths starting with /, no need to sign unless they are in S3
+                            designMap.set(id, { SK: id, ...systemDesign });
                         }
                     }
                 }
@@ -288,8 +303,12 @@ function formatOrderDetails(meta: any, orderDetail: any) {
 
 async function addDesignThumbnails(order: any, designId: string) {
     const designRes = await ddb.send(new GetCommand({ TableName: TABLE_NAME, Key: { PK: 'CARD_DESIGN#METADATA', SK: designId } }));
-    if (designRes.Item) {
-        order.thumbf = await signUrlIfS3(designRes.Item.thumbf, BUCKET_NAME);
-        order.thumbb = await signUrlIfS3(designRes.Item.thumbb, BUCKET_NAME);
+    const design = designRes.Item || getSystemDesign(designId);
+    if (design) {
+        order.thumbf = design.thumbf?.startsWith('http') || !design.thumbf ? design.thumbf : await signUrlIfS3(design.thumbf, BUCKET_NAME);
+        order.thumbb = design.thumbb?.startsWith('http') || !design.thumbb ? design.thumbb : await signUrlIfS3(design.thumbb, BUCKET_NAME);
+        // Special case for system designs starting with / (not in S3)
+        if (design.thumbf?.startsWith('/')) order.thumbf = design.thumbf;
+        if (design.thumbb?.startsWith('/')) order.thumbb = design.thumbb;
     }
 }

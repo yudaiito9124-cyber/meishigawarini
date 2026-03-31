@@ -13,8 +13,8 @@ export default function ReceivedHistoryPage() {
     const router = useRouter();
 
     const [loading, setLoading] = useState(true);
-    const [history, setHistory] = useState<Array<{ 
-        uuid: string, 
+    const [history, setHistory] = useState<Array<{
+        uuid: string,
         timestamp: string,
         pin?: string,
         product_name?: string,
@@ -51,9 +51,9 @@ export default function ReceivedHistoryPage() {
             <Card className="w-full max-w-2xl shadow-xl border-none bg-white/80 backdrop-blur-md rounded-3xl overflow-hidden">
                 <CardHeader className="bg-gradient-to-r from-purple-500 to-indigo-600 p-8 text-white flex flex-col gap-4">
                     <div className="flex justify-between items-start">
-                        <Button 
-                            variant="ghost" 
-                            size="sm" 
+                        <Button
+                            variant="ghost"
+                            size="sm"
                             className="text-white hover:bg-white/20 -ml-2 h-8"
                             onClick={() => router.push('/user')}
                         >
@@ -100,7 +100,7 @@ export default function ReceivedHistoryPage() {
                                         )}
                                         {/* Gradient Overlay */}
                                         <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
-                                        
+
                                         {/* Product Image Inset */}
                                         {item.product_image_url && (
                                             <div className="absolute bottom-1 right-1 w-8 h-8 rounded-md overflow-hidden border border-white/50 shadow-sm bg-white">
@@ -123,11 +123,25 @@ export default function ReceivedHistoryPage() {
                                                 <p className="text-xs text-gray-500 font-medium">@{item.shop_name}</p>
                                             )}
                                         </div>
-                                        <p className="text-[10px] font-mono text-gray-400 truncate mb-1">
-                                            {item.uuid}
-                                        </p>
+                                        <div className="flex items-center gap-1.5 mb-1 group">
+                                            <p className="text-[10px] font-mono text-gray-400 truncate">
+                                                {item.uuid}
+                                            </p>
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                className="h-4 w-4 text-gray-300"
+                                                onClick={() => handleCopy(item.uuid)}
+                                            >
+                                                {copiedId === item.uuid ? (
+                                                    <Check className="h-2.5 w-2.5 text-green-500" />
+                                                ) : (
+                                                    <Copy className="h-2.5 w-2.5" />
+                                                )}
+                                            </Button>
+                                        </div>
                                         <p className="text-[10px] text-gray-500">
-                                            {new Date(item.timestamp).toLocaleString()}
+                                            受取日: {new Date(item.timestamp).toLocaleString()}
                                         </p>
                                     </div>
 
@@ -151,8 +165,8 @@ export default function ReceivedHistoryPage() {
                                                 </Button>
                                             </div>
                                         )}
-                                        <Button 
-                                            variant="outline" 
+                                        <Button
+                                            variant="outline"
                                             size="sm"
                                             className="gap-1.5 rounded-xl border-purple-200 text-purple-700 hover:bg-purple-50 text-xs h-9 px-4 shrink-0"
                                             onClick={() => window.open(`/receive/${item.uuid}`, '_blank')}

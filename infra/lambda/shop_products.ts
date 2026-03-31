@@ -27,6 +27,7 @@ import { DynamoDBDocumentClient, PutCommand, QueryCommand, GetCommand, UpdateCom
 import { checkShopOwnerOrGM } from './share/shop-auth';
 import { generateId } from './utils/id';
 import { stripSignaturesInHtml, stripSignature, signUrlIfS3, signUrlsInHtml } from './utils/s3';
+import { getSystemDesign } from './utils/designs';
 
 const client = new DynamoDBClient({});
 const ddb = DynamoDBDocumentClient.from(client);
@@ -75,8 +76,11 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             if (!name) return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Missing product name' }) };
             if (!card_design_id) return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Missing card_design_id' }) };
 
-            // Validate that the design is allowed for this shop
-            if (!shopMetadata.card_designs || !Array.isArray(shopMetadata.card_designs) || !shopMetadata.card_designs.includes(card_design_id)) {
+            // Validate that the design is allowed for this shop (or is a system design)
+            const isSystemDesign = !!getSystemDesign(card_design_id);
+            const isAllowedDesign = shopMetadata.card_designs && Array.isArray(shopMetadata.card_designs) && shopMetadata.card_designs.includes(card_design_id);
+            
+            if (!isSystemDesign && !isAllowedDesign) {
                 return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Invalid or disallowed card_design_id' }) };
             }
 
@@ -147,6 +151,19 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                         bgimgb: d.bgimgb ? await signUrlIfS3(d.bgimgb, BUCKET_NAME) : undefined,
                     };
                 }
+                
+                // Add system designs to designMap
+                for (const id of cardDesignIds) {
+                    const systemDesign = getSystemDesign(id);
+                    if (systemDesign && !designMap[id]) {
+                        designMap[id] = {
+                            design_id: id,
+                            name: id,
+                            description: "System Design",
+                            ...systemDesign
+                        };
+                    }
+                }
             }
 
             for (const item of items) {
@@ -210,7 +227,10 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             }
 
             if (card_design_id) {
-                if (!shopMetadata.card_designs || !Array.isArray(shopMetadata.card_designs) || !shopMetadata.card_designs.includes(card_design_id)) {
+                const isSystemDesign = !!getSystemDesign(card_design_id);
+                const isAllowedDesign = shopMetadata.card_designs && Array.isArray(shopMetadata.card_designs) && shopMetadata.card_designs.includes(card_design_id);
+                
+                if (!isSystemDesign && !isAllowedDesign) {
                     return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Invalid or disallowed card_design_id' }) };
                 }
                 updateExpressions.push('card_design_id = :card_design_id');

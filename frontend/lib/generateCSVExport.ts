@@ -1,5 +1,5 @@
 import JSZip from 'jszip';
-import { cardformats } from './generatePDF';
+import { cardformats } from './constants/designs';
 import { APP_CONFIG } from "@/lib/config";
 
 const NEXT_PUBLIC_APP_URL = process.env.NEXT_PUBLIC_APP_URL || "";
