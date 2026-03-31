@@ -7,99 +7,105 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Loader2, QrCode, ScanLine, X, ChevronDown, CheckCircle2 } from "lucide-react";
-import { Html5QrcodeScanner } from "html5-qrcode";
+import QRScanner from "@/components/ui/qr-scanner";
 import { userApi } from "@/lib/api/user";
 
 export default function SendGiftPage() {
     const t = useTranslations('UserProfilePage');
+    const tb = useTranslations('Backend');
     const router = useRouter();
 
     const [isScanning, setIsScanning] = useState(false);
+    const [scannedUuids, setScannedUuids] = useState<string[]>([]);
     const [scannedUrl, setScannedUrl] = useState("");
+    const [showManualInput, setShowManualInput] = useState(false);
     const [processing, setProcessing] = useState(false);
     const [successMsg, setSuccessMsg] = useState("");
     const [errorMsg, setErrorMsg] = useState("");
+    const [bulkResults, setBulkResults] = useState<Array<{ uuid: string, status: 'success' | 'error', message?: string }>>([]);
+    const [isConfirming, setIsConfirming] = useState(false);
+    const [completedCount, setCompletedCount] = useState(0);
 
-    useEffect(() => {
-        if (!isScanning) return;
-
-        const scanner = new Html5QrcodeScanner(
-            "reader",
-            { fps: 10, qrbox: { width: 250, height: 250 } },
-            false
-        );
-
-        scanner.render(
-            (decodedText) => {
-                scanner.clear();
-                setIsScanning(false);
-                setScannedUrl(decodedText);
-                handleUrl(decodedText);
-            },
-            (error) => {
-                // Ignore frequent errors
-            }
-        );
-
-        return () => {
-            scanner.clear().catch(e => console.error("Failed to clear scanner", e));
-        };
-    }, [isScanning]);
-
-    const handleUrl = async (urlToProcess: string) => {
-        setProcessing(true);
+    const handleUrl = (urlToProcess: string) => {
         setErrorMsg("");
         setSuccessMsg("");
-        
+
         try {
-            // パターン: /receive/UUID?pin=PIN
-            let urlObj;
+            const trimmedInput = urlToProcess.trim();
+            if (!trimmedInput) return;
+
+            // 1. URL解析
+            let extractedUuid = "";
             try {
-                urlObj = new URL(urlToProcess);
+                if (trimmedInput.includes('://') || trimmedInput.startsWith('/') || trimmedInput.startsWith('receive/')) {
+                    const url = trimmedInput.includes('://') ? new URL(trimmedInput) : new URL(trimmedInput.startsWith('/') ? trimmedInput : `/${trimmedInput}`, window.location.origin);
+                    const pathParts = url.pathname.split('/');
+                    const uuidIndex = pathParts.findIndex(p => p === 'receive');
+                    if (uuidIndex !== -1 && pathParts[uuidIndex + 1]) {
+                        extractedUuid = pathParts[uuidIndex + 1];
+                    }
+                }
             } catch (e) {
-                // もしURLでなければ手動入力か？
-                // 簡易的に補完
-                if (urlToProcess.startsWith("/receive")) {
-                    urlObj = new URL(urlToProcess, window.location.origin);
-                } else {
-                    throw new Error("Invalid QR Code Format");
+                // Ignore
+            }
+
+            // 2. UUID形式チェック (URLでなかったら生のID)
+            if (!extractedUuid) {
+                const idRegex = /^[a-zA-Z0-9\-_]+$/;
+                if (idRegex.test(trimmedInput) && trimmedInput.length >= 8) {
+                    extractedUuid = trimmedInput;
                 }
             }
 
-            const pathParts = urlObj.pathname.split('/');
-            const uuidIndex = pathParts.findIndex(p => p === 'receive');
-            if (uuidIndex === -1 || !pathParts[uuidIndex + 1]) {
-                throw new Error("Invalid QR Code (No UUID found)");
+            if (extractedUuid) {
+                if (!scannedUuids.includes(extractedUuid)) {
+                    setScannedUuids(prev => [...prev, extractedUuid]);
+                }
+                setScannedUrl(""); // 手動入力欄をクリア
+            } else {
+                throw new Error(t('bulkScan.invalidFormat'));
             }
-            
-            const uuid = pathParts[uuidIndex + 1];
-            const pin = urlObj.searchParams.get('pin');
-
-            if (!pin) {
-                throw new Error("Invalid QR Code (No PIN found)");
-            }
-
-            // バックエンドAPIコール
-            await userApi.user_history_sendgift({ uuid, pin });
-            setSuccessMsg("ギフトの送信者として正常に登録されました。");
-            
-            // 少し待ってからプロフィール編集画面(または送信履歴画面)へ？
-            setTimeout(() => {
-                window.location.href = urlToProcess; // スキャンしたQRの本来のURLへ遷移させる (オプション)
-            }, 3000);
 
         } catch (e: any) {
-            setErrorMsg(e.message || "Failed to link gift to your profile");
-        } finally {
-            setProcessing(false);
+            setErrorMsg(e.message);
+        }
+    };
+
+    const handleBulkLink = async () => {
+        if (scannedUuids.length === 0) return;
+
+        setIsConfirming(false);
+        setProcessing(true);
+        setCompletedCount(0);
+        const results: Array<{ uuid: string, status: 'success' | 'error', message?: string }> = [];
+
+        for (let i = 0; i < scannedUuids.length; i++) {
+            const uuid = scannedUuids[i];
+            try {
+                // PINは一旦無効化
+                await userApi.user_history_sendgift({ uuid, pin: "" });
+                results.push({ uuid, status: 'success' });
+            } catch (e: any) {
+                results.push({
+                    uuid,
+                    status: 'error',
+                    message: e.message 
+                });
+            }
+            setCompletedCount(i + 1);
+        }
+
+        setBulkResults(results);
+        setProcessing(false);
+        const successCount = results.filter(r => r.status === 'success').length;
+        if (successCount > 0) {
+            setSuccessMsg(t('bulkScan.successReport', { count: successCount }));
         }
     };
 
     const handleManualSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        if (scannedUrl) {
-            handleUrl(scannedUrl);
-        }
+        handleUrl(scannedUrl);
     };
 
     return (
@@ -107,92 +113,248 @@ export default function SendGiftPage() {
             <Card className="w-full max-w-lg shadow-xl border-none bg-white/80 backdrop-blur-md rounded-3xl overflow-hidden">
                 <CardHeader className="bg-gradient-to-r from-orange-500 to-red-500 p-8 text-white flex flex-col gap-4">
                     <div className="flex justify-between items-start">
-                        <Button 
-                            variant="ghost" 
-                            size="sm" 
+                        <Button
+                            variant="ghost"
+                            size="sm"
                             className="text-white hover:bg-white/20 -ml-2 h-8"
                             onClick={() => router.push('/user')}
                         >
                             <ChevronDown className="h-4 w-4 mr-1 rotate-90" /> {t('back')}
                         </Button>
                     </div>
-                    <div>
-                        <CardTitle className="text-2xl font-black tracking-tight">{t('sendGift')}</CardTitle>
-                        <p className="text-orange-100/80 text-sm mt-1">{t('sendGiftDesc')}</p>
-                    </div>
+                    <CardTitle className="text-2xl font-black tracking-tight">{t('sendGift')}</CardTitle>
                 </CardHeader>
                 <CardContent className="p-8 space-y-6">
-                    {successMsg ? (
-                        <div className="flex flex-col items-center justify-center py-12 text-center animate-in zoom-in-95 duration-500">
-                            <CheckCircle2 className="w-16 h-16 text-green-500 mb-4" />
-                            <h3 className="text-xl font-bold text-gray-800 mb-2">登録完了！</h3>
-                            <p className="text-gray-500 mb-6">{successMsg}</p>
-                            <Loader2 className="w-6 h-6 animate-spin text-gray-300" />
-                            <p className="text-sm text-gray-400 mt-2">ギフトページへ移動しています...</p>
+                    {successMsg || bulkResults.length > 0 ? (
+                        <div className="space-y-6 animate-in zoom-in-95 duration-500">
+                            <div className="flex flex-col items-center justify-center text-center">
+                                <CheckCircle2 className="w-16 h-16 text-green-500 mb-4" />
+                                <h3 className="text-xl font-bold text-gray-800 mb-2">{t('bulkScan.completeTitle')}</h3>
+                                <p className="text-gray-500 mb-6">{successMsg}</p>
+                            </div>
+
+                            <div className="space-y-3">
+                                <p className="text-sm font-bold text-gray-700 border-b pb-2">{t('bulkScan.resultsDetail')}</p>
+                                <div className="max-h-60 overflow-y-auto space-y-2 pr-1">
+                                    {bulkResults.map((res, idx) => (
+                                        <div key={idx} className={`p-3 rounded-xl border flex justify-between items-center ${res.status === 'success' ? 'bg-green-50 border-green-100' : 'bg-red-50 border-red-100'}`}>
+                                            <div className="flex flex-col overflow-hidden">
+                                                <span className="text-[10px] font-mono text-gray-400 truncate">{res.uuid}</span>
+                                                {res.message && <span className="text-xs text-red-600 font-medium mt-1">{tb(res.message) || res.message}</span>}
+                                            </div>
+                                            {res.status === 'success' ? <CheckCircle2 className="w-4 h-4 text-green-600 shrink-0" /> : <X className="w-4 h-4 text-red-600 shrink-0" />}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 gap-3">
+                                <Button
+                                    onClick={() => {
+                                        setSuccessMsg("");
+                                        setScannedUuids([]);
+                                        setBulkResults([]);
+                                        setIsConfirming(false);
+                                    }}
+                                    className="w-full rounded-2xl h-12 bg-orange-600 hover:bg-orange-700 text-white font-bold"
+                                >
+                                    {t('bulkScan.continueButton')}
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    onClick={() => router.push('/user/sentmemory')}
+                                    className="w-full rounded-2xl h-12 font-bold"
+                                >
+                                    {t('bulkScan.checkSentButton')}
+                                </Button>
+                            </div>
+                        </div>
+                    ) : isConfirming ? (
+                        <div className="space-y-6 animate-in slide-in-from-bottom-4 duration-500">
+                            <div className="text-center space-y-3">
+                                <QrCode className="w-12 h-12 text-orange-600 mx-auto" />
+                                <h3 className="text-xl font-black text-gray-900">{t('bulkScan.confirmTitle')}</h3>
+                                <p className="text-sm text-gray-500">
+                                    {t('bulkScan.confirmDesc', { count: scannedUuids.length })}
+                                </p>
+                                <div className="text-[10px] text-gray-400 space-y-1">
+                                    <p>{t('bulkScan.undoNotice')}</p>
+                                    <p className="underline cursor-pointer" onClick={() => router.push('/user/profile')}>{t('bulkScan.checkProfileLink')}</p>
+                                </div>
+                            </div>
+
+                            <div className="bg-gray-50 rounded-2xl p-4 max-h-40 overflow-y-auto border border-gray-100">
+                                <ul className="space-y-2">
+                                    {scannedUuids.map((uuid, idx) => (
+                                        <li key={idx} className="text-[10px] font-mono text-gray-500 flex items-center gap-2">
+                                            <span className="w-1.5 h-1.5 bg-orange-300 rounded-full" />
+                                            {uuid}
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3">
+                                <Button
+                                    variant="outline"
+                                    onClick={() => setIsConfirming(false)}
+                                    className="rounded-2xl h-12 font-bold"
+                                    disabled={processing}
+                                >
+                                    {t('back')}
+                                </Button>
+                                <Button
+                                    onClick={handleBulkLink}
+                                    className="rounded-2xl h-12 bg-orange-600 hover:bg-orange-700 text-white font-bold"
+                                    disabled={processing}
+                                >
+                                    {processing ? <Loader2 className="w-5 h-5 animate-spin" /> : t('bulkScan.executeButton')}
+                                </Button>
+                            </div>
                         </div>
                     ) : (
                         <>
-                            <div className="flex justify-center">
-                                {!isScanning ? (
-                                    <Button 
-                                        onClick={() => setIsScanning(true)}
-                                        className="w-full h-32 rounded-3xl bg-gray-50 hover:bg-orange-50 text-gray-700 hover:text-orange-600 border-2 border-dashed border-gray-300 hover:border-orange-400 flex flex-col gap-3 font-bold text-lg shadow-sm transition-all"
-                                    >
-                                        <ScanLine className="w-10 h-10" />
-                                        カメラを起動してスキャン
-                                    </Button>
-                                ) : (
-                                    <div className="w-full max-w-sm overflow-hidden rounded-2xl shadow-lg relative bg-black">
-                                        <div id="reader" className="w-full" />
-                                        <Button 
-                                            variant="destructive"
-                                            size="sm"
-                                            className="absolute top-2 right-2 rounded-full z-10"
+                            <div className="space-y-4">
+                                {isScanning ? (
+                                    <div className="space-y-4">
+                                        <div className="w-full aspect-square overflow-hidden rounded-2xl shadow-lg relative bg-black border-4 border-orange-500">
+                                            <QRScanner
+                                                qrCodeSuccessCallback={(decodedText) => {
+                                                    handleUrl(decodedText);
+                                                }}
+                                                qrCodeErrorCallback={() => { }}
+                                                isContinuous={true}
+                                            />
+                                            <div className="absolute top-0 left-0 right-0 p-5 z-20 flex justify-between items-center pointer-events-none">
+                                                <div className="text-[10px] bg-black/40 backdrop-blur-sm text-white font-bold px-3 py-1 rounded-full flex items-center gap-1.5 border border-white/20">
+                                                    <span className="w-2 h-2 bg-orange-500 rounded-full animate-pulse" />
+                                                    {t('bulkScan.scanningNotice')}
+                                                </div>
+                                                <div className="text-[12px] bg-black/60 text-white font-bold px-3 py-1 rounded-full border border-white/20">
+                                                    {t('bulkScan.scannedCount', { count: scannedUuids.length })}
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <Button
                                             onClick={() => setIsScanning(false)}
+                                            className="w-full h-14 rounded-2xl bg-gray-900 hover:bg-black text-white font-bold shadow-xl"
                                         >
-                                            <X className="w-4 h-4" />
+                                            {t('bulkScan.finishScanButton')}
                                         </Button>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-6">
+                                        <Button
+                                            onClick={() => setIsScanning(true)}
+                                            className="w-full h-44 rounded-3xl bg-mist-50 hover:bg-orange-50 text-gray-700 hover:text-orange-600 border-2 border-dashed border-gray-300 hover:border-orange-400 flex flex-col gap-4 font-bold text-xl shadow-sm transition-all group"
+                                        >
+                                            <div className="w-16 h-16 bg-white rounded-2xl shadow-sm flex items-center justify-center group-hover:scale-110 transition-transform">
+                                                <ScanLine className="w-10 h-10 text-orange-500" />
+                                            </div>
+                                            {t('bulkScan.startScanButton')}
+                                        </Button>
+
+                                        {scannedUuids.length > 0 && (
+                                            <div className="bg-orange-50 rounded-2xl p-5 border border-orange-100 space-y-4 animate-in fade-in zoom-in-95">
+                                                <div className="flex justify-between items-center">
+                                                    <h4 className="text-sm font-black text-orange-800">{t('bulkScan.scannedListTitle', { count: scannedUuids.length })}</h4>
+                                                    <Button variant="ghost" size="sm" onClick={() => setScannedUuids([])} className="h-6 text-[10px] text-orange-600">
+                                                        {t('bulkScan.clearAll')}
+                                                    </Button>
+                                                </div>
+                                                <div className="max-h-32 overflow-y-auto space-y-1 pr-1">
+                                                    {scannedUuids.map((uuid, idx) => (
+                                                        <div key={idx} className="text-[10px] font-mono text-orange-600 bg-white/60 px-3 py-1.5 rounded-lg flex justify-between items-center group">
+                                                            <span className="truncate mr-2">{uuid}</span>
+                                                            <X className="w-3 h-3 cursor-pointer text-gray-400 hover:text-red-500 shrink-0" onClick={() => setScannedUuids(prev => prev.filter(u => u !== uuid))} />
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                                <Button
+                                                    onClick={() => setIsConfirming(true)}
+                                                    className="w-full rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-bold h-12 shadow-lg"
+                                                >
+                                                    {t('bulkScan.confirmButton')}
+                                                </Button>
+                                            </div>
+                                        )}
                                     </div>
                                 )}
                             </div>
 
-                            <div className="relative flex items-center py-2">
-                                <div className="flex-grow border-t border-gray-200"></div>
-                                <span className="flex-shrink-0 mx-4 text-gray-400 text-xs uppercase font-bold tracking-widest">or</span>
-                                <div className="flex-grow border-t border-gray-200"></div>
-                            </div>
-
-                            <form onSubmit={handleManualSubmit} className="space-y-4">
-                                <div className="space-y-2">
-                                    <label className="text-sm font-bold text-gray-700">QRコードのURLを手動入力</label>
-                                    <div className="flex gap-2">
-                                        <Input 
-                                            value={scannedUrl}
-                                            onChange={(e) => setScannedUrl(e.target.value)}
-                                            placeholder="https://.../receive/..."
-                                            className="rounded-xl bg-gray-50 border-gray-200 focus:border-orange-500"
-                                            disabled={processing}
-                                        />
-                                        <Button 
-                                            type="submit" 
-                                            disabled={!scannedUrl || processing}
-                                            className="rounded-xl bg-gray-800 hover:bg-black text-white px-6 font-bold"
-                                        >
-                                            {processing ? <Loader2 className="w-4 h-4 animate-spin" /> : "送信"}
-                                        </Button>
-                                    </div>
-                                </div>
-                            </form>
-
-                            {errorMsg && (
-                                <div className="p-4 bg-red-50 text-red-600 rounded-xl text-sm font-medium border border-red-100">
-                                    {errorMsg}
+                            {!isScanning && (
+                                <div className="space-y-4 pt-4 border-t border-gray-100 mt-4">
+                                    {!showManualInput ? (
+                                        <div className="flex justify-center">
+                                            <Button variant="ghost" size="sm" onClick={() => setShowManualInput(true)} className="text-gray-400 text-xs font-bold">
+                                                {t('bulkScan.manualInputButton')}
+                                            </Button>
+                                        </div>
+                                    ) : (
+                                        <form onSubmit={handleManualSubmit} className="space-y-4 animate-in fade-in slide-in-from-top-2">
+                                            <div className="space-y-2">
+                                                <div className="flex justify-between items-center">
+                                                    <label className="text-sm font-bold text-gray-700">{t('bulkScan.manualInputLabel')}</label>
+                                                    <X className="w-4 h-4 cursor-pointer text-gray-400" onClick={() => setShowManualInput(false)} />
+                                                </div>
+                                                <div className="flex gap-2">
+                                                    <Input
+                                                        value={scannedUrl}
+                                                        onChange={(e) => setScannedUrl(e.target.value)}
+                                                        placeholder={t('bulkScan.manualInputPlaceholder')}
+                                                        className="rounded-xl bg-gray-50 border-gray-200"
+                                                        autoFocus
+                                                    />
+                                                    <Button type="submit" disabled={!scannedUrl} className="rounded-xl bg-gray-800 text-white px-6 font-bold">
+                                                        {t('bulkScan.addButton')}
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                        </form>
+                                    )}
                                 </div>
                             )}
                         </>
                     )}
+
+                    {errorMsg && (
+                        <div className="p-4 bg-red-50 text-red-600 rounded-xl text-xs font-medium border border-red-100 animate-in fade-in slide-in-from-top-1">
+                            {tb(errorMsg) || errorMsg}
+                        </div>
+                    )}
                 </CardContent>
             </Card>
+
+            {/* Processing Overlay */}
+            {processing && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-white/60 backdrop-blur-md animate-in fade-in duration-300">
+                    <div className="bg-white p-8 rounded-3xl shadow-2xl flex flex-col items-center gap-6 border border-orange-100 max-w-sm w-full mx-4">
+                        <div className="relative">
+                            <Loader2 className="w-16 h-16 text-orange-500 animate-spin" />
+                            <div className="absolute inset-0 flex items-center justify-center">
+                                <span className="text-[10px] font-bold text-orange-600">
+                                    {Math.round((completedCount / scannedUuids.length) * 100)}%
+                                </span>
+                            </div>
+                        </div>
+                        <div className="space-y-2 text-center">
+                            <h3 className="font-black text-xl text-gray-900">{t('bulkScan.processingTitle')}</h3>
+                            <div className="flex flex-col items-center gap-1">
+                                <p className="text-gray-500 font-bold">
+                                    {completedCount} / {scannedUuids.length}
+                                </p>
+                                <div className="w-48 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                                    <div 
+                                        className="h-full bg-gradient-to-r from-orange-500 to-red-500 transition-all duration-300 ease-out" 
+                                        style={{ width: `${(completedCount / scannedUuids.length) * 100}%` }}
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

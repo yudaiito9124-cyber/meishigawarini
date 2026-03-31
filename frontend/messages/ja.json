@@ -74,7 +74,38 @@
     "userId": "ユーザーID",
     "userEmail": "メールアドレス",
     "createMyShop": "ショップを開設する",
-    "createMyShopConfirm": "本当にショップを開設しますか？これは、「名刺がわりに」で商品を販売したい場合に必要な手続きです。ギフトを渡したり、受け取ったりする場合は不要です。"
+    "createMyShopConfirm": "本当にショップを開設しますか？これは、「名刺がわりに」で商品を販売したい場合に必要な手続きです。ギフトを渡したり、受け取ったりする場合は不要です。",
+    "saving": "保存中...",
+    "details": "詳細",
+    "noSentHistory": "送信履歴がありません。",
+    "noReceivedHistory": "受け取り履歴がありません。",
+    "sendDate": "送信日: ",
+    "receiveDate": "受取日: ",
+    "bulkScan": {
+      "completeTitle": "一括処理完了！",
+      "resultsDetail": "処理結果詳細",
+      "continueButton": "続けてギフトを登録する",
+      "checkSentButton": "贈ったギフトを確認する",
+      "confirmTitle": "紐付けの確認",
+      "confirmDesc": "読み取った {count} 件のギフトに、あなたのプロフィール情報を送り主として登録します。本当に実行しますか？",
+      "undoNotice": "※一度紐付けると解除できません。",
+      "checkProfileLink": "プロフィールを確認する(ページ遷移します)",
+      "executeButton": "実行する",
+      "scanningNotice": "連続でスキャンできます",
+      "scannedCount": "{count}枚",
+      "finishScanButton": "完了して確認画面へ",
+      "startScanButton": "カメラでスキャンを開始",
+      "scannedListTitle": "読み取り済み ({count}件)",
+      "clearAll": "クリア",
+      "confirmButton": "紐付けを確認する",
+      "manualInputButton": "IDを手動で入力する",
+      "manualInputLabel": "手動追加",
+      "manualInputPlaceholder": "URLまたはUUIDを入力",
+      "addButton": "追加",
+      "invalidFormat": "形式が正しくありません。QRのURLまたはIDを正しく入力してください。",
+      "successReport": "{count}件のギフトを紐付けました。",
+      "processingTitle": "紐付け処理中..."
+    }
   },
   "LoginPage": {
     "title": "ログイン",
@@ -819,7 +850,12 @@
   },
   "UI": {
     "Error starting scanner": "QRコードスキャナーを起動できませんでした。",
-    "Camera permission denied or error starting scanner": "カメラを起動できませんでした。カメラの使用を許可してください。または、ほかのアプリケーション(Web会議等)でカメラを使用している場合は、そのアプリケーションを閉じるか、カメラの使用を中断し、もう一度スキャンボタンを押してください。"
+    "Camera permission denied or error starting scanner": "カメラを起動できませんでした。カメラの使用を許可してください。または、ほかのアプリケーション(Web会議等)でカメラを使用している場合は、そのアプリケーションを閉じるか、カメラの使用を中断し、もう一度スキャンボタンを押してください。",
+    "Select Camera": "カメラを選択",
+    "Close": "閉じる",
+    "Switch Camera": "カメラを切り替え",
+    "Scanning": "スキャン中...",
+    "No Camera Found": "カメラが見つかりません"
   },
   "HelpButton": {
     "ariaLabel": "ヘルプページを開く"
@@ -843,6 +879,7 @@
     "Missing qr_id": "QR IDが不足しています。",
     "Missing product_id": "プロダクトIDが不足しています。",
     "QR not found": "QRコードが見つかりません。",
+    "Already registered as a sender": "すでに送り主情報が登録されています。",
     "Product not found in this shop": "このショップに指定された商品が見つかりません。",
     "QR state is not unassigned": "このQRコードはすでに使用中か、未割り当ての状態ではありません。",
     "This QR code is reserved for another shop owner / manager": "このQRコードは別のオーナーまたはマネージャー専用に予約されています。",
@@ -864,8 +901,10 @@
     "Images deleted": "画像を削除しました。",
     "Operation failed_ QR might not be in correct state or belongs to another shop_": "操作に失敗しました。QRコードの状態が正しくないか、すでに別のショップ・商品に紐付けられている可能性があります。",
     "Internal Server Error": "システムエラーが発生しました。",
+    "Missing uuid or pin": "UUIDまたはPINが不足しています。",
     "Missing UUID or PIN": "UUIDまたはPINが不足しています。",
     "Invalid Gift or PIN": "ギフトまたはPINが無効です。",
+    "Invalid PIN or QR not found": "PINが無効か、QRコードが見つかりません。",
     "Too many attempts_ Please try again later_": "試行回数が制限を超えました。しばらく時間をおいてから再試行してください。",
     "Missing UUID": "UUIDが不足しています。",
     "Missing PIN": "PINが不足しています。",

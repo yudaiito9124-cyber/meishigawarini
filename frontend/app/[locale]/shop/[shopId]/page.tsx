@@ -1211,11 +1211,11 @@ export default function ShopPage() {
                                                                 className="w-full aspect-square mx-auto flex items-center justify-center overflow-hidden rounded-lg bg-gray-100"
                                                                 style={{ maxWidth: 'min(400px, 50vh)', maxHeight: '50vh' }}
                                                             >
-
                                                                 <QRScanner
                                                                     qrCodeSuccessCallback={handleScanSuccess}
                                                                     disableFlip={false}
                                                                     onFatalError={handleScannerError}
+                                                                    isContinuous={isContinuousScan}
                                                                 />
                                                             </div>
                                                             <div className="flex flex-col gap-4">

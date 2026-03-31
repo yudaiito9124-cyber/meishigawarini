@@ -78,7 +78,7 @@ export default function ReceivedHistoryPage() {
                     ) : history.length === 0 ? (
                         <div className="flex flex-col items-center justify-center p-12 text-center text-gray-500">
                             <Inbox className="w-12 h-12 text-gray-300 mb-4" />
-                            <p>受け取り履歴がありません。</p>
+                            <p>{t('noReceivedHistory')}</p>
                         </div>
                     ) : (
                         <div className="divide-y divide-gray-100">
@@ -141,7 +141,7 @@ export default function ReceivedHistoryPage() {
                                             </Button>
                                         </div>
                                         <p className="text-[10px] text-gray-500">
-                                            受取日: {new Date(item.timestamp).toLocaleString()}
+                                            {t('receiveDate')}{new Date(item.timestamp).toLocaleString()}
                                         </p>
                                     </div>
 
@@ -171,7 +171,7 @@ export default function ReceivedHistoryPage() {
                                             className="gap-1.5 rounded-xl border-purple-200 text-purple-700 hover:bg-purple-50 text-xs h-9 px-4 shrink-0"
                                             onClick={() => window.open(`/receive/${item.uuid}`, '_blank')}
                                         >
-                                            詳細 <ExternalLink className="w-3.5 h-3.5" />
+                                            {t('details')} <ExternalLink className="w-3.5 h-3.5" />
                                         </Button>
                                     </div>
                                 </div>

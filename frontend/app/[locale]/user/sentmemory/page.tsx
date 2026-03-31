@@ -78,7 +78,7 @@ export default function SendHistoryPage() {
                     ) : history.length === 0 ? (
                         <div className="flex flex-col items-center justify-center p-12 text-center text-gray-500">
                             <Send className="w-12 h-12 text-gray-300 mb-4" />
-                            <p>送信履歴がありません。</p>
+                            <p>{t('noSentHistory')}</p>
                         </div>
                     ) : (
                         <div className="divide-y divide-gray-100">
@@ -141,7 +141,7 @@ export default function SendHistoryPage() {
                                             </Button>
                                         </div>
                                         <p className="text-[10px] text-gray-500">
-                                            送信日: {new Date(item.timestamp).toLocaleString()}
+                                            {t('sendDate')}{new Date(item.timestamp).toLocaleString()}
                                         </p>
                                     </div>
 
@@ -171,7 +171,7 @@ export default function SendHistoryPage() {
                                             className="gap-1.5 rounded-xl border-green-200 text-green-700 hover:bg-green-50 text-xs h-9 px-4 shrink-0"
                                             onClick={() => window.open(`/receive/${item.uuid}`, '_blank')}
                                         >
-                                            詳細 <ExternalLink className="w-3.5 h-3.5" />
+                                            {t('details')} <ExternalLink className="w-3.5 h-3.5" />
                                         </Button>
                                     </div>
                                 </div>

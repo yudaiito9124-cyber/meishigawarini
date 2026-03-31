@@ -173,7 +173,7 @@ export default function DeliverySettingsPage() {
                             className="rounded-full px-12 py-7 bg-rose-600 hover:bg-rose-700 text-white font-black text-xl transition-all shadow-xl hover:shadow-rose-200 active:scale-95 disabled:opacity-50 h-10"
                         >
                             {saving ? (
-                                <><Loader2 className="w-6 h-6 mr-3 animate-spin" /> 保存中...</>
+                                <><Loader2 className="w-6 h-6 mr-3 animate-spin" /> {tp('saving')}</>
                             ) : (
                                 <><Save className="w-6 h-6 mr-3" /> {tp('save')}</>
                             )}
