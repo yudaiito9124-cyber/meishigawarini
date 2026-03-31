@@ -1,92 +1,62 @@
 /**
- * 概要: 商品画像アップロード用URLの発行
- * 詳細: S3へ画像を直接アップロードするための署名付きURL（Presigned URL）を発行します。
- * エンドポイント: POST /shop/products/uploadurl
- * リクエストボディ:
- *  - shop_id: 紐付け対象のショップID (必須)
- *  - filename: アップロード予定のファイル名 (必須)
- *  - contentType: ファイルのMIMEタイプ (例: image/jpeg) (必須)
- *  - folder: 格納先指定 (例: 'shopcontent'。デフォルトはproducts) (オプション)
+ * 概要: 商品画像アップロード用のURL生成 (ショップ用)
+ * 詳細: 
+ *  - ショップ管理者が新商品の画像をアップロードするためのS3署名付きURL(PutObject)を発行します。
+ *  - オブジェクトキーは `shop/{shopId}/products/{productId}/{id}.ext` の形式で保存され、ショップごとのディレクトリ分離を保証します。
+ *
+ * エンドポイント: POST /shop/products/upload-url
  */
 import { APIGatewayProxyHandler } from 'aws-lambda';
-import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
-import { DynamoDBDocumentClient } from '@aws-sdk/lib-dynamodb';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { checkShopOwnerOrGM } from './share/shop-auth';
-import { signUrlIfS3 } from './utils/s3';
+import { generateId } from './utils/id';
+import { successResponse, errorResponse } from './utils/response';
+import { ddb, TABLE_NAME, BUCKET_NAME } from './share/db';
+import { getShopId, getUserId } from './utils/request';
 
-const client = new DynamoDBClient({});
-const ddb = DynamoDBDocumentClient.from(client);
 const s3 = new S3Client({});
-const TABLE_NAME = process.env.TABLE_NAME || '';
-const BUCKET_NAME = process.env.BUCKET_NAME || '';
-
-const corsHeaders = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type,Authorization',
-    'Access-Control-Allow-Methods': 'OPTIONS,POST'
-};
 
 export const handler: APIGatewayProxyHandler = async (event) => {
     try {
-        if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers: corsHeaders, body: '' };
-
-        const authorizer = event.requestContext?.authorizer;
-        const userId = authorizer?.principalId;
-        const claims = authorizer;
-        if (!userId) return { statusCode: 401, headers: corsHeaders, body: JSON.stringify({ message: 'Unauthorized' }) };
+        if (event.httpMethod === 'OPTIONS') return successResponse();
 
         const body = JSON.parse(event.body || '{}');
-        const { shopId, filename, contentType, folder } = body;
-
-        if (!shopId) return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Missing shopId' }) };
+        const userId = getUserId(event);
+        const shopId = getShopId(event, body);
+        const { productId, filename, contentType } = body;
         
+        if (!shopId || !productId || !filename) return errorResponse(400, 'Missing required fields');
+        if (!userId) return errorResponse(401, 'Unauthorized');
+
         // 【DB操作: 内部モジュールによる GetItem・BatchGetItem】
-        // - 目的: 実行ユーザーが対象ショップのオーナーまたはGMであるかの権限を検証
-        // - テーブル: TABLE_NAME
-        // - リクエストキー: { PK: `SHOP#${shopId}`, SK: 'METADATA' } および { PK: `USER#${userId}`, SK: 'SHOP' }
-        // - 取得カラム: ショップのメタデータ一式、およびユーザーの権限リストmand が実行される PK = SHOP#{shopId})
+        // 理由: 実行ユーザーが対象ショップの管理権限を持っているか検証。
         const shopMetadata = await checkShopOwnerOrGM(ddb, TABLE_NAME, shopId, userId, event);
-        if (shopMetadata === false) {
-            return { statusCode: 401, headers: corsHeaders, body: JSON.stringify({ message: 'Unauthorized' }) };
-        }
+        if (!shopMetadata) return errorResponse(403, 'Forbidden');
 
-        if (!filename || !contentType) return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Missing filename or contentType' }) };
+        const id = generateId();
+        const ext = filename.split('.').pop() || 'bin';
+        const key = `shop/${shopId}/products/${productId}/${id}.${ext}`;
 
-        const ALLOWED_CONTENT_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-        if (!ALLOWED_CONTENT_TYPES.includes(contentType)) {
-            return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Invalid content type. Only images are allowed.' }) };
-        }
-
-        const ext = filename.split('.').pop()?.toLowerCase();
-        const ALLOWED_EXTENSIONS = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
-        if (!ext || !ALLOWED_EXTENSIONS.includes(ext)) {
-            return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Invalid file extension. Only images are allowed.' }) };
-        }
-
-        let key = `shop/${shopId}/products/${filename}`;
-        if (folder === 'shopcontent') {
-            key = `shop/${shopId}/shopcontent/${filename}`;
-        }
-        
-        // S3 PutObject用コマンド生成および署名付きURL発行
+        // S3 PutObject 署名付きURLの生成 (有効期限: 1時間)
+        // 理由: フロントエンドから直接S3へ安全に画像をアップロードさせるためのトークンを発行。
         const command = new PutObjectCommand({
             Bucket: BUCKET_NAME,
             Key: key,
-            ContentType: contentType
+            ContentType: contentType || 'image/jpeg',
+            ACL: 'private'
+        });
+        const uploadUrl = await getSignedUrl(s3, command, { expiresIn: 3600 });
+        const finalUrl = `s3://${BUCKET_NAME}/${key}`;
+
+        return successResponse({
+            uploadUrl,
+            key,
+            fileUrl: finalUrl
         });
 
-        const uploadUrl = await getSignedUrl(s3, command, { expiresIn: 300 });
-        const region = process.env.AWS_REGION || 'ap-northeast-1';
-        const publicUrl = `https://${BUCKET_NAME}.s3.${region}.amazonaws.com/${key}`;
-
-        // フロントエンド用の一時プレビューURL生成処理
-        const signedPublicUrl = await signUrlIfS3(publicUrl, BUCKET_NAME);
-
-        return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ uploadUrl, publicUrl: signedPublicUrl }) };
     } catch (error: any) {
-        console.error(error);
-        return { statusCode: 500, headers: corsHeaders, body: JSON.stringify({ message: 'Internal Server Error', error: String(error) }) };
+        console.error('Shop products upload-url error:', error);
+        return errorResponse(500, 'Internal Server Error', error.message);
     }
 };

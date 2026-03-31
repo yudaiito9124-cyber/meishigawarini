@@ -1,151 +1,99 @@
 /**
  * 概要: 特定のQRコードをBAN（利用停止）または解除する。
- * 詳細: QRコードのステータスを`BANNED`に変更する。解除時には、QRコードの属性情報から元の状態（`ACTIVE`, `LINKED`等）を判定して自動的に復元する。
+ * 詳細: 
+ *  - QRコードのステータスを一時的に`BANNED`に変更し、利用不能にします。
+ *  - 解除時には、アイテムの属性（ts_completed_at等）から元の論理状態（COMPLETED, SHIPPED, USED, ACTIVE等）を自動判定して復元します。
+ *
  * エンドポイント: POST /admin/qr/ban
- * リクエストボディ:
- *  - uuid: 対象QRコードのUUID
- *  - reason: BANの理由（オプション）
  */
-
 import { APIGatewayProxyHandler } from 'aws-lambda';
-import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
-import { DynamoDBDocumentClient, UpdateCommand, GetCommand } from '@aws-sdk/lib-dynamodb';
+import { UpdateCommand, GetCommand } from '@aws-sdk/lib-dynamodb';
+import { successResponse, errorResponse } from './utils/response';
+import { ddb, TABLE_NAME } from './share/db';
+import { getUUID, getAction } from './utils/request';
 
-const client = new DynamoDBClient({});
-const ddb = DynamoDBDocumentClient.from(client);
-const TABLE_NAME = process.env.TABLE_NAME || '';
-
-const corsHeaders = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type,Authorization',
-    'Access-Control-Allow-Methods': 'POST,OPTIONS'
-};
-
-
+/**
+ * アイテムの属性から、BAN解除後に戻すべきステータスを判定します。
+ */
 const getRevertStatus = (item: any): string => {
-
     if (item.ts_completed_at) return "COMPLETED";
     if (item.ts_shipped_at) return "SHIPPED";
     if (item.ts_submitted_at) return "USED";
 
     const now = new Date();
-    const expiresAt = new Date(item.ts_expired_at);
-    if (now > expiresAt) {
-        return "EXPIRED";
-    }
+    const expiresAt = item.ts_expired_at ? new Date(item.ts_expired_at) : null;
+    if (expiresAt && now > expiresAt) return "EXPIRED";
 
     if (item.ts_activated_at) return "ACTIVE";
     if (item.ts_linked_at) return "LINKED";
     return "UNASSIGNED";
 }
 
-
 export const handler: APIGatewayProxyHandler = async (event) => {
     try {
-        if (event.httpMethod === 'OPTIONS') {
-            return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ message: 'OK' }) };
-        }
-        if (event.httpMethod !== 'POST') {
-            return { statusCode: 405, headers: corsHeaders, body: JSON.stringify({ message: 'Method Not Allowed' }) };
-        }
+        if (event.httpMethod === 'OPTIONS') return successResponse();
+        if (event.httpMethod !== 'POST') return errorResponse(405, 'Method Not Allowed');
 
-        // /admin/qrcodes/ban
         const body = JSON.parse(event.body || '{}');
-        const uuid = body.uuid;
-        if (!uuid) {
-            return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Missing UUID' }) };
-        }
+        const uuid = getUUID(event, body);
+        const reason = body.reason || 'No reason provided';
+        
+        if (!uuid) return errorResponse(400, 'Missing UUID');
 
-        console.log(`Banning QR: ${uuid}`);
-
-        let reason = 'No reason provided';
-        try {
-            const body = JSON.parse(event.body || '{}');
-            if (body.reason) reason = body.reason;
-        } catch (e) { }
-
-        // 1. Fetch current status
-        // QRコードの現在の状態を取得
-        // - 検索条件: PK = QR#{uuid}, SK = "METADATA"
-        // - 取得カラム: status (現在のステータス), 各種日付属性 (復元用)
-        const currentData = await ddb.send(new GetCommand({
-            TableName: TABLE_NAME,
-            Key: { PK: `QR#${uuid}`, SK: 'METADATA' }
+        // 【DB操作: GetItem】
+        // 現在のステータスと、解除時の復帰判定に必要なタイムスタンプ類を取得
+        const currentRes = await ddb.send(new GetCommand({
+            TableName: TABLE_NAME, Key: { PK: `QR#${uuid}`, SK: 'METADATA' }
         }));
 
-        const item = currentData.Item;
-        if (!item) {
-            return { statusCode: 404, headers: corsHeaders, body: JSON.stringify({ message: 'QR Code not found' }) };
-        }
+        const item = currentRes.Item;
+        if (!item) return errorResponse(404, 'QR Code not found');
 
         const currentStatus = item.status;
         const now = new Date().toISOString();
 
         if (currentStatus === 'BANNED') {
-            // UNBAN (Revert)
+            // ====================================================================
+            // ACTION: UNBAN (復元)
+            // ====================================================================
             const revertStatus = getRevertStatus(item);
             console.log(`Unbanning QR ${uuid}: Reverting to ${revertStatus}`);
 
-            // BAN（利用停止）を解除し、元のステータスに復元
-            // - 検索条件: PK = QR#{uuid}, SK = "METADATA"
-            // - 更新カラム:
-            //   - status: 計算された復元後のステータス
-            //   - GSI1_PK: ステータスに応じたインデックスキー (QR#STATUS)
-            //   - ts_updated_at: 現在時刻
-            // - 削除(REMOVE)カラム: ban_reason, ts_banned_at (BAN情報のクリア)
+            // 【DB操作: UpdateItem】
+            // statusを復元し、GSI1_PKも同期。BAN関連フィールドを削除。
             await ddb.send(new UpdateCommand({
                 TableName: TABLE_NAME,
                 Key: { PK: `QR#${uuid}`, SK: 'METADATA' },
-                UpdateExpression: 'SET #status = :s, GSI1_PK = :gsi_pk, ts_updated_at = :ts_updated_at REMOVE ban_reason, ts_banned_at',
+                UpdateExpression: 'SET #status = :s, GSI1_PK = :gsi_pk, ts_updated_at = :now REMOVE ban_reason, ts_banned_at',
                 ExpressionAttributeNames: { '#status': 'status' },
                 ExpressionAttributeValues: {
-                    ':s': revertStatus,
-                    ':gsi_pk': `QR#${revertStatus}`,
-                    ':ts_updated_at': now
+                    ':s': revertStatus, ':gsi_pk': `QR#${revertStatus}`, ':now': now
                 }
             }));
 
-            return {
-                statusCode: 200,
-                headers: corsHeaders,
-                body: JSON.stringify({ message: 'QR Code Unbanned', uuid, status: revertStatus })
-            };
+            return successResponse({ message: 'QR Code Unbanned', uuid, status: revertStatus });
         } else {
-            // BAN
+            // ====================================================================
+            // ACTION: BAN (停止)
+            // ====================================================================
             console.log(`Banning QR ${uuid} (current: ${currentStatus})`);
-            // QRコードをBAN（利用停止）状態に設定
-            // - 検索条件: PK = QR#{uuid}, SK = "METADATA"
-            // - 更新カラム:
-            //   - status: "BANNED"
-            //   - GSI1_PK: "QR#BANNED" (検索高速化用)
-            //   - ts_updated_at, ts_banned_at: 現在時刻
-            //   - ban_reason: BANの理由
+
+            // 【DB操作: UpdateItem】
+            // statusをBANNEDに変更し、理由と実行日時を記録。
             await ddb.send(new UpdateCommand({
                 TableName: TABLE_NAME,
                 Key: { PK: `QR#${uuid}`, SK: 'METADATA' },
-                UpdateExpression: 'SET #status = :banned, GSI1_PK = :gsi_pk, ts_updated_at = :ts_updated_at, ts_banned_at = :ts_banned_at, ban_reason = :reason',
+                UpdateExpression: 'SET #status = :banned, GSI1_PK = :gsi_pk, ts_updated_at = :now, ts_banned_at = :now, ban_reason = :reason',
                 ExpressionAttributeNames: { '#status': 'status' },
                 ExpressionAttributeValues: {
-                    ':banned': 'BANNED',
-                    ':gsi_pk': 'QR#BANNED',
-                    ':ts_updated_at': now,
-                    ':ts_banned_at': now,
-                    ':reason': reason,
+                    ':banned': 'BANNED', ':gsi_pk': 'QR#BANNED', ':now': now, ':reason': reason
                 }
             }));
 
-            return {
-                statusCode: 200,
-                headers: corsHeaders,
-                body: JSON.stringify({ message: 'QR Code Banned', uuid, status: 'BANNED' })
-            };
+            return successResponse({ message: 'QR Code Banned', uuid, status: 'BANNED' });
         }
-    } catch (error) {
-        console.error(error);
-        return {
-            statusCode: 500,
-            headers: corsHeaders,
-            body: JSON.stringify({ message: 'Internal Server Error' })
-        };
+    } catch (error: any) {
+        console.error('Admin QR Ban error:', error);
+        return errorResponse(500, 'Internal Server Error', error.message);
     }
 };

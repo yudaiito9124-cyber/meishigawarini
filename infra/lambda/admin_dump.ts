@@ -1,74 +1,54 @@
 /**
- * 概要: 指定された複数のパーティションキー（PK）に紐付くデータを一括でダンプする。
- * 詳細: デバッグやデータメンテナンスを目的として、指定されたPKのリストに対して全ソートキー（SK）のアイテムを検索して返す。
+ * 概要: 指定されたパーティションキー（PK）に紐づく全データのダンプ (管理者用)
+ * 詳細: 
+ *  - デバッグやデータメンテナンスを目的として、指定されたPKの各項目に対し、全ソートキー（SK）の属性情報を取得して返却します。
+ *  - 開発および管理用途での詳細なデータ調査に使用。
+ *
  * エンドポイント: POST /admin/dump
- * リクエストボディ:
- *  - pks: 取得対象のPK（Partition Key）の配列 (例: ["SHOP#uuid", "USER#uuid"])
  */
-
 import { APIGatewayProxyHandler } from 'aws-lambda';
-import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
-import { DynamoDBDocumentClient, QueryCommand } from '@aws-sdk/lib-dynamodb';
-
-const client = new DynamoDBClient({});
-const ddb = DynamoDBDocumentClient.from(client);
-const TABLE_NAME = process.env.TABLE_NAME || '';
-
-const corsHeaders = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type,Authorization',
-    'Access-Control-Allow-Methods': 'POST,OPTIONS'
-};
+import { QueryCommand } from '@aws-sdk/lib-dynamodb';
+import { successResponse, errorResponse } from './utils/response';
+import { ddb, TABLE_NAME } from './share/db';
 
 export const handler: APIGatewayProxyHandler = async (event) => {
     try {
-        if (event.httpMethod === 'OPTIONS') {
-            return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ message: 'OK' }) };
-        }
-        if (event.httpMethod !== 'POST') {
-            return { statusCode: 405, headers: corsHeaders, body: JSON.stringify({ message: 'Method Not Allowed' }) };
-        }
+        if (event.httpMethod === 'OPTIONS') return successResponse();
+        if (event.httpMethod !== 'POST') return errorResponse(405, 'Method Not Allowed');
 
         const body = JSON.parse(event.body || '{}');
         const pks = body.pks;
 
-        if (!Array.isArray(pks)) {
-            return {
-                statusCode: 400,
-                headers: corsHeaders,
-                body: JSON.stringify({ message: 'pks is required' })
-            };
+        if (!Array.isArray(pks) || pks.length === 0) {
+            return errorResponse(400, 'Missing pks array');
         }
 
-        let items: any[] = [];
+        let allItems: any[] = [];
 
+        // 指定された各PKに対し、SKを条件とせずにQueryを実行して全関連アイテムを取得
         for (const pk of pks) {
-            // 指定されたPKに紐付く全てのソートキー（SK）のアイテムを検索
-            // - 検索条件: PK = pk (リクエストで指定された各PK)
-            // - 取得カラム: 項目の全ての属性
+            // 【DB操作: Query】
+            // 理由: 同一PKを持つ全アイテム(METADATA, ORDER, CHAT 等)を一括で取得。
             const res = await ddb.send(new QueryCommand({
                 TableName: TABLE_NAME,
                 KeyConditionExpression: 'PK = :pk',
-                ExpressionAttributeValues: {
-                    ':pk': pk
-                }
+                ExpressionAttributeValues: { ':pk': pk }
             }));
-            items = items.concat({ PK: pk });
-            items = items.concat(res.Items || []);
+            
+            if (res.Items && res.Items.length > 0) {
+                // 調査対象の区切りとしてヘッダーを挿入
+                allItems.push({ __HEADER__: `--- Data for PK: ${pk} ---` });
+                allItems = allItems.concat(res.Items);
+            }
         }
 
-        return {
-            statusCode: 200,
-            headers: corsHeaders,
-            body: JSON.stringify({ items })
-        };
+        return successResponse({ 
+            count: allItems.length,
+            items: allItems 
+        });
 
-    } catch (error) {
-        console.error(error);
-        return {
-            statusCode: 500,
-            headers: corsHeaders,
-            body: JSON.stringify({ message: 'Internal Server Error', error: String(error) })
-        };
+    } catch (error: any) {
+        console.error('Admin dump error:', error);
+        return errorResponse(500, 'Internal Server Error', error.message);
     }
 };

@@ -1,103 +1,75 @@
 /**
- * 概要: ギフト受取完了の報告
- * 詳細: ユーザーがギフトを受け取ったことを報告し、ステータスを COMPLETED (完了) に変更します。
+ * 概要: ギフト受取完了の確定
+ * 詳細: 
+ *  - 被贈答者が商品を受け取ったことを確認し、ステータスを`SHIPPED`から`COMPLETED`へ変更します。
+ *  - PINによる認証を行い、正当な受取人による操作であることを保証します。
+ *
  * エンドポイント: POST /receive/completed
- * リクエストボディ:
- *  - qr_id: ギフト（QR）のUUID (必須)
- *  - pin_code: 4桁のPINコード (必須)
  */
 import { APIGatewayProxyHandler } from 'aws-lambda';
-import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
-import { DynamoDBDocumentClient, TransactWriteCommand, GetCommand } from '@aws-sdk/lib-dynamodb';
+import { UpdateCommand, GetCommand } from '@aws-sdk/lib-dynamodb';
 import { sendSystemNotification } from './utils/notification';
-
-const client = new DynamoDBClient({});
-const ddb = DynamoDBDocumentClient.from(client);
-const TABLE_NAME = process.env.TABLE_NAME || '';
-
-const corsHeaders = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type,Authorization,X-QR-UUID,X-QR-PIN',
-    'Access-Control-Allow-Methods': 'OPTIONS,POST'
-};
+import { successResponse, errorResponse } from './utils/response';
+import { ddb, TABLE_NAME } from './share/db';
 
 export const handler: APIGatewayProxyHandler = async (event) => {
     try {
-        if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers: corsHeaders, body: '' };
-        if (event.httpMethod !== 'POST') {
-            return { statusCode: 405, headers: corsHeaders, body: JSON.stringify({ message: 'Method Not Allowed' }) };
-        }
+        if (event.httpMethod === 'OPTIONS') return successResponse();
 
         const body = JSON.parse(event.body || '{}');
-        const { qr_id, pin_code } = body;
-
-        if (!qr_id || !pin_code) {
-            return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Missing required fields' }) };
-        }
+        const { uuid, pin } = body;
+        
+        if (!uuid || !pin) return errorResponse(400, 'Missing uuid or pin');
 
         // 【DB操作: GetItem】
-        // - 目的: 指定されたQRコードの状態確認。すでに発送済み(SHIPPED)であるか、PINが一致しているかを検証
-        // - テーブル: TABLE_NAME
-        // - リクエストキー: { PK: `QR#${qr_id}`, SK: 'METADATA' }
-        // - 取得カラム: ALL (status, pin 等)
-        const getRes = await ddb.send(new GetCommand({
+        // 理由: QRコードのメタデータを取得し、PINの一致とステータスを検証。
+        const qrRes = await ddb.send(new GetCommand({
+            TableName: TABLE_NAME, Key: { PK: `QR#${uuid}`, SK: 'METADATA' }
+        }));
+
+        if (!qrRes.Item || String(qrRes.Item.pin) !== String(pin)) {
+            return errorResponse(403, 'Unauthorized');
+        }
+
+        const item = qrRes.Item;
+        const currentStatus = item.status;
+
+        // ステータス遷移のバリデーション (発送済み(SHIPPED)から完了へ)
+        if (currentStatus !== 'SHIPPED') {
+            return errorResponse(409, `Cannot mark as completed from current state: ${currentStatus}`);
+        }
+
+        const now = new Date().toISOString();
+
+        // 【DB操作: UpdateItem】
+        // 理由: statusをCOMPLETEDに変更し、完了日時を記録。
+        await ddb.send(new UpdateCommand({
             TableName: TABLE_NAME,
-            Key: { PK: `QR#${qr_id}`, SK: 'METADATA' }
+            Key: { PK: `QR#${uuid}`, SK: 'METADATA' },
+            UpdateExpression: 'SET #status = :completed, GSI1_PK = :gsi_pk, ts_completed_at = :now, ts_updated_at = :now',
+            ConditionExpression: '#status = :shipped', // 二重操作防止
+            ExpressionAttributeNames: { '#status': 'status' },
+            ExpressionAttributeValues: { ':completed': 'COMPLETED', ':shipped': 'SHIPPED', ':gsi_pk': 'QR#COMPLETED', ':now': now }
         }));
 
-        if (!getRes.Item) {
-            return { statusCode: 404, headers: corsHeaders, body: JSON.stringify({ message: 'QR Code not found' }) };
-        }
-
-        if (getRes.Item.status !== 'SHIPPED') {
-            return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'QR Code is not shipped' }) };
-        }
-
-        if (getRes.Item.pin !== pin_code) {
-            return { statusCode: 403, headers: corsHeaders, body: JSON.stringify({ message: 'Invalid PIN' }) };
-        }
-
-        // 【DB操作: TransactWriteItems】
-        // - 目的: 商品受領に伴い、QRコードのステータスを「完了(COMPLETED)」へアトミックに移行
-        // - テーブル: TABLE_NAME
-        // - 処理: { PK: `QR#${qr_id}`, SK: 'METADATA' } の status, GSI1_PK, ts_completed_at を更新
-        // - 条件: 別のプロセスによって status が SHIPPED 以外に書き換えられていないこと
-        await ddb.send(new TransactWriteCommand({
-            TransactItems: [
-                {
-                    Update: {
-                        TableName: TABLE_NAME,
-                        Key: { PK: `QR#${qr_id}`, SK: 'METADATA' },
-                        UpdateExpression: 'SET #status = :completed, GSI1_PK = :gsi_pk, ts_completed_at = :now, ts_updated_at = :now',
-                        ConditionExpression: '#status = :shipped',
-                        ExpressionAttributeNames: { '#status': 'status' },
-                        ExpressionAttributeValues: {
-                            ':completed': 'COMPLETED',
-                            ':shipped': 'SHIPPED',
-                            ':gsi_pk': 'QR#COMPLETED',
-                            ':now': new Date().toISOString()
-                        }
-                    }
-                }
-            ]
-        }));
-
-        // 通知送信 (ショップ管理者に受取完了を知らせる)
+        // 【事後処理: システム通知】
+        // 理由: 送り主・受け取り人の双方に受取完了を通知し、チャット履歴にシステムメッセージを残します。
         try {
-            await sendSystemNotification(qr_id, 'DeliveryCompleted', pin_code);
+            await sendSystemNotification(uuid, 'DeliveryCompleted', pin);
         } catch (e) {
             console.error('Notification failed', e);
         }
 
-        return {
-            statusCode: 200,
-            headers: corsHeaders,
-            body: JSON.stringify({ message: 'Gift received successfully', order_id: `ORDER#${qr_id}` })
-        };
+        return successResponse({ 
+            message: 'Gift marked as completed',
+            order_id: `ORDER#${uuid}` 
+        });
 
     } catch (error: any) {
-        console.error(error);
-        if (error.name === 'TransactionCanceledException') return { statusCode: 409, headers: corsHeaders, body: JSON.stringify({ message: 'Already completed' }) };
-        return { statusCode: 500, headers: corsHeaders, body: JSON.stringify({ message: 'Internal Server Error' }) };
+        console.error('Receive completed error:', error);
+        if (error.name === 'ConditionalCheckFailedException') {
+            return errorResponse(409, 'Conflict detected. Order might be already completed.');
+        }
+        return errorResponse(500, 'Internal Server Error', error.message);
     }
 };

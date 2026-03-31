@@ -144,11 +144,11 @@ export const handler = async (event: APIGatewayRequestAuthorizerEvent): Promise<
         }
 
         return generatePolicy(`receiver-${uuid}`, 'Allow', policyResource, {
-            uuid: uuid,
-            pin: pin,
-            status: item.status,
-            shopId: item.shop_id,
-            ...(userId ? { userId: userId } : {})
+            uuid: String(uuid),
+            pin: String(pin),
+            status: String(item.status),
+            shopId: item.shop_id ? String(item.shop_id) : '',
+            ...(userId ? { userId: String(userId) } : {})
         });
 
     } catch (err) {

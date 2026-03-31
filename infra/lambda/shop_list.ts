@@ -1,170 +1,112 @@
 /**
- * 概要: マイショップ一覧の取得
- * 詳細: ログイン中ユーザーがオーナーまたはGMとして所属するショップの一覧を取得します。
+ * 概要: マイショップ一覧の取得 (ショップ用)
+ * 詳細: 
+ *  - ログイン中のユーザーが「オーナー」または「GM」として所属しているショップの一覧を取得します。
+ *  - ユーザー専用の権限管理レコード(PK=USER#{id}, SK=SHOP)が存在しない場合、レガシーデータからの移行、またはデフォルトショップの自動生成を行います。
+ *
  * エンドポイント: POST /shop/list
- * リクエストボディ: なし
  */
 import { APIGatewayProxyHandler } from 'aws-lambda';
-import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
-import { DynamoDBDocumentClient, GetCommand, QueryCommand, BatchGetCommand, PutCommand } from '@aws-sdk/lib-dynamodb';
+import { GetCommand, QueryCommand, BatchGetCommand, PutCommand } from '@aws-sdk/lib-dynamodb';
 import { generateId } from './utils/id';
-
-const client = new DynamoDBClient({});
-const ddb = DynamoDBDocumentClient.from(client);
-const TABLE_NAME = process.env.TABLE_NAME || '';
-
-const corsHeaders = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type,Authorization',
-    'Access-Control-Allow-Methods': 'GET,POST,OPTIONS'
-};
+import { successResponse, errorResponse } from './utils/response';
+import { ddb, TABLE_NAME } from './share/db';
+import { getUserId } from './utils/request';
 
 export const handler: APIGatewayProxyHandler = async (event) => {
     try {
-        if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers: corsHeaders, body: '' };
+        if (event.httpMethod === 'OPTIONS') return successResponse();
 
-        const authorizer = event.requestContext?.authorizer;
-        const userId = authorizer?.principalId;
-        const claims = authorizer;
-        if (!userId) return { statusCode: 401, headers: corsHeaders, body: JSON.stringify({ message: 'Unauthorized' }) };
+        const userId = getUserId(event);
+        if (!userId) return errorResponse(401, 'Unauthorized');
 
         const body = JSON.parse(event.body || '{}');
-        const noCreate = body?.noCreate === true;
-
-        let roles: string[] = [];
-        let owner_shop_ids: string[] = [];
-        let gm_shop_ids: string[] = [];
+        const noCreate = body.noCreate === true;
 
         // 【DB操作: GetItem】
-        // - 目的: アクセスしたユーザーの所持するロールやショップ権限情報の取得
-        // - テーブル: TABLE_NAME
-        // - リクエストキー: { PK: `USER#${userId}`, SK: 'SHOP' }
-        // - 取得カラム: roles, owner_shop_ids, gm_shop_ids
-        let userRes = await ddb.send(new GetCommand({
-            TableName: TABLE_NAME,
-            Key: { PK: `USER#${userId}`, SK: 'SHOP' },
-            ConsistentRead: true
+        // 理由: ユーザーの所属ショップIDリスト(owner_shop_ids, gm_shop_ids)を直接取得。
+        const userRes = await ddb.send(new GetCommand({
+            TableName: TABLE_NAME, Key: { PK: `USER#${userId}`, SK: 'SHOP' }, ConsistentRead: true
         }));
 
-        if (!userRes?.Item) {
-            // 【DB操作: Query】
-            // - 目的: (レガシー対応)ユーザー専用レコード未作成時代の、オーナーになっているショップ一覧の取得
-            // - テーブル: TABLE_NAME
-            // - インデックス: GSI2
-            // - 検索条件: GSI2_PK = `USER#${userId}`
-            // - 取得カラム: ALL (結果のPKからショップIDを抽出して利用)
-            const res = await ddb.send(new QueryCommand({
-                TableName: TABLE_NAME,
-                IndexName: 'GSI2',
-                KeyConditionExpression: 'GSI2_PK = :uid',
-                ExpressionAttributeValues: { ':uid': `USER#${userId}` }
-            }));
-            let regacy_shop_ids = res.Items?.map((item: any) => item.PK.replace('SHOP#', '')) || [];
+        let roles: string[] = [];
+        let ownerShopIds: string[] = [];
+        let gmShopIds: string[] = [];
 
-            if (regacy_shop_ids && regacy_shop_ids.length > 0) {
-                const now = new Date().toISOString();
-                const email = claims?.email;
+        if (userRes.Item) {
+            roles = userRes.Item.roles || [];
+            ownerShopIds = userRes.Item.owner_shop_ids || [];
+            gmShopIds = userRes.Item.gm_shop_ids || [];
+        } else {
+            // レガシー対応: 権限管理レコードが無い場合、既存のショップから検索
+            // 【DB操作: Query】
+            // 理由: GSI2(オーナーID)を利用して、過去に作成したショップを検索。
+            const legacyRes = await ddb.send(new QueryCommand({
+                TableName: TABLE_NAME, IndexName: 'GSI2',
+                KeyConditionExpression: 'GSI2_PK = :uid', ExpressionAttributeValues: { ':uid': `USER#${userId}` }
+            }));
+            const legacyIds = legacyRes.Items?.map(i => i.PK.replace('SHOP#', '')) || [];
+
+            if (legacyIds.length > 0) {
                 // 【DB操作: PutItem】
-                // - 目的: レガシーユーザー向けに新形式のユーザー権限レコードを自動生成
-                // - テーブル: TABLE_NAME
-                // - リクエストキー: { PK: `USER#${userId}`, SK: 'SHOP' }
-                // - 登録カラム: email, roles, owner_shop_ids, gm_shop_ids, ts_created_at
+                // 理由: 発見したレガシーIDを元に、新しい権限管理レコードを作成(移行)。
                 await ddb.send(new PutCommand({
                     TableName: TABLE_NAME,
                     Item: {
                         PK: `USER#${userId}`, SK: 'SHOP',
-                        email, roles: ['SHOP_MANAGER'], owner_shop_ids: regacy_shop_ids, gm_shop_ids: [], ts_created_at: now
+                        roles: ['SHOP_MANAGER'], owner_shop_ids: legacyIds, gm_shop_ids: [],
+                        ts_created_at: new Date().toISOString()
                     }
                 }));
-                roles = ['SHOP_MANAGER'];
-                owner_shop_ids = regacy_shop_ids;
-                gm_shop_ids = [];
+                roles = ['SHOP_MANAGER']; ownerShopIds = legacyIds;
+            } else if (!noCreate) {
+                // 初回ログイン対応: ショップが1つも無い場合はデフォルトショップを作成
+                const newShopId = generateId();
+                const now = new Date().toISOString();
+                
+                // 【DB操作: PutItem × 2】
+                // 1. ショップメタデータの作成
+                await ddb.send(new PutCommand({
+                    TableName: TABLE_NAME,
+                    Item: {
+                        PK: `SHOP#${newShopId}`, SK: 'METADATA',
+                        name: "My Default Shop", owner_id: userId,
+                        GSI2_PK: `USER#${userId}`, GSI2_SK: now, ts_created_at: now
+                    }
+                }));
+                // 2. ユーザー権限レコードの作成
+                await ddb.send(new PutCommand({
+                    TableName: TABLE_NAME,
+                    Item: {
+                        PK: `USER#${userId}`, SK: 'SHOP',
+                        roles: ['SHOP_MANAGER'], owner_shop_ids: [newShopId], gm_shop_ids: [], ts_created_at: now
+                    }
+                }));
+                roles = ['SHOP_MANAGER']; ownerShopIds = [newShopId];
             }
         }
 
-        // 既存のユーザー情報を変数に反映
-        if (userRes?.Item) {
-            roles = userRes.Item.roles || [];
-            owner_shop_ids = userRes.Item.owner_shop_ids || [];
-            gm_shop_ids = userRes.Item.gm_shop_ids || [];
-        }
-
-        // 【ショップ作成判定】
-        // - 条件: 管理・所属しているショップが1つも存在しない場合
-        if (owner_shop_ids.length === 0 && gm_shop_ids.length === 0) {
-            if (noCreate) {
-                return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ shops: [], roles, owner_shop_ids, gm_shop_ids }) };
-            }
-            const newShopId = generateId();
-            const now = new Date().toISOString();
-            const email = claims?.email;
-
-            // 【DB操作: PutItem】
-            // - 目的: 完全新規のユーザー向けにデフォルトのショップメタデータを自動作成
-            // - テーブル: TABLE_NAME
-            // - リクエストキー: { PK: `SHOP#${newShopId}`, SK: 'METADATA' }
-            // - 登録カラム: name, email, owner_id, GSI2_PK, GSI2_SK, ts_created_at
-            // - 備考: GSI2を利用してオーナー検索を可能にする
-            await ddb.send(new PutCommand({
-                TableName: TABLE_NAME,
-                Item: {
-                    PK: `SHOP#${newShopId}`, SK: 'METADATA',
-                    name: "My Default Shop", email, owner_id: userId,
-                    GSI2_PK: `USER#${userId}`, GSI2_SK: now, ts_created_at: now
-                }
-            }));
-
-            // 【DB操作: PutItem】
-            // - 目的: 完全新規のユーザー向けにロールとショップ権限の管理レコードを自動作成
-            // - テーブル: TABLE_NAME
-            // - リクエストキー: { PK: `USER#${userId}`, SK: 'SHOP' }
-            // - 登録カラム: email, roles(SHOP_MANAGER), owner_shop_ids(初期ショップID), gm_shop_ids, ts_created_at
-            await ddb.send(new PutCommand({
-                TableName: TABLE_NAME,
-                Item: {
-                    PK: `USER#${userId}`, SK: 'SHOP',
-                    email, roles: ['SHOP_MANAGER'], owner_shop_ids: [newShopId], gm_shop_ids: [], ts_created_at: now
-                }
-            }));
-            roles = ['SHOP_MANAGER'];
-            owner_shop_ids = [newShopId];
-            gm_shop_ids = [];
-        }
-
-        let shops = Array.from(new Set([...owner_shop_ids, ...gm_shop_ids]));
-
-        if (shops.length === 0) {
-            return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ shops: [], roles, owner_shop_ids, gm_shop_ids }) };
+        const allShopIds = Array.from(new Set([...ownerShopIds, ...gmShopIds]));
+        if (allShopIds.length === 0) {
+            return successResponse({ shops: [], roles, owner_shop_ids: [], gm_shop_ids: [] });
         }
 
         // 【DB操作: BatchGetItem】
-        // - 目的: 権限として紐付いている全所属ショップリストのメタデータを一括高速取得
-        // - テーブル: TABLE_NAME
-        // - リクエストキー配列: 取得した所属ショップIDごとに { PK: `SHOP#${id}`, SK: 'METADATA' }
-        // - 取得カラム: ALL (名前や作成日時等を取得)
-        const shopKeys = shops.map(id => ({ PK: `SHOP#${id}`, SK: 'METADATA' }));
-        const res = await ddb.send(new BatchGetCommand({
-            RequestItems: {
-                [TABLE_NAME]: { Keys: shopKeys }
-            }
+        // 理由: 各ショップの基本情報(名前、作成日)を効率的に一括取得。
+        const shopKeys = allShopIds.map(id => ({ PK: `SHOP#${id}`, SK: 'METADATA' }));
+        const batchRes = await ddb.send(new BatchGetCommand({
+            RequestItems: { [TABLE_NAME]: { Keys: shopKeys } }
         }));
 
-        const shopList = shops.map(id => {
-            const item = res.Responses?.[TABLE_NAME]?.find(s => s.PK === `SHOP#${id}`);
-            return item ? {
-                id: id,
-                name: item.name,
-                ts_created_at: item.ts_created_at
-            } : null;
+        const shopList = allShopIds.map(id => {
+            const item = batchRes.Responses?.[TABLE_NAME]?.find(s => s.PK === `SHOP#${id}`);
+            return item ? { id, name: item.name, ts_created_at: item.ts_created_at } : null;
         }).filter(Boolean);
 
-        return {
-            statusCode: 200,
-            headers: corsHeaders,
-            body: JSON.stringify({ shops: shopList, roles, owner_shop_ids, gm_shop_ids })
-        };
+        return successResponse({ shops: shopList, roles, owner_shop_ids: ownerShopIds, gm_shop_ids: gmShopIds });
+
     } catch (error: any) {
-        console.error(error);
-        return { statusCode: 500, headers: corsHeaders, body: JSON.stringify({ message: 'Internal Server Error', error: String(error) }) };
+        console.error('Shop list error:', error);
+        return errorResponse(500, 'Internal Server Error', error.message);
     }
 };

@@ -1,62 +1,43 @@
 /**
  * 概要: 新規QRコードとPINをバッチで一括生成する。
- * 詳細: 指定された件数のQRコードを生成し、オプションに応じた属性（ショップID、商品ID、有効期限、デザイン等）を設定してDynamoDBに登録する。
+ * 詳細: 
+ *  - 指定された件数のQRコードを生成し、オプションに応じた属性（ショップID、商品ID、有効期限、デザイン等）を設定してDynamoDBに登録する。
+ *  - 各項目ごとに一意のUUIDと8桁のPINを発行。
+ *  - バッチ書き込み制約（25件/回）を考慮したループ処理を行う。
+ *
  * エンドポイント: POST /admin/qr/generate
- * リクエストボディ:
- *  - count: 生成件数 (最大100)
- *  - card_design: カードデザインID (必須)
- *  - shopId, productId, expiry_date, owner_uuid, sender_info, senderId: 各種属性（オプション）
- *  - activate_now: trueの場合、即座に有効状態で生成
  */
 import { APIGatewayProxyHandler } from 'aws-lambda';
-import { DynamoDBClient, BatchWriteItemCommand } from '@aws-sdk/client-dynamodb';
-import { DynamoDBDocumentClient, GetCommand, QueryCommand } from '@aws-sdk/lib-dynamodb';
+import { BatchWriteCommand } from '@aws-sdk/lib-dynamodb';
 import * as crypto from 'crypto';
 import { generateId } from './utils/id';
-import { checkUserShopPermission } from './share/shop-auth';
-import { stripSignaturesInHtml, stripSignature } from './utils/s3';
 import { validateQRParams } from './utils/qr-validation';
-
-const client = new DynamoDBClient({});
-const ddbDocClient = DynamoDBDocumentClient.from(client);
-const TABLE_NAME = process.env.TABLE_NAME || '';
-const BUCKET_NAME = process.env.BUCKET_NAME || '';
-
-const corsHeaders = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type,Authorization',
-    'Access-Control-Allow-Methods': 'POST,OPTIONS'
-};
+import { successResponse, errorResponse } from './utils/response';
+import { ddb, TABLE_NAME, BUCKET_NAME } from './share/db';
+import { getShopId, getUserId } from './utils/request';
 
 export const handler: APIGatewayProxyHandler = async (event) => {
     try {
-        if (event.httpMethod === 'OPTIONS') {
-            return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ message: 'OK' }) };
-        }
-        if (event.httpMethod !== 'POST') {
-            return { statusCode: 405, headers: corsHeaders, body: JSON.stringify({ message: 'Method Not Allowed' }) };
-        }
+        if (event.httpMethod === 'OPTIONS') return successResponse();
 
         const body = JSON.parse(event.body || '{}');
-        const count = body.count || 1; //required
-        const shopId = body.shopId;  //optional
-        const productId = body.productId;  //optional
-        const expiryDate = body.expiry_date;  //optional
-        const ownerUuid = body.owner_uuid;  //optional
-        const senderInfo = body.sender_info;  //optional
-        let senderId = body.senderId;  //optional
-        const activateNow = body.activate_now === true;  //optional
-        const cardDesign = body.card_design;  //required
+        const count = body.count || 1;
+        const shopId = getShopId(event, body);
+        const productId = body.productId;
+        const expiryDate = body.expiry_date;
+        const ownerUuid = body.owner_uuid;
+        const senderInfo = body.sender_info;
+        let senderId = body.senderId;
+        const activateNow = body.activate_now === true;
+        const cardDesign = body.card_design;
 
-
-        // Limit max count for safety
-        if (count > 100) { // DynamoDB BatchWrite limit is 25 items
-            return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Max 100 items per batch', detail: { count } }) };
+        // 生成件数の上限チェック (25件の倍数等を考慮しつつ100件まで)
+        if (count > 100) {
+            return errorResponse(400, 'Max 100 items per batch', { count });
         }
 
-        // Execute shared parameter and consistency validation
-        // この一連のチェックは admin_qr_generate.ts と shop_card_orders.ts で共通のロジックを使用する。
-        const validationResult = await validateQRParams(ddbDocClient, TABLE_NAME, BUCKET_NAME, {
+        // 共通バリデーションロジックの呼び出し
+        const validationResult: any = await validateQRParams(ddb, TABLE_NAME, BUCKET_NAME, {
             shopId,
             productId,
             ownerUuid,
@@ -69,95 +50,81 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         });
 
         if (validationResult.statusCode) {
-            return {
-                statusCode: validationResult.statusCode,
-                headers: corsHeaders,
-                body: JSON.stringify({ message: validationResult.message, detail: validationResult.detail })
-            };
+            return errorResponse(validationResult.statusCode, validationResult.message, validationResult.detail);
         }
 
         const { processedSenderInfo, isLinkeable, validDays } = validationResult;
 
-
         const ids = [];
         const batch_id = generateId();
-
-        const items = [];
+        const writeRequests = [];
 
         for (let i = 0; i < count; i++) {
             const uuid = generateId();
             let pin = '';
             do {
-                // Cryptographically secure random number
+                // 8桁のPIN生成 (ゾロ目を避ける)
                 pin = crypto.randomInt(10000000, 100000000).toString();
-            } while (/^(\d)\1+$/.test(pin)); // 8 digit PIN, avoid repdigits
+            } while (/^(\d)\1+$/.test(pin));
 
             const now = new Date().toISOString();
 
+            // METADATA 項目の構築
             const item: any = {
-                PK: { S: `QR#${uuid}` },
-                SK: { S: 'METADATA' },
-                pin: { S: pin },
-                batch_id: { S: batch_id }, // Store the batch ID
-                ts_created_at: { S: now },
-                ts_updated_at: { S: now }
+                PK: `QR#${uuid}`,
+                SK: 'METADATA',
+                pin: pin,
+                batch_id: batch_id,
+                ts_created_at: now,
+                ts_updated_at: now
             };
 
-            if (expiryDate) {
-                item.ts_expired_at = { S: expiryDate };
-            }
-            if (ownerUuid) {
-                item.owner_id = { S: ownerUuid };
-            }
+            if (expiryDate) item.ts_expired_at = expiryDate;
+            if (ownerUuid) item.owner_id = ownerUuid;
             if (shopId) {
-                item.shop_id = { S: shopId };
-                item.GSI2_PK = { S: `SHOP#${shopId}` };
-                item.GSI2_SK = { S: now };
+                item.shop_id = shopId;
+                item.GSI2_PK = `SHOP#${shopId}`;
+                item.GSI2_SK = now;
             }
-            if (productId) {
-                item.product_id = { S: productId };
-            }
-            if (cardDesign) {
-                item.card_design = { S: cardDesign };
-            }
+            if (productId) item.product_id = productId;
+            if (cardDesign) item.card_design = cardDesign;
+
+            // ステータスとGSI1の設定
             if (activateNow) {
                 const activationDate = new Date();
                 const expirationDate = new Date(activationDate);
                 expirationDate.setDate(expirationDate.getDate() + validDays);
 
-                item.GSI1_PK = { S: 'QR#ACTIVE' };
-                item.GSI1_SK = { S: now };
-                item.status = { S: 'ACTIVE' };
-                item.ts_activated_at = { S: now };
+                item.GSI1_PK = 'QR#ACTIVE';
+                item.GSI1_SK = now;
+                item.status = 'ACTIVE';
+                item.ts_activated_at = now;
                 if (!expiryDate) {
-                    item.ts_expired_at = { S: expirationDate.toISOString() };
+                    item.ts_expired_at = expirationDate.toISOString();
                 }
             } else if (isLinkeable) {
-                item.GSI1_PK = { S: 'QR#LINKED' };
-                item.GSI1_SK = { S: now };
-                item.status = { S: 'LINKED' };
-                item.ts_linked_at = { S: now };
+                item.GSI1_PK = 'QR#LINKED';
+                item.GSI1_SK = now;
+                item.status = 'LINKED';
+                item.ts_linked_at = now;
             } else {
-                item.GSI1_PK = { S: 'QR#UNASSIGNED' };
-                item.GSI1_SK = { S: now };
-                item.status = { S: 'UNASSIGNED' };
+                item.GSI1_PK = 'QR#UNASSIGNED';
+                item.GSI1_SK = now;
+                item.status = 'UNASSIGNED';
             }
 
-            items.push({
-                PutRequest: {
-                    Item: item
-                }
-            });
+            writeRequests.push({ PutRequest: { Item: item } });
 
+            // CHAT レコード（送信者が決まっている場合のみ）
             if (processedSenderInfo) {
-                items.push({
+                writeRequests.push({
                     PutRequest: {
                         Item: {
-                            PK: { S: `QR#${uuid}` },
-                            SK: { S: 'CHAT' },
-                            sender_id: { S: processedSenderInfo.sender_id },
-                            ts_created_at: { S: now },
-                            ts_updated_at: { S: now }
+                            PK: `QR#${uuid}`,
+                            SK: 'CHAT',
+                            sender_id: processedSenderInfo.sender_id,
+                            ts_created_at: now,
+                            ts_updated_at: now
                         }
                     }
                 });
@@ -166,35 +133,23 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             ids.push({ uuid, pin });
         }
 
-        // DynamoDB BatchWriteItem has a limit of 25 items per request
-        for (let i = 0; i < items.length; i += 25) {
-            const chunk = items.slice(i, i + 25);
-            // 生成したQRコードデータを一括登録 (25件ずつのバッチ実行)
-            // - 登録内容: 各種ステータス、生成されたUUID/PIN、有効期限、関連ID等
-            await client.send(new BatchWriteItemCommand({
-                RequestItems: {
-                    [TABLE_NAME]: chunk
-                }
+        // 25件ずつのバッチ書き込みを実行 (BatchWriteCommand は DocumentClient 用)
+        for (let i = 0; i < writeRequests.length; i += 25) {
+            const chunk = writeRequests.slice(i, i + 25);
+            await ddb.send(new BatchWriteCommand({
+                RequestItems: { [TABLE_NAME]: chunk }
             }));
         }
 
-        return {
-            statusCode: 200,
-            headers: corsHeaders,
-            body: JSON.stringify({
-                message: 'QR Codes generated',
-                count: ids.length,
-                batch_id: batch_id,
-                data: ids
-            })
-        };
+        return successResponse({
+            message: 'QR Codes generated',
+            count: ids.length,
+            batch_id: batch_id,
+            data: ids
+        });
 
     } catch (error: any) {
-        console.error(error);
-        return {
-            statusCode: 500,
-            headers: corsHeaders,
-            body: JSON.stringify({ message: 'Internal Server Error', error: error.message || String(error) })
-        };
+        console.error('QR generate error:', error);
+        return errorResponse(500, 'Internal Server Error', error.message || String(error));
     }
 };

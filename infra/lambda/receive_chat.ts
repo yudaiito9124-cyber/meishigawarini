@@ -1,111 +1,88 @@
 /**
- * 概要: チャットメッセージの取得・送信
- * 詳細: 特定のギフト（QR）に紐付くチャット履歴の取得、および新規メッセージの送信を行います。宛先へのメール通知も行います。
- * エンドポイント:
- *  - POST /receive/chat/get (チャット履歴・送り主情報の取得)
- *  - POST /receive/chat/send (新規メッセージの送信)
- * リクエストボディ:
- *  [send の場合]
- *  - username: 表示名 (必須)
- *  - message: 本文 (必須/ファイルがある場合は任意)
- *  - file_url: 添付ファイルURL (オプション)
- *  - file_name: ファイル名 (オプション)
- *  - file_type: MIMEタイプ (オプション)
- *  - file_size: ファイルサイズ (オプション)
+ * 概要: 送り主・受け取り人間でのチャットメッセージ交換
+ * 詳細: 
+ *  - 特定のQRコードに関連付けられたチャット履歴の取得(list)および新規メッセージの送信(send)を管理。
+ *  - 被贈答者(Receiver)によるメッセージ投稿時には、QRコードとPINの認証が必要です。
+ *  - 各ギフトにおける画像添付などの累計ファイルサイズ(total_size_bytes)を追跡し、100MBの容量制限を課しています。
+ *
+ * エンドポイント: POST /receive/chat
  */
 import { APIGatewayProxyHandler } from 'aws-lambda';
-import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
-import { DynamoDBDocumentClient, GetCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
-import { sendLocalizedEmail } from './templates/email';
+import { GetCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
+import { isLocked, getRateLimitUpdate, getResetRateLimitUpdate } from './utils/rate-limit';
 import { signUrlIfS3, signUrlsInHtml, stripSignature } from './utils/s3';
-import { generateId } from './utils/id';
-import { getResetRateLimitUpdate } from './utils/rate-limit';
+import { sendLocalizedEmail } from './templates/email';
+import { successResponse, errorResponse } from './utils/response';
+import { ddb, TABLE_NAME, BUCKET_NAME } from './share/db';
 
-const client = new DynamoDBClient({});
-const ddb = DynamoDBDocumentClient.from(client, {
-    marshallOptions: {
-        removeUndefinedValues: true,
-        convertEmptyValues: true
-    }
-});
-const TABLE_NAME = process.env.TABLE_NAME || '';
-const BUCKET_NAME = process.env.BUCKET_NAME || '';
-
-const corsHeaders = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type,Authorization,X-QR-UUID,X-QR-PIN',
-    'Access-Control-Allow-Methods': 'OPTIONS,POST,GET'
-};
+const CHAT_CAPACITY_LIMIT_MB = 100;
 
 export const handler: APIGatewayProxyHandler = async (event) => {
     try {
-        if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers: corsHeaders, body: '' };
-
-        // 認可コンテキストからUUIDを取得 (Authorizer経由)
-        const authorizer = event.requestContext.authorizer;
-        const uuid = authorizer?.uuid || event.pathParameters?.uuid || (event.headers['X-QR-UUID'] || event.headers['x-qr-uuid']);
-        
-        if (!uuid) {
-            return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Missing UUID' }) };
-        }
+        if (event.httpMethod === 'OPTIONS') return successResponse();
 
         const body = JSON.parse(event.body || '{}');
+        const { uuid, pin, action, message, type, file_url, file_size } = body;
         
-        // Determine action from path or body
-        let action = body.action;
-        const resPath = event.resource;
-        if (resPath.endsWith('/get') || event.httpMethod === 'GET') action = 'get_messages';
-        else if (resPath.endsWith('/send')) action = 'post_message';
+        if (!uuid || !pin) return errorResponse(400, 'Missing uuid or pin');
 
-        // ====================================================================
-        // Action: get_messages (GET メソッド または POST /get)
-        // ====================================================================
-        if (action === 'get_messages') {
-            // 【DB操作: GetItem】
-            // - 目的: チャット履歴(messages)およびチャット画面の設定情報(sender_info等)を取得
-            // - テーブル: TABLE_NAME
-            // - リクエストキー: { PK: `QR#${uuid}`, SK: 'CHAT' }
-            // - 取得カラム: ALL
-            const getChat = await ddb.send(new GetCommand({
+        // 【DB操作: GetItem】
+        // 理由: QRコードのメタデータを取得し、PINの一致とレートリミット（認証試行数制限）を検証。
+        const metaRes = await ddb.send(new GetCommand({
+            TableName: TABLE_NAME, Key: { PK: `QR#${uuid}`, SK: 'METADATA' }
+        }));
+
+        if (!metaRes.Item) return errorResponse(404, 'QR Code not found');
+        const item = metaRes.Item;
+
+        // 【確認フェーズ 1: レートリミット制限のチェック】
+        if (isLocked(item)) {
+            return errorResponse(403, 'Too many attempts. Please try again later.');
+        }
+
+        // 【確認フェーズ 2: PINの照合】
+        if (String(item.pin) !== String(pin)) {
+            const { UpdateExpression, ExpressionAttributeValues, ExpressionAttributeNames } = getRateLimitUpdate(item);
+            await ddb.send(new UpdateCommand({
                 TableName: TABLE_NAME,
-                Key: { PK: `QR#${uuid}`, SK: 'CHAT' }
+                Key: { PK: `QR#${uuid}`, SK: 'METADATA' },
+                UpdateExpression, ExpressionAttributeValues, ExpressionAttributeNames
             }));
+            return errorResponse(403, 'Invalid PIN');
+        }
 
-            // 【DB操作: UpdateItem】
-            // - 目的: 認証成功に伴い、METADATA側のレートリミット（失敗回数）をリセット
-            try {
-                const getMeta = await ddb.send(new GetCommand({ TableName: TABLE_NAME, Key: { PK: `QR#${uuid}`, SK: 'METADATA' } }));
-                if (getMeta.Item && (getMeta.Item.failed_attempts || getMeta.Item.locked_until)) {
-                    const { UpdateExpression, ExpressionAttributeNames } = getResetRateLimitUpdate();
-                    await ddb.send(new UpdateCommand({
-                        TableName: TABLE_NAME,
-                        Key: { PK: `QR#${uuid}`, SK: 'METADATA' },
-                        UpdateExpression,
-                        ExpressionAttributeNames
-                    }));
-                }
-            } catch (e) {
-                console.error("Failed to reset rate limit on GET", e);
-            }
+        // 認証成功時: 失敗カウントのリセット（遅延評価）
+        if (item.failed_attempts || item.locked_until) {
+            const { UpdateExpression, ExpressionAttributeNames } = getResetRateLimitUpdate();
+            await ddb.send(new UpdateCommand({
+                TableName: TABLE_NAME,
+                Key: { PK: `QR#${uuid}`, SK: 'METADATA' },
+                UpdateExpression, ExpressionAttributeNames
+            })).catch(e => console.error('Failed to reset rate limit', e));
+        }
 
-            const messages = getChat.Item?.messages || [];
-            const sender_info = getChat.Item?.sender_info || null;
-
-            // S3画像の署名付きURL生成（メッセージ添付ファイル）
+        // ====================================================================
+        // ACTION: list (チャット履歴の取得)
+        // ====================================================================
+        if (action === 'list') {
+            // 【DB操作: GetItem】
+            // 理由: SK=CHATレコードを取得し、蓄積された全メッセージ(messages)を返します。
+            const chatRes = await ddb.send(new GetCommand({
+                TableName: TABLE_NAME, Key: { PK: `QR#${uuid}`, SK: 'CHAT' }
+            }));
+            const chatLog = chatRes.Item || { messages: [], total_size_bytes: 0, sender_info: null };
+            
+            // 各メッセージの添付ファイルURLに署名を付与
+            const messages = chatLog.messages || [];
             for (const msg of messages) {
-                if (msg.file_url) {
-                    msg.file_url = await signUrlIfS3(msg.file_url, BUCKET_NAME);
-                }
+                if (msg.file_url) msg.file_url = await signUrlIfS3(msg.file_url, BUCKET_NAME);
             }
 
-            // S3画像の署名付きURL生成（送り主プロフィール情報）
+            // 送り主情報の署名付きURL生成 (Enrichment)
+            const sender_info = chatLog.sender_info;
             if (sender_info) {
-                if (sender_info.card_image_url) {
-                    sender_info.card_image_url = await signUrlIfS3(sender_info.card_image_url, BUCKET_NAME);
-                }
-                if (sender_info.detail_html) {
-                    sender_info.detail_html = await signUrlsInHtml(sender_info.detail_html, BUCKET_NAME);
-                }
+                if (sender_info.card_image_url) sender_info.card_image_url = await signUrlIfS3(sender_info.card_image_url, BUCKET_NAME);
+                if (sender_info.detail_html) sender_info.detail_html = await signUrlsInHtml(sender_info.detail_html, BUCKET_NAME);
                 if (sender_info.html_image_urls && Array.isArray(sender_info.html_image_urls)) {
                     sender_info.html_image_urls = await Promise.all(
                         sender_info.html_image_urls.map((url: string) => signUrlIfS3(url, BUCKET_NAME))
@@ -113,130 +90,75 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 }
             }
 
-            return {
-                statusCode: 200,
-                headers: corsHeaders,
-                body: JSON.stringify({
-                    messages,
-                    total_size_bytes: getChat.Item?.total_size_bytes || 0,
-                    sender_info,
-                    sender_id: getChat.Item?.sender_id
-                })
+            return successResponse({ 
+                messages,
+                total_size_bytes: chatLog.total_size_bytes || 0,
+                capacity_limit_mb: CHAT_CAPACITY_LIMIT_MB,
+                sender_info,
+                sender_id: chatLog.sender_id
+            });
+        }
+
+        // ====================================================================
+        // ACTION: send (メッセージの送信)
+        // ====================================================================
+        if (action === 'send') {
+            if (!message && !file_url) return errorResponse(400, 'Empty message');
+
+            const now = new Date().toISOString();
+            const newMessage = { 
+                role: 'RECEIVER', 
+                content: message, 
+                type: type || 'text',
+                file_url: file_url ? stripSignature(file_url) : undefined,
+                file_size: file_size || 0,
+                ts_created_at: now 
             };
-        }
 
-        // ====================================================================
-        // Action: post_message (POST /send)
-        // ====================================================================
-        // (body parsing already handled above)
-        const { username, message, file_url, file_name, file_type, file_size } = body;
-
-        if (!username || (!message && !file_url)) {
-            return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Missing required fields' }) };
-        }
-
-        if (username === 'System') {
-            return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Invalid username' }) };
-        }
-
-        const newMessage: any = {
-            id: generateId(),
-            username,
-            message,
-            ts_created_at: new Date().toISOString()
-        };
-
-        if (file_url) {
-            newMessage.file_url = stripSignature(file_url);
-            newMessage.file_name = file_name;
-            newMessage.file_type = file_type;
-            newMessage.file_size = file_size;
-        }
-
-        // 【DB操作: UpdateItem】
-        // - 目的: チャット履歴への新規メッセージ追加と、累積ストレージ使用量の更新
-        // - テーブル: TABLE_NAME
-        // - リクエストキー: { PK: `QR#${uuid}`, SK: 'CHAT' }
-        // - 更新内容: messagesリストの末尾に要素追加、total_size_bytesの加算
-        await ddb.send(new UpdateCommand({
-            TableName: TABLE_NAME,
-            Key: { PK: `QR#${uuid}`, SK: 'CHAT' },
-            UpdateExpression: 'SET messages = list_append(if_not_exists(messages, :empty_list), :new_msg) ADD total_size_bytes :size',
-            ExpressionAttributeValues: {
-                ':empty_list': [],
-                ':new_msg': [newMessage],
-                ':size': file_size || 0
+            // 容量制限のチェック
+            const chatRes = await ddb.send(new GetCommand({ TableName: TABLE_NAME, Key: { PK: `QR#${uuid}`, SK: 'CHAT' } }));
+            const currentTotalSize = chatRes.Item?.total_size_bytes || 0;
+            if (currentTotalSize + (file_size || 0) > CHAT_CAPACITY_LIMIT_MB * 1024 * 1024) {
+                return errorResponse(403, 'Chat storage capacity exceeded');
             }
-        }));
 
-        // 【DB操作: UpdateItem】
-        // - 目的: メッセージ投稿成功に伴い、METADATA側のレートリミットをリセット
-        try {
-            const getMeta = await ddb.send(new GetCommand({ TableName: TABLE_NAME, Key: { PK: `QR#${uuid}`, SK: 'METADATA' } }));
-            if (getMeta.Item && (getMeta.Item.failed_attempts || getMeta.Item.locked_until)) {
-                const { UpdateExpression, ExpressionAttributeNames } = getResetRateLimitUpdate();
-                await ddb.send(new UpdateCommand({
-                    TableName: TABLE_NAME,
-                    Key: { PK: `QR#${uuid}`, SK: 'METADATA' },
-                    UpdateExpression,
-                    ExpressionAttributeNames
-                }));
-            }
-        } catch (e) {
-            console.error("Failed to reset rate limit on message", e);
-        }
-
-        // 通知送信処理
-        try {
-            // 【DB操作: GetItem】
-            // - 目的: メッセージ着信を通知すべき先のメールアドレスリストと、各ユーザーの言語設定を取得
-            // - テーブル: TABLE_NAME
-            // - リクエストキー: { PK: `QR#${uuid}`, SK: 'CHAT' }
-            // - 取得カラム: notification_emails, email_preferences
-            const getRes = await ddb.send(new GetCommand({
+            // 【DB操作: UpdateItem】
+            // 理由: messagesリストに新メッセージを追記(list_append)し、累計ファイルサイズを加算(ADD)。
+            await ddb.send(new UpdateCommand({
                 TableName: TABLE_NAME,
                 Key: { PK: `QR#${uuid}`, SK: 'CHAT' },
-                ProjectionExpression: 'notification_emails, email_preferences'
+                UpdateExpression: 'SET messages = list_append(if_not_exists(messages, :empty_list), :msg), total_size_bytes = if_not_exists(total_size_bytes, :zero) + :fsize, ts_updated_at = :now',
+                ExpressionAttributeValues: { 
+                    ':msg': [newMessage], ':empty_list': [], ':now': now,
+                    ':zero': 0, ':fsize': file_size || 0 
+                }
             }));
 
-            if (getRes.Item && getRes.Item.notification_emails) {
-                const recipients = Array.from(new Set(getRes.Item.notification_emails as string[]));
-                const preferences = getRes.Item.email_preferences || {};
+            // 【事後処理: 通知送信】
+            // 理由: チャット参加者（notification_emails）に新着メッセージを通知。
+            if (chatRes.Item?.notification_emails) {
+                const recipients = Array.from(new Set(chatRes.Item.notification_emails as string[]));
+                const preferences = chatRes.Item.email_preferences || {};
 
                 const sendPromises = recipients.map(emailTo => {
-                    const lang = (preferences[emailTo] === 'en') ? 'en' : 'ja';
+                    const lang = preferences[emailTo] === 'en' ? 'en' : 'ja';
                     return sendLocalizedEmail({
                         type: 'MESSAGE_NOTIFICATION',
-                        to: [emailTo],
-                        params: {
-                            username,
-                            message: message || '',
-                            uuid,
-                            pin: authorizer?.pin || '' // Authorizerから取得可能なら使用
-                        },
-                        lang: lang as 'ja' | 'en'
+                        to: emailTo,
+                        params: { username: 'Recipient', message: message || '', uuid, pin },
+                        lang
                     });
                 });
-                await Promise.all(sendPromises);
+                await Promise.all(sendPromises).catch(e => console.error('Notification failed', e));
             }
-        } catch (e) {
-            console.error('Failed to send notification emails:', e);
+            
+            return successResponse({ message: 'Message sent successfully', data: newMessage });
         }
 
-        // フロントエンドでの即時表示用に署名を付与
-        const responseData = { ...newMessage };
-        if (responseData.file_url) {
-            responseData.file_url = await signUrlIfS3(responseData.file_url, BUCKET_NAME);
-        }
-
-        return {
-            statusCode: 200,
-            headers: corsHeaders,
-            body: JSON.stringify({ message: 'Message posted', data: responseData })
-        };
+        return errorResponse(400, 'Unknown action');
 
     } catch (error: any) {
-        console.error(error);
-        return { statusCode: 500, headers: corsHeaders, body: JSON.stringify({ message: 'Internal Server Error' }) };
+        console.error('Receive chat error:', error);
+        return errorResponse(500, 'Internal Server Error', error.message);
     }
 };
