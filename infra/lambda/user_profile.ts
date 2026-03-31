@@ -257,7 +257,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 body: JSON.stringify({ uploadUrl, publicUrl: signedPublicUrl, signedUrl: signedPublicUrl })
             };
         }
-        
+
         // ====================================================================
         // ACTION: receiver_get (配送先デフォルト情報の取得)
         // ====================================================================
@@ -378,7 +378,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             // 履歴に含まれるUUIDから、PINコードや商品画像などの詳細情報を取得します。
             const allLogs = [...sentLogs, ...receivedLogs];
             const uniqueUuids = [...new Set(allLogs.map(l => l.uuid))];
-            
+
             if (uniqueUuids.length > 0) {
                 // 1. 【DB操作: BatchGetItem (QR METADATA)】
                 // - 目的: 履歴にある各QRコードの基本設定(PIN, 紐付くショップ・商品・デザインID)を一括取得します。
@@ -412,7 +412,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 const productKeys = Array.from(metadataMap.values())
                     .filter(m => m.shop_id && m.product_id)
                     .map(m => ({ PK: `SHOP#${m.shop_id}`, SK: `PRODUCT#${m.product_id}` }));
-                
+
                 const uniqueProductKeys = Array.from(new Set(productKeys.map(k => JSON.stringify(k)))).map(s => JSON.parse(s));
 
                 if (uniqueProductKeys.length > 0) {
@@ -535,31 +535,39 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         // ACTION: history_sendgift (QRをスキャンして送信履歴に登録&紐付け)
         // ====================================================================
         if (action === 'history_sendgift') {
-            const { uuid, pin } = body;
-            if (!uuid || !pin) return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Missing uuid or pin' }) };
+            const { uuid } = body;
+            if (!uuid) return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Missing UUID or PIN' }) };
 
             // 【DB操作: GetItem】
-            // - 目的: スキャンされたQRコード(ギフト)が実在し、入力されたPINコードと一致するか検証します。
+            // - 目的: スキャンされたQRコード(ギフト)が実在するか検証します。
             // - キー: PK=`QR#${uuid}`, SK='METADATA'
             const getRes = await ddb.send(new GetCommand({
                 TableName: TABLE_NAME,
                 Key: { PK: `QR#${uuid}`, SK: 'METADATA' }
             }));
 
-            if (!getRes.Item || String(getRes.Item.pin) !== String(pin)) {
-                return { statusCode: 403, headers: corsHeaders, body: JSON.stringify({ message: 'Invalid PIN or QR not found' }) };
+            if (!getRes.Item) {
+                return { statusCode: 404, headers: corsHeaders, body: JSON.stringify({ message: 'QR not found' }) };
             }
 
             // 【DB操作: UpdateItem】
             // - 目的: チャット管理レコード(CHAT)に送信者のユーザーIDを永続化します。
-            // - 背景: ギフトの受取人は、このsender_idを通じて送り主のプロフィール情報(SENDER)を参照可能になります。
+            // - 条件: sender_idが未設定である、または自分自身のIDである場合のみ更新を許可します（上書き防止）。
             // - キー: PK=`QR#${uuid}`, SK='CHAT'
-            await ddb.send(new UpdateCommand({
-                TableName: TABLE_NAME,
-                Key: { PK: `QR#${uuid}`, SK: 'CHAT' },
-                UpdateExpression: 'SET sender_id = :sid, ts_updated_at = :now',
-                ExpressionAttributeValues: { ':sid': userId, ':now': new Date().toISOString() }
-            }));
+            try {
+                await ddb.send(new UpdateCommand({
+                    TableName: TABLE_NAME,
+                    Key: { PK: `QR#${uuid}`, SK: 'CHAT' },
+                    UpdateExpression: 'SET sender_id = :sid, ts_updated_at = :now',
+                    ConditionExpression: 'attribute_not_exists(sender_id)',
+                    ExpressionAttributeValues: { ':sid': userId, ':now': new Date().toISOString() }
+                }));
+            } catch (err: any) {
+                if (err.name === 'ConditionalCheckFailedException') {
+                    return { statusCode: 409, headers: corsHeaders, body: JSON.stringify({ message: 'Already registered as a sender' }) };
+                }
+                throw err;
+            }
 
             // 【DB操作: 内部関数 appendToHistory 呼び出し】
             // - 目的: ユーザーの送信履歴(SENDLOG)に今回のギフトUUIDを追記します。
