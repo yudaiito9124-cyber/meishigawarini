@@ -18,9 +18,9 @@ export default async function Image({ params }: { params: Promise<{ uuid: string
   const NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || "";
   let data: any = null;
   try {
-    const apiEndpoint = `${NEXT_PUBLIC_API_URL}/share/${uuid}?shop&product&card`;
+    const apiEndpoint = `${NEXT_PUBLIC_API_URL}/share/${uuid}`;
     console.log("OGP Image fetching data from:", apiEndpoint);
-    
+
     const res = await fetch(apiEndpoint, { next: { revalidate: 3600 } });
     if (res.ok) {
       data = await res.json();
