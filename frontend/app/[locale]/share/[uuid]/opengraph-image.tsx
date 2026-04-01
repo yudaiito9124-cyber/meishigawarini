@@ -16,6 +16,7 @@ export default async function Image({ params }: { params: Promise<{ uuid: string
 
   // APIから情報を取得
   const NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || "";
+  const NEXT_PUBLIC_APP_URL = process.env.NEXT_PUBLIC_APP_URL || "";
   let data: any = null;
   try {
     const apiEndpoint = `${NEXT_PUBLIC_API_URL}/share/${uuid}`;
@@ -93,7 +94,10 @@ export default async function Image({ params }: { params: Promise<{ uuid: string
               display: 'flex'
             }}>
               {data.design?.thumbf ? (
-                <img src={data.design.thumbf} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                <img
+                  src={data.design.thumbf.startsWith('http') ? data.design.thumbf : `${NEXT_PUBLIC_APP_URL}${data.design.thumbf}`}
+                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                />
               ) : (
                 <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <svg width="100" height="100" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 12 20 22 4 22 4 12"></polyline><rect x="2" y="7" width="20" height="5"></rect></svg>
@@ -118,7 +122,10 @@ export default async function Image({ params }: { params: Promise<{ uuid: string
               padding: 10
             }}>
               {data.product?.image_url ? (
-                <img src={data.product.image_url} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 50 }} />
+                <img
+                  src={data.product.image_url.startsWith('http') ? data.product.image_url : `${NEXT_PUBLIC_APP_URL}${data.product.image_url}`}
+                  style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 50 }}
+                />
               ) : (
                 <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="#CBD5E1" strokeWidth="1.5"><circle cx="9" cy="21" r="1"></circle><circle cx="20" cy="21" r="1"></circle><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path></svg>
