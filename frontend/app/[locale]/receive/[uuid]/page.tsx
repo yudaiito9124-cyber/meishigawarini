@@ -24,6 +24,7 @@ import { useRouter } from "@/i18n/routing";
 import { receiveApi } from "@/lib/api/receive";
 import { fetchAuthSession, getCurrentUser } from "aws-amplify/auth";
 import { userApi } from "@/lib/api/user";
+import { ShareDialog } from "@/components/ShareDialog";
 
 
 const NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || "";
@@ -574,18 +575,20 @@ export default function ReceivePage() {
             if (selectedFile) {
                 setUploading(true);
                 let uploadFile: File | Blob = selectedFile;
+                let finalFilename = selectedFile.name;
 
                 // Resize if image
                 if (selectedFile.type.startsWith("image/")) {
                     try {
                         uploadFile = await resizeImage(selectedFile);
+                        finalFilename = `${generateId()}.webp`; // Force WebP extension
                     } catch (err) {
                         // console.error("Resize failed, using original", err);
                     }
                 }
 
                 const { uploadUrl, fileUrl } = await receiveApi.receive_uploadurl_get(uuid, pin, {
-                    filename: selectedFile.name,
+                    filename: finalFilename,
                     content_type: uploadFile.type,
                     file_size: uploadFile.size
                 });
@@ -600,8 +603,8 @@ export default function ReceivePage() {
 
                 fileData = {
                     fileUrl: fileUrl,
-                    fileName: selectedFile.name,
-                    fileType: selectedFile.type,
+                    fileName: finalFilename,
+                    fileType: uploadFile.type,
                     fileSize: uploadFile.size
                 };
             }
@@ -680,15 +683,17 @@ export default function ReceivePage() {
         setSenderInfoLoading(true);
         try {
             let uploadFile: File | Blob = file;
+            let finalFilename = file.name;
             if (file.type.startsWith("image/")) {
                 try {
                     uploadFile = await resizeImage(file);
+                    finalFilename = `${generateId()}.webp`; // Force WebP extension
                 } catch (err) {
                     // console.error("Resize failed", err);
                 }
             }
 
-            const { uploadUrl, fileUrl } = await receiveApi.receive_uploadurl_get(uuid, pin, { filename: file.name, content_type: uploadFile.type, file_size: uploadFile.size });
+            const { uploadUrl, fileUrl } = await receiveApi.receive_uploadurl_get(uuid, pin, { filename: finalFilename, content_type: uploadFile.type, file_size: uploadFile.size });
 
             const s3Res = await fetch(uploadUrl, {
                 method: 'PUT',
@@ -746,9 +751,11 @@ export default function ReceivePage() {
         setSenderInfoLoading(true);
         try {
             let uploadFile: File | Blob = file;
+            let finalFilename = file.name;
             if (file.type.startsWith("image/")) {
                 try {
                     uploadFile = await resizeImage(file);
+                    finalFilename = `${generateId()}.webp`; // Force WebP extension
                 } catch (err) {
                     // console.error("Resize failed", err);
                 }
@@ -757,7 +764,7 @@ export default function ReceivePage() {
             const { uploadUrl, fileUrl } = await receiveApi.receive_uploadurl_get(
                 uuid,
                 pin,
-                { filename: file.name, content_type: uploadFile.type, file_size: uploadFile.size }
+                { filename: finalFilename, content_type: uploadFile.type, file_size: uploadFile.size }
             );
 
             const uploadRes = await fetch(uploadUrl, {
@@ -771,7 +778,7 @@ export default function ReceivePage() {
             const newSenderInfo = {
                 ...senderForm,
                 card_image_url: fileUrl,
-                card_image_name: file.name,
+                card_image_name: finalFilename, // fixed
                 ts_updated_at: new Date().toISOString()
             };
 
@@ -1136,6 +1143,16 @@ export default function ReceivePage() {
                                     <p className="text-sm text-amber-900/80 whitespace-pre-wrap leading-relaxed">{gift.memo_for_users}</p>
                                 </div>
                             )}
+
+                            {/* SNS Share Button - Witty Place */}
+                            <div className="mt-8 animate-reveal reveal-delay-500">
+                                <ShareDialog
+                                    uuid={uuid}
+                                    product={{ name: gift.product.name, image_url: gift.product.image_url }}
+                                    card={{ image_url: gift.design?.thumbf || gift.card_design_thumbf || gift.card_image_url }}
+                                    shop={{ name: gift.shop_name }}
+                                />
+                            </div>
 
                         </div>
                     )}

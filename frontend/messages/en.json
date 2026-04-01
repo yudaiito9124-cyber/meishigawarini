@@ -571,11 +571,28 @@
     "shopinfo": "Shop Introduction",
     "shopinfo_description": "Introduction to the shop selling this gift",
     "memorySection": {
-      "title": "Memory Record",
-      "daysPassed": "{days} days since our encounter",
-      "message": "May this gift become a wonderful memory for you.",
-      "submittedAt": "Order Date: {date}",
-      "receivedAt": "Received on: {date}"
+      "title": "Memories of the Gift",
+      "daysPassed": "{days} days since that day",
+      "message": "May this gift become one of your wonderful memories.",
+      "submittedAt": "Date Ordered: {date}",
+      "receivedAt": "Date Received: {date}"
+    },
+    "share": {
+      "title": "Can I brag? (Sure you can!)",
+      "description": "Share your awesome gift with everyone!",
+      "button": "Share the record",
+      "buttonDesc": "Brag on SNS",
+      "copyLink": "Copy link",
+      "copied": "Copied! Ready to share 👍",
+      "navigatorShare": "Share via other apps",
+      "x": "Brag on X",
+      "line": "Share on LINE",
+      "options": {
+        "title": "What to share:",
+        "product": "Product info",
+        "card": "Message card",
+        "shop": "Shop info"
+      }
     }
   },
   "AdminPage": {

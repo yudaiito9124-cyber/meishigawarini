@@ -333,27 +333,34 @@ export default function ShopPage() {
             }
 
             // 1. Get Presigned URL
-            const { uploadUrl, publicUrl } = await shopApi.shop_products_uploadurl({
+            const resData = await shopApi.shop_products_uploadurl({
                 shop_id: shopId!,
                 filename: `${generateId()}.webp`,
                 content_type: 'image/webp',
                 folder: 'shopcontent'
             });
+            
+            const uploadUrl = resData.uploadUrl;
+            const publicUrl = resData.publicUrl || resData.fileUrl; // Handle both for compatibility
+            const viewUrl = resData.viewUrl || publicUrl; // Use signed URL for immediate preview
 
-            // 2. Upload to S3
-            const uploadRes = await fetch(uploadUrl, {
-                method: 'PUT',
-                body: uploadFile,
-                headers: { 'Content-Type': uploadFile.type }
-            });
+                const res = await fetch(uploadUrl, {
+                    method: 'PUT',
+                    body: uploadFile,
+                    headers: { 'Content-Type': 'image/webp' }
+                });
 
-            if (!uploadRes.ok) throw new Error('Failed to upload image');
+                if (!res.ok) {
+                    const errorText = await res.text();
+                    console.error('S3 Upload Error Details:', errorText);
+                    throw new Error('Failed to upload image (' + res.status + ')');
+                }
 
-            // 3. Update State
-            setHtmlImageUrls(prev => [...prev, publicUrl]);
-            setSessionUploadedUrls(prev => [...prev, publicUrl]);
+                // 3. Update State
+                setHtmlImageUrls(prev => [...prev, viewUrl]);
+                setSessionUploadedUrls(prev => [...prev, publicUrl]);
         } catch (err: any) {
-            // console.error('HTML Image upload failed:', err);
+            console.error('HTML Image upload failed:', err);
             alert(t('addProduct.imageUploadFailed') + ': ' + (tb(err.message.replace(/\./g, '_')) || err.message));
         } finally {
             setIsUploadingHtmlImage(false);
@@ -393,32 +400,34 @@ export default function ShopPage() {
                 // Resize Image
                 const resizedBlob = await resizeImage(file);
 
-                // 2. Rename (use random UUID for image)
-                const ext = file.name.split('.').pop();
-                const randomName = generateId();
-                const filename = `${randomName}.${ext}`;
-
-                // Cast Blob back to File-like object if necessary, or just use blob body
-                const resizedFile = new File([resizedBlob], filename, { type: file.type });
+                // Use the resized blob directly with the correct type
 
                 // Get Presigned URL
-                const { uploadUrl, publicUrl } = await shopApi.shop_products_uploadurl({
+                const resData = await shopApi.shop_products_uploadurl({
                     shop_id: shopId!,
                     filename: `${generateId()}.webp`,
                     content_type: 'image/webp'
                 });
+                
+                const uploadUrl = resData.uploadUrl;
+                const publicUrl = resData.publicUrl || resData.fileUrl; // Handle both for compatibility
+                const viewUrl = resData.viewUrl || publicUrl; // Use signed URL for immediate preview
 
                 // Upload to S3 (No Auth Header for S3 direct upload)
                 const s3Res = await fetch(uploadUrl, {
                     method: 'PUT',
                     headers: {
-                        'Content-Type': resizedFile.type
+                        'Content-Type': 'image/webp'
                     },
-                    body: resizedFile
+                    body: resizedBlob
                 });
-                if (!s3Res.ok) throw new Error('Failed to upload image to S3');
+                if (!s3Res.ok) {
+                    const errorText = await s3Res.text();
+                    console.error('S3 Upload Error Details:', errorText);
+                    throw new Error('Failed to upload image to S3 (' + s3Res.status + ')');
+                }
 
-                imageUrl = publicUrl;
+                imageUrl = viewUrl;
             }
 
             if (editingProduct && !isDuplicateMode) {

@@ -13,6 +13,8 @@ import { SiX, SiInstagram, SiYoutube, SiFacebook, SiLine, SiTiktok, SiThreads, S
 import { cn } from "@/lib/utils";
 import SandboxedHtml from "@/components/SandboxedHtml";
 import { userApi } from "@/lib/api/user";
+import { resizeImage } from "@/lib/image-utils";
+import { generateId } from "@/lib/id";
 
 const SENDER_FORM_KEYS = [
     "name", "job_title", "company", "department", "email", "phone", "phone_direct",
@@ -20,28 +22,7 @@ const SENDER_FORM_KEYS = [
     "SNS_X", "SNS_YouTube", "SNS_LINE", "SNS_TikTok", "Service_Eight", "Service_Linktree"
 ];
 
-// image resizing utility
-function resizeImage(file: File, maxWidth = 1000): Promise<File | Blob> {
-    return new Promise((resolve, reject) => {
-        const img = new Image();
-        img.onload = () => {
-            if (img.width <= maxWidth) return resolve(file);
-            const scale = maxWidth / img.width;
-            const canvas = document.createElement('canvas');
-            canvas.width = maxWidth;
-            canvas.height = img.height * scale;
-            const ctx = canvas.getContext('2d');
-            if (!ctx) return resolve(file);
-            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-            canvas.toBlob((blob) => {
-                if (blob) resolve(new File([blob], file.name, { type: file.type }));
-                else resolve(file);
-            }, file.type);
-        };
-        img.onerror = reject;
-        img.src = URL.createObjectURL(file);
-    });
-}
+
 
 export default function UserProfilePage() {
     const t = useTranslations('ReceivePage');
@@ -123,24 +104,30 @@ export default function UserProfilePage() {
             }));
 
             let uploadFile: File | Blob = file;
+            let finalFilename = file.name;
             if (file.type.startsWith("image/")) {
                 try {
                     uploadFile = await resizeImage(file);
+                    finalFilename = `${generateId()}.webp`; // Force WebP extension
                 } catch (err) {}
             }
 
             const { uploadUrl, publicUrl } = await userApi.user_profile_uploadurl({
-                filename: file.name,
+                filename: finalFilename,
                 content_type: uploadFile.type
             });
 
             const res = await fetch(uploadUrl, {
                 method: "PUT",
                 body: uploadFile,
-                headers: { "Content-Type": file.type }
+                headers: { "Content-Type": uploadFile.type }
             });
 
-            if (!res.ok) throw new Error("Upload failed");
+            if (!res.ok) {
+                const errorText = await res.text();
+                console.error("S3 Upload Error Details:", errorText);
+                throw new Error("Upload failed (" + res.status + ")");
+            }
 
             // After upload, we have the S3 URL (signed by the backend).
             // We update the state so when it saves, the S3 URL is stored.
@@ -163,24 +150,30 @@ export default function UserProfilePage() {
             // Local preview isn't worth it here as it's an array and needs S3 URL for HTML mapping.
             // But let's at least show something.
             let uploadFile: File | Blob = file;
+            let finalFilename = file.name;
             if (file.type.startsWith("image/")) {
                 try {
                     uploadFile = await resizeImage(file);
+                    finalFilename = `${generateId()}.webp`; // Force WebP extension
                 } catch (err) {}
             }
 
             const { uploadUrl, publicUrl } = await userApi.user_profile_uploadurl({
-                filename: file.name,
-                content_type: file.type
+                filename: finalFilename,
+                content_type: uploadFile.type
             });
 
             const res = await fetch(uploadUrl, {
                 method: "PUT",
                 body: uploadFile,
-                headers: { "Content-Type": file.type }
+                headers: { "Content-Type": uploadFile.type }
             });
 
-            if (!res.ok) throw new Error("Upload failed");
+            if (!res.ok) {
+                const errorText = await res.text();
+                console.error("S3 Upload Error Details:", errorText);
+                throw new Error("Upload failed (" + res.status + ")");
+            }
 
             const next = [...htmlImageUrls, publicUrl];
             setHtmlImageUrls(next);

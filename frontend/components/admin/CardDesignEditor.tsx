@@ -132,7 +132,7 @@ export default function CardDesignEditor({ apiUrl }: { apiUrl: string }) {
             const token = session.tokens?.idToken?.toString();
             const thumbType = type === 'bgimgf' ? 'thumbf' : 'thumbb';
 
-            // 1. Prepare Main Image
+            // 1. Prepare Main Image (No preprocessing for resolution)
             const { uploadUrl: mainUploadUrl, publicUrl: mainPublicUrl } = await adminApi.admin_carddesigns_uploadurl({
                 filename: file.name,
                 content_type: file.type,

@@ -11,7 +11,7 @@ import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { checkShopOwnerOrGM } from './share/shop-auth';
 import { generateId } from './utils/id';
-import { getPublicUrl } from './utils/s3';
+import { getPublicUrl, getPresignedViewUrl } from './utils/s3';
 import { successResponse, errorResponse } from './utils/response';
 import { ddb, TABLE_NAME, BUCKET_NAME } from './share/db';
 import { getShopId, getUserId, getProductId } from './utils/request';
@@ -26,7 +26,8 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         const userId = getUserId(event);
         const shopId = getShopId(event, body);
         const productId = getProductId(event, body);
-        const { filename, contentType, folder } = body;
+        const { filename, contentType, content_type, folder } = body;
+        const finalContentType = contentType || content_type || 'image/jpeg';
         
         if (!shopId || !filename) return errorResponse(400, 'Missing required fields');
         if (!userId) return errorResponse(401, 'Unauthorized');
@@ -49,16 +50,19 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         const command = new PutObjectCommand({
             Bucket: BUCKET_NAME,
             Key: key,
-            ContentType: contentType || 'image/jpeg',
+            ContentType: finalContentType,
             ACL: 'private'
         });
         const uploadUrl = await getSignedUrl(s3, command, { expiresIn: 3600 });
         const finalUrl = getPublicUrl(BUCKET_NAME, key);
+        const viewUrl = await getPresignedViewUrl(BUCKET_NAME, key, 3600); // 1h signed GET URL for immediate preview
 
         return successResponse({
             uploadUrl,
             key,
-            fileUrl: finalUrl
+            fileUrl: finalUrl,
+            publicUrl: finalUrl, // Stored in DB
+            viewUrl // For immediate UI preview
         });
 
     } catch (error: any) {

@@ -20,7 +20,7 @@ const nextConfig: NextConfig = {
       },
     ],
   },
-  serverExternalPackages: ['jspdf'],
+  serverExternalPackages: ['jspdf', 'sharp'],
 };
 
 export default withNextIntl(nextConfig);

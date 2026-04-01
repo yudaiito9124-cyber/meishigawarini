@@ -622,6 +622,23 @@
       "message": "このギフトが、あなたにとって素敵な思い出のひとつになりますように。",
       "submittedAt": "受注日: {date}",
       "receivedAt": "受け取り日: {date}"
+    },
+    "share": {
+      "title": "自慢してもいいですか？（してください！）",
+      "description": "受け取った素敵なギフトを、みんなに自慢しましょう！",
+      "button": "記録をシェアする",
+      "buttonDesc": "SNSで自慢しちゃう",
+      "copyLink": "リンクをコピー",
+      "copied": "コピー完了！準備OK👍",
+      "navigatorShare": "他のアプリでシェア",
+      "x": "Xで自慢する",
+      "line": "LINEでおねだり",
+      "options": {
+        "title": "シェアする内容",
+        "product": "届いた商品",
+        "card": "メッセージカード",
+        "shop": "ショップ情報"
+      }
     }
   },
   "AdminPage": {

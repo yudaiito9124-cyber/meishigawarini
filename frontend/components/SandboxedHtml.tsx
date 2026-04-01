@@ -6,7 +6,7 @@ import DOMPurify from "isomorphic-dompurify";
 
 
 
-export default function ResponsiveSecureFrame({ html }: { html: string }) {
+export default function ResponsiveSecureFrame({ html, darkMode = false }: { html: string, darkMode?: boolean }) {
     const [height, setHeight] = useState("400px");
     const iframeId = useId();
 
@@ -86,8 +86,8 @@ export default function ResponsiveSecureFrame({ html }: { html: string }) {
         meta.content = `
             default-src none;
             script-src 'unsafe-inline' 'unsafe-eval' https://www.youtube.com https://*.ytimg.com https://*.googleapis.com;
-            style-src 'unsafe-inline' ${trustedCDNs}; 
-            font-src ${trustedCDNs} data:; 
+            style-src 'self' 'unsafe-inline' ${trustedCDNs}; 
+            font-src 'self' ${trustedCDNs} data:; 
             img-src 'self' data: https:; 
             frame-src ${embedDomains}; 
             connect-src https:;
@@ -157,13 +157,18 @@ export default function ResponsiveSecureFrame({ html }: { html: string }) {
         // 3. リセットスタイル：途切れを防止しつつ、100vhの連鎖を止める
         const style = doc.createElement("style");
         style.textContent = `
-        html, body { 
+            html, body { 
                 margin: 0 !important; 
                 padding: 0 !important; 
                 width: 100%; 
                 height: auto !important;
                 min-height: 0 !important;
                 overflow: visible !important;
+                ${darkMode ? "color: #cbd5e1 !important;" : ""} /* slate-300 */
+                font-family: sans-serif;
+            }
+            a {
+                ${darkMode ? "color: #34d399 !important;" : ""} /* emerald-400 */
             }
             #content-inner {
                 display: block; /* flow-root よりも確実な場合がある */
@@ -191,7 +196,7 @@ export default function ResponsiveSecureFrame({ html }: { html: string }) {
         doc.body.appendChild(script); // Append script after innerWrapper
 
         return doc.documentElement.outerHTML;
-    }, [html, iframeId]);
+    }, [html, iframeId, darkMode]);
 
     return (
         <div style={{ width: "100%", display: "block", position: "relative" }}>
