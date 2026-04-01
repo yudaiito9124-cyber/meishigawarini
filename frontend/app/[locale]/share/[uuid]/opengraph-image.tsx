@@ -1,5 +1,5 @@
 import { ImageResponse } from 'next/og';
-import { Gift } from 'lucide-react';
+// import { Gift } from 'lucide-react';
 
 export const runtime = 'edge';
 
@@ -11,19 +11,25 @@ export const size = {
 
 export const contentType = 'image/png';
 
-export default async function Image({ params }: { params: { uuid: string; locale: string } }) {
-  const { uuid } = params;
+export default async function Image({ params }: { params: Promise<{ uuid: string; locale: string }> }) {
+  const { uuid } = await params;
 
   // APIから情報を取得
   const NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || "";
   let data: any = null;
   try {
-    const res = await fetch(`${NEXT_PUBLIC_API_URL}/share/${uuid}?shop&product&card`, { next: { revalidate: 3600 } });
+    const apiEndpoint = `${NEXT_PUBLIC_API_URL}/share/${uuid}?shop&product&card`;
+    console.log("OGP Image fetching data from:", apiEndpoint);
+    
+    const res = await fetch(apiEndpoint, { next: { revalidate: 3600 } });
     if (res.ok) {
       data = await res.json();
+      console.log("OGP Image data fetched successfully:", data);
+    } else {
+      console.error("OGP Image data fetch failed with status:", res.status, await res.text().catch(() => "no-body"));
     }
   } catch (e) {
-    console.error("OGP Image data fetch failed", e);
+    console.error("OGP Image data fetch failed with exception", e);
   }
 
   if (!data) {
