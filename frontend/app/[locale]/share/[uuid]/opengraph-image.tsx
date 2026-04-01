@@ -17,23 +17,34 @@ export default async function Image({ params }: { params: Promise<{ uuid: string
   // APIから情報を取得
   const NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || "";
   const NEXT_PUBLIC_APP_URL = process.env.NEXT_PUBLIC_APP_URL || "";
+  
   let data: any = null;
-  try {
-    const apiEndpoint = `${NEXT_PUBLIC_API_URL}/share/${uuid}`;
-    console.log("OGP Image fetching data from:", apiEndpoint);
+  let errorInfo: string | null = null;
+  let apiEndpoint = "";
 
-    const res = await fetch(apiEndpoint, { next: { revalidate: 3600 } });
-    if (res.ok) {
-      data = await res.json();
-      console.log("OGP Image data fetched successfully:", data);
+  try {
+    apiEndpoint = `${NEXT_PUBLIC_API_URL}/share/${uuid}`;
+    console.log("OGP Image fetching data from:", apiEndpoint);
+    
+    if (!NEXT_PUBLIC_API_URL) {
+      errorInfo = "NEXT_PUBLIC_API_URL is empty";
     } else {
-      console.error("OGP Image data fetch failed with status:", res.status, await res.text().catch(() => "no-body"));
+      const res = await fetch(apiEndpoint, { next: { revalidate: 3600 } });
+      if (res.ok) {
+        data = await res.json();
+        console.log("OGP Image data fetched successfully:", data);
+      } else {
+        const errorBody = await res.text().catch(() => "no-body");
+        errorInfo = `API Error ${res.status}: ${errorBody.substring(0, 100)}`;
+      }
     }
-  } catch (e) {
+  } catch (e: any) {
     console.error("OGP Image data fetch failed with exception", e);
+    errorInfo = `Exception: ${e.message || "Unknown error"}`;
   }
 
-  if (!data) {
+  // データ取得失敗またはエラー時のデバッグ用描画
+  if (!data || errorInfo) {
     return new ImageResponse(
       (
         <div
@@ -44,17 +55,36 @@ export default async function Image({ params }: { params: Promise<{ uuid: string
             flexDirection: 'column',
             alignItems: 'center',
             justifyContent: 'center',
-            backgroundColor: '#F8FAFC',
+            backgroundColor: '#FEF2F2', // Red-50 (error background)
+            border: '20px solid #EF4444',
+            padding: '40px',
+            fontFamily: 'sans-serif'
           }}
         >
-          <div style={{ fontSize: 60, fontWeight: 900, color: '#059669', marginBottom: 20 }}>名刺代わりに。</div>
-          <div style={{ fontSize: 30, color: '#64748B' }}>素敵なギフトが届きました</div>
+          <div style={{ fontSize: 60, fontWeight: 900, color: '#DC2626', marginBottom: 20 }}>OGP Error</div>
+          <div style={{ fontSize: 24, color: '#1F2937', marginBottom: 10, textAlign: 'center' }}>
+            {errorInfo || "Data not found"}
+          </div>
+          <div style={{ fontSize: 16, color: '#6B7280', marginBottom: 20, wordBreak: 'break-all', textAlign: 'center' }}>
+            URL: {apiEndpoint || "empty"}
+          </div>
+          <div style={{ fontSize: 14, color: '#9CA3AF', marginTop: 40 }}>
+            NEXT_PUBLIC_API_URL: {NEXT_PUBLIC_API_URL || "NOT SET"}
+          </div>
+          <div style={{ fontSize: 14, color: '#9CA3AF' }}>
+            NEXT_PUBLIC_APP_URL: {NEXT_PUBLIC_APP_URL || "NOT SET"}
+          </div>
         </div>
       ),
       { ...size }
     );
   }
 
+  // WebP の製品画像を考慮（Satori は WebP 非対応）
+  // png に置換、またはプレースホルダーを表示
+  const productImageUrl = data.product?.image_url;
+  const isWebP = productImageUrl?.toLowerCase().includes('.webp');
+  
   return new ImageResponse(
     (
       <div
@@ -94,9 +124,9 @@ export default async function Image({ params }: { params: Promise<{ uuid: string
               display: 'flex'
             }}>
               {data.design?.thumbf ? (
-                <img
-                  src={data.design.thumbf.startsWith('http') ? data.design.thumbf : `${NEXT_PUBLIC_APP_URL}${data.design.thumbf}`}
-                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                <img 
+                  src={data.design.thumbf.startsWith('http') ? data.design.thumbf : `${NEXT_PUBLIC_APP_URL}${data.design.thumbf}`} 
+                  style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
                 />
               ) : (
                 <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -121,14 +151,11 @@ export default async function Image({ params }: { params: Promise<{ uuid: string
               display: 'flex',
               padding: 10
             }}>
-              {data.product?.image_url ? (
-                <img
-                  src={data.product.image_url.startsWith('http') ? data.product.image_url : `${NEXT_PUBLIC_APP_URL}${data.product.image_url}`}
-                  style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 50 }}
-                />
+              {productImageUrl && !isWebP ? (
+                <img src={productImageUrl} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 50 }} />
               ) : (
-                <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="#CBD5E1" strokeWidth="1.5"><circle cx="9" cy="21" r="1"></circle><circle cx="20" cy="21" r="1"></circle><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path></svg>
+                <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#F1F5F9', borderRadius: 50 }}>
+                   <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="#CBD5E1" strokeWidth="1.5"><circle cx="9" cy="21" r="1"></circle><circle cx="20" cy="21" r="1"></circle><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path></svg>
                 </div>
               )}
             </div>

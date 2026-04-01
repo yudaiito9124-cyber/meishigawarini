@@ -116,7 +116,7 @@ export default function SendHistoryPage() {
                                             }}
                                         />
                                         {/* Surface Gloss */}
-                                        <div className="absolute inset-0 bg-gradient-to-br from-white/[0.03] via-transparent to-transparent" />
+                                        <div className="absolute inset-0 bg-gradient-to-br from-white/[0.00] via-transparent to-transparent" />
                                     </div>
 
                                     {/* The rotating container */}
