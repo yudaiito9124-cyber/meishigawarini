@@ -89,7 +89,7 @@ export default function SendGiftPage() {
                 results.push({
                     uuid,
                     status: 'error',
-                    message: e.message 
+                    message: e.message
                 });
             }
             setCompletedCount(i + 1);
@@ -109,22 +109,31 @@ export default function SendGiftPage() {
     };
 
     return (
-        <div className="min-h-screen bg-mist-50 flex flex-col items-center py-12 px-4">
-            <Card className="w-full max-w-lg shadow-xl border-none bg-white/80 backdrop-blur-md rounded-3xl overflow-hidden">
-                <CardHeader className="bg-gradient-to-r from-orange-500 to-red-500 p-8 text-white flex flex-col gap-4">
-                    <div className="flex justify-between items-start">
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            className="text-white hover:bg-white/20 -ml-2 h-8"
-                            onClick={() => router.push('/user')}
-                        >
-                            <ChevronDown className="h-4 w-4 mr-1 rotate-90" /> {t('back')}
-                        </Button>
+        <div className="min-h-screen bg-slate-50 flex flex-col items-center py-12 px-4 font-sans">
+            <div className="w-full max-w-lg flex justify-start mb-6">
+                <Button
+                    variant="outline"
+                    size="sm"
+                    className="rounded-full bg-white/50 backdrop-blur-sm border-gray-200 text-gray-500 hover:text-gray-900 shadow-sm h-9 px-4"
+                    onClick={() => router.push('/user')}
+                >
+                    <ChevronDown className="h-4 w-4 mr-1 rotate-90" /> {t('back')}
+                </Button>
+            </div>
+
+            <Card className="w-full max-w-lg shadow-2xl border-none bg-white/80 backdrop-blur-xl rounded-[2rem] overflow-hidden animate-in fade-in zoom-in-95 duration-500">
+                <CardHeader className="bg-gradient-to-r from-orange-500 to-red-500 p-10 text-white flex flex-col gap-4">
+                    <div className="flex flex-row items-center gap-4">
+                        <div className="p-3 bg-white/20 rounded-2xl shadow-inner">
+                            <QrCode className="w-8 h-8 text-white" />
+                        </div>
+                        <div>
+                            <CardTitle className="text-3xl font-black tracking-tight">{t('sendGift')}</CardTitle>
+                            <p className="text-orange-100/80 text-sm font-bold uppercase tracking-widest mt-1">{t("sendGiftDesc")}</p>
+                        </div>
                     </div>
-                    <CardTitle className="text-2xl font-black tracking-tight">{t('sendGift')}</CardTitle>
                 </CardHeader>
-                <CardContent className="p-8 space-y-6">
+                <CardContent className="p-8 space-y-8">
                     {successMsg || bulkResults.length > 0 ? (
                         <div className="space-y-6 animate-in zoom-in-95 duration-500">
                             <div className="flex flex-col items-center justify-center text-center">
@@ -244,36 +253,49 @@ export default function SendGiftPage() {
                                         </Button>
                                     </div>
                                 ) : (
-                                    <div className="space-y-6">
+                                    <div className="space-y-8">
                                         <Button
                                             onClick={() => setIsScanning(true)}
-                                            className="w-full h-44 rounded-3xl bg-mist-50 hover:bg-orange-50 text-gray-700 hover:text-orange-600 border-2 border-dashed border-gray-300 hover:border-orange-400 flex flex-col gap-4 font-bold text-xl shadow-sm transition-all group"
+                                            className="w-full h-56 rounded-[2.5rem] bg-white/50 hover:bg-white backdrop-blur-sm text-gray-700 hover:text-orange-600 border-2 border-dashed border-slate-200 hover:border-orange-400 flex flex-col gap-6 font-black text-2xl shadow-sm hover:shadow-2xl hover:-translate-y-2 transition-all group duration-500"
                                         >
-                                            <div className="w-16 h-16 bg-white rounded-2xl shadow-sm flex items-center justify-center group-hover:scale-110 transition-transform">
-                                                <ScanLine className="w-10 h-10 text-orange-500" />
+                                            <div className="w-20 h-20 bg-white rounded-[2rem] shadow-xl flex items-center justify-center group-hover:scale-110 group-hover:rotate-3 transition-transform duration-500">
+                                                <ScanLine className="w-12 h-12 text-orange-500" />
                                             </div>
-                                            {t('bulkScan.startScanButton')}
+                                            <div className="space-y-1">
+                                                <span>{t('bulkScan.startScanButton')}</span>
+                                                <p className="text-xs text-gray-400 font-bold uppercase tracking-widest">{t('bulkScan.scanningNotice')}</p>
+                                            </div>
                                         </Button>
 
                                         {scannedUuids.length > 0 && (
-                                            <div className="bg-orange-50 rounded-2xl p-5 border border-orange-100 space-y-4 animate-in fade-in zoom-in-95">
+                                            <div className="bg-orange-50/50 rounded-[2rem] p-6 border border-orange-100/50 space-y-6 animate-in fade-in zoom-in-95 duration-500">
                                                 <div className="flex justify-between items-center">
-                                                    <h4 className="text-sm font-black text-orange-800">{t('bulkScan.scannedListTitle', { count: scannedUuids.length })}</h4>
-                                                    <Button variant="ghost" size="sm" onClick={() => setScannedUuids([])} className="h-6 text-[10px] text-orange-600">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="w-2 h-2 bg-orange-500 rounded-full animate-pulse" />
+                                                        <h4 className="text-sm font-black text-orange-800 uppercase tracking-widest">{t('bulkScan.scannedListTitle', { count: scannedUuids.length })}</h4>
+                                                    </div>
+                                                    <Button variant="ghost" size="sm" onClick={() => setScannedUuids([])} className="h-8 rounded-full text-[10px] font-black text-orange-600 hover:bg-orange-100">
                                                         {t('bulkScan.clearAll')}
                                                     </Button>
                                                 </div>
-                                                <div className="max-h-32 overflow-y-auto space-y-1 pr-1">
+                                                <div className="max-h-44 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
                                                     {scannedUuids.map((uuid, idx) => (
-                                                        <div key={idx} className="text-[10px] font-mono text-orange-600 bg-white/60 px-3 py-1.5 rounded-lg flex justify-between items-center group">
-                                                            <span className="truncate mr-2">{uuid}</span>
-                                                            <X className="w-3 h-3 cursor-pointer text-gray-400 hover:text-red-500 shrink-0" onClick={() => setScannedUuids(prev => prev.filter(u => u !== uuid))} />
+                                                        <div key={idx} className="text-[10px] font-mono font-bold text-orange-600 bg-white px-4 py-3 rounded-2xl flex justify-between items-center group shadow-sm border border-orange-50">
+                                                            <span className="truncate mr-4">{uuid}</span>
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="icon"
+                                                                className="w-6 h-6 rounded-full hover:bg-red-50 hover:text-red-500 text-gray-300 transition-colors"
+                                                                onClick={() => setScannedUuids(prev => prev.filter(u => u !== uuid))}
+                                                            >
+                                                                <X className="w-3.5 h-3.5" />
+                                                            </Button>
                                                         </div>
                                                     ))}
                                                 </div>
                                                 <Button
                                                     onClick={() => setIsConfirming(true)}
-                                                    className="w-full rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-bold h-12 shadow-lg"
+                                                    className="w-full rounded-full bg-orange-600 hover:bg-orange-700 text-white font-black h-14 shadow-xl hover:shadow-orange-200 transition-all active:scale-95 text-lg"
                                                 >
                                                     {t('bulkScan.confirmButton')}
                                                 </Button>
@@ -345,8 +367,8 @@ export default function SendGiftPage() {
                                     {completedCount} / {scannedUuids.length}
                                 </p>
                                 <div className="w-48 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                                    <div 
-                                        className="h-full bg-gradient-to-r from-orange-500 to-red-500 transition-all duration-300 ease-out" 
+                                    <div
+                                        className="h-full bg-gradient-to-r from-orange-500 to-red-500 transition-all duration-300 ease-out"
                                         style={{ width: `${(completedCount / scannedUuids.length) * 100}%` }}
                                     />
                                 </div>

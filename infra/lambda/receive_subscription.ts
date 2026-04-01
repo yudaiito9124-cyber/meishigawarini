@@ -11,13 +11,16 @@ import { APIGatewayProxyHandler } from 'aws-lambda';
 import { GetCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
 import { successResponse, errorResponse } from './utils/response';
 import { ddb, TABLE_NAME } from './share/db';
+import { getUUID, getPIN } from './utils/request';
 
 export const handler: APIGatewayProxyHandler = async (event) => {
     try {
         if (event.httpMethod === 'OPTIONS') return successResponse();
 
         const body = JSON.parse(event.body || '{}');
-        const { uuid, pin, email, locale } = body;
+        const uuid = getUUID(event, body);
+        const pin = getPIN(event, body);
+        const { email, locale } = body;
         
         if (!uuid || !pin || !email) return errorResponse(400, 'Missing required fields');
 

@@ -11,9 +11,10 @@ import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { checkShopOwnerOrGM } from './share/shop-auth';
 import { generateId } from './utils/id';
+import { getPublicUrl } from './utils/s3';
 import { successResponse, errorResponse } from './utils/response';
 import { ddb, TABLE_NAME, BUCKET_NAME } from './share/db';
-import { getShopId, getUserId } from './utils/request';
+import { getShopId, getUserId, getProductId } from './utils/request';
 
 const s3 = new S3Client({});
 
@@ -24,19 +25,24 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         const body = JSON.parse(event.body || '{}');
         const userId = getUserId(event);
         const shopId = getShopId(event, body);
-        const { productId, filename, contentType } = body;
+        const productId = getProductId(event, body);
+        const { filename, contentType, folder } = body;
         
-        if (!shopId || !productId || !filename) return errorResponse(400, 'Missing required fields');
+        if (!shopId || !filename) return errorResponse(400, 'Missing required fields');
         if (!userId) return errorResponse(401, 'Unauthorized');
 
-        // 【DB操作: 内部モジュールによる GetItem・BatchGetItem】
-        // 理由: 実行ユーザーが対象ショップの管理権限を持っているか検証。
+        // ...権限チェック...
         const shopMetadata = await checkShopOwnerOrGM(ddb, TABLE_NAME, shopId, userId, event);
         if (!shopMetadata) return errorResponse(403, 'Forbidden');
 
         const id = generateId();
         const ext = filename.split('.').pop() || 'bin';
-        const key = `shop/${shopId}/products/${productId}/${id}.${ext}`;
+        
+        // S3キーの構築 logic (HEAD~2 互換)
+        let key = `shop/${shopId}/products/${productId || 'undefined'}/${id}.${ext}`;
+        if (folder === 'shopcontent') {
+            key = `shop/${shopId}/shopcontent/${filename}`;
+        }
 
         // S3 PutObject 署名付きURLの生成 (有効期限: 1時間)
         // 理由: フロントエンドから直接S3へ安全に画像をアップロードさせるためのトークンを発行。
@@ -47,7 +53,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             ACL: 'private'
         });
         const uploadUrl = await getSignedUrl(s3, command, { expiresIn: 3600 });
-        const finalUrl = `s3://${BUCKET_NAME}/${key}`;
+        const finalUrl = getPublicUrl(BUCKET_NAME, key);
 
         return successResponse({
             uploadUrl,

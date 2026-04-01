@@ -63,10 +63,10 @@ export const userApi = createUserApi<UserApiSchema>(userApiBase);
 type UserApiSchema = {
     user_profile_get: {};
     user_profile_update: { profile: any; deleted_html_image_urls?: string[] };
-    user_profile_uploadurl: { filename: string; contentType: string };
+    user_profile_uploadurl: { filename: string; content_type: string };
     user_receiver_get: {};
     user_receiver_update: { receiver_info: any };
     user_history_get: {};
-    user_history_sendgift: { uuid: string; pin: string };
+    user_history_sendgift: { uuid: string; pin?: string };
 };
 

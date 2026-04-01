@@ -15,7 +15,7 @@ import { signUrlIfS3 } from './utils/s3';
 import { getSystemDesign } from './utils/designs';
 import { successResponse, errorResponse } from './utils/response';
 import { ddb, TABLE_NAME, BUCKET_NAME } from './share/db';
-import { getShopId, getAction, getUserId } from './utils/request';
+import { getUUID, getShopId, getAction, getUserId } from './utils/request';
 
 export const handler: APIGatewayProxyHandler = async (event) => {
     try {
@@ -121,7 +121,9 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         // ACTION: update (発送情報・各種メモの更新)
         // ====================================================================
         if (action === 'update') {
-            const { qr_id, delivery_company, tracking_number, memo_for_users, memo_for_shop } = body;
+            const qr_id = getUUID(event, body);
+            const { delivery_company, tracking_number, memo_for_users, memo_for_shop } = body;
+            
             if (!qr_id) return errorResponse(400, 'Missing qr_id');
 
             // 更新対象の状態確認

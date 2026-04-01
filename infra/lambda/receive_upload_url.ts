@@ -12,8 +12,10 @@ import { GetCommand } from '@aws-sdk/lib-dynamodb';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { generateId } from './utils/id';
+import { getPublicUrl } from './utils/s3';
 import { successResponse, errorResponse } from './utils/response';
 import { ddb, TABLE_NAME, BUCKET_NAME } from './share/db';
+import { getUUID, getPIN } from './utils/request';
 
 const s3 = new S3Client({});
 const CAPACITY_LIMIT_MB = 100;
@@ -23,7 +25,9 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         if (event.httpMethod === 'OPTIONS') return successResponse();
 
         const body = JSON.parse(event.body || '{}');
-        const { uuid, pin, filename, contentType, fileSize } = body;
+        const uuid = getUUID(event, body);
+        const pin = getPIN(event, body);
+        const { filename, contentType, fileSize } = body;
         
         if (!uuid || !pin || !filename) return errorResponse(400, 'Missing required fields');
 
@@ -59,7 +63,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             ContentType: contentType || 'application/octet-stream'
         });
         const uploadUrl = await getSignedUrl(s3, command, { expiresIn: 3600 });
-        const finalUrl = `s3://${BUCKET_NAME}/${key}`;
+        const finalUrl = getPublicUrl(BUCKET_NAME, key);
 
         return successResponse({
             uploadUrl,

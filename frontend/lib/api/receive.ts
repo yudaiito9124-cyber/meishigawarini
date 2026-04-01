@@ -55,6 +55,15 @@ export const receiveApiBase = {
         });
         if (!res.ok) throw await res.json().catch(() => ({ message: res.statusText }));
         return res.json();
+    },
+
+    /** 
+     * Share用公開情報の取得 (GET /share/{uuid})
+     */
+    async share_get(uuid: string) {
+        const res = await fetch(`${NEXT_PUBLIC_API_URL}/share/${uuid}`);
+        if (!res.ok) throw await res.json().catch(() => ({ message: res.statusText }));
+        return res.json();
     }
 };
 
@@ -83,26 +92,26 @@ export const receiveApi = createReceiveApi<ReceiveApiSchema>(receiveApiBase);
  */
 type ReceiveApiSchema = {
     receive_submit: {
-        qr_id: string;
-        pin_code: string;
+        uuid: string;
+        pin: string;
         shipping_info: {
             name: string;
-            zipCode: string;
             address: string;
+            zip_code: string;
             phone?: string;
             email?: string;
-            preferredDate?: string;
-            preferredTime?: string;
-            client_timestamp?: string
+            preferred_date?: string;
+            preferred_time?: string;
+            client_timestamp?: string;
         };
-        password?: string
+        password?: string;
     };
-    receive_completed: { qr_id: string; pin_code: string };
+    receive_completed: { uuid: string; pin: string };
     receive_chat_get: {};
     receive_chat_send: { username: string; message?: string; file_url?: string; file_name?: string; file_size?: number; file_type?: string };
     receive_subscription: { email: string; locale: string };
     receive_sender_update: { sender_info: any; deleted_html_image_urls?: string[]; locale?: string };
     receive_sender_load: { id: string };
     receive_sender_save: { sender_info: any; id?: string };
-    receive_uploadurl_get: { filename: string; contentType: string; fileSize: number; folder?: string };
+    receive_uploadurl_get: { filename: string; content_type: string; file_size: number; folder?: string };
 };

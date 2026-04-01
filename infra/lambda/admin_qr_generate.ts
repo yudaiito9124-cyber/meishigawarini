@@ -14,7 +14,7 @@ import { generateId } from './utils/id';
 import { validateQRParams } from './utils/qr-validation';
 import { successResponse, errorResponse } from './utils/response';
 import { ddb, TABLE_NAME, BUCKET_NAME } from './share/db';
-import { getShopId, getUserId } from './utils/request';
+import { getShopId, getUserId, getProductId } from './utils/request';
 
 export const handler: APIGatewayProxyHandler = async (event) => {
     try {
@@ -23,13 +23,13 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         const body = JSON.parse(event.body || '{}');
         const count = body.count || 1;
         const shopId = getShopId(event, body);
-        const productId = body.productId;
-        const expiryDate = body.expiry_date;
-        const ownerUuid = body.owner_uuid;
-        const senderInfo = body.sender_info;
-        let senderId = body.senderId;
-        const activateNow = body.activate_now === true;
-        const cardDesign = body.card_design;
+        const productId = getProductId(event, body);
+        const expiryDate = body.expiry_date || body.expiryDate;
+        const ownerUuid = body.owner_uuid || body.ownerUuid;
+        const senderInfo = body.sender_info || body.senderInfo;
+        let senderId = body.senderId || body.sender_id;
+        const activateNow = body.activate_now === true || body.activateNow === true;
+        const cardDesign = body.card_design || body.cardDesign;
 
         // 生成件数の上限チェック (25件の倍数等を考慮しつつ100件まで)
         if (count > 100) {

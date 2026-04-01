@@ -9,6 +9,7 @@
 import { APIGatewayProxyHandler } from 'aws-lambda';
 import { UpdateCommand, GetCommand } from '@aws-sdk/lib-dynamodb';
 import { sendSystemNotification } from './utils/notification';
+import { getUUID, getPIN } from './utils/request';
 import { successResponse, errorResponse } from './utils/response';
 import { ddb, TABLE_NAME } from './share/db';
 
@@ -17,7 +18,8 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         if (event.httpMethod === 'OPTIONS') return successResponse();
 
         const body = JSON.parse(event.body || '{}');
-        const { uuid, pin } = body;
+        const uuid = getUUID(event, body);
+        const pin = getPIN(event, body);
         
         if (!uuid || !pin) return errorResponse(400, 'Missing uuid or pin');
 

@@ -14,7 +14,7 @@ import { stripSignaturesInHtml, stripSignature, signUrlIfS3, signUrlsInHtml } fr
 import { getSystemDesign } from './utils/designs';
 import { successResponse, errorResponse, apiResponse } from './utils/response';
 import { ddb, TABLE_NAME, BUCKET_NAME } from './share/db';
-import { getShopId, getAction, getUserId } from './utils/request';
+import { getProductId, getShopId, getAction, getUserId } from './utils/request';
 
 const DEFAULT_VALID_DAYS = parseInt(process.env.DEFAULT_VALID_DAYS || '180');
 
@@ -133,7 +133,9 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         // 目的: 価格、有効期間、デザインなどの属性を部分更新します。
         // ====================================================================
         if (action === 'update') {
-            const { product_id, status, name, description, image_url, price, valid_days, detail_html, card_design_id } = body;
+            const product_id = getProductId(event, body);
+            const { status, name, description, image_url, price, valid_days, detail_html, card_design_id } = body;
+            
             if (!product_id) return errorResponse(400, 'Missing product ID');
 
             // 【確認フェーズ】
@@ -186,7 +188,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         // 目的: 商品を削除済み(DELETED)状態にします。稼働中のQRがある場合は不可。
         // ====================================================================
         if (action === 'delete') {
-            const { product_id } = body;
+            const product_id = getProductId(event, body);
             if (!product_id) return errorResponse(400, 'Missing product ID');
 
             const prodRes = await ddb.send(new GetCommand({

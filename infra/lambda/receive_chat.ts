@@ -9,11 +9,12 @@
  */
 import { APIGatewayProxyHandler } from 'aws-lambda';
 import { GetCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
-import { isLocked, getRateLimitUpdate, getResetRateLimitUpdate } from './utils/rate-limit';
 import { signUrlIfS3, signUrlsInHtml, stripSignature } from './utils/s3';
 import { sendLocalizedEmail } from './templates/email';
 import { successResponse, errorResponse } from './utils/response';
 import { ddb, TABLE_NAME, BUCKET_NAME } from './share/db';
+import { getUUID, getPIN, getAction } from './utils/request';
+import { generateId } from './utils/id';
 
 const CHAT_CAPACITY_LIMIT_MB = 100;
 
@@ -22,44 +23,20 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         if (event.httpMethod === 'OPTIONS') return successResponse();
 
         const body = JSON.parse(event.body || '{}');
-        const { uuid, pin, action, message, type, file_url, file_size } = body;
-        
+        const uuid = getUUID(event, body);
+        const pin = getPIN(event, body);
+        let action = getAction(event, body);
+
+        // パスベースのルーティング互換性 (/get -> list)
+        if (action === 'get') action = 'list';
+
+        const { username, message, type, file_url, file_size, file_name, file_type } = body;
+
         if (!uuid || !pin) return errorResponse(400, 'Missing uuid or pin');
 
-        // 【DB操作: GetItem】
-        // 理由: QRコードのメタデータを取得し、PINの一致とレートリミット（認証試行数制限）を検証。
-        const metaRes = await ddb.send(new GetCommand({
-            TableName: TABLE_NAME, Key: { PK: `QR#${uuid}`, SK: 'METADATA' }
-        }));
+        // Note: PIN verification and Rate Limiting are handled by receiveAuthorizer.ts
+        // so we can proceed directly to business logic.
 
-        if (!metaRes.Item) return errorResponse(404, 'QR Code not found');
-        const item = metaRes.Item;
-
-        // 【確認フェーズ 1: レートリミット制限のチェック】
-        if (isLocked(item)) {
-            return errorResponse(403, 'Too many attempts. Please try again later.');
-        }
-
-        // 【確認フェーズ 2: PINの照合】
-        if (String(item.pin) !== String(pin)) {
-            const { UpdateExpression, ExpressionAttributeValues, ExpressionAttributeNames } = getRateLimitUpdate(item);
-            await ddb.send(new UpdateCommand({
-                TableName: TABLE_NAME,
-                Key: { PK: `QR#${uuid}`, SK: 'METADATA' },
-                UpdateExpression, ExpressionAttributeValues, ExpressionAttributeNames
-            }));
-            return errorResponse(403, 'Invalid PIN');
-        }
-
-        // 認証成功時: 失敗カウントのリセット（遅延評価）
-        if (item.failed_attempts || item.locked_until) {
-            const { UpdateExpression, ExpressionAttributeNames } = getResetRateLimitUpdate();
-            await ddb.send(new UpdateCommand({
-                TableName: TABLE_NAME,
-                Key: { PK: `QR#${uuid}`, SK: 'METADATA' },
-                UpdateExpression, ExpressionAttributeNames
-            })).catch(e => console.error('Failed to reset rate limit', e));
-        }
 
         // ====================================================================
         // ACTION: list (チャット履歴の取得)
@@ -71,9 +48,15 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 TableName: TABLE_NAME, Key: { PK: `QR#${uuid}`, SK: 'CHAT' }
             }));
             const chatLog = chatRes.Item || { messages: [], total_size_bytes: 0, sender_info: null };
-            
+
             // 各メッセージの添付ファイルURLに署名を付与
-            const messages = chatLog.messages || [];
+            const messages = (chatLog.messages || []).map((msg: any) => {
+                // 互換性担保: content があれば message に振替
+                if (!msg.message && msg.content) msg.message = msg.content;
+                if (!msg.username && msg.role) msg.username = msg.role;
+                return msg;
+            });
+
             for (const msg of messages) {
                 if (msg.file_url) msg.file_url = await signUrlIfS3(msg.file_url, BUCKET_NAME);
             }
@@ -90,7 +73,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 }
             }
 
-            return successResponse({ 
+            return successResponse({
                 messages,
                 total_size_bytes: chatLog.total_size_bytes || 0,
                 capacity_limit_mb: CHAT_CAPACITY_LIMIT_MB,
@@ -106,13 +89,17 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             if (!message && !file_url) return errorResponse(400, 'Empty message');
 
             const now = new Date().toISOString();
-            const newMessage = { 
-                role: 'RECEIVER', 
-                content: message, 
+            const newMessage = {
+                id: generateId(),
+                role: 'RECEIVER',
+                username: username || 'Receiver',
+                message: message,
                 type: type || 'text',
                 file_url: file_url ? stripSignature(file_url) : undefined,
                 file_size: file_size || 0,
-                ts_created_at: now 
+                file_name: file_name,
+                file_type: file_type,
+                ts_created_at: now
             };
 
             // 容量制限のチェック
@@ -128,9 +115,9 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 TableName: TABLE_NAME,
                 Key: { PK: `QR#${uuid}`, SK: 'CHAT' },
                 UpdateExpression: 'SET messages = list_append(if_not_exists(messages, :empty_list), :msg), total_size_bytes = if_not_exists(total_size_bytes, :zero) + :fsize, ts_updated_at = :now',
-                ExpressionAttributeValues: { 
+                ExpressionAttributeValues: {
                     ':msg': [newMessage], ':empty_list': [], ':now': now,
-                    ':zero': 0, ':fsize': file_size || 0 
+                    ':zero': 0, ':fsize': file_size || 0
                 }
             }));
 
@@ -151,7 +138,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 });
                 await Promise.all(sendPromises).catch(e => console.error('Notification failed', e));
             }
-            
+
             return successResponse({ message: 'Message sent successfully', data: newMessage });
         }
 

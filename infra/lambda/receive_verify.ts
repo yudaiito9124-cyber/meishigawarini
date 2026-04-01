@@ -12,11 +12,12 @@ import { APIGatewayProxyHandler } from 'aws-lambda';
 import { GetCommand, UpdateCommand, BatchGetCommand } from '@aws-sdk/lib-dynamodb';
 import { CognitoIdentityProviderClient, AdminGetUserCommand } from '@aws-sdk/client-cognito-identity-provider';
 import * as bcrypt from 'bcryptjs';
-import { isLocked, getRateLimitUpdate, getResetRateLimitUpdate } from './utils/rate-limit';
 import { signUrlIfS3, signUrlsInHtml } from './utils/s3';
+
 import { getSystemDesign } from './utils/designs';
 import { successResponse, errorResponse } from './utils/response';
 import { ddb, TABLE_NAME, BUCKET_NAME } from './share/db';
+import { getUUID, getPIN } from './utils/request';
 
 const cognito = new CognitoIdentityProviderClient({});
 const USER_POOL_ID = process.env.USER_POOL_ID || '';
@@ -27,11 +28,14 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         if (event.httpMethod !== 'POST') return errorResponse(405, 'Method Not Allowed');
 
         const body = JSON.parse(event.body || '{}');
-        const { uuid, pin, password } = body;
-        
+        const uuid = getUUID(event, body);
+        const pin = getPIN(event, body);
+        const { password } = body;
+
         if (!uuid || !pin) return errorResponse(400, 'Missing uuid or pin');
 
-        // 【確認フェーズ 1: QRコードの存在と状態確認】
+        // 【確認フェーズ 1: QRコードの状態確認】
+        // Note: PIN認証と連続試行制限は receiveAuthorizer.ts で既に検証済みです。
         const qrRes = await ddb.send(new GetCommand({
             TableName: TABLE_NAME, Key: { PK: `QR#${uuid}`, SK: 'METADATA' }
         }));
@@ -39,27 +43,6 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 
         const item = qrRes.Item;
 
-        // 【確認フェーズ 2: レートリミット管理】
-        if (isLocked(item)) return errorResponse(403, 'Too many attempts. QR is currently locked.');
-
-        // PIN認証
-        if (String(item.pin) !== String(pin)) {
-            const { UpdateExpression, ExpressionAttributeValues, ExpressionAttributeNames } = getRateLimitUpdate(item);
-            await ddb.send(new UpdateCommand({
-                TableName: TABLE_NAME, Key: { PK: `QR#${uuid}`, SK: 'METADATA' },
-                UpdateExpression, ExpressionAttributeValues, ExpressionAttributeNames
-            }));
-            return errorResponse(400, 'Invalid Gift or PIN');
-        }
-
-        // 成功時にカウンタリセット
-        if (item.failed_attempts || item.locked_until) {
-            const { UpdateExpression, ExpressionAttributeNames } = getResetRateLimitUpdate();
-            await ddb.send(new UpdateCommand({
-                TableName: TABLE_NAME, Key: { PK: `QR#${uuid}`, SK: 'METADATA' },
-                UpdateExpression, ExpressionAttributeNames
-            })).catch(e => console.error("Rate limit reset failed", e));
-        }
 
         // 【確認フェーズ 3: パスワード保護の検証】
         let isAuthorizedByPassword = true;
@@ -87,10 +70,9 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             })).catch(e => console.error('Failed lazy expire update', e));
         }
 
-        // 基本的な受取可能チェック
-        if (!['ACTIVE', 'USED', 'SHIPPED', 'COMPLETED'].includes(status)) {
-            return errorResponse(410, 'Gift is not in an active state');
-        }
+
+        // 基本的な受取可能チェック (無効なステータスだがBANNEDでない場合は enriched data を返す)
+        // ここでの許可により、EXPIREDやPROMOTIONの状態でもギフト情報が見れるようになります。
 
         // ====================================================================
         // 情報の紐付け (実施フェーズ / Enrichment)
@@ -119,8 +101,8 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         // ショップオーナーのEmailフォールバック (Cognito)
         let shopEmail = shop?.email;
         if (!shopEmail && shop?.owner_id && USER_POOL_ID) {
-            const user = await cognito.send(new AdminGetUserCommand({ 
-                UserPoolId: USER_POOL_ID, Username: shop.owner_id 
+            const user = await cognito.send(new AdminGetUserCommand({
+                UserPoolId: USER_POOL_ID, Username: shop.owner_id
             })).catch(() => null);
             shopEmail = user?.UserAttributes?.find(attr => attr.Name === 'email')?.Value;
         }

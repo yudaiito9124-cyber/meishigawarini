@@ -59,11 +59,16 @@ export class UserApi extends cdk.NestedStack {
     };
 
     const user_profile = new nodejs.NodejsFunction(this, 'user_profile', { entry: lampath('user_profile'), ...fnProps });
+    const user_history = new nodejs.NodejsFunction(this, 'user_history', { entry: lampath('user_history'), ...fnProps });
+    const user_receiver = new nodejs.NodejsFunction(this, 'user_receiver', { entry: lampath('user_receiver'), ...fnProps });
 
     // Grant Permissions
-    grantTablePermissions(user_profile, true);
+    [user_profile, user_history, user_receiver].forEach(fn => {
+      grantTablePermissions(fn, true);
+      bucket.grantRead(fn);
+    });
+    // Profile needs write/delete for images
     bucket.grantPut(user_profile);
-    bucket.grantRead(user_profile);
     bucket.grantDelete(user_profile);
 
     // Helper to add resource
@@ -85,11 +90,11 @@ export class UserApi extends cdk.NestedStack {
     addResourceWithCors(profileResource, 'uploadurl').addMethod('POST', new apigateway.LambdaIntegration(user_profile), routeOptions);
 
     const receiverResource = addResourceWithCors(this.userResource, 'receiver');
-    addResourceWithCors(receiverResource, 'get').addMethod('POST', new apigateway.LambdaIntegration(user_profile), routeOptions);
-    addResourceWithCors(receiverResource, 'update').addMethod('POST', new apigateway.LambdaIntegration(user_profile), routeOptions);
+    addResourceWithCors(receiverResource, 'get').addMethod('POST', new apigateway.LambdaIntegration(user_receiver), routeOptions);
+    addResourceWithCors(receiverResource, 'update').addMethod('POST', new apigateway.LambdaIntegration(user_receiver), routeOptions);
 
     const historyResource = addResourceWithCors(this.userResource, 'history');
-    addResourceWithCors(historyResource, 'get').addMethod('POST', new apigateway.LambdaIntegration(user_profile), routeOptions);
-    addResourceWithCors(historyResource, 'sendgift').addMethod('POST', new apigateway.LambdaIntegration(user_profile), routeOptions);
+    addResourceWithCors(historyResource, 'get').addMethod('POST', new apigateway.LambdaIntegration(user_history), routeOptions);
+    addResourceWithCors(historyResource, 'sendgift').addMethod('POST', new apigateway.LambdaIntegration(user_history), routeOptions);
   }
 }

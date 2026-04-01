@@ -12,10 +12,11 @@ import { APIGatewayProxyHandler } from 'aws-lambda';
 import { TransactWriteCommand, GetCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
 import { CognitoIdentityProviderClient, AdminGetUserCommand } from '@aws-sdk/client-cognito-identity-provider';
 import * as bcrypt from 'bcryptjs';
-import { isLocked, getRateLimitUpdate, getResetRateLimitUpdate } from './utils/rate-limit';
 import { sendLocalizedEmail } from './templates/email';
 import { successResponse, errorResponse } from './utils/response';
 import { ddb, TABLE_NAME } from './share/db';
+
+import { getUUID, getPIN } from './utils/request';
 
 const cognito = new CognitoIdentityProviderClient({});
 const USER_POOL_ID = process.env.USER_POOL_ID || '';
@@ -25,11 +26,29 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         if (event.httpMethod === 'OPTIONS') return successResponse();
 
         const body = JSON.parse(event.body || '{}');
-        const { uuid, pin, name, address, zipCode, phone, preferredDate, preferredTime, email, password, client_timestamp } = body;
-        
-        if (!uuid || !pin || !name || !address) return errorResponse(400, 'Missing required fields');
+        const uuid = getUUID(event, body);
+        const pin = getPIN(event, body);
 
-        // 【確認フェーズ 1: QRコードの存在と状態確認】
+        // フロントエンドの入れ子構造(shipping_info)に対応
+        const shipping = body.shipping_info || {};
+        const name = body.name || shipping.name;
+        const address = body.address || shipping.address;
+        const zip_code = body.zip_code || body.zipCode || shipping.zip_code || shipping.zipCode;
+        const phone = body.phone || shipping.phone;
+        const email = body.email || shipping.email;
+        const preferred_date = body.preferred_date || body.preferredDate || shipping.preferred_date || shipping.preferredDate;
+        const preferred_time = body.preferred_time || body.preferredTime || shipping.preferred_time || shipping.preferredTime;
+        const client_timestamp = body.client_timestamp || shipping.client_timestamp;
+
+        // その他のパラメータ
+        const password = body.password;
+
+        if (!uuid || !pin || !name || !address) {
+            return errorResponse(400, 'Missing required fields (uuid, pin, name, or address)');
+        }
+
+        // 【確認フェーズ 1: QRコードの状態確認】
+        // Note: PINとレートリミットは receiveAuthorizer.ts で検証済みです。
         const qrRes = await ddb.send(new GetCommand({
             TableName: TABLE_NAME, Key: { PK: `QR#${uuid}`, SK: 'METADATA' }
         }));
@@ -37,16 +56,6 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 
         const item = qrRes.Item;
 
-        // 【確認フェーズ 2: レートリミット / PIN検証】
-        if (isLocked(item)) return errorResponse(403, 'Too many attempts. Please try again later.');
-        if (String(item.pin) !== String(pin)) {
-            const { UpdateExpression, ExpressionAttributeValues, ExpressionAttributeNames } = getRateLimitUpdate(item);
-            await ddb.send(new UpdateCommand({
-                TableName: TABLE_NAME, Key: { PK: `QR#${uuid}`, SK: 'METADATA' },
-                UpdateExpression, ExpressionAttributeValues, ExpressionAttributeNames
-            }));
-            return errorResponse(403, 'Invalid PIN');
-        }
 
         // 状態チェック
         if (item.status !== 'ACTIVE') {
@@ -83,11 +92,11 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                     Update: {
                         TableName: TABLE_NAME,
                         Key: { PK: `QR#${uuid}`, SK: 'METADATA' },
-                        UpdateExpression: 'SET #status = :used, GSI1_PK = :gsi_pk, ts_submitted_at = :now, ts_updated_at = :now' + 
-                                          (password_hash ? ', password_hash = :ph' : '') + ' REMOVE #fa, #lu',
+                        UpdateExpression: 'SET #status = :used, GSI1_PK = :gsi_pk, ts_submitted_at = :now, ts_updated_at = :now' +
+                            (password_hash ? ', password_hash = :ph' : '') + ' REMOVE #fa, #lu',
                         ConditionExpression: '#status = :active',
                         ExpressionAttributeNames: { '#status': 'status', '#fa': 'failed_attempts', '#lu': 'locked_until' },
-                        ExpressionAttributeValues: { 
+                        ExpressionAttributeValues: {
                             ':used': 'USED', ':active': 'ACTIVE', ':gsi_pk': 'QR#USED', ':now': nowIso,
                             ...(password_hash ? { ':ph': password_hash } : {})
                         }
@@ -96,9 +105,9 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 {
                     Put: {
                         TableName: TABLE_NAME,
-                        Item: { 
+                        Item: {
                             PK: `QR#${uuid}`, SK: 'ORDER',
-                            name, address, zipCode, phone, preferredDate, preferredTime, email,
+                            name, address, zip_code, phone, preferred_date, preferred_time, email,
                             ts_submitted_at: nowIso, ts_updated_at: nowIso
                         }
                     }
@@ -109,7 +118,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         // ====================================================================
         // 副作用処理 (通知と購読)
         // ====================================================================
-        
+
         // 1. 被贈答者の自動購読と確認メール
         if (email) {
             try {
@@ -126,11 +135,11 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                     ExpressionAttributeValues: { ':lang': 'ja' }
                 }));
                 // 確認メール送信
-                await sendLocalizedEmail({ 
-                    type: 'ADDRESS_REGISTRATION_CONFIRMATION', 
-                    to: email, 
-                    params: { uuid, pin }, 
-                    lang: 'ja' 
+                await sendLocalizedEmail({
+                    type: 'ADDRESS_REGISTRATION_CONFIRMATION',
+                    to: email,
+                    params: { uuid, pin },
+                    lang: 'ja'
                 });
             } catch (e) { console.error('Recipient notification/subscription failed', e); }
         }
@@ -147,22 +156,22 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 
                 let shopEmail = shopRes.Item?.email;
                 if (!shopEmail && shopRes.Item?.owner_id && USER_POOL_ID) {
-                    const userRes = await cognito.send(new AdminGetUserCommand({ 
-                        UserPoolId: USER_POOL_ID, Username: shopRes.Item.owner_id 
+                    const userRes = await cognito.send(new AdminGetUserCommand({
+                        UserPoolId: USER_POOL_ID, Username: shopRes.Item.owner_id
                     }));
                     shopEmail = userRes.UserAttributes?.find(attr => attr.Name === 'email')?.Value;
                 }
 
                 if (shopEmail) {
                     await sendLocalizedEmail({
-                        type: 'ADDRESS_REGISTRATION_NOTIFICATION', 
+                        type: 'ADDRESS_REGISTRATION_NOTIFICATION',
                         to: shopEmail,
-                        params: { 
-                            shopName: shopRes.Item?.name || '不明なショップ', 
-                            productName: productRes.Item?.name || '不明な商品', 
-                            qr_id: uuid, 
-                            shopId: shopId, 
-                            timestamp: client_timestamp || now.toLocaleString('ja-JP') 
+                        params: {
+                            shopName: shopRes.Item?.name || '不明なショップ',
+                            productName: productRes.Item?.name || '不明な商品',
+                            qr_id: uuid,
+                            shopId: shopId,
+                            timestamp: client_timestamp || now.toLocaleString('ja-JP')
                         },
                         lang: 'ja'
                     });

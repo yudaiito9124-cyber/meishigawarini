@@ -11,6 +11,7 @@ export const getUUID = (event: APIGatewayProxyEvent, body: any = {}): string | u
         event.headers['X-QR-UUID'] ||
         event.headers['x-qr-uuid'] ||
         body?.qr_id ||
+        body?.qrId ||
         body?.uuid
     );
 };
@@ -25,6 +26,7 @@ export const getPIN = (event: APIGatewayProxyEvent, body: any = {}): string | un
         event.headers['X-QR-PIN'] ||
         event.headers['x-qr-pin'] ||
         body?.pin_code ||
+        body?.pinCode ||
         body?.pin
     );
 };
@@ -33,14 +35,38 @@ export const getPIN = (event: APIGatewayProxyEvent, body: any = {}): string | un
  * リクエストから ShopID を安全に取得します。
  */
 export const getShopId = (event: APIGatewayProxyEvent, body: any = {}): string | undefined => {
-    return body?.shopId || body?.shop_id || event.queryStringParameters?.shopId;
+    return (
+        event.headers['X-Shop-Id'] ||
+        event.headers['x-shop-id'] ||
+        body?.shop_id ||
+        body?.shopId ||
+        event.queryStringParameters?.shopId ||
+        event.queryStringParameters?.shop_id
+    );
+};
+
+/**
+ * リクエストから ProductID を安全に取得します。
+ */
+export const getProductId = (event: APIGatewayProxyEvent, body: any = {}): string | undefined => {
+    return (
+        event.headers['X-Product-Id'] ||
+        event.headers['x-product-id'] ||
+        body?.product_id ||
+        body?.productId ||
+        event.queryStringParameters?.productId ||
+        event.queryStringParameters?.product_id
+    );
 };
 
 /**
  * リクエストから UserId (Cognito) を安全に取得します。
  */
 export const getUserId = (event: APIGatewayProxyEvent): string | undefined => {
-    return event.requestContext?.authorizer?.principalId;
+    return (
+        event.requestContext?.authorizer?.principalId ||
+        event.requestContext?.authorizer?.claims?.sub
+    );
 };
 
 /**
@@ -50,24 +76,8 @@ export const getAction = (event: APIGatewayProxyEvent, body: any = {}): string |
     // 1. ボディに action が明示されている場合はそれを優先
     if (body.action) return body.action;
 
-    // 2. リソースパスの末尾から判定
-    const resPath = event.resource || '';
-    if (resPath.endsWith('/get')) return 'get';
-    if (resPath.endsWith('/list')) return 'list';
-    if (resPath.endsWith('/create')) return 'create';
-    if (resPath.endsWith('/update')) return 'update';
-    if (resPath.endsWith('/delete')) return 'delete';
-    if (resPath.endsWith('/send')) return 'send';
-    if (resPath.endsWith('/sendgift')) return 'sendgift';
-    if (resPath.endsWith('/cancel')) return 'cancel';
-    if (resPath.endsWith('/complete')) return 'complete';
-    if (resPath.endsWith('/activate')) return 'activate';
-    if (resPath.endsWith('/link')) return 'link';
-    if (resPath.endsWith('/uploadurl')) return 'uploadurl';
-    if (resPath.endsWith('/load')) return 'load';
-    if (resPath.endsWith('/save')) return 'save';
-    if (resPath.endsWith('/execute')) return 'execute';
-    if (resPath.endsWith('/delete-images')) return 'delete_images';
-
-    return undefined;
+    // 2. パスの最後のスラッシュ以降を Action として取得
+    const path = event.path || '';
+    const parts = path.split('/');
+    return parts[parts.length - 1] || undefined;
 };

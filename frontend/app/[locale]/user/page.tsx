@@ -112,19 +112,20 @@ export default function UserDashboardPage() {
     ];
 
     return (
-        <div className="flex flex-col min-h-screen bg-mist-50 font-sans">
-            <main className="flex-1 max-w-4xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-8 pb-12 pt-12">
-                <div className="flex justify-between items-center mb-8">
+        <div className="flex flex-col min-h-screen bg-slate-50 font-sans">
+            <main className="flex-1 max-w-4xl w-full mx-auto p-6 sm:p-8 lg:p-12 space-y-12 pb-16 pt-16">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 mb-12">
                     <div>
-                        <h1 className="text-3xl font-black text-gray-800 tracking-tight">{t('title')}</h1>
-                        <div className="mt-1 space-y-0.5">
+                        <h1 className="text-4xl font-black text-gray-900 tracking-tighter mb-2">{t('title')}</h1>
+                        <div className="flex flex-col gap-1.5">
                             <div className="flex items-center gap-2">
-                                <p className="text-xs text-gray-400 font-medium">{t('userId')} : {userId ? userId : ""}</p>
+                                <span className="inline-block w-2h-2 rounded-full bg-blue-500 animate-pulse" />
+                                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">{t('userId')} : {userId ? userId : "..."}</p>
                                 {userId && (
                                     <Button
                                         variant="ghost"
                                         size="icon"
-                                        className="h-4 w-4 text-gray-400 hover:text-gray-600"
+                                        className="h-5 w-5 text-gray-300 hover:text-blue-600 transition-colors"
                                         onClick={() => handleCopy(userId)}
                                     >
                                         {copiedId === userId ? (
@@ -135,42 +136,51 @@ export default function UserDashboardPage() {
                                     </Button>
                                 )}
                             </div>
-                            <p className="text-xs text-gray-400 font-medium">{t('userEmail')} : {userEmail ? userEmail : ""}</p>
+                            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest ml-4">{t('userEmail')} : {userEmail ? userEmail : "..."}</p>
                         </div>
                     </div>
-                    <div>
-                        <Button variant="ghost" className="text-mist-500 hover:text-mist-800" onClick={() => router.push('/login')}>
+                    <div className="flex items-center gap-2">
+                        <Button variant="outline" className="rounded-full bg-white/50 backdrop-blur-sm border-gray-200 text-gray-600 hover:text-gray-900 shadow-sm" onClick={() => router.push('/login')}>
                             <ChevronDown className="h-4 w-4 mr-1 rotate-90" /> {t('back')}
                         </Button>
-                        <Button variant="ghost" className="text-mist-500 hover:text-mist-800" onClick={handleLogout}>
-                            <LogOut className="w-5 h-5 mr-2" />
+                        <Button variant="outline" className="rounded-full bg-white/50 backdrop-blur-sm border-gray-200 text-gray-600 hover:text-red-600 shadow-sm" onClick={handleLogout}>
+                            <LogOut className="w-4 h-4 mr-2" />
                             {t('logout')}
                         </Button>
                     </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 mt-8">
                     {navItems.map((item, idx) => (
                         <Card
                             key={idx}
                             onClick={() => router.push(item.href)}
-                            className={`cursor-pointer transition-all hover:scale-105 active:scale-95 shadow-md border-2 ${item.border} rounded-3xl overflow-hidden`}
+                            className={`group cursor-pointer transition-all hover:-translate-y-2 active:scale-95 shadow-xl hover:shadow-2xl border-none bg-white/80 backdrop-blur-xl rounded-[2rem] overflow-hidden`}
                         >
-                            <CardContent className="p-6 flex flex-col items-center justify-center text-center gap-4 h-full">
-                                <div className={`p-4 rounded-2xl ${item.bg}`}>
+                            <CardContent className="p-8 flex flex-col items-center justify-center text-center gap-6 h-full relative overflow-hidden">
+                                {/* Subtle background glow */}
+                                <div className={`absolute -right-4 -bottom-4 w-24 h-24 rounded-full ${item.bg} opacity-20 blur-2xl group-hover:scale-150 transition-transform`} />
+                                
+                                <div className={`p-5 rounded-2xl ${item.bg} shadow-inner transition-transform group-hover:scale-110`}>
                                     <item.icon className={`w-10 h-10 ${item.color}`} />
                                 </div>
-                                <div>
-                                    <h3 className="text-xl font-bold text-gray-800 mb-2">{item.title}</h3>
-                                    <p className="text-sm text-gray-500 font-medium">{item.desc}</p>
+                                <div className="space-y-2 relative z-10">
+                                    <h3 className="text-2xl font-black text-gray-900">{item.title}</h3>
+                                    <p className="text-sm text-gray-500 font-medium leading-relaxed max-w-[200px] mx-auto">{item.desc}</p>
                                 </div>
                             </CardContent>
                         </Card>
                     ))}
                 </div>
             </main>
-            <div className="flex justify-center p-4">
-                <Button className=" p-4 h-10 hover:bg-red-500 hover:text-mist-50" variant="ghost" onClick={handleCreatesop}>{t("createMyShop")}</Button>
+            <div className="flex justify-center p-8 pb-12">
+                <Button 
+                    className="rounded-full px-8 h-12 bg-white/50 backdrop-blur-sm border border-gray-200 text-gray-400 hover:text-red-500 hover:bg-red-50 hover:border-red-100 transition-all font-bold" 
+                    variant="outline" 
+                    onClick={handleCreatesop}
+                >
+                    {t("createMyShop")}
+                </Button>
             </div>
         </div>
     );

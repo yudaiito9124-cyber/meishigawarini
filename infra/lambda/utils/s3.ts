@@ -16,20 +16,31 @@ export async function getPresignedViewUrl(bucket: string, key: string, expiresIn
 
 /**
  * Checks if the URL is an S3 URL for our bucket and signs it if it is.
- * Expects format: https://{bucket}.s3.{region}.amazonaws.com/{key}
+ * Supports both:
+ * - https://{bucket}.s3.{region}.amazonaws.com/{key}
+ * - s3://{bucket}/{key}
  */
 export async function signUrlIfS3(url: string | undefined, bucketName: string): Promise<string | undefined> {
-    if (!url || !url.includes(bucketName) || !url.includes('.s3.')) {
-        return url;
-    }
+    if (!url || !url.includes(bucketName)) return url;
 
+    let key = '';
     try {
-        const urlObj = new URL(url);
-        // Path is like /key or /bucket/key depending on calling convention, 
-        // but typically https://bucket.s3.region.amazonaws.com/key
-        // So pathname starts with / and then the key.
-        const key = decodeURIComponent(urlObj.pathname.substring(1));
-        
+        if (url.startsWith('s3://')) {
+            // format: s3://bucket/key
+            key = url.replace(`s3://${bucketName}/`, '');
+        } else if (url.includes('.s3.')) {
+            // format: https://bucket.s3.region.amazonaws.com/key
+            const urlObj = new URL(url);
+            key = decodeURIComponent(urlObj.pathname.substring(1));
+            // Standardize format: /bucket/key vs /key
+            if (key.startsWith(`${bucketName}/`)) {
+                key = key.substring(bucketName.length + 1);
+            }
+        } else {
+            return url;
+        }
+
+        if (!key) return url;
         return await getPresignedViewUrl(bucketName, key);
     } catch (e) {
         console.error("Failed to sign S3 URL:", url, e);
@@ -42,6 +53,7 @@ export async function signUrlIfS3(url: string | undefined, bucketName: string): 
  */
 export function stripSignature(url: string | undefined): string | undefined {
     if (!url) return url;
+    if (url.startsWith('s3://')) return url; // Already clean
     try {
         const urlObj = new URL(url);
         urlObj.search = '';
@@ -49,6 +61,15 @@ export function stripSignature(url: string | undefined): string | undefined {
     } catch (e) {
         return url;
     }
+}
+
+/**
+ * Generates a clean browser-compatible S3 URL.
+ * Format: https://{bucket}.s3.{region}.amazonaws.com/{key}
+ */
+export function getPublicUrl(bucket: string, key: string): string {
+    const region = process.env.AWS_REGION || 'ap-northeast-1';
+    return `https://${bucket}.s3.${region}.amazonaws.com/${key}`;
 }
 /**
  * Deletes an object from S3.

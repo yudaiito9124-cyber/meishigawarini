@@ -114,7 +114,7 @@ export default function AdminPage() {
     const handleUpdateCardOrderStatus = async (shopId: string, orderId: string, status: string) => {
         try {
             await adminApi.admin_card_orders_update({
-                shopId,
+                shop_id: shopId,
                 order_id: orderId,
                 status
             });
@@ -148,10 +148,10 @@ export default function AdminPage() {
             const data = await adminApi.admin_qr_generate({
                 count,
                 ...(useMetadataOptions ? {
-                    shopId: shopId || undefined,
-                    productId: productId || undefined,
+                    shop_id: shopId || undefined,
+                    product_id: productId || undefined,
                     owner_uuid: ownerUuid || undefined,
-                    senderId: senderId || undefined,
+                    sender_id: senderId || undefined,
                     expiry_date: expiryDate ? new Date(expiryDate).toISOString() : undefined,
                     activate_now: activateNow
                 } : {}),
@@ -1538,8 +1538,8 @@ function ManagerLinkingSection({ apiUrl }: { apiUrl: string }) {
         setLoading(true);
         try {
             const data = await adminApi.admin_links({
-                userIds: uids,
-                shopIds: sids,
+                user_ids: uids,
+                shop_ids: sids,
                 action: 'validate'
             });
             setValidationData(data);
@@ -1563,8 +1563,8 @@ function ManagerLinkingSection({ apiUrl }: { apiUrl: string }) {
         setLoading(true);
         try {
             await adminApi.admin_links({
-                userIds: uids,
-                shopIds: sids,
+                user_ids: uids,
+                shop_ids: sids,
                 action: 'execute'
             });
             alert(t('list.managerLinking.success'));
@@ -1674,8 +1674,8 @@ function ShopOwnerChangeSection({ apiUrl }: { apiUrl: string }) {
         setLoading(true);
         try { // error section
             const data = await adminApi.admin_changeowner({
-                shopId: shopId.trim().replace(/^SHOP#/, ""),
-                newUserId: newUserId.trim().replace(/^USER#/, ""),
+                shop_id: shopId.trim().replace(/^SHOP#/, ""),
+                new_user_id: newUserId.trim().replace(/^USER#/, ""),
                 action: 'validate'
             });
             setValidationData(data);
@@ -1696,8 +1696,8 @@ function ShopOwnerChangeSection({ apiUrl }: { apiUrl: string }) {
         setLoading(true);
         try {
             await adminApi.admin_changeowner({
-                shopId: shopId.trim().replace(/^SHOP#/, ""),
-                newUserId: newUserId.trim().replace(/^USER#/, ""),
+                shop_id: shopId.trim().replace(/^SHOP#/, ""),
+                new_user_id: newUserId.trim().replace(/^USER#/, ""),
                 action: 'execute'
             });
             alert(t('list.ownerChange.success'));
@@ -1789,8 +1789,8 @@ function AdminShopCreationSection({ apiUrl }: { apiUrl: string }) {
         setLoading(true);
         try {
             const data = await adminApi.admin_links({
-                userIds: [userId.trim().replace(/^USER#/, "")],
-                shopIds: [],
+                user_ids: [userId.trim().replace(/^USER#/, "")],
+                shop_ids: [],
                 action: 'validate'
             });
             if (data.users && data.users.length > 0) {
@@ -1884,7 +1884,7 @@ function AdminShopCardDesignLinkSection({ apiUrl, dbCardDesigns }: { apiUrl: str
         if (!shopId.trim()) return;
         setLoading(true);
         try {
-            const data = await adminApi.admin_shop_carddesign_link_get({ shopId: shopId.trim() });
+            const data = await adminApi.admin_shop_carddesign_link_get({ shop_id: shopId.trim() });
             setShopData(data);
             setSelectedDesignIds(data.card_designs || []);
         } catch (e: any) {
@@ -1900,7 +1900,7 @@ function AdminShopCardDesignLinkSection({ apiUrl, dbCardDesigns }: { apiUrl: str
         setSaving(true);
         try {
             await adminApi.admin_shop_carddesign_link_update({
-                shopId: shopData.PK.replace(/^SHOP#/, ""),
+                shop_id: shopData.PK.replace(/^SHOP#/, ""),
                 card_designs: selectedDesignIds
             });
             alert(tLink('saveSuccess'));
@@ -2062,8 +2062,8 @@ function CardOrderListSection({
             // For now, we generate a fresh batch.
             const data = await adminApi.admin_qr_generate({
                 count: order.quantity,
-                shopId: order.shop_id,
-                productId: order.product_id,
+                shop_id: order.shop_id,
+                product_id: order.product_id,
                 card_design: order.card_design || cardFormat,
                 activate_now: false
             });

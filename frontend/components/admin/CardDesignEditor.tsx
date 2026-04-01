@@ -135,7 +135,7 @@ export default function CardDesignEditor({ apiUrl }: { apiUrl: string }) {
             // 1. Prepare Main Image
             const { uploadUrl: mainUploadUrl, publicUrl: mainPublicUrl } = await adminApi.admin_carddesigns_uploadurl({
                 filename: file.name,
-                contentType: file.type,
+                content_type: file.type,
                 design_id: editingDesign.design_id
             });
 
@@ -145,7 +145,7 @@ export default function CardDesignEditor({ apiUrl }: { apiUrl: string }) {
 
             const { uploadUrl: thumbUploadUrl, publicUrl: thumbPublicUrl } = await adminApi.admin_carddesigns_uploadurl({
                 filename: thumbFile.name,
-                contentType: "image/webp",
+                content_type: "image/webp",
                 design_id: editingDesign.design_id
             });
 

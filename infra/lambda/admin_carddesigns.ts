@@ -102,15 +102,16 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         // 目的: デザインアセットのアップロード先URLを発行します。
         // ====================================================================
         if (action === 'uploadurl') {
-            const { filename, contentType, design_id } = body;
-            if (!filename || !contentType || !design_id) return errorResponse(400, 'Missing params');
+            const content_type = body.content_type || body.contentType;
+            const { filename, design_id } = body;
+            if (!filename || !content_type || !design_id) return errorResponse(400, 'Missing params');
 
             const tempId = generateId();
             const key = `temp/card-designs/${design_id}/${tempId}_${filename}`;
             const command = new PutObjectCommand({
                 Bucket: BUCKET_NAME,
                 Key: key,
-                ContentType: contentType
+                ContentType: content_type
             });
 
             const uploadUrl = await getSignedUrl(s3Client, command, { expiresIn: 300 });

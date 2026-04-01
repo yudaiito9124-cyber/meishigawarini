@@ -8,9 +8,13 @@
  */
 import { APIGatewayProxyHandler } from 'aws-lambda';
 import { PutCommand, UpdateCommand, GetCommand } from '@aws-sdk/lib-dynamodb';
+import { CognitoIdentityProviderClient, AdminGetUserCommand } from '@aws-sdk/client-cognito-identity-provider';
 import { generateId } from './utils/id';
 import { successResponse, errorResponse, apiResponse } from './utils/response';
 import { ddb, TABLE_NAME } from './share/db';
+
+const cognito = new CognitoIdentityProviderClient({});
+const USER_POOL_ID = process.env.USER_POOL_ID;
 
 export const handler: APIGatewayProxyHandler = async (event) => {
     try {
@@ -18,9 +22,31 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         if (event.httpMethod !== 'POST') return errorResponse(405, 'Method Not Allowed');
 
         const body = JSON.parse(event.body || '{}');
-        const { owner_id, name, email, gm_ids } = body;
+        const { owner_id, name, gm_ids } = body;
         
         if (!owner_id || !name) return errorResponse(400, 'Missing owner_id or name');
+
+        // 【DB操作: GetItem】
+        // 理由: オーナー候補となるユーザーの存在確認とメールアドレスの取得
+        const userownerRes = await ddb.send(new GetCommand({
+            TableName: TABLE_NAME,
+            Key: { PK: `USER#${owner_id}`, SK: 'SHOP' }
+        }));
+
+        let email = userownerRes?.Item?.email;
+
+        // Email不在時のCognitoフォールバック
+        if (!email && owner_id && USER_POOL_ID) {
+            try {
+                const user = await cognito.send(new AdminGetUserCommand({
+                    UserPoolId: USER_POOL_ID,
+                    Username: owner_id
+                }));
+                email = user.UserAttributes?.find(attr => attr.Name === 'email')?.Value;
+            } catch (e) {
+                console.warn(`Failed to fetch owner email from Cognito: ${owner_id}`, e);
+            }
+        }
 
         const newShopId = generateId();
         const now = new Date().toISOString();
@@ -33,7 +59,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             TableName: TABLE_NAME,
             Item: {
                 PK: `SHOP#${newShopId}`, SK: 'METADATA',
-                name, email, owner_id, gm_ids: gm_idslist,
+                name, email: email || null, owner_id, gm_ids: gm_idslist,
                 GSI2_PK: `USER#${owner_id}`, GSI2_SK: now,
                 ts_created_at: now, ts_updated_at: now
             }

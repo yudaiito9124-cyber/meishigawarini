@@ -68,10 +68,6 @@ export const handler = async (event: APIGatewayRequestAuthorizerEvent): Promise<
 
         if (item.status !== 'PROMOTION') {
             // 1. 状態チェック (Banned / Closed etc)
-            if (item.ts_banned_at) {
-                console.log(`QR is banned: ${uuid}`);
-                return generatePolicy(`receiver-${uuid}`, 'Deny', event.methodArn);
-            }
 
             // 2. Lockチェック
             if (isLocked(item)) {

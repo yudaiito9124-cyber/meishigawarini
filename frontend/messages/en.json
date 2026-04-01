@@ -428,8 +428,8 @@
       "name-placeholder": "John Doe",
       "address": "Delivery Address",
       "address-placeholder": "1-1 Meishigawarini St., Akita",
-      "zipCode": "Postal Code",
-      "zipCode-placeholder": "010-XXXX",
+      "zip_code": "Postal Code",
+      "zip_code-placeholder": "010-XXXX",
       "phone": "Phone Number",
       "phone-placeholder": "090-XXXX-XXXX",
       "email": "Email (Optional)",
@@ -854,7 +854,7 @@
     "Method Not Allowed": "Method Not Allowed.",
     "Invalid JSON body": "Invalid JSON body.",
     "Missing required fields": "Missing required fields.",
-    "Missing required address fields (name, address, zipCode)": "Missing required address fields (name, address, zipCode).",
+    "Missing required address fields (name, address, zip_code)": "Missing required address fields (name, address, zip_code).",
     "QR Code not found": "QR Code not found.",
     "QR Code has expired": "QR Code has expired.",
     "QR Code is not active": "QR Code is not active.",
@@ -892,7 +892,9 @@
     "Subscribed successfully": "Subscribed successfully.",
     "Successfully deleted BANNED items": "Successfully deleted BANNED items.",
     "User data not found": "User data not found.",
-    "User updated successfully": "User profile updated successfully."
+    "User updated successfully": "User profile updated successfully.",
+    "This gift is already linked to a sender": "This gift is already linked to a sender.",
+    "Gift successfully linked to your sender profile": "Gift successfully linked to your sender profile."
   },
   "MFASetupPage": {
     "title": "Set up Two-Factor Authentication (MFA)",

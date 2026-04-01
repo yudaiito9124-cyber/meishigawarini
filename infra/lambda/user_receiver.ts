@@ -4,6 +4,7 @@
  *  - ユーザーがギフトを受け取る際のデフォルトの配送先情報を管理します。
  *  - ここで保存された情報は、ギフト受取時の入力フォームに自動補完（プリフィル）するために使用されます。
  *  - 配送先情報は、氏名、郵便番号、住所、電話番号、メールアドレス等を含みます。
+ *  - APIでは snake_case (zip_code) を使用し、DynamoDB内では camelCase (zipCode) を使用します。
  *
  * エンドポイント:
  *  - POST /user/profile/receiver-get (配送先デフォルト情報を取得)
@@ -21,7 +22,6 @@ import { getUserId, getAction } from './utils/request';
 
 export const handler: APIGatewayProxyHandler = async (event) => {
     try {
-        // CORSプリフライトへの即時応答
         if (event.httpMethod === 'OPTIONS') return successResponse();
 
         const userId = getUserId(event);
@@ -31,76 +31,86 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         const action = getAction(event, body);
 
         // ====================================================================
-        // ACTION: receiver_get (配送先デフォルト情報の取得)
+        // ACTION: get (配送先デフォルト情報の取得)
         // --------------------------------------------------------------------
-        // 目的: ログインユーザーのIDに紐付く「受取人」(RECEIVER) メタデータを取得します。
+        // 目的: ログインユーザーのIDに紐付く「受取人」(RECEIVER) メタデータを取得。
+        // DB上の camelCase (zipCode) を API仕様の snake_case (zip_code) に変換します。
         // ====================================================================
-        if (action === 'receiver_get') {
-            /**
-             * 【DynamoDB操作: GetCommand】
-             * - 指定されたユーザーの固定SKである "RECEIVER" 項目を取得します。
-             */
+        if (action === 'get') {
             const getRes = await ddb.send(new GetCommand({
                 TableName: TABLE_NAME,
                 Key: { PK: `USER#${userId}`, SK: 'RECEIVER' }
             }));
 
-            // 項目が存在しない場合は、初期状態として null を返却します。
             if (!getRes.Item) {
                 return successResponse({ receiver_info: null });
             }
 
-            const receiver_info = { ...getRes.Item };
-            // 管理用キー(PK, SK)を除外
-            delete receiver_info.PK;
-            delete receiver_info.SK;
+            const item = getRes.Item;
+            // DB(camelCase) -> API(snake_case) への変換
+            const receiver_info = {
+                name: item.name,
+                zip_code: item.zipCode || item.zip_code, // 移行期対応
+                address: item.address,
+                phone: item.phone,
+                email: item.email
+            };
 
             return successResponse({ receiver_info });
         }
 
         // ====================================================================
-        // ACTION: receiver_update (配送先デフォルト情報の更新)
+        // ACTION: update (配送先デフォルト情報の更新)
         // --------------------------------------------------------------------
-        // 目的: ユーザーの配送先情報を保存または部分更新（Upsert）します。
+        // 目的: ユーザーの配送先情報を保存または部分更新（Upsert）。
+        // API仕様の snake_case (zip_code) を DB上の camelCase (zipCode) に変換して保存します。
         // ====================================================================
-        if (action === 'receiver_update') {
-            const { receiver_info } = body;
-            if (!receiver_info) return errorResponse(400, 'Missing receiver_info data');
+        if (action === 'update') {
+            const raw_receiver_info = body.receiverInfo || body.receiver_info;
+            if (!raw_receiver_info) return errorResponse(400, 'Missing receiver_info data');
+
+            // API Payload -> DB Attributes への変換
+            const dbFields: any = { ...raw_receiver_info };
+            if (raw_receiver_info.zip_code !== undefined) {
+                dbFields.zipCode = raw_receiver_info.zip_code;
+                delete dbFields.zip_code;
+            }
 
             /**
              * 【属性抽出とフィルタリング】
-             * フロントエンドから送られてきた各属性を、DynamoDBのUpdateExpression形式に変換します。
-             * 意図しないキー値の上書きを防ぐため、システム予約語(PK, SK等)をフィルタリングします。
+             * 意図しないキー値（PK, SK等）の混入を防ぐため、許可されたフィールドのみを抽出。
              */
-            const keys = Object.keys(receiver_info).filter(k => !['ts_created_at', 'ts_updated_at', 'PK', 'SK'].includes(k));
+            const allowedFields = ['name', 'zipCode', 'address', 'phone', 'email'];
+            const keys = Object.keys(dbFields).filter(k => allowedFields.includes(k));
+            
             if (keys.length === 0) return errorResponse(400, 'No valid fields to update');
 
-            /**
-             * 【DynamoDB操作: UpdateCommand】
-             * - 更新日時(ts_updated_at)を確実に更新。
-             * - 作成日時(ts_created_at)は項目が未存在の場合のみセット (if_not_exists)。
-             * - 各フィールド値を動的に生成されたプレースホルダ(#f, :v)を用いてセットします。
-             */
+            const updateExpressions = ['#ts_up = :now', '#ts_cr = if_not_exists(#ts_cr, :now)'];
+            const expressionAttributeNames: any = {
+                '#ts_up': 'ts_updated_at',
+                '#ts_cr': 'ts_created_at'
+            };
+            const expressionAttributeValues: any = {
+                ':now': new Date().toISOString()
+            };
+
+            keys.forEach((k, i) => {
+                updateExpressions.push(`#f${i} = :v${i}`);
+                expressionAttributeNames[`#f${i}`] = k;
+                expressionAttributeValues[`:v${i}`] = dbFields[k];
+            });
+
             await ddb.send(new UpdateCommand({
                 TableName: TABLE_NAME,
                 Key: { PK: `USER#${userId}`, SK: 'RECEIVER' },
-                UpdateExpression: 'SET #ts_up = :now, #ts_cr = if_not_exists(#ts_cr, :now), ' +
-                    keys.map((_, i) => `#f${i} = :v${i}`).join(', '),
-                ExpressionAttributeNames: {
-                    '#ts_up': 'ts_updated_at',
-                    '#ts_cr': 'ts_created_at',
-                    ...keys.reduce((acc, k, i) => ({ ...acc, [`#f${i}`]: k }), {})
-                },
-                ExpressionAttributeValues: {
-                    ':now': new Date().toISOString(),
-                    ...keys.reduce((acc, k, i) => ({ ...acc, [`:v${i}`]: receiver_info[k] }), {})
-                }
+                UpdateExpression: 'SET ' + updateExpressions.join(', '),
+                ExpressionAttributeNames: expressionAttributeNames,
+                ExpressionAttributeValues: expressionAttributeValues
             }));
 
             return successResponse({ message: 'Receiver info updated successfully' });
         }
 
-        // 定義されていないアクションに対するフォールバック
         return errorResponse(400, `Invalid action: ${action}`);
 
     } catch (error: any) {

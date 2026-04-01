@@ -113,13 +113,13 @@ export default function ReceivePage() {
     const [gift, setGift] = useState<any>(null);
     const [pin, setPin] = useState("");
     const [name, setName] = useState("");
-    const [zipCode, setZipCode] = useState("");
+    const [zip_code, setZipCode] = useState("");
     const [address, setAddress] = useState("");
     const [phone, setPhone] = useState("");
     const [email, setEmail] = useState("");
     const [email2, setEmail2] = useState("");
-    const [preferredDate, setPreferredDate] = useState("");
-    const [preferredTime, setPreferredTime] = useState("");
+    const [preferred_date, setPreferredDate] = useState("");
+    const [preferred_time, setPreferredTime] = useState("");
 
     // Password Protection State
     const [password, setPassword] = useState("");
@@ -373,7 +373,7 @@ export default function ReceivePage() {
         }
 
         // この辺の処理がないとpatternに設定しているのに素通りします
-        const zipDigits = zipCode.replace(/\D/g, '').length;
+        const zipDigits = zip_code.replace(/\D/g, '').length;
         const phoneDigits = phone.replace(/\D/g, '').length;
 
         if (zipDigits !== 7) {
@@ -398,16 +398,16 @@ export default function ReceivePage() {
         try {
             const isSubscribed = !!notificationEmail; // Check if notificationEmail is set
             await receiveApi.receive_submit(uuid, pin, {
-                qr_id: uuid,
-                pin_code: pin,
+                uuid,
+                pin,
                 shipping_info: {
                     name,
                     address,
-                    zipCode,
+                    zip_code: zip_code,
                     phone,
                     email: isSubscribed ? email : undefined,
-                    preferredDate,
-                    preferredTime,
+                    preferred_date: preferred_date,
+                    preferred_time: preferred_time,
                     client_timestamp: new Date().toISOString(),
                 },
                 password
@@ -425,7 +425,7 @@ export default function ReceivePage() {
         e.preventDefault();
         setLoading(true);
         try {
-            await receiveApi.receive_completed(uuid, pin, { qr_id: uuid, pin_code: pin });
+            await receiveApi.receive_completed(uuid, pin, { uuid, pin });
             setStep("COMPLETED");
         } catch (error: any) {
             // console.error("Receive error:", error);
@@ -449,7 +449,7 @@ export default function ReceivePage() {
             // Pre-fill receiver info immediately if available
             if (receiverData?.receiver_info) {
                 setName(prev => prev || receiverData.receiver_info.name || '');
-                setZipCode(prev => prev || receiverData.receiver_info.zipCode || '');
+                setZipCode(prev => prev || receiverData.receiver_info.zip_code || receiverData.receiver_info.zipCode || '');
                 setAddress(prev => prev || receiverData.receiver_info.address || '');
                 setPhone(prev => prev || receiverData.receiver_info.phone || '');
                 setEmail(prev => prev || receiverData.receiver_info.email || '');
@@ -492,7 +492,8 @@ export default function ReceivePage() {
                 setIsEditingSender(false);
             }
         } catch (e: any) {
-            // console.error(e);
+            console.error("Failed to load messages or user data:", e);
+            alert(t('errors.loadFailed') + (tb(e.message.replace(/\./g, '_')) || e.message));
         }
     }, [uuid, pin, handleImportFromId]);
 
@@ -533,7 +534,7 @@ export default function ReceivePage() {
             const data = await userApi.user_receiver_get({});
             if (data.receiver_info) {
                 setName(data.receiver_info.name || '');
-                setZipCode(data.receiver_info.zipCode || '');
+                setZipCode(data.receiver_info.zip_code || '');
                 setAddress(data.receiver_info.address || '');
                 setPhone(data.receiver_info.phone || '');
                 setEmail(data.receiver_info.email || '');
@@ -585,8 +586,8 @@ export default function ReceivePage() {
 
                 const { uploadUrl, fileUrl } = await receiveApi.receive_uploadurl_get(uuid, pin, {
                     filename: selectedFile.name,
-                    contentType: uploadFile.type,
-                    fileSize: uploadFile.size
+                    content_type: uploadFile.type,
+                    file_size: uploadFile.size
                 });
 
                 const uploadRes = await fetch(uploadUrl, {
@@ -598,17 +599,20 @@ export default function ReceivePage() {
                 if (!uploadRes.ok) throw new Error("S3 Upload failed");
 
                 fileData = {
-                    file_url: fileUrl,
-                    file_name: selectedFile.name,
-                    file_type: selectedFile.type,
-                    file_size: uploadFile.size
+                    fileUrl: fileUrl,
+                    fileName: selectedFile.name,
+                    fileType: selectedFile.type,
+                    fileSize: uploadFile.size
                 };
             }
 
             await receiveApi.receive_chat_send(uuid, pin, {
                 username: chatName,
                 message: chatMessage,
-                ...(fileData || {})
+                file_url: fileData?.fileUrl,
+                file_name: fileData?.fileName,
+                file_type: fileData?.fileType,
+                file_size: fileData?.fileSize
             });
             setChatMessage("");
             setSelectedFile(null);
@@ -684,7 +688,7 @@ export default function ReceivePage() {
                 }
             }
 
-            const { uploadUrl, fileUrl } = await receiveApi.receive_uploadurl_get(uuid, pin, { filename: file.name, contentType: uploadFile.type, fileSize: uploadFile.size });
+            const { uploadUrl, fileUrl } = await receiveApi.receive_uploadurl_get(uuid, pin, { filename: file.name, content_type: uploadFile.type, file_size: uploadFile.size });
 
             const s3Res = await fetch(uploadUrl, {
                 method: 'PUT',
@@ -753,7 +757,7 @@ export default function ReceivePage() {
             const { uploadUrl, fileUrl } = await receiveApi.receive_uploadurl_get(
                 uuid,
                 pin,
-                { filename: file.name, contentType: uploadFile.type, fileSize: uploadFile.size }
+                { filename: file.name, content_type: uploadFile.type, file_size: uploadFile.size }
             );
 
             const uploadRes = await fetch(uploadUrl, {
@@ -1279,14 +1283,14 @@ export default function ReceivePage() {
                                     />
                                 </div>
                                 <div className="space-y-2">
-                                    <Label htmlFor="zipCode">{t('formStep.zipCode')}</Label>
+                                    <Label htmlFor="zip_code">{t('formStep.zip_code')}</Label>
                                     <Input
-                                        id="zipCode"
+                                        id="zip_code"
                                         required
-                                        value={zipCode}
+                                        value={zip_code}
                                         pattern="^(?=([^0-9]*[0-9]){7}[^0-9]*$)[0-9\-]*$"
                                         onChange={handleZipCodeChange}
-                                        placeholder={t('formStep.zipCode-placeholder')}
+                                        placeholder={t('formStep.zip_code-placeholder')}
                                     />
                                 </div>
                                 <div className="space-y-2">
@@ -1337,21 +1341,21 @@ export default function ReceivePage() {
                                     )}
                                 </div>
                                 <div className="space-y-2">
-                                    <Label htmlFor="preferredDate">{t('formStep.preferredDate')}</Label>
+                                    <Label htmlFor="preferred_date">{t('formStep.preferred_date')}</Label>
                                     <div className="flex gap-2 items-start h-9">
                                         <div className="flex-1 flex h-full items-center justify-center">
                                             <Input
-                                                id="preferredDate"
+                                                id="preferred_date"
                                                 type="date"
-                                                value={preferredDate}
+                                                value={preferred_date}
                                                 onChange={(e) => setPreferredDate(e.target.value)}
                                                 className="w-full h-full"
                                             />
-                                            {/* {preferredDate && (
+                                            {/* {preferred_date && (
                                                     <p className="text-[10px] text-blue-600 font-bold ml-1 animate-in fade-in slide-in-from-top-1">
                                                         {(() => {
                                                             try {
-                                                                const [y, m, d] = preferredDate.split('-').map(Number);
+                                                                const [y, m, d] = preferred_date.split('-').map(Number);
                                                                 const date = new Date(y, m - 1, d);
                                                                 if (isNaN(date.getTime())) return "";
                                                                     const weekday = date.toLocaleDateString(params?.locale as string || 'ja-JP', { weekday: 'short' });
@@ -1377,10 +1381,10 @@ export default function ReceivePage() {
                                     </div>
                                 </div>
                                 <div className="space-y-2">
-                                    <Label htmlFor="preferredTime">{t('formStep.preferredTime')}</Label>
+                                    <Label htmlFor="preferred_time">{t('formStep.preferred_time')}</Label>
                                     <select
-                                        id="preferredTime"
-                                        value={preferredTime}
+                                        id="preferred_time"
+                                        value={preferred_time}
                                         onChange={(e) => setPreferredTime(e.target.value)}
                                         className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
                                     >
@@ -1573,10 +1577,16 @@ export default function ReceivePage() {
             {/* Sender Info Section */}
             {
                 // 送り主情報を追加するボタン
-                (step === "FORM" && !isLoggedIn && !isEditingSender && EmptySenderInfo(senderInfo)) && (
+                (step === "FORM" && !isLoggedIn && !isEditingSender && EmptySenderInfo(senderInfo) && gift?.status === 'ACTIVE') && (
                     <div>
                         <Card className="w-full max-w-xl mt-20 flex flex-col items-center justify-center cursor-pointer p-6 border-3 border-dashed border-black-100 rounded-xl bg-gray-50/50 hover:bg-blue-200/50  hover:border-blue-200 transition-colors"
-                            onClick={() => setIsEditingSender(!isEditingSender)}
+                            onClick={() => {
+                                if (gift?.status !== 'ACTIVE') {
+                                    alert(t('senderInfo.onlyActive'));
+                                    return;
+                                }
+                                setIsEditingSender(!isEditingSender);
+                            }}
                         >
                             {/* <CardHeader className="w-full flex flex-col items-center justify-center cursor-pointer p-6 border border-dash rounded-xl bg-gray-50/50 hover:bg-white transition-colors"> */}
                             <CardTitle className="text-xl text-center flex items-center justify-center gap-2">
@@ -1609,7 +1619,13 @@ export default function ReceivePage() {
                                             variant="ghost"
                                             size="icon"
                                             className="h-10 w-10 text-gray-400 hover:text-gray-600"
-                                            onClick={() => setIsEditingSender(!isEditingSender)}
+                                            onClick={() => {
+                                                if (gift?.status !== 'ACTIVE') {
+                                                    alert(t('senderInfo.onlyActive'));
+                                                    return;
+                                                }
+                                                setIsEditingSender(!isEditingSender);
+                                            }}
                                         >
                                             {isEditingSender ? <X className="h-4 w-4" /> : <Pencil className="h-4 w-4" />}
                                         </Button>
@@ -2084,7 +2100,7 @@ export default function ReceivePage() {
                                 {messages.length === 0 ? (
                                     <p className="text-sm text-gray-500 text-center py-4">{t('chat.noMessages')}</p>
                                 ) : (
-                                    messages.slice().map((msg) => {
+                                    messages.slice().map((msg, index) => {
                                         const isSystem = msg.username === 'System';
                                         const displayUsername = isSystem ? t('chat.system') : msg.username;
                                         const displayMessage = (isSystem && msg.message === 'DeliveryCompleted')
@@ -2092,7 +2108,7 @@ export default function ReceivePage() {
                                             : msg.message;
 
                                         return (
-                                            <div key={msg.id} className={`${isSystem ? 'bg-blue-50 border-blue-100' : ''} p-2 rounded-xl text-sm ${msg.username === chatName ? 'ml-10' : 'mr-10'}`}>
+                                            <div key={msg.id || msg.ts_created_at || index} className={`${isSystem ? 'bg-blue-50 border-blue-100' : ''} p-2 rounded-xl text-sm ${msg.username === chatName ? 'ml-10' : 'mr-10'}`}>
                                                 <p className={`font-bold text-xs ml-1 mb-1 flex items-center gap-1.5 ${isSystem ? 'text-blue-700' : 'text-gray-600'}`}>
                                                     <span className={`w-2 h-2 rounded-full shrink-0 ${isSystem ? 'bg-blue-500' : 'bg-gray-400'}`} />
                                                     {displayUsername}

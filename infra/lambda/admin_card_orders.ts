@@ -104,12 +104,13 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         // 目的: 管理者が発注のステータス（SHIPPED, COMPLETED 等）を更新します。
         // ====================================================================
         if (action === 'update') {
-            const { shopId, order_id, status } = body;
-            if (!shopId || !order_id || !status) return errorResponse(400, 'Missing shopId, order_id, or status');
+            const shop_id = body.shop_id || body.shopId;
+            const { order_id, status } = body;
+            if (!shop_id || !order_id || !status) return errorResponse(400, 'Missing shop_id, order_id, or status');
 
             await ddb.send(new UpdateCommand({
                 TableName: TABLE_NAME,
-                Key: { PK: `CARD_ORDER#SHOP${shopId}`, SK: `ORDER#${order_id}` },
+                Key: { PK: `CARD_ORDER#SHOP${shop_id}`, SK: `ORDER#${order_id}` },
                 UpdateExpression: 'SET #status = :status, GSI1_PK = :gsi_pk, ts_updated_at = :now',
                 ExpressionAttributeNames: { '#status': 'status' },
                 ExpressionAttributeValues: {

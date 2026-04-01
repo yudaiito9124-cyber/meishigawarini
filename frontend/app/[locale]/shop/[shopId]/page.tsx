@@ -170,7 +170,7 @@ export default function ShopPage() {
 
         const fetchShop = async () => {
             try {
-                const data = await shopApi.shop_details_get({ shopId: shopId as string });
+                const data = await shopApi.shop_details_get({ shop_id: shopId as string });
                 setShop(data);
                 if (data.detail_html) {
                     setDebouncedPreviewHtml(data.detail_html);
@@ -192,7 +192,7 @@ export default function ShopPage() {
 
         const fetchProducts = async () => {
             try {
-                const data = await shopApi.shop_products_list({ shopId: shopId as string });
+                const data = await shopApi.shop_products_list({ shop_id: shopId as string });
                 setProducts(data.products || data.items || []);
             } catch (e) {
                 // console.error(e);
@@ -203,7 +203,7 @@ export default function ShopPage() {
 
         const fetchQRCodes = async () => {
             try {
-                const data = await shopApi.shop_qr_list({ shopId: shopId as string });
+                const data = await shopApi.shop_qr_list({ shop_id: shopId as string });
                 setQrCodes(data.items || []);
             } catch (e) {
                 // console.error(e);
@@ -212,7 +212,7 @@ export default function ShopPage() {
 
         const fetchOrders = async () => {
             try {
-                const data = await shopApi.shop_orders_list({ shopId: shopId as string });
+                const data = await shopApi.shop_orders_list({ shop_id: shopId as string });
                 setOrders(data.orders || data.items || []); // robust check
             } catch (e) {
                 // console.error(e);
@@ -240,7 +240,7 @@ export default function ShopPage() {
         if (!shopId) return;
         setCardOrdersLoading(true);
         try {
-            const data = await shopApi.shop_card_orders_list({ shopId: shopId as string });
+            const data = await shopApi.shop_card_orders_list({ shop_id: shopId as string });
             setCardOrders(data.items || []);
         } catch (e) {
             // console.error(e);
@@ -257,7 +257,7 @@ export default function ShopPage() {
 
     const fetchImportShops = async () => {
         try {
-            const data = await shopApi.shop_products_import_list({ shopId: shopId as string });
+            const data = await shopApi.shop_products_import_list({ shop_id: shopId as string });
             // Filter out the current shop
             setImportShops((data.shops || []).filter((s: any) => s.id !== shopId));
         } catch (error) {
@@ -267,7 +267,7 @@ export default function ShopPage() {
 
     const fetchAdminEmails = async () => {
         try {
-            const data = await shopApi.shop_admins({ shopId: shopId as string });
+            const data = await shopApi.shop_admins({ shop_id: shopId as string });
             setAdminEmails(data);
         } catch (e) {
             // console.error('Failed to fetch admin emails', e);
@@ -304,7 +304,7 @@ export default function ShopPage() {
         if (!open && sessionUploadedUrls.length > 0) {
             // Closed without save - Cleanup temporary uploads
             try {
-                await shopApi.shop_delete_images({ shopId: shopId!, urls: sessionUploadedUrls });
+                await shopApi.shop_delete_images({ shop_id: shopId!, urls: sessionUploadedUrls });
             } catch (e) {
                 // console.error('Failed to cleanup temporary images', e);
             }
@@ -334,9 +334,9 @@ export default function ShopPage() {
 
             // 1. Get Presigned URL
             const { uploadUrl, publicUrl } = await shopApi.shop_products_uploadurl({
-                shopId: shopId!,
+                shop_id: shopId!,
                 filename: `${generateId()}.webp`,
-                contentType: 'image/webp',
+                content_type: 'image/webp',
                 folder: 'shopcontent'
             });
 
@@ -403,9 +403,9 @@ export default function ShopPage() {
 
                 // Get Presigned URL
                 const { uploadUrl, publicUrl } = await shopApi.shop_products_uploadurl({
-                    shopId: shopId!,
+                    shop_id: shopId!,
                     filename: `${generateId()}.webp`,
-                    contentType: 'image/webp'
+                    content_type: 'image/webp'
                 });
 
                 // Upload to S3 (No Auth Header for S3 direct upload)
@@ -424,7 +424,7 @@ export default function ShopPage() {
             if (editingProduct && !isDuplicateMode) {
                 // Update Product
                 await shopApi.shop_products_update({
-                    shopId: shopId!,
+                    shop_id: shopId!,
                     product_id: editingProduct.product_id,
                     name: formData.get('name') as string,
                     description: formData.get('description') as string,
@@ -437,7 +437,7 @@ export default function ShopPage() {
             } else {
                 // Create Product (including Duplicate)
                 await shopApi.shop_products_create({
-                    shopId: shopId!,
+                    shop_id: shopId!,
                     name: formData.get('name') as string,
                     description: formData.get('description') as string,
                     price: Number(formData.get('price')),
@@ -519,12 +519,12 @@ export default function ShopPage() {
 
                 try {
                     await shopApi.shop_qr_link({
-                        shopId: shopId as string,
-                        qr_id: uuid,
+                        shop_id: shopId as string,
+                        uuid: uuid,
                         product_id: finalProductId,
                         activate_now: true,
-                        memo_for_users,
-                        memo_for_shop
+                        memo_for_users: memo_for_users,
+                        memo_for_shop: memo_for_shop
                     });
                     successCount++;
                 } catch (err: any) {
@@ -562,7 +562,7 @@ export default function ShopPage() {
 
         try {
             await shopApi.shop_products_delete({
-                shopId: shopId!,
+                shop_id: shopId!,
                 product_id: productId
             });
             fetchShopData();
@@ -578,7 +578,7 @@ export default function ShopPage() {
         setTogglingProductId(productId);
         try {
             await shopApi.shop_products_update({
-                shopId: shopId!,
+                shop_id: shopId!,
                 product_id: productId,
                 status: newStatus
             });
@@ -593,8 +593,8 @@ export default function ShopPage() {
         setShippingOrderId(qrId);
         try {
             await shopApi.shop_orders_update({
-                shopId: shopId!,
-                qr_id: qrId,
+                shop_id: shopId!,
+                uuid: qrId,
                 delivery_company: deliveryCompany,
                 tracking_number: trackingNumber,
                 memo_for_users: memoForUsers,
@@ -614,7 +614,7 @@ export default function ShopPage() {
         setIsCreatingCardOrder(true);
         try {
             await shopApi.shop_card_orders_create({
-                shopId: shopId as string,
+                shop_id: shopId as string,
                 quantity: orderQuantity,
                 design_id: selectedOrderProduct.card_design_id || selectedOrderProduct.design?.design_id,
                 product_id: selectedOrderProduct.product_id,
@@ -633,7 +633,7 @@ export default function ShopPage() {
     const handleCancelCardOrder = async (orderId: string) => {
         if (!confirm(t('cardOrder.cancel') + '?')) return;
         try {
-            await shopApi.shop_card_orders_cancel({ shopId: shopId as string, order_id: orderId });
+            await shopApi.shop_card_orders_cancel({ shop_id: shopId as string, order_id: orderId });
             fetchCardOrders();
         } catch (e: any) {
             alert(tb(e.message?.replace(/\./g, '_')) || e.message);
@@ -642,7 +642,7 @@ export default function ShopPage() {
 
     const handleCompleteCardOrder = async (orderId: string) => {
         try {
-            await shopApi.shop_card_orders_complete({ shopId: shopId as string, order_id: orderId });
+            await shopApi.shop_card_orders_complete({ shop_id: shopId as string, order_id: orderId });
             fetchCardOrders();
         } catch (e: any) {
             alert(tb(e.message?.replace(/\./g, '_')) || e.message);
@@ -658,8 +658,8 @@ export default function ShopPage() {
         setIsImporting(true);
         try {
             const data = await shopApi.shop_products_import_execute({
-                shopId: shopId!,
-                importShopId: selectedImportShopId.replace('SHOP#', '')
+                shop_id: shopId!,
+                import_shop_id: selectedImportShopId.replace('SHOP#', '')
             });
 
             if (true) {
@@ -686,7 +686,7 @@ export default function ShopPage() {
 
         try {
             await shopApi.shop_details_update({
-                shopId: shopId!,
+                shop_id: shopId!,
                 name: (formData.get('shop_name') as string),
                 detail_html: (formData.get('shop_detail_html') as string),
                 html_image_urls: htmlImageUrls,
@@ -719,8 +719,8 @@ export default function ShopPage() {
         setQrStatusDetails(null);
         try {
             const data = await shopApi.shop_qrcodecheck({
-                shopId: shopId as string,
-                qr_id: uuid
+                shop_id: shopId as string,
+                uuid: uuid
             });
             setScannedUuid(uuid);
             setQrStatusDetails(data);
@@ -759,8 +759,8 @@ export default function ShopPage() {
             // Status check for sequential scan
             try {
                 const data = await shopApi.shop_qrcodecheck({
-                    shopId: shopId as string,
-                    qr_id: uuid
+                    shop_id: shopId as string,
+                    uuid: uuid
                 });
                 setScannedUuids(prev => prev.map(item =>
                     item.uuid === uuid ? { ...item, status: data } : item

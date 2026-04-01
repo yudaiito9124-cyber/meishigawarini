@@ -12,7 +12,7 @@
  */
 import { APIGatewayProxyHandler } from 'aws-lambda';
 import { GetCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
-import { stripSignature, deleteFileByUrl, copyS3Object, signUrlIfS3, signUrlsInHtml, stripSignaturesInHtml } from './utils/s3';
+import { stripSignature, deleteFileByUrl, copyS3Object, signUrlIfS3, signUrlsInHtml, stripSignaturesInHtml, getPublicUrl } from './utils/s3';
 import { generateId } from './utils/id';
 import { successResponse, errorResponse } from './utils/response';
 import { ddb, TABLE_NAME, BUCKET_NAME } from './share/db';
@@ -32,18 +32,27 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         if (resPath.endsWith('/update')) action = 'update_sender_info';
         else if (resPath.endsWith('/load')) action = 'load_from_id';
         else if (resPath.endsWith('/save')) action = 'save_as_new_user';
-        else if (resPath.endsWith('/delete-images')) action = 'delete_images';
+        else if (resPath.endsWith('/delete-images')) action = 'delete-images';
 
         if (!uuid) return errorResponse(400, 'Missing UUID');
-        
+
         // ====================================================================
         // ACTION: update_sender_info (チャット送り主情報の更新)
         // --------------------------------------------------------------------
         // 目的: 指定されたギフト(UUID)のチャット画面に表示するプロフィールを更新します。
         // ====================================================================
         if (action === 'update_sender_info') {
-            const { sender_info, deleted_html_image_urls } = body;
-            if (!sender_info) return errorResponse(400, 'Missing sender_info');
+            const sender_info = body.senderInfo || body.sender_info;
+            const deleted_html_image_urls = body.deletedHtmlImageUrls || body.deleted_html_image_urls;
+            if (!sender_info) return errorResponse(400, 'Missing senderInfo');
+
+            // 【ステータスチェック】送り主情報を登録できるのはActiveの状態のみ
+            const metaRes = await ddb.send(new GetCommand({
+                TableName: TABLE_NAME, Key: { PK: `QR#${uuid}`, SK: 'METADATA' }
+            }));
+            if (!metaRes.Item || metaRes.Item.status !== 'ACTIVE') {
+                return errorResponse(403, 'Sender info can only be updated for active gifts.');
+            }
 
             const res = await ddb.send(new UpdateCommand({
                 TableName: TABLE_NAME,
@@ -110,9 +119,10 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         // 目的: 入力情報をユーザーの「送り主テンプレート」(USER#SENDER)として保存します。
         // ====================================================================
         if (action === 'save_as_new_user') {
-            const { sender_info, id } = body;
-            if (!sender_info) return errorResponse(400, 'Missing sender_info');
-            
+            const sender_info = body.senderInfo || body.sender_info;
+            const id = body.id;
+            if (!sender_info) return errorResponse(400, 'Missing senderInfo');
+
             const userid = id ? id.replace('USER#', '').trim() : generateId();
 
             const copyFile = async (url: string) => {
@@ -124,8 +134,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                     const filename = sourceKey.split('/').pop();
                     const destKey = `user/${userid}/usercontent/${filename}`;
                     await copyS3Object(BUCKET_NAME, sourceKey, destKey);
-                    const region = process.env.AWS_REGION || 'ap-northeast-1';
-                    return `https://${BUCKET_NAME}.s3.${region}.amazonaws.com/${destKey}`;
+                    return getPublicUrl(BUCKET_NAME, destKey);
                 } catch (e) {
                     console.error("S3 Copy failed:", url, e);
                     return url;
@@ -170,7 +179,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         if (action === 'load_from_id') {
             let { id } = body;
             if (!id || typeof id !== 'string') return errorResponse(400, 'Missing or invalid ID');
-            
+
             let trimid = id.startsWith("USER#") ? id.replace("USER#", "") : id;
             const pk = `USER#${trimid}`;
 
@@ -198,9 +207,9 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         }
 
         // ====================================================================
-        // ACTION: delete_images (画像物理削除)
+        // ACTION: delete-images (画像物理削除)
         // ====================================================================
-        if (action === 'delete_images') {
+        if (action === 'delete-images') {
             const { urls } = body;
             if (!urls || !Array.isArray(urls)) return errorResponse(400, 'Missing urls');
             for (const url of urls) {

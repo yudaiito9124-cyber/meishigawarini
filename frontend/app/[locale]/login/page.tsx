@@ -67,7 +67,7 @@ export default function LoginPage() {
             if (isAdmin) {
                 return;
             }
-            const data = await shopApi.shop_list({ noCreate: true });
+            const data = await shopApi.shop_list({ no_create: true });
             const shops = data.shops || [];
 
             console.log("shops: " + shops)

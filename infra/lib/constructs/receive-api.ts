@@ -100,9 +100,15 @@ export class ReceiveApi extends cdk.NestedStack {
     });
     
     const receive_upload_url = new nodejs.NodejsFunction(this, 'receive_upload_url', { entry: lampath('receive_upload_url'), ...fnProps });
+    
+    // --- Share API (No Authorizer) ---
+    const share_get = new nodejs.NodejsFunction(this, 'share_get', {
+      entry: lampath('share_get'),
+      ...fnProps,
+    });
 
     // Grant Permissions
-    const allLambdas = [receive_verify, receive_submit, receive_completed, receive_chat, receive_subscription, receive_sender, receive_upload_url];
+    const allLambdas = [receive_verify, receive_submit, receive_completed, receive_chat, receive_subscription, receive_sender, receive_upload_url, share_get];
     allLambdas.forEach(fn => {
       grantTablePermissions(fn, true);
       bucket.grantRead(fn);
@@ -141,8 +147,14 @@ export class ReceiveApi extends cdk.NestedStack {
     addResourceWithCors(senderRes, 'update').addMethod('POST', new apigateway.LambdaIntegration(receive_sender), routeOptions);
     addResourceWithCors(senderRes, 'load').addMethod('POST', new apigateway.LambdaIntegration(receive_sender), routeOptions);
     addResourceWithCors(senderRes, 'save').addMethod('POST', new apigateway.LambdaIntegration(receive_sender), routeOptions);
+    addResourceWithCors(senderRes, 'delete-images').addMethod('POST', new apigateway.LambdaIntegration(receive_sender), routeOptions);
 
     const uploadUrlRoot = addResourceWithCors(this.receiveResource, 'uploadurl');
     addResourceWithCors(uploadUrlRoot, 'get').addMethod('POST', new apigateway.LambdaIntegration(receive_upload_url), routeOptions);
+
+    // --- Share Endpoint (Public) ---
+    const shareResource = api.root.addResource('share');
+    const shareUuidResource = shareResource.addResource('{uuid}');
+    shareUuidResource.addMethod('GET', new apigateway.LambdaIntegration(share_get));
   }
 }

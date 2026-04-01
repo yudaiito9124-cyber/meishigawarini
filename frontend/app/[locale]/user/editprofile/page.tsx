@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, Plus, X, Globe, Copy, Trash2, SendHorizontal, Pencil, User, Image as ImageIcon, FileIcon, ChevronDown } from "lucide-react";
+import { Loader2, Plus, X, Globe, Copy, Trash2, SendHorizontal, Pencil, User, Image as ImageIcon, FileIcon, ChevronDown, Sparkles } from "lucide-react";
 import { SiX, SiInstagram, SiYoutube, SiFacebook, SiLine, SiTiktok, SiThreads, SiLinktree, SiEight } from '@icons-pack/react-simple-icons';
 import { cn } from "@/lib/utils";
 import SandboxedHtml from "@/components/SandboxedHtml";
@@ -115,6 +115,13 @@ export default function UserProfilePage() {
     const handleSenderCardUpload = async (file: File) => {
         setSenderInfoLoading(true);
         try {
+            // Instant local preview
+            const localPreviewUrl = URL.createObjectURL(file);
+            setSenderForm((prev: any) => ({
+                ...prev,
+                card_image_url: localPreviewUrl,
+            }));
+
             let uploadFile: File | Blob = file;
             if (file.type.startsWith("image/")) {
                 try {
@@ -124,7 +131,7 @@ export default function UserProfilePage() {
 
             const { uploadUrl, publicUrl } = await userApi.user_profile_uploadurl({
                 filename: file.name,
-                contentType: uploadFile.type
+                content_type: uploadFile.type
             });
 
             const res = await fetch(uploadUrl, {
@@ -135,11 +142,14 @@ export default function UserProfilePage() {
 
             if (!res.ok) throw new Error("Upload failed");
 
+            // After upload, we have the S3 URL (signed by the backend).
+            // We update the state so when it saves, the S3 URL is stored.
             setSenderForm((prev: any) => ({
                 ...prev,
                 card_image_url: publicUrl,
                 card_image_name: file.name
             }));
+            setSenderInfoLoading(false);
         } catch (e: any) {
             alert(t('errors.uploadFailed'));
         } finally {
@@ -150,6 +160,8 @@ export default function UserProfilePage() {
     const handleHtmlImageUpload = async (file: File) => {
         setSenderInfoLoading(true);
         try {
+            // Local preview isn't worth it here as it's an array and needs S3 URL for HTML mapping.
+            // But let's at least show something.
             let uploadFile: File | Blob = file;
             if (file.type.startsWith("image/")) {
                 try {
@@ -159,7 +171,7 @@ export default function UserProfilePage() {
 
             const { uploadUrl, publicUrl } = await userApi.user_profile_uploadurl({
                 filename: file.name,
-                contentType: file.type
+                content_type: file.type
             });
 
             const res = await fetch(uploadUrl, {
@@ -229,44 +241,46 @@ export default function UserProfilePage() {
 
     if (loading) {
         return (
-            <div className="min-h-screen flex items-center justify-center bg-gray-50">
+            <div className="min-h-screen flex items-center justify-center bg-slate-50">
                 <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
             </div>
         );
     }
 
     return (
-        <div className="min-h-screen bg-gray-50 flex flex-col items-center py-12 px-4">
-            <div className="w-full max-w-xl flex justify-start mb-4">
+        <div className="min-h-screen bg-slate-50 flex flex-col items-center py-12 px-4 font-sans">
+            <div className="w-full max-w-xl flex justify-start mb-6">
                  <Button 
-                    variant="ghost" 
+                    variant="outline" 
                     size="sm" 
-                    className="text-gray-500 hover:text-gray-800 -ml-2 h-8"
+                    className="rounded-full bg-white/50 backdrop-blur-sm border-gray-200 text-gray-500 hover:text-gray-900 shadow-sm h-9 px-4"
                     onClick={() => router.push('/user')}
                  >
                     <ChevronDown className="h-4 w-4 mr-1 rotate-90" /> {tUser('back')}
                  </Button>
             </div>
 
-            <Card className="w-full max-w-xl flex flex-col mt-2 shadow-xl border-none rounded-2xl overflow-hidden bg-white">
-                <CardHeader className="flex flex-row justify-between items-center bg-gradient-to-r from-blue-600 to-indigo-700 text-white p-6 rounded-t-2xl">
-                    <CardTitle className="text-xl text-center flex items-center justify-left gap-2 text-white">
-                        <User className="w-5 h-5 text-white" />
+            <Card className="w-full max-w-xl flex flex-col mt-2 shadow-2xl border-none rounded-[2rem] overflow-hidden bg-white/80 backdrop-blur-xl animate-in fade-in zoom-in-95 duration-500">
+                <CardHeader className="flex flex-row justify-between items-center bg-gradient-to-r from-blue-600 to-indigo-700 text-white p-8">
+                    <CardTitle className="text-2xl font-black tracking-tight text-center flex items-center justify-left gap-3 text-white">
+                        <div className="p-2 bg-white/20 rounded-xl">
+                            <User className="w-6 h-6 text-white" />
+                        </div>
                         {t('senderInfo.title')}
                     </CardTitle>
-                    <div className="flex flex-row items-center">
+                    <div className="flex flex-row items-center gap-3">
                         {(senderInfo && senderInfo.ts_updated_at) && (
-                            <span className="text-[10px] text-blue-100 flex items-center mr-2">
-                                {new Date(senderInfo.ts_updated_at).toLocaleString()} {t('senderInfo.updated')}
+                            <span className="text-[10px] text-blue-100 font-bold uppercase tracking-widest hidden sm:block">
+                                {new Date(senderInfo.ts_updated_at).toLocaleDateString()} {t('senderInfo.updated')}
                             </span>
                         )}
                         <Button
                             variant="ghost"
                             size="icon"
-                            className="h-10 w-10 text-white hover:bg-white/20 hover:text-white"
+                            className="h-10 w-10 text-white hover:bg-white/20 rounded-full"
                             onClick={() => setIsEditingSender(!isEditingSender)}
                         >
-                            {isEditingSender ? <X className="h-4 w-4" /> : <Pencil className="h-4 w-4" />}
+                            {isEditingSender ? <X className="h-5 w-5" /> : <Pencil className="h-5 w-5" />}
                         </Button>
                     </div>
                 </CardHeader>
@@ -274,56 +288,60 @@ export default function UserProfilePage() {
                     
                     {/* 編集箇所 (ReceivePageと完全一致) */}
                     {isEditingSender ? (
-                        <div className="space-y-6 p-6">
-                            <div className="w-full flex items-center justify-center text-xs text-center text-gray-500">
+                        <div className="space-y-8 p-8 animate-in slide-in-from-top-4 duration-500">
+                            <div className="w-full flex items-center justify-center text-xs text-center text-gray-400 font-bold uppercase tracking-widest bg-slate-50 py-3 rounded-xl border border-slate-100">
                                 {t('senderInfo.description')}
                             </div>
                             <div
-                                className="aspect-[1.6/1] w-full flex flex-col items-center justify-center gap-3 cursor-pointer p-6 border rounded-xl bg-gray-50/50 hover:bg-white transition-colors"
+                                className="aspect-[1.6/1] w-full flex flex-col items-center justify-center gap-4 cursor-pointer p-8 border-2 border-dashed border-slate-200 rounded-3xl bg-slate-50/50 hover:bg-white hover:border-blue-400 hover:shadow-xl transition-all group/upload"
                                 onClick={() => document.getElementById('senderCardUpload')?.click()}
                             >
-                                {senderForm?.card_image_url && (
-                                    <div className="relative w-full h-full">
+                                {senderForm?.card_image_url ? (
+                                    <div className="relative w-full h-full animate-in zoom-in-95">
                                         <img
                                             src={senderForm.card_image_url}
                                             alt="Business Card"
-                                            className="w-full h-full object-contain rounded-lg shadow-md bg-white ring-1 ring-black/5"
+                                            className="w-full h-full object-contain rounded-2xl shadow-2xl bg-white ring-1 ring-black/5"
                                         />
                                         <Button
                                             variant="destructive"
                                             size="icon"
-                                            className="absolute -top-2 -right-2 h-8 w-8 rounded-full shadow-lg z-10"
+                                            className="absolute -top-3 -right-3 h-10 w-10 rounded-full shadow-xl z-20 border-2 border-white"
                                             onClick={(e) => {
                                                 e.stopPropagation();
                                                 handleRemoveSenderImage();
                                             }}
                                         >
-                                            <X className="h-4 w-4" />
+                                            <X className="h-5 w-5" />
                                         </Button>
                                     </div>
+                                ) : (
+                                    <>
+                                        <div className="w-20 h-20 rounded-3xl bg-white shadow-sm flex items-center justify-center group-hover/upload:scale-110 group-hover/upload:rotate-3 transition-transform duration-300">
+                                            <FileIcon className="w-10 h-10 text-blue-500" />
+                                        </div>
+                                        <div className="text-center">
+                                            <p className="font-black text-gray-900 text-lg">{t('senderInfo.uploadPlaceholder')}</p>
+                                            <p className="text-xs text-gray-400 font-medium mt-1 uppercase tracking-tight">PNG, JPG up to 10MB</p>
+                                        </div>
+                                    </>
                                 )}
-                                <div className="w-16 h-16 rounded-full bg-blue-50 flex items-center justify-center group-hover/card:scale-110 transition-transform">
-                                    <FileIcon className="w-8 h-8 text-blue-500" />
-                                </div>
-                                <div className="text-center">
-                                    <p className="font-semibold text-gray-800">{t('senderInfo.uploadPlaceholder')}</p>
-                                </div>
                             </div>
 
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t pt-6">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 border-t border-slate-100 pt-8">
                                 {SENDER_FORM_KEYS.map((field) => (
                                     field !== 'card_image_url' && field !== 'card_image_name' && field !== 'ts_updated_at' && field !== 'ts_created_at' && field !== `html_image_urls` && field !== `detail_html` && field !== 'import_id' && field !== 'sender_id' && (
-                                        <div key={field} className={cn("space-y-1.5", (field === 'memo' || field === 'address' || field === 'detail_html') && "md:col-span-2")}>
-                                            <Label htmlFor={`sender-${field}`} className="text-xs font-bold text-gray-600 flex items-center gap-1">
-                                                {field === "SNS_X" ? <SiX size={14} color="default" /> :
-                                                    field === "SNS_Instagram" ? <SiInstagram size={14} color="default" /> :
-                                                        field === "SNS_YouTube" ? <SiYoutube size={14} color="default" /> :
-                                                            field === "SNS_Facebook" ? <SiFacebook size={14} color="default" /> :
-                                                                field === "SNS_LINE" ? <SiLine size={14} color="default" /> :
-                                                                    field === "SNS_TikTok" ? <SiTiktok size={14} color="default" /> :
-                                                                        field === "SNS_Threads" ? <SiThreads size={14} color="default" /> :
-                                                                            field === "Service_Linktree" ? <SiLinktree size={14} color="default" /> :
-                                                                                field === "Service_Eight" ? <SiEight size={14} color="default" /> :
+                                        <div key={field} className={cn("space-y-2.5", (field === 'memo' || field === 'address' || field === 'detail_html') && "md:col-span-2")}>
+                                            <Label htmlFor={`sender-${field}`} className="text-xs font-black text-slate-600 uppercase tracking-widest flex items-center gap-2 ml-1">
+                                                {field === "SNS_X" ? <SiX size={14} /> :
+                                                    field === "SNS_Instagram" ? <SiInstagram size={14} /> :
+                                                        field === "SNS_YouTube" ? <SiYoutube size={14} /> :
+                                                            field === "SNS_Facebook" ? <SiFacebook size={14} /> :
+                                                                field === "SNS_LINE" ? <SiLine size={14} /> :
+                                                                    field === "SNS_TikTok" ? <SiTiktok size={14} /> :
+                                                                        field === "SNS_Threads" ? <SiThreads size={14} /> :
+                                                                            field === "Service_Linktree" ? <SiLinktree size={14} /> :
+                                                                                field === "Service_Eight" ? <SiEight size={14} /> :
                                                                                     (field.startsWith("SNS_") || field.startsWith("Service_") || field === "HP" || field === "url") ? <Globe size={14} /> :
                                                                                         null
                                                 }
@@ -335,7 +353,7 @@ export default function UserProfilePage() {
                                                     value={senderForm[field] || ""}
                                                     onChange={(e) => updateSenderForm(field, e.target.value)}
                                                     disabled={senderInfoLoading}
-                                                    className="min-h-[80px] text-sm"
+                                                    className="min-h-[100px] text-base rounded-2xl border-slate-200 focus:ring-blue-500 focus:border-blue-500 bg-slate-50/50 shadow-inner"
                                                     placeholder={t(`senderInfo.labels.${field}`)}
                                                 />
                                             ) : (
@@ -344,7 +362,7 @@ export default function UserProfilePage() {
                                                     value={senderForm[field] || ""}
                                                     onChange={(e) => updateSenderForm(field, e.target.value)}
                                                     disabled={senderInfoLoading}
-                                                    className="h-9 text-sm"
+                                                    className="h-12 text-base rounded-2xl border-slate-200 focus:ring-blue-500 focus:border-blue-500 bg-slate-50/50 shadow-inner"
                                                     placeholder={t(`senderInfo.labels.${field}`)}
                                                     type={field === 'email' ? 'email' : field === 'phone' ? 'tel' : 'text'}
                                                 />
@@ -353,101 +371,105 @@ export default function UserProfilePage() {
                                     )
                                 ))}
 
-                                <div className="md:col-span-2 mt-4 flex justify-center pb-0">
+                                <div className="md:col-span-2 mt-6 flex justify-center">
                                     <Button
                                         type="button"
-                                        variant="ghost"
+                                        variant="outline"
                                         size="sm"
-                                        className="text-xs text-gray-500 hover:text-blue-600 gap-2 px-4 h-8"
+                                        className="text-xs font-bold text-gray-500 hover:text-blue-600 hover:bg-blue-50 gap-2 px-6 h-10 rounded-full border-slate-200"
                                         onClick={() => setShowDetailHtmlSection(!showDetailHtmlSection)}
                                     >
-                                        <Plus className={cn("w-3.5 h-3.5 transition-transform duration-200", showDetailHtmlSection && "rotate-180")} />
+                                        <Plus className={cn("w-4 h-4 transition-transform duration-300", showDetailHtmlSection && "rotate-180")} />
                                         {t(`senderInfo.labels.addhtmlmessage`)}
                                     </Button>
                                 </div>
 
                                 {showDetailHtmlSection && (
-                                    <div className="md:col-span-2 flex flex-col px-6 space-y-4 p-2 pt-0 border rounded-xl shadow">
-                                        {/* HTML Section */}
-                                        <div className="flex items-center justify-between mt-8">
-                                            <Label htmlFor={`sender-detail_html`} className="text-xs font-bold text-gray-600 flex items-center">
+                                    <div className="md:col-span-2 flex flex-col space-y-6 pt-10 border-t border-slate-100 animate-in slide-in-from-top-4">
+                                        <div className="flex items-center justify-between">
+                                            <Label htmlFor={`sender-detail_html`} className="text-sm font-black text-gray-900 uppercase tracking-widest flex items-center gap-2">
+                                                <Sparkles className="w-4 h-4 text-blue-500" />
                                                 {t(`senderInfo.labels.detail_html`)}
                                             </Label>
                                         </div>
-                                        <div className="md:col-span-2 flex flex-col w-full items-center gap-2 space-y-1.5 p-0 mb-3">
-                                            <div className="md:col-span-1 w-full flex flex-col px-6 space-y-1 p-0 pr-0 pl-0">
+                                        <div className="flex flex-col w-full gap-6">
+                                            <div className="w-full">
                                                 <Textarea
                                                     id={`sender-detail_html`}
                                                     value={senderForm["detail_html"] || ""}
                                                     onChange={(e) => updateSenderForm("detail_html", e.target.value)}
                                                     disabled={senderInfoLoading}
-                                                    className="min-h-[80px] text-sm font-mono"
+                                                    className="min-h-[150px] text-sm font-mono rounded-2xl border-slate-200 bg-slate-900 text-slate-100 p-6 selection:bg-blue-500/30"
                                                     placeholder={t(`senderInfo.labels.detail_html-placeholder`)}
                                                 />
                                             </div>
 
-                                            {/* HTML Images Section */}
-                                            <div className="md:col-span-1 flex flex-col px-6 space-y-1 p-0 pr-0 pl-0 mt-4 w-full">
-                                                <div className="flex items-center justify-center">
-                                                    <span className="text-xs font-bold text-gray-500 uppercase tracking-wider flex items-center gap-2">
-                                                        <ImageIcon className="w-3 h-3 text-blue-500" />
+                                            <div className="flex flex-col gap-4">
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-xs font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
+                                                        <ImageIcon className="w-4 h-4 text-blue-500" />
                                                         {t(`senderInfo.labels.detail_html-images`)}
                                                     </span>
                                                 </div>
-                                                <div className="space-y-2">
-                                                    {htmlImageUrls.length === 0 ? (
-                                                        <p className="text-[10px] text-gray-400 italic font-medium py-2 text-center">{t('senderInfo.labels.detail_html-noimages')}</p>
-                                                    ) : (
-                                                        <div className="grid grid-cols-1 gap-2">
-                                                            {htmlImageUrls.map((url, idx) => (
-                                                                <div key={idx} className="flex items-center gap-3 p-2 bg-gray-50 rounded-md border border-gray-100 group hover:border-blue-200 transition-colors">
-                                                                    <div className="w-10 h-10 rounded-md border bg-white overflow-hidden shrink-0 shadow-sm ring-1 ring-black/5">
-                                                                        <img src={url} alt="HTML Asset" className="w-full h-full object-cover" onError={(e) => { (e.target as any).src = 'https://placehold.co/100x100?text=Error'; }} />
-                                                                    </div>
-                                                                    <div className="flex-1 min-w-0">
-                                                                        <p className="text-[10px] font-mono text-gray-400 truncate select-all">{url}</p>
-                                                                    </div>
-                                                                    <div className="flex items-center gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
-                                                                        <Button
-                                                                            variant="ghost"
-                                                                            size="icon"
-                                                                            className="h-8 w-8 text-gray-400 hover:text-blue-600 hover:bg-blue-50"
-                                                                            onClick={() => {
-                                                                                navigator.clipboard.writeText(url);
-                                                                                alert(t('senderInfo.urlCopied'));
-                                                                            }}
-                                                                        >
-                                                                            <Copy className="w-3.5 h-3.5" />
-                                                                        </Button>
-                                                                        <Button
-                                                                            variant="ghost"
-                                                                            size="icon"
-                                                                            className="h-8 w-8 text-gray-400 hover:text-red-600 hover:bg-red-50"
-                                                                            onClick={() => handleRemoveHtmlImage(url)}
-                                                                        >
-                                                                            <Trash2 className="w-3.5 h-3.5" />
-                                                                        </Button>
-                                                                    </div>
+                                                
+                                                {htmlImageUrls.length === 0 ? (
+                                                    <div className="p-8 border-2 border-dashed border-slate-100 rounded-3xl text-center bg-slate-50/30">
+                                                        <p className="text-[10px] text-gray-400 font-bold uppercase tracking-tighter">{t('senderInfo.labels.detail_html-noimages')}</p>
+                                                    </div>
+                                                ) : (
+                                                    <div className="grid grid-cols-1 gap-3">
+                                                        {htmlImageUrls.map((url, idx) => (
+                                                            <div key={idx} className="flex items-center gap-4 p-3 bg-white rounded-2xl border border-slate-100 group hover:border-blue-400 hover:shadow-lg transition-all duration-300">
+                                                                <div className="w-12 h-12 rounded-xl border bg-slate-50 overflow-hidden shrink-0 shadow-sm ring-1 ring-black/5">
+                                                                    <img src={url} alt="HTML Asset" className="w-full h-full object-cover transition-transform group-hover:scale-110" onError={(e) => { (e.target as any).src = 'https://placehold.co/100x100?text=Error'; }} />
                                                                 </div>
-                                                            ))}
-                                                        </div>
-                                                    )}
-                                                </div>
+                                                                <div className="flex-1 min-w-0">
+                                                                    <p className="text-[10px] font-mono text-gray-400 truncate select-all">{url}</p>
+                                                                </div>
+                                                                <div className="flex items-center gap-2 opacity-20 group-hover:opacity-100 transition-opacity">
+                                                                    <Button
+                                                                        variant="ghost"
+                                                                        size="icon"
+                                                                        className="h-10 w-10 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-full"
+                                                                        onClick={() => {
+                                                                            navigator.clipboard.writeText(url);
+                                                                            alert(t('senderInfo.urlCopied'));
+                                                                        }}
+                                                                    >
+                                                                        <Copy className="w-4 h-4" />
+                                                                    </Button>
+                                                                    <Button
+                                                                        variant="ghost"
+                                                                        size="icon"
+                                                                        className="h-10 w-10 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-full"
+                                                                        onClick={() => handleRemoveHtmlImage(url)}
+                                                                    >
+                                                                        <Trash2 className="w-4 h-4" />
+                                                                    </Button>
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
 
                                                 <Button
                                                     variant="outline"
                                                     size="sm"
-                                                    className="h-7 text-[10px] gap-1 px-2 border-dashed bg-blue-50/50 hover:bg-blue-50 text-blue-600 border-blue-200 w-full mt-2"
+                                                    className="h-12 text-xs font-black uppercase tracking-widest gap-2 bg-blue-50/50 hover:bg-blue-100 text-blue-600 border-blue-200 border-2 border-dashed rounded-2xl w-full"
                                                     onClick={() => (document.getElementById('htmlImageUpload') as HTMLInputElement)?.click()}
                                                 >
-                                                    <Plus className="w-3 h-3" />
+                                                    <Plus className="w-4 h-4" />
                                                     {t(`senderInfo.labels.detail_html-addimage`)}
                                                 </Button>
-                                                <div className="bg-blue-50/50 p-2.5 rounded-lg border border-blue-100/50 mt-2">
-                                                    <p className="text-[9px] text-blue-700 leading-relaxed font-medium">
-                                                        <span className="inline-block px-1 bg-blue-100 rounded mr-1 text-blue-800">{t('senderInfo.usage')}</span>
-                                                        {t('senderInfo.usageDesc1')} <code>&lt;img src="..."&gt;</code> {t('senderInfo.usageDesc2')}
-                                                    </p>
+                                                
+                                                <div className="bg-blue-600 p-6 rounded-[2rem] text-white shadow-xl shadow-blue-200 overflow-hidden relative">
+                                                     <div className="absolute top-0 right-0 p-4 opacity-20">
+                                                         <Sparkles className="w-16 h-16" />
+                                                     </div>
+                                                     <p className="text-[10px] font-black uppercase tracking-[0.2em] mb-2 opacity-80">{t('senderInfo.usage')}</p>
+                                                     <p className="text-sm font-bold leading-relaxed relative z-10">
+                                                        {t('senderInfo.usageDesc1')} <code className="bg-white/20 px-1.5 py-0.5 rounded font-mono text-xs">&lt;img src="..."&gt;</code> {t('senderInfo.usageDesc2')}
+                                                     </p>
                                                 </div>
                                             </div>
                                             <input
@@ -465,26 +487,29 @@ export default function UserProfilePage() {
                                     </div>
                                 )}
 
-                                <div className="md:col-span-2 flex flex-col gap-2 pt-5 ">
+                                <div className="md:col-span-2 flex flex-col gap-3 pt-8 border-t border-slate-100">
                                     <Button
                                         onClick={() => handleSenderInfoUpdate()}
                                         disabled={senderInfoLoading}
-                                        className="w-full"
+                                        className="w-full h-14 rounded-full bg-blue-600 hover:bg-blue-700 text-lg font-black shadow-xl hover:shadow-blue-200 transition-all active:scale-95"
                                     >
-                                        {senderInfoLoading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <SendHorizontal className="w-4 h-4 mr-2" />}
+                                        {senderInfoLoading ? <Loader2 className="w-5 h-5 animate-spin mr-3" /> : <SendHorizontal className="w-5 h-5 mr-3" />}
                                         {senderInfoLoading ? t('senderInfo.saving') : t('senderInfo.save')}
                                     </Button>
                                     <Button
                                         type="button"
                                         variant="ghost"
+                                        className="rounded-full h-12 font-bold text-gray-500 hover:text-black"
                                         onClick={() => setIsEditingSender(false)}
                                     >
                                         {t('senderInfo.cancel')}
                                     </Button>
                                 </div>
                             </div>
-                            <div className="mt-20 border-b" />
-                            <Label className="w-full flex flex-col text-center text-xl border border-blue-100 border-3 border-dashed rounded-xl py-4">{t('senderInfo.preview')}</Label>
+                            <div className="mt-24 border-b border-slate-100" />
+                            <div className="flex justify-center -mt-5">
+                                <Label className="bg-white px-8 py-2 text-xs font-black uppercase tracking-[0.3em] text-blue-600 border-2 border-blue-100 rounded-full shadow-sm">{t('senderInfo.preview')}</Label>
+                            </div>
                         </div>
                     ) : null}
 
