@@ -35,8 +35,10 @@ export const viewport = {
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
   const t = await getTranslations({ locale, namespace: 'Metadata' });
+  const NEXT_PUBLIC_APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 
   return {
+    metadataBase: new URL(NEXT_PUBLIC_APP_URL),
     title: t('title'),
     description: t('description'),
   };
