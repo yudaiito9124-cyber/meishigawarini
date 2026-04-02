@@ -10,13 +10,14 @@ import { APIGatewayProxyHandler } from 'aws-lambda';
 import { QueryCommand } from '@aws-sdk/lib-dynamodb';
 import { successResponse, errorResponse } from './utils/response';
 import { ddb, TABLE_NAME } from './share/db';
+import { AdminApiSchema } from '@shared/api-types';
 
 export const handler: APIGatewayProxyHandler = async (event) => {
     try {
         if (event.httpMethod === 'OPTIONS') return successResponse();
         if (event.httpMethod !== 'POST') return errorResponse(405, 'Method Not Allowed');
 
-        const body = JSON.parse(event.body || '{}');
+        const body = JSON.parse(event.body || '{}') as AdminApiSchema['admin_dump'];
         const pks = body.pks;
 
         if (!Array.isArray(pks) || pks.length === 0) {

@@ -8,6 +8,7 @@
  */
 import { APIGatewayProxyHandler } from 'aws-lambda';
 import { successResponse, errorResponse } from './utils/response';
+import { AdminApiSchema } from '@shared/api-types';
 
 export const handler: APIGatewayProxyHandler = async (event) => {
     try {

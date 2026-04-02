@@ -17,7 +17,8 @@ import { APIGatewayProxyHandler } from 'aws-lambda';
 import { GetCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
 import { successResponse, errorResponse } from './utils/response';
 import { ddb, TABLE_NAME } from './share/db';
-import { getUserId } from './utils/request';
+import { getUserId, getAction } from './utils/request';
+import { AdminApiSchema } from '@shared/api-types';
 
 export const handler: APIGatewayProxyHandler = async (event) => {
     try {
@@ -26,24 +27,20 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 
         const body = JSON.parse(event.body || '{}');
         const userId = getUserId(event);
-        let { shopIds, userIds, action } = body;
+        const action = getAction(event, body);
 
-        // リクエストデータのクリーンアップ（重複除去）
-        if (Array.isArray(shopIds)) shopIds = Array.from(new Set(shopIds));
-        if (Array.isArray(userIds)) userIds = Array.from(new Set(userIds));
-
-        // 必須チェック
-        if (!Array.isArray(shopIds) || !Array.isArray(userIds) || !action) {
-            return errorResponse(400, 'Missing required fields: shopIds, userIds, action');
-        }
-
-        // ====================================================================
-        // ACTION: validate (ID存在確認とプレビュー)
-        // --------------------------------------------------------------------
-        // 目的: 指定されたIDが全てDynamoDB上に実在するかを確認し、
-        // 実行前にユーザー名やショップ名をフロントエンドへ返却します。
-        // ====================================================================
         if (action === 'validate') {
+            let { shop_ids, user_ids } = body as AdminApiSchema['admin_links'];
+            
+            // リクエストデータのクリーンアップ（重複除去）
+            if (Array.isArray(shop_ids)) shop_ids = Array.from(new Set(shop_ids));
+            if (Array.isArray(user_ids)) user_ids = Array.from(new Set(user_ids));
+
+            // 必須チェック
+            if (!Array.isArray(shop_ids) || !Array.isArray(user_ids) || !action) {
+                return errorResponse(400, 'Missing required fields: shop_ids, user_ids, action');
+            }
+
             const userMetadataList = [];
             const shopMetadataList = [];
             const missingIds = [];
@@ -51,7 +48,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             /**
              * 【ユーザーの存在確認】
              */
-            for (const uid of userIds) {
+            for (const uid of user_ids) {
                 const res = await ddb.send(new GetCommand({
                     TableName: TABLE_NAME,
                     Key: { PK: `USER#${uid}`, SK: 'SHOP' }
@@ -66,7 +63,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             /**
              * 【ショップの存在確認】
              */
-            for (const sid of shopIds) {
+            for (const sid of shop_ids) {
                 const res = await ddb.send(new GetCommand({
                     TableName: TABLE_NAME,
                     Key: { PK: `SHOP#${sid}`, SK: 'METADATA' }
@@ -92,13 +89,24 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         // 目的: ユーザーとショップの双方向リンクをUpdateItemで構築します。
         // ====================================================================
         if (action === 'execute') {
+            let { shop_ids, user_ids } = body as AdminApiSchema['admin_links'];
+            
+            // リクエストデータのクリーンアップ（重複除去）
+            if (Array.isArray(shop_ids)) shop_ids = Array.from(new Set(shop_ids));
+            if (Array.isArray(user_ids)) user_ids = Array.from(new Set(user_ids));
+
+            // 必須チェック
+            if (!Array.isArray(shop_ids) || !Array.isArray(user_ids) || !action) {
+                return errorResponse(400, 'Missing required fields: shop_ids, user_ids, action');
+            }
+
             const now = new Date().toISOString();
 
             /**
              * 【1. ユーザー側の更新】
              * ユーザープロフィールにGM管理下のショップIDを追加し、ロールを付与します。
              */
-            for (const uid of userIds) {
+            for (const uid of user_ids) {
                 const userRes = await ddb.send(new GetCommand({ TableName: TABLE_NAME, Key: { PK: `USER#${uid}`, SK: 'SHOP' } }));
                 if (!userRes.Item) continue;
 
@@ -106,7 +114,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 const currentGmShopIds = userRes.Item.gm_shop_ids || [];
 
                 // 既にオーナーであるショップはリンク対象から除外
-                const finalShopIdsToLink = shopIds.filter(id => !ownerShopIds.includes(id) && !currentGmShopIds.includes(id));
+                const finalShopIdsToLink = shop_ids.filter(id => !ownerShopIds.includes(id) && !currentGmShopIds.includes(id));
 
                 if (finalShopIdsToLink.length > 0) {
                     // ショップIDを配列(list_append)に追加
@@ -137,7 +145,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
              * 【2. ショップ側の更新】
              * ショップ側の管理メタデータに、所属するGMのユーザーIDを追加します。
              */
-            for (const sid of shopIds) {
+            for (const sid of shop_ids) {
                 const shopRes = await ddb.send(new GetCommand({ TableName: TABLE_NAME, Key: { PK: `SHOP#${sid}`, SK: 'METADATA' } }));
                 if (!shopRes.Item) continue;
 
@@ -145,7 +153,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 const currentGmIds = shopRes.Item.gm_ids || [];
 
                 // オーナー自身をGMには登録しないようにフィルタリング
-                const finalUserIdsToLink = userIds.filter(id => id !== ownerId && !currentGmIds.includes(id));
+                const finalUserIdsToLink = user_ids.filter(id => id !== ownerId && !currentGmIds.includes(id));
 
                 if (finalUserIdsToLink.length > 0) {
                     // GM IDを配列に追加

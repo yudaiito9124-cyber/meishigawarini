@@ -15,6 +15,7 @@ import { getSystemDesign } from './utils/designs';
 import { successResponse, errorResponse, apiResponse } from './utils/response';
 import { ddb, TABLE_NAME, BUCKET_NAME } from './share/db';
 import { getProductId, getShopId, getAction, getUserId } from './utils/request';
+import { ShopApiSchema } from '@shared/api-types';
 
 const DEFAULT_VALID_DAYS = parseInt(process.env.DEFAULT_VALID_DAYS || '180');
 
@@ -48,7 +49,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         // 目的: ショップに紐づく新しい商品を登録します。
         // ====================================================================
         if (action === 'create') {
-            const { name, description, image_url, price, valid_days, detail_html, card_design_id } = body;
+            const { name, description, image_url, price, valid_days, detail_html, card_design_id } = body as ShopApiSchema['shop_products_create'];
             if (!name) return errorResponse(400, 'Missing product name');
             if (!card_design_id) return errorResponse(400, 'Missing card_design_id');
 
@@ -67,7 +68,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                     product_id: productId, name, description,
                     detail_html: stripSignaturesInHtml(detail_html || '', BUCKET_NAME),
                     image_url: stripSignature(image_url),
-                    price, valid_days: Math.min(valid_days ? parseInt(valid_days) : DEFAULT_VALID_DAYS, 180),
+                    price, valid_days: Math.min(valid_days || DEFAULT_VALID_DAYS, 180),
                     card_design_id,
                     status: 'ACTIVE',
                     GSI1_PK: 'PRODUCT#ACTIVE', GSI1_SK: now,
@@ -134,7 +135,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         // ====================================================================
         if (action === 'update') {
             const product_id = getProductId(event, body);
-            const { status, name, description, image_url, price, valid_days, detail_html, card_design_id } = body;
+            const { status, name, description, image_url, price, valid_days, detail_html, card_design_id } = body as ShopApiSchema['shop_products_update'];
             
             if (!product_id) return errorResponse(400, 'Missing product ID');
 
@@ -162,7 +163,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             if (description !== undefined) { updateExpr.push('description = :desc'); attrValues[':desc'] = description; }
             if (image_url !== undefined) { updateExpr.push('image_url = :img'); attrValues[':img'] = stripSignature(image_url); }
             if (price !== undefined) { updateExpr.push('price = :price'); attrValues[':price'] = price; }
-            if (valid_days !== undefined) { updateExpr.push('valid_days = :vd'); attrValues[':vd'] = Math.min(parseInt(valid_days), 180); }
+            if (valid_days !== undefined) { updateExpr.push('valid_days = :vd'); attrValues[':vd'] = Math.min(valid_days, 180); }
             if (detail_html !== undefined) { updateExpr.push('detail_html = :html'); attrValues[':html'] = stripSignaturesInHtml(detail_html, BUCKET_NAME); }
             
             if (card_design_id) {

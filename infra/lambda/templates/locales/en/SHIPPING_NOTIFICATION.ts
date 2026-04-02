@@ -3,6 +3,6 @@ Your item has been shipped.
 Please wait for it to arrive.
 
 Check status here:
-{{baseUrl}}/receive/{{uuid}}
+{{baseUrl}}/receive/{{qr_id}}
 PIN: {{pin}}
 `.trim();

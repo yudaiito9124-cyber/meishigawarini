@@ -13,7 +13,8 @@ import { checkShopOwnerOrGM, checkUserShopPermission } from './share/shop-auth';
 import { checkAndExpire } from './utils/expiration';
 import { successResponse, errorResponse } from './utils/response';
 import { ddb, TABLE_NAME } from './share/db';
-import { getUUID, getProductId, getShopId, getAction, getUserId } from './utils/request';
+import { getQrId, getProductId, getShopId, getAction, getUserId } from './utils/request';
+import { ShopApiSchema } from '@shared/api-types';
 
 const DEFAULT_VALID_DAYS = parseInt(process.env.DEFAULT_VALID_DAYS || '180');
 
@@ -46,7 +47,8 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         // 目的: 指定されたQRコードが自ショップで利用可能（未割当またはリンク済）かを確認します。
         // ====================================================================
         if (action === 'check') {
-            const qr_id = getUUID(event, body);
+            const { qr_id: body_qr_id } = body as ShopApiSchema['shop_qrcodecheck'];
+            const qr_id = getQrId(event, body);
             if (!qr_id) return errorResponse(400, 'Missing qr_id');
 
             const qrRes = await ddb.send(new GetCommand({
@@ -92,6 +94,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         // 目的: ショップに関連付けられた（GSI2_PK = SHOP#{id}）QRコードを一覧表示します。
         // ====================================================================
         if (action === 'list') {
+            const { shop_id } = body as ShopApiSchema['shop_qr_list'];
             const res = await ddb.send(new QueryCommand({
                 TableName: TABLE_NAME, IndexName: 'GSI2',
                 KeyConditionExpression: 'GSI2_PK = :sid', ExpressionAttributeValues: { ':sid': `SHOP#${shopId}` }
@@ -122,9 +125,9 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         // 目的: 未割当のQRコードを特定の商品に紐付けます。activate_now=trueで即時有効化。
         // ====================================================================
         if (action === 'link') {
-            const qr_id = getUUID(event, body);
+            const { qr_id: body_qr_id, product_id: body_product_id, memo_for_users, memo_for_shop, activate_now } = body as ShopApiSchema['shop_qr_link'];
+            const qr_id = getQrId(event, body);
             const product_id = getProductId(event, body);
-            let { memo_for_users, memo_for_shop, activate_now } = body;
             
             if (!qr_id || !product_id) return errorResponse(400, 'Missing qr_id or product_id');
 
@@ -188,7 +191,8 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         // 目的: 既に特定の商品に紐付いている(LINKED)QRコードを利用可能(ACTIVE)にします。
         // ====================================================================
         if (action === 'activate') {
-            const qr_id = getUUID(event, body);
+            const { qr_id: body_qr_id } = body as ShopApiSchema['shop_qr_activate'];
+            const qr_id = getQrId(event, body);
             if (!qr_id) return errorResponse(400, 'Missing qr_id');
 
             const qrRes = await ddb.send(new GetCommand({ TableName: TABLE_NAME, Key: { PK: `QR#${qr_id}`, SK: 'METADATA' } }));

@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils";
 import confetti from "canvas-confetti";
 
 interface ShareDialogProps {
-    uuid: string;
+    qr_id: string;
     product?: {
         name: string;
         image_url: string;
@@ -24,7 +24,7 @@ interface ShareDialogProps {
     };
 }
 
-export function ShareDialog({ uuid, product, card, shop }: ShareDialogProps) {
+export function ShareDialog({ qr_id, product, card, shop }: ShareDialogProps) {
     const t = useTranslations('ReceivePage.share');
     const [includeProduct, setIncludeProduct] = useState(true);
     const [includeCard, setIncludeCard] = useState(true);
@@ -37,7 +37,7 @@ export function ShareDialog({ uuid, product, card, shop }: ShareDialogProps) {
     const locale = localeMatch ? localeMatch[1] : 'ja';
 
     const generateShareUrl = () => {
-        const url = new URL(`${baseUrl}/${locale}/share/${uuid}`);
+        const url = new URL(`${baseUrl}/${locale}/share/${qr_id}`);
         const params: string[] = [];
         if (includeProduct) params.push('product');
         if (includeCard) params.push('card');

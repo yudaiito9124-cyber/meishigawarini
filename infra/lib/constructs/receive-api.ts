@@ -29,10 +29,11 @@ export class ReceiveApi extends cdk.NestedStack {
 
     // Helper for lambda paths
     const lampath = (name: string) => path.join(__dirname, `../../lambda/${name}.ts`);
+    const authpath = (name: string) => path.join(__dirname, `../../lambda/authorizer/${name}.ts`);
 
     // --- Receive Authorizer (Custom Lambda Authorizer) ---
     const receive_authorizer_fn = new nodejs.NodejsFunction(this, 'receive_authorizer_fn', {
-      entry: lampath('receiveAuthorizer'),
+      entry: authpath('receiveAuthorizer'),
       environment: {
         TABLE_NAME: table.tableName,
         USER_POOL_ID: userPool.userPoolId,
@@ -44,6 +45,7 @@ export class ReceiveApi extends cdk.NestedStack {
     const authorizer = new apigateway.RequestAuthorizer(this, 'receive_authorizer', {
       handler: receive_authorizer_fn,
       identitySources: [
+        apigateway.IdentitySource.header('X-QR-ID'),
         apigateway.IdentitySource.header('X-QR-UUID'),
         apigateway.IdentitySource.header('X-QR-PIN'),
         apigateway.IdentitySource.header('Authorization'),
@@ -87,7 +89,7 @@ export class ReceiveApi extends cdk.NestedStack {
     const receive_completed = new nodejs.NodejsFunction(this, 'receive_completed', { entry: lampath('receive_completed'), ...fnProps });
     const receive_chat = new nodejs.NodejsFunction(this, 'receive_chat', { entry: lampath('receive_chat'), ...fnProps });
     const receive_subscription = new nodejs.NodejsFunction(this, 'receive_subscription', { entry: lampath('receive_subscription'), ...fnProps });
-    
+
     // Pass userPool details to receive_sender for history logging
     const receive_sender = new nodejs.NodejsFunction(this, 'receive_sender', {
       entry: lampath('receive_sender'),
@@ -98,9 +100,9 @@ export class ReceiveApi extends cdk.NestedStack {
         CLIENT_ID: userPoolClient.userPoolClientId,
       }
     });
-    
+
     const receive_upload_url = new nodejs.NodejsFunction(this, 'receive_upload_url', { entry: lampath('receive_upload_url'), ...fnProps });
-    
+
     // --- Share API (No Authorizer) ---
     const share_get = new nodejs.NodejsFunction(this, 'share_get', {
       entry: lampath('share_get'),
@@ -154,7 +156,7 @@ export class ReceiveApi extends cdk.NestedStack {
 
     // --- Share Endpoint (Public) ---
     const shareResource = api.root.addResource('share');
-    const shareUuidResource = shareResource.addResource('{uuid}');
-    shareUuidResource.addMethod('GET', new apigateway.LambdaIntegration(share_get));
+    const shareQrIdResource = shareResource.addResource('{qr_id}');
+    shareQrIdResource.addMethod('GET', new apigateway.LambdaIntegration(share_get));
   }
 }

@@ -26,7 +26,8 @@ import { getSystemDesign } from './utils/designs';
 import { appendToHistory } from './utils/history';
 import { apiResponse, successResponse, errorResponse } from './utils/response';
 import { ddb, TABLE_NAME, BUCKET_NAME, USER_POOL_ID } from './share/db';
-import { getUUID, getPIN, getShopId, getAction, getUserId } from './utils/request';
+import { getQrId, getPIN, getShopId, getAction, getUserId } from './utils/request';
+import { UserApiSchema } from '@shared/api-types';
 
 const s3Client = new S3Client({});
 
@@ -66,6 +67,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         // S3上の画像データについては、フロントエンドから参照可能な「署名付きURL」に変換して返却します。
         // ====================================================================
         if (action === 'get') {
+            const {} = body as UserApiSchema['user_profile_get'];
             const pk = `USER#${userId}`;
             const sk = 'SENDER';
 
@@ -90,8 +92,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         // 目的: ユーザーの「送り主」(SENDER) プロフィール情報を保存・部分更新。
         // ====================================================================
         if (action === 'update') {
-            const profile_input = body.senderInfo || body.profile;
-            const deleted_html_image_urls = body.deletedHtmlImageUrls || body.deleted_html_image_urls;
+            const { profile: profile_input, deleted_html_image_urls } = body as UserApiSchema['user_profile_update'];
             if (!profile_input) return errorResponse(400, 'Missing profile data');
 
             // 後方互換性のため camelCase を snake_case にマッピング
@@ -179,8 +180,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         // 目的: ブラウザから直接S3へファイルをアップロードするための署名付きURLを発行
         // ====================================================================
         if (action === 'uploadurl') {
-            const { filename } = body;
-            const content_type = body.content_type || body.contentType;
+            const { filename, content_type } = body as UserApiSchema['user_profile_uploadurl'];
             if (!filename || !content_type) return errorResponse(400, 'Missing filename or content_type');
 
             const timestamp = Date.now();

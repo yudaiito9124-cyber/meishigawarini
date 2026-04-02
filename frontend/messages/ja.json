@@ -4,7 +4,8 @@
     "unknownError": "不明なエラー",
     "failed": "失敗しました",
     "all": "すべて",
-    "cancel": "キャンセル"
+    "cancel": "キャンセル",
+    "unitCard": "枚"
   },
   "Site": {
     "name": "名刺代わりに。"
@@ -100,7 +101,7 @@
       "confirmButton": "紐付けを確認する",
       "manualInputButton": "IDを手動で入力する",
       "manualInputLabel": "手動追加",
-      "manualInputPlaceholder": "URLまたはUUIDを入力",
+      "manualInputPlaceholder": "URLまたはQR IDを入力",
       "addButton": "追加",
       "invalidFormat": "形式が正しくありません。QRのURLまたはIDを正しく入力してください。",
       "successReport": "{count}件のギフトを紐付けました。",
@@ -195,6 +196,8 @@
     "created": "作成日: {date}"
   },
   "ShopPage": {
+    "frontView": "表面プレビュー",
+    "backView": "裏面プレビュー",
     "loading": "ショップの管理画面を読み込み中...",
     "title": "-",
     "movetoshops": "戻る",
@@ -214,13 +217,21 @@
     },
     "cardOrder": {
       "title": "カードの発注",
+      "errors": {
+        "tooManyCards": "発注枚数は100枚までに制限されています。"
+      },
       "subtitle": "カード（QR付きカード）の発注を行います。",
       "selectProduct": "カードデザイン（商品）を選択",
       "selectProductDesc": "発注するカードのデザインを選択してください。",
       "quantity": "発注枚数",
+      "quantitydescription": "10枚単位(10〜100枚)で発注できます。",
       "placeOrder": "この内容で発注する",
       "confirmTitle": "発注の最終確認",
-      "confirmDesc": "{product} を {quantity} 枚発注します。よろしいですか？",
+      "confirmDesc": "{product} 用のカードを以下のデザインで {quantity} 枚発注します。よろしいですか？",
+      "link": "専用に設定",
+      "product": "商品",
+      "card front": "カード表面デザイン",
+      "card back": "カード裏面デザイン",
       "historyTitle": "発注履歴",
       "noOrders": "発注履歴はありません。",
       "cancel": "キャンセル",
@@ -249,7 +260,7 @@
       "preferredDateTime": "希望日時",
       "status": "ステータス",
       "action": "発送処理",
-      "uuid": "ID",
+      "qrId": "ID",
       "productName": "商品名",
       "noOrders": "注文はまだありません",
       "ship": "発送する",
@@ -324,7 +335,7 @@
       "title": "カード有効化",
       "cardDesign": "カードデザイン",
       "description": "会計後，カードと商品を紐付けし，使えるようにします。",
-      "uuidLabel": "QRコード",
+      "qrIdLabel": "QRコード",
       "placeholder": "QRコード手動入力? 123e4567-...",
       "productName": "商品名",
       "scan": "QRコードをスキャン",
@@ -496,6 +507,7 @@
     },
     "errors": {
       "invalidPin": "PINが無効か、ギフトが見つかりません",
+      "loadFailed": "メッセージまたはユーザーデータの読み込みに失敗しました。",
       "inactive": "このカードは有効ではありません。",
       "submitFailed": "住所の送信に失敗しました。",
       "passwordMismatch": "パスワードが一致しません",
@@ -642,6 +654,7 @@
     }
   },
   "AdminPage": {
+    "verifyingAdmin": "管理者権限をチェック中...",
     "title": "管理ダッシュボード",
     "qrAdminLoginPage": "ログイン画面",
     "helpButton": "ヘルプ",
@@ -660,8 +673,8 @@
       "quantity": "生成数 (<100)",
       "shopId": "ショップID (任意, そのショップに限定)",
       "productId": "商品ID (任意, その商品に限定)",
-      "ownerUuid": "ユーザーID (任意, そのユーザーが閲覧できるショップに限定(/shopに存在する店))",
-      "senderId": "送り主ID (任意, USER#[uuid]形式, 指定するとその送り主情報が紐付きます)",
+      "ownerUserId": "ユーザーID (任意, そのユーザーが閲覧できるショップに限定(/shopに存在する店))",
+      "senderId": "送り主ID (任意, USER#[userId]形式, 指定するとその送り主情報が紐付きます)",
       "expiryDate": "使用期限 (任意, 指定しない場合は有効化した日付 + 商品ごとの有効期間 を足した日時)",
       "activateNow": "この場でアクティベートする (任意、ショップIDと商品IDの両方の指定が必要)",
       "useMetadata": "オプション情報を使用する",
@@ -688,7 +701,7 @@
       "downloadCsv": "印刷用画像(カードプリンタ等)",
       "downloading": "ダウンロード準備中...",
       "table": {
-        "uuid": "UUID",
+        "qrId": "UUID",
         "pin": "PIN"
       },
       "alerts": {
@@ -720,7 +733,8 @@
       },
       "info": "ステータス: {status} • 件数: {count}  (最大最新50件まで)",
       "table": {
-        "uuid": "UUID",
+        "qrId": "UUID",
+        "qrIdLabel": "UUID",
         "pin": "PIN",
         "status": "ステータス",
         "createdAt": "更新日時",
@@ -750,7 +764,7 @@
         "error": "削除中にエラーが発生しました"
       },
       "keyword": {
-        "placeholder": "UUIDで検索 (8文字以上)",
+        "placeholder": "QR IDで検索 (8文字以上)",
         "tooShort": "キーワードは8文字以上で入力してください。"
       },
       "raw": "生データ",
@@ -844,6 +858,7 @@
         "shop": "ショップ",
         "product": "商品",
         "quantity": "数量",
+        "actions": "操作",
         "status": "状態",
         "date": "注文日時",
         "dateupdated": "更新日時"

@@ -28,11 +28,11 @@ const ddb = DynamoDBDocumentClient.from(client, {
 
 export const handler = async (event: APIGatewayRequestAuthorizerEvent): Promise<APIGatewayAuthorizerResult> => {
     try {
-        const uuid = event.headers?.['x-qr-uuid'] || event.headers?.['X-QR-UUID'];
+        const qr_id = event.headers?.['x-qr-id'] || event.headers?.['X-QR-ID'] || event.headers?.['x-qr-uuid'] || event.headers?.['X-QR-UUID'];
         const pin = event.headers?.['x-qr-pin'] || event.headers?.['X-QR-PIN'];
 
-        if (!uuid || !pin) {
-            console.log('Missing UUID or PIN in headers');
+        if (!qr_id || !pin) {
+            console.log('Missing QR ID or PIN in headers');
             return generatePolicy('unidentified-receiver', 'Deny', event.methodArn);
         }
 
@@ -53,14 +53,14 @@ export const handler = async (event: APIGatewayRequestAuthorizerEvent): Promise<
         const getRes = await ddb.send(new GetCommand({
             TableName: TABLE_NAME,
             Key: {
-                PK: `QR#${uuid}`,
+                PK: `QR#${qr_id}`,
                 SK: 'METADATA'
             }
         }));
 
         if (!getRes.Item) {
-            console.log(`QR not found: ${uuid}`);
-            return generatePolicy(`receiver-${uuid}`, 'Deny', event.methodArn);
+            console.log(`QR not found: ${qr_id}`);
+            return generatePolicy(`receiver-${qr_id}`, 'Deny', event.methodArn);
         }
 
         const item = getRes.Item;
@@ -71,25 +71,25 @@ export const handler = async (event: APIGatewayRequestAuthorizerEvent): Promise<
 
             // 2. Lockチェック
             if (isLocked(item)) {
-                console.log(`QR is locked: ${uuid}`);
-                return generatePolicy(`receiver-${uuid}`, 'Deny', event.methodArn, { locked: 'true' });
+                console.log(`QR is locked: ${qr_id}`);
+                return generatePolicy(`receiver-${qr_id}`, 'Deny', event.methodArn, { locked: 'true' });
             }
 
             // 2. PIN検証
             if (String(item.pin) !== String(pin)) {
-                console.log(`Invalid PIN for QR: ${uuid}`);
+                console.log(`Invalid PIN for QR: ${qr_id}`);
 
                 // 失敗回数のカウントアップ (Side Effect)
                 const { UpdateExpression, ExpressionAttributeValues, ExpressionAttributeNames } = getRateLimitUpdate(item);
                 await ddb.send(new UpdateCommand({
                     TableName: TABLE_NAME,
-                    Key: { PK: `QR#${uuid}`, SK: 'METADATA' },
+                    Key: { PK: `QR#${qr_id}`, SK: 'METADATA' },
                     UpdateExpression,
                     ExpressionAttributeValues,
                     ExpressionAttributeNames
                 }));
 
-                return generatePolicy(`receiver-${uuid}`, 'Deny', event.methodArn);
+                return generatePolicy(`receiver-${qr_id}`, 'Deny', event.methodArn);
             }
 
             // 3. 成功時：失敗回数のリセット (もしあれば)
@@ -98,7 +98,7 @@ export const handler = async (event: APIGatewayRequestAuthorizerEvent): Promise<
                 try {
                     await ddb.send(new UpdateCommand({
                         TableName: TABLE_NAME,
-                        Key: { PK: `QR#${uuid}`, SK: 'METADATA' },
+                        Key: { PK: `QR#${qr_id}`, SK: 'METADATA' },
                         UpdateExpression,
                         ExpressionAttributeNames
                     }));
@@ -119,7 +119,7 @@ export const handler = async (event: APIGatewayRequestAuthorizerEvent): Promise<
 
             if (!allowedPaths.includes(path)) {
                 console.log(`PROMOTION status restricted access to: ${path}`);
-                return generatePolicy(`receiver-${uuid}`, 'Deny', event.methodArn);
+                return generatePolicy(`receiver-${qr_id}`, 'Deny', event.methodArn);
             }
         }
 
@@ -139,8 +139,8 @@ export const handler = async (event: APIGatewayRequestAuthorizerEvent): Promise<
             policyResource = `${stageArn}/*/receive/*`;
         }
 
-        return generatePolicy(`receiver-${uuid}`, 'Allow', policyResource, {
-            uuid: String(uuid),
+        return generatePolicy(`receiver-${qr_id}`, 'Allow', policyResource, {
+            qr_id: String(qr_id),
             pin: String(pin),
             status: String(item.status),
             shopId: item.shop_id ? String(item.shop_id) : '',

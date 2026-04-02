@@ -21,6 +21,20 @@ const nextConfig: NextConfig = {
     ],
   },
   serverExternalPackages: ['jspdf', 'sharp'],
+  async redirects() {
+    return [
+      {
+        source: '/share',
+        destination: '/share/you-will-love-it?shop&product&card',
+        permanent: true,
+      },
+      {
+        source: '/receive',
+        destination: '/receive/you-will-love-it',
+        permanent: true,
+      },
+    ];
+  },
 };
 
 export default withNextIntl(nextConfig);

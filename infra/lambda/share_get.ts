@@ -1,11 +1,11 @@
 /**
  * 概要: シェア用公開情報の取得
  * 詳細: 
- *  - PIN認証なしで、UUIDに関連付けられた公開可能なギフト情報（商品、ショップ、デザイン）を取得します。
+ *  - PIN認証なしで、QR IDに関連付けられた公開可能なギフト情報（商品、ショップ、デザイン）を取得します。
  *  - 被贈答者の個人情報や、贈り主(Sender)の氏名・プロフィール・メッセージ等は一切含みません。
  *  - ギフトがBANNED（利用停止）状態の場合はエラーを返します。
  *
- * エンドポイント: GET /share/{uuid}
+ * エンドポイント: GET /share/{qr_id}
  */
 import { APIGatewayProxyHandler } from 'aws-lambda';
 import { GetCommand, BatchGetCommand } from '@aws-sdk/lib-dynamodb';
@@ -13,19 +13,20 @@ import { signUrlIfS3, signUrlsInHtml } from './utils/s3';
 import { getSystemDesign } from './utils/designs';
 import { successResponse, errorResponse } from './utils/response';
 import { ddb, TABLE_NAME, BUCKET_NAME } from './share/db';
-import { getUUID } from './utils/request';
+import { getQrId } from './utils/request';
+import { PublicApiSchema } from '@shared/api-types';
 
 export const handler: APIGatewayProxyHandler = async (event) => {
     try {
         if (event.httpMethod === 'OPTIONS') return successResponse();
         
-        const uuid = getUUID(event);
-        if (!uuid) return errorResponse(400, 'Missing uuid');
+        const qr_id = getQrId(event);
+        if (!qr_id) return errorResponse(400, 'Missing qr_id');
 
         // 【フェーズ 1: ギフトの基本ステータス確認】
         const qrRes = await ddb.send(new GetCommand({
             TableName: TABLE_NAME,
-            Key: { PK: `QR#${uuid}`, SK: 'METADATA' }
+            Key: { PK: `QR#${qr_id}`, SK: 'METADATA' }
         }));
 
         if (!qrRes.Item) return errorResponse(404, 'Gift Not Found');
@@ -66,7 +67,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         // 【フェーズ 3: レスポンスの構築】
         // セキュリティのため、公開して良い項目のみを厳選して返却
         const result = {
-            uuid,
+            qr_id,
             status: item.status,
             shop: shop ? {
                 name: shop.name || 'Unknown Shop',

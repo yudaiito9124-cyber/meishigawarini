@@ -9,24 +9,25 @@
 import { APIGatewayProxyHandler } from 'aws-lambda';
 import { UpdateCommand, GetCommand } from '@aws-sdk/lib-dynamodb';
 import { sendSystemNotification } from './utils/notification';
-import { getUUID, getPIN } from './utils/request';
+import { getQrId, getPIN } from './utils/request';
 import { successResponse, errorResponse } from './utils/response';
 import { ddb, TABLE_NAME } from './share/db';
+import { ReceiveApiSchema } from '@shared/api-types';
 
 export const handler: APIGatewayProxyHandler = async (event) => {
     try {
         if (event.httpMethod === 'OPTIONS') return successResponse();
 
-        const body = JSON.parse(event.body || '{}');
-        const uuid = getUUID(event, body);
+        const body = JSON.parse(event.body || '{}') as ReceiveApiSchema['receive_completed'];
+        const qr_id = getQrId(event, body);
         const pin = getPIN(event, body);
         
-        if (!uuid || !pin) return errorResponse(400, 'Missing uuid or pin');
+        if (!qr_id || !pin) return errorResponse(400, 'Missing qr_id or pin');
 
         // 【DB操作: GetItem】
         // 理由: QRコードのメタデータを取得し、PINの一致とステータスを検証。
         const qrRes = await ddb.send(new GetCommand({
-            TableName: TABLE_NAME, Key: { PK: `QR#${uuid}`, SK: 'METADATA' }
+            TableName: TABLE_NAME, Key: { PK: `QR#${qr_id}`, SK: 'METADATA' }
         }));
 
         if (!qrRes.Item || String(qrRes.Item.pin) !== String(pin)) {
@@ -47,7 +48,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         // 理由: statusをCOMPLETEDに変更し、完了日時を記録。
         await ddb.send(new UpdateCommand({
             TableName: TABLE_NAME,
-            Key: { PK: `QR#${uuid}`, SK: 'METADATA' },
+            Key: { PK: `QR#${qr_id}`, SK: 'METADATA' },
             UpdateExpression: 'SET #status = :completed, GSI1_PK = :gsi_pk, ts_completed_at = :now, ts_updated_at = :now',
             ConditionExpression: '#status = :shipped', // 二重操作防止
             ExpressionAttributeNames: { '#status': 'status' },
@@ -57,14 +58,14 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         // 【事後処理: システム通知】
         // 理由: 送り主・受け取り人の双方に受取完了を通知し、チャット履歴にシステムメッセージを残します。
         try {
-            await sendSystemNotification(uuid, 'DeliveryCompleted', pin);
+            await sendSystemNotification(qr_id, 'DeliveryCompleted', pin);
         } catch (e) {
             console.error('Notification failed', e);
         }
 
         return successResponse({ 
             message: 'Gift marked as completed',
-            order_id: `ORDER#${uuid}` 
+            order_id: `ORDER#${qr_id}` 
         });
 
     } catch (error: any) {

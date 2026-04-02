@@ -2,6 +2,6 @@ export const body = `
 {{message}}
 ----------------------------------
 確認はこちら:
-{{baseUrl}}/receive/{{uuid}}
+{{baseUrl}}/receive/{{qr_id}}
 PIN: {{pin}}
 `.trim();

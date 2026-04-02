@@ -11,6 +11,7 @@ import { QueryCommand, UpdateCommand, BatchGetCommand } from '@aws-sdk/lib-dynam
 import { successResponse, errorResponse } from './utils/response';
 import { ddb, TABLE_NAME } from './share/db';
 import { getAction } from './utils/request';
+import { AdminApiSchema } from '@shared/api-types';
 
 export const handler: APIGatewayProxyHandler = async (event) => {
     try {
@@ -26,8 +27,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         // 目的: 管理者向けに特定ステータスの注文を全件取得し、詳細情報をマージします。
         // ====================================================================
         if (action === 'list') {
-            const status = body.status || 'ORDERED';
-            const limit = Number(body.limit) || 50;
+            const { status = 'ORDERED', limit = 50 } = body as AdminApiSchema['admin_card_orders_list'];
 
             // ステータスに応じたGSI1検索 (最新順)
             const result = await ddb.send(new QueryCommand({
@@ -104,8 +104,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         // 目的: 管理者が発注のステータス（SHIPPED, COMPLETED 等）を更新します。
         // ====================================================================
         if (action === 'update') {
-            const shop_id = body.shop_id || body.shopId;
-            const { order_id, status } = body;
+            const { shop_id, order_id, status } = body as AdminApiSchema['admin_card_orders_update'];
             if (!shop_id || !order_id || !status) return errorResponse(400, 'Missing shop_id, order_id, or status');
 
             await ddb.send(new UpdateCommand({

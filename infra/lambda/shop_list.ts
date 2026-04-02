@@ -12,6 +12,7 @@ import { generateId } from './utils/id';
 import { successResponse, errorResponse } from './utils/response';
 import { ddb, TABLE_NAME } from './share/db';
 import { getUserId } from './utils/request';
+import { ShopApiSchema } from '@shared/api-types';
 
 export const handler: APIGatewayProxyHandler = async (event) => {
     try {
@@ -20,8 +21,8 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         const userId = getUserId(event);
         if (!userId) return errorResponse(401, 'Unauthorized');
 
-        const body = JSON.parse(event.body || '{}');
-        const noCreate = body.noCreate === true;
+        const body = JSON.parse(event.body || '{}') as ShopApiSchema['shop_list'];
+        const noCreate = body.no_create === true;
 
         // 【DB操作: GetItem】
         // 理由: ユーザーの所属ショップIDリスト(owner_shop_ids, gm_shop_ids)を直接取得。

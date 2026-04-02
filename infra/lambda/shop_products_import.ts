@@ -14,6 +14,7 @@ import { checkShopOwnerOrGM } from './share/shop-auth';
 import { successResponse, errorResponse, apiResponse } from './utils/response';
 import { ddb, TABLE_NAME, BUCKET_NAME } from './share/db';
 import { getShopId, getUserId, getAction } from './utils/request';
+import { ShopApiSchema } from '@shared/api-types';
 import { generateId } from './utils/id';
 
 const s3 = new S3Client({});
@@ -79,7 +80,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         // 目的: 指定されたショップから商品をコピーし、画像アセットも実体コピーします。
         // ====================================================================
         if (action === 'execute_import') {
-            const { source_shop_id, product_ids } = body;
+            const { source_shop_id, product_ids } = body as ShopApiSchema['shop_products_import_execute'];
             if (!source_shop_id) return errorResponse(400, 'Missing source_shop_id');
 
             // インポート元ショップの権限も念のため確認 (確認フェーズ)

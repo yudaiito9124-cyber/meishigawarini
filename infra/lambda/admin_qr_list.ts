@@ -14,6 +14,7 @@ import { getSystemDesign } from './utils/designs';
 import { checkAndExpire } from './utils/expiration';
 import { successResponse, errorResponse } from './utils/response';
 import { ddb, TABLE_NAME, BUCKET_NAME, USER_POOL_ID } from './share/db';
+import { AdminApiSchema } from '@shared/api-types';
 
 const cognito = new CognitoIdentityProviderClient({});
 const INDEX_NAME = 'GSI1';
@@ -23,7 +24,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         if (event.httpMethod === 'OPTIONS') return successResponse();
         if (event.httpMethod !== 'POST') return errorResponse(405, 'Method Not Allowed');
 
-        const body = JSON.parse(event.body || '{}');
+        const body = JSON.parse(event.body || '{}') as AdminApiSchema['admin_qr_list'];
         const status = body.status || 'UNASSIGNED';
         const limit = Number(body.limit) || 50;
         const keyword = (body.keyword || '').trim();
@@ -96,7 +97,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             }
         }
 
-        // 2. 配送・注文情報のEnrichment (BatchGet, PK=QR#{uuid}, SK=ORDER)
+        // 2. 配送・注文情報のEnrichment (BatchGet, PK=QR#{qr_id}, SK=ORDER)
         const orderKeys = items.filter((i: any) => i.status !== 'UNASSIGNED').map((i: any) => ({ PK: i.PK, SK: 'ORDER' }));
         if (orderKeys.length > 0) {
             const batchRes = await ddb.send(new BatchGetCommand({ RequestItems: { [TABLE_NAME]: { Keys: orderKeys } } }));
@@ -117,10 +118,10 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 
         // 全項目のマージおよび遅延評価(期限切れチェック)
         const enrichedItems = await Promise.all(items.map(async (item: any) => {
-            const uuid = item.PK.replace('QR#', '');
+            const qr_id = item.PK.replace('QR#', '');
             
             // 【確認フェーズ: 期限切れチェック (遅延評価)】
-            const currentStatus = await checkAndExpire(ddb, TABLE_NAME, uuid, item);
+            const currentStatus = await checkAndExpire(ddb, TABLE_NAME, qr_id, item);
             
             const shop = item.shop_id ? shopMap.get(item.shop_id) : null;
             const order = orderMap.get(item.PK);

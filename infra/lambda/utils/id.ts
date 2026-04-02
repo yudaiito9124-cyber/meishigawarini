@@ -1,15 +1,14 @@
 import * as crypto from 'crypto';
 
 /**
- * Generates a unified ID starting with YYYYMMDDHHMMSS followed by a UUID.
+ * Generates a unified ID starting with YYYYMMDDHHMMSS followed by a random UUID.
  * The timestamp is in UTC.
  */
 export function generateId(): string {
-    const now = new Date();
-
     const pad = (n: number) => n.toString().padStart(2, '0');
 
     // Using UTC to ensure consistency across different environments/regions
+    const now = new Date();
     const y = now.getUTCFullYear();
     const m = pad(now.getUTCMonth() + 1);
     const d = pad(now.getUTCDate());
@@ -21,7 +20,7 @@ export function generateId(): string {
         .map(() => String.fromCharCode(Math.floor(Math.random() * 26) + 97))
         .join('')
     const timestamp = `${y}${m}${d}${h}${min}${s}${randomStr}`;
-    const uuid = crypto.randomUUID();
+    const random_uuid = crypto.randomUUID();
 
-    return `${timestamp}-${uuid}`;
+    return `${timestamp}-${random_uuid}`;
 }

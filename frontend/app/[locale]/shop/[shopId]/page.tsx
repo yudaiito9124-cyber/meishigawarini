@@ -5,7 +5,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { RefreshCw, ArrowRight, HelpCircle, Camera, Settings, ShoppingBasket, Eye, Plus, Trash2, Copy, ImageIcon, Save, Loader2, Pencil, ChevronDown, Download, Check, QrCode, Package, Truck, CreditCard, Gift, LogOut } from 'lucide-react';
+import { RefreshCw, ArrowRight, HelpCircle, Camera, Settings, ShoppingBasket, Eye, Plus, Trash2, Copy, ImageIcon, Save, Loader2, Pencil, ChevronDown, Download, Check, QrCode, Package, Truck, CreditCard, Gift, LogOut, ArrowBigDownDash } from 'lucide-react';
 import { notFound, useParams } from 'next/navigation';
 import { useRouter } from '@/i18n/routing';
 import { useTranslations } from 'next-intl';
@@ -60,14 +60,14 @@ export default function ShopPage() {
     const shopDetailRef = useRef<HTMLTextAreaElement>(null);
     const [isLinking, setIsLinking] = useState(false);
     const [isScanning, setIsScanning] = useState(false);
-    const [scannedUuid, setScannedUuid] = useState('');
+    const [scannedQrId, setScannedQrId] = useState('');
     const [qrStatusDetails, setQrStatusDetails] = useState<any>(null);
     const [showOptions, setShowOptions] = useState(false);
     const [isContinuousScan, setIsContinuousScan] = useState(false);
-    const [scannedUuids, setScannedUuids] = useState<{ uuid: string, status?: any, error?: string }[]>([]);
+    const [scannedQrIds, setScannedQrIds] = useState<{ qr_id: string, status?: any, error?: string }[]>([]);
     const lastScannedTimeRef = useRef<Record<string, number>>({});
 
-    const [searchUuid, setSearchUuid] = useState('');
+    const [searchQrId, setSearchQrId] = useState('');
     const [orderStatusFilter, setOrderStatusFilter] = useState<string>('ALL');
     const [orderProductFilter, setOrderProductFilter] = useState<string | null>(null);
     const [shippingOrderId, setShippingOrderId] = useState<string | null>(null);
@@ -339,26 +339,26 @@ export default function ShopPage() {
                 content_type: 'image/webp',
                 folder: 'shopcontent'
             });
-            
+
             const uploadUrl = resData.uploadUrl;
             const publicUrl = resData.publicUrl || resData.fileUrl; // Handle both for compatibility
             const viewUrl = resData.viewUrl || publicUrl; // Use signed URL for immediate preview
 
-                const res = await fetch(uploadUrl, {
-                    method: 'PUT',
-                    body: uploadFile,
-                    headers: { 'Content-Type': 'image/webp' }
-                });
+            const res = await fetch(uploadUrl, {
+                method: 'PUT',
+                body: uploadFile,
+                headers: { 'Content-Type': 'image/webp' }
+            });
 
-                if (!res.ok) {
-                    const errorText = await res.text();
-                    console.error('S3 Upload Error Details:', errorText);
-                    throw new Error('Failed to upload image (' + res.status + ')');
-                }
+            if (!res.ok) {
+                const errorText = await res.text();
+                console.error('S3 Upload Error Details:', errorText);
+                throw new Error('Failed to upload image (' + res.status + ')');
+            }
 
-                // 3. Update State
-                setHtmlImageUrls(prev => [...prev, viewUrl]);
-                setSessionUploadedUrls(prev => [...prev, publicUrl]);
+            // 3. Update State
+            setHtmlImageUrls(prev => [...prev, viewUrl]);
+            setSessionUploadedUrls(prev => [...prev, publicUrl]);
         } catch (err: any) {
             console.error('HTML Image upload failed:', err);
             alert(t('addProduct.imageUploadFailed') + ': ' + (tb(err.message.replace(/\./g, '_')) || err.message));
@@ -408,7 +408,7 @@ export default function ShopPage() {
                     filename: `${generateId()}.webp`,
                     content_type: 'image/webp'
                 });
-                
+
                 const uploadUrl = resData.uploadUrl;
                 const publicUrl = resData.publicUrl || resData.fileUrl; // Handle both for compatibility
                 const viewUrl = resData.viewUrl || publicUrl; // Use signed URL for immediate preview
@@ -499,26 +499,26 @@ export default function ShopPage() {
         const memo_for_users = formData.get('memo_for_users') as string;
         const memo_for_shop = formData.get('memo_for_shop') as string;
 
-        // Process all non-error UUIDs.
-        const itemsToProcess = scannedUuids.filter(item => !item.error);
+        // Process all non-error IDs.
+        const itemsToProcess = scannedQrIds.filter(item => !item.error);
 
         let successCount = 0;
         let errors: string[] = [];
 
         try {
             for (const item of itemsToProcess) {
-                const uuid = item.uuid;
+                const qr_id = item.qr_id;
                 const finalProductId = (item.status?.product_linked)
                     ? item.status.product_id
                     : productId;
 
                 if (!finalProductId) {
-                    errors.push(`${uuid}: ${t('linkQr.selectPlaceholder')}`);
+                    errors.push(`${qr_id}: ${t('linkQr.selectPlaceholder')}`);
                     continue;
                 }
 
                 const body: any = {
-                    qr_id: uuid,
+                    qr_id: qr_id,
                     product_id: finalProductId,
                     activate_now: true,
                 };
@@ -529,7 +529,7 @@ export default function ShopPage() {
                 try {
                     await shopApi.shop_qr_link({
                         shop_id: shopId as string,
-                        uuid: uuid,
+                        qr_id: qr_id,
                         product_id: finalProductId,
                         activate_now: true,
                         memo_for_users: memo_for_users,
@@ -537,7 +537,7 @@ export default function ShopPage() {
                     });
                     successCount++;
                 } catch (err: any) {
-                    errors.push(`${uuid}: ${err.message || 'Failed to link'}`);
+                    errors.push(`${qr_id}: ${err.message || 'Failed to link'}`);
                 }
             }
 
@@ -549,8 +549,8 @@ export default function ShopPage() {
 
             if (successCount > 0) {
                 form.reset();
-                setScannedUuid('');
-                setScannedUuids([]);
+                setScannedQrId('');
+                setScannedQrIds([]);
                 setIsContinuousScan(false);
                 setQrStatusDetails(null);
                 setShowOptions(false);
@@ -558,8 +558,8 @@ export default function ShopPage() {
             }
         } catch (err: any) {
             alert(t('linkQr.error') + ": " + (tb(err.message.replace(/\./g, '_')) || err.message));
-            setScannedUuid('');
-            setScannedUuids([]);
+            setScannedQrId('');
+            setScannedQrIds([]);
         } finally {
             setIsLinking(false);
         }
@@ -598,12 +598,12 @@ export default function ShopPage() {
         }
     };
 
-    const handleUpdateOrderMeta = async (qrId: string, deliveryCompany?: string, trackingNumber?: string, memoForUsers?: string, memoForShop?: string) => {
-        setShippingOrderId(qrId);
+    const handleUpdateOrderMeta = async (qr_id: string, deliveryCompany?: string, trackingNumber?: string, memoForUsers?: string, memoForShop?: string) => {
+        setShippingOrderId(qr_id);
         try {
             await shopApi.shop_orders_update({
                 shop_id: shopId!,
-                uuid: qrId,
+                qr_id: qr_id,
                 delivery_company: deliveryCompany,
                 tracking_number: trackingNumber,
                 memo_for_users: memoForUsers,
@@ -620,6 +620,10 @@ export default function ShopPage() {
 
     const handleCreateCardOrder = async () => {
         if (!selectedOrderProduct || isCreatingCardOrder) return;
+        if (orderQuantity > 100) {
+            alert(t('cardOrder.errors.tooManyCards') || 'Quantity must be 100 or less');
+            return;
+        }
         setIsCreatingCardOrder(true);
         try {
             await shopApi.shop_card_orders_create({
@@ -668,7 +672,7 @@ export default function ShopPage() {
         try {
             const data = await shopApi.shop_products_import_execute({
                 shop_id: shopId!,
-                import_shop_id: selectedImportShopId.replace('SHOP#', '')
+                source_shop_id: selectedImportShopId.replace('SHOP#', '')
             });
 
             if (true) {
@@ -724,71 +728,71 @@ export default function ShopPage() {
     const [isManualInput, setisManualInput] = useState(false);
     const [manualInput, setManualInput] = useState('');
 
-    const checkQrStatus = async (uuid: string) => {
+    const checkQrStatus = async (qr_id: string) => {
         setQrStatusDetails(null);
         try {
             const data = await shopApi.shop_qrcodecheck({
                 shop_id: shopId as string,
-                uuid: uuid
+                qr_id: qr_id
             });
-            setScannedUuid(uuid);
+            setScannedQrId(qr_id);
             setQrStatusDetails(data);
-            setScannedUuids([{ uuid, status: data }]);
+            setScannedQrIds([{ qr_id, status: data }]);
         } catch (error: any) {
             const translatedError = error.message ? tb(error.message.replace(/\./g, '_')) : t('linkQr.foreignQrError');
-            setScannedUuids([{ uuid, error: translatedError }]);
+            setScannedQrIds([{ qr_id, error: translatedError }]);
             alert(translatedError + (error.detail ? ` (${error.detail})` : ''));
-            setScannedUuid('');
+            setScannedQrId('');
         } finally {
             setIsScanning(false);
         }
     };
 
     const handleScanSuccess = async (decodedText: string) => {
-        let uuid = decodedText;
+        let qr_id = decodedText;
         if (decodedText.includes('/')) {
-            uuid = decodedText.split('/').pop() || decodedText;
+            qr_id = decodedText.split('/').pop() || decodedText;
         }
 
         const now = Date.now();
-        const lastScanTime = lastScannedTimeRef.current[uuid] || 0;
+        const lastScanTime = lastScannedTimeRef.current[qr_id] || 0;
         if (now - lastScanTime < 2000) {
             return;
         }
-        lastScannedTimeRef.current[uuid] = now;
+        lastScannedTimeRef.current[qr_id] = now;
 
         // Skip if already in list (for continuous scan)
-        if (scannedUuids.some(item => item.uuid === uuid)) {
+        if (scannedQrIds.some(item => item.qr_id === qr_id)) {
             return;
         }
 
         if (isContinuousScan) {
-            setScannedUuids(prev => [...prev, { uuid }]);
+            setScannedQrIds(prev => [...prev, { qr_id }]);
 
             // Status check for sequential scan
             try {
                 const data = await shopApi.shop_qrcodecheck({
                     shop_id: shopId as string,
-                    uuid: uuid
+                    qr_id: qr_id
                 });
-                setScannedUuids(prev => prev.map(item =>
-                    item.uuid === uuid ? { ...item, status: data } : item
+                setScannedQrIds(prev => prev.map(item =>
+                    item.qr_id === qr_id ? { ...item, status: data } : item
                 ));
             } catch (err: any) {
                 const translatedError = err.message ? tb(err.message.replace(/\./g, '_')) : t('linkQr.foreignQrError');
                 // In continuous mode, don't stop scanning - just record error in the list
-                setScannedUuids(prev => prev.map(item =>
-                    item.uuid === uuid ? { ...item, error: translatedError + (err.detail ? ` (${err.detail})` : '') } : item
+                setScannedQrIds(prev => prev.map(item =>
+                    item.qr_id === qr_id ? { ...item, error: translatedError + (err.detail ? ` (${err.detail})` : '') } : item
                 ));
             }
             return;
         }
 
         // Single scan mode
-        setScannedUuids([{ uuid }]);
-        setScannedUuid(uuid);
+        setScannedQrIds([{ qr_id }]);
+        setScannedQrId(qr_id);
         setIsScanning(false);
-        checkQrStatus(uuid);
+        checkQrStatus(qr_id);
     };
 
     const handleScannerError = (err: any) => {
@@ -1159,6 +1163,8 @@ export default function ShopPage() {
 
 
 
+
+
                 {/* --- Wrapper for Activation --- */}
                 {activeTab === 'activation' && (
                     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
@@ -1177,14 +1183,14 @@ export default function ShopPage() {
                                 </CardHeader>
                                 <CardContent>
                                     <form onSubmit={handleLinkQr} className="space-y-4">
-                                        {!scannedUuid ? (
+                                        {!scannedQrId ? (
                                             <div className="flex flex-col gap-4">
                                                 <Dialog open={isScanning} onOpenChange={(open) => {
                                                     setIsScanning(open);
                                                     if (open) {
                                                         setManualInput('');
                                                         setQrStatusDetails(null);
-                                                        setScannedUuids([]);
+                                                        setScannedQrIds([]);
                                                     }
                                                 }}
                                                 >
@@ -1211,7 +1217,7 @@ export default function ShopPage() {
                                                                 <div className="flex flex-col">
                                                                     <Label htmlFor="continuous-scan" className="text-sm font-bold">{t('linkQr.continuousScan')}</Label>
                                                                     {isContinuousScan && (
-                                                                        <span className="text-[10px] text-blue-600 font-bold">{t('linkQr.scannedCount', { count: scannedUuids.length })}</span>
+                                                                        <span className="text-[10px] text-blue-600 font-bold">{t('linkQr.scannedCount', { count: scannedQrIds.length })}</span>
                                                                     )}
                                                                 </div>
                                                             </div>
@@ -1228,38 +1234,38 @@ export default function ShopPage() {
                                                                 />
                                                             </div>
                                                             <div className="flex flex-col gap-4">
-                                                                {isContinuousScan && scannedUuids.length > 0 && (
+                                                                {isContinuousScan && scannedQrIds.length > 0 && (
                                                                     <Button
                                                                         type="button"
                                                                         className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold"
                                                                         onClick={async () => {
-                                                                            const validItems = scannedUuids.filter(item => !item.error);
+                                                                            const validItems = scannedQrIds.filter(item => !item.error);
                                                                             if (validItems.length > 0) {
-                                                                                setScannedUuid(validItems.map(item => item.uuid).join('\n'));
+                                                                                setScannedQrId(validItems.map(item => item.qr_id).join('\n'));
                                                                                 setIsScanning(false);
                                                                             }
                                                                         }}
                                                                     >
-                                                                        {t('linkQr.finishScan')} ({scannedUuids.length})
+                                                                        {t('linkQr.finishScan')} ({scannedQrIds.length})
                                                                     </Button>
                                                                 )}
-                                                                {isContinuousScan && scannedUuids.length > 0 && (
+                                                                {isContinuousScan && scannedQrIds.length > 0 && (
                                                                     <div className="mt-2 border rounded-md bg-gray-50 max-h-[80vh] overflow-y-auto w-full overflow-x-hidden">
                                                                         <ul className="text-[10px] font-mono p-1 sm:p-2 space-y-1">
-                                                                            {scannedUuids.map((item, i) => (
-                                                                                <li key={item.uuid} className="border-b last:border-0 pb-1 last:pb-0 flex flex-col">
+                                                                            {scannedQrIds.map((item, i) => (
+                                                                                <li key={item.qr_id} className="border-b last:border-0 pb-1 last:pb-0 flex flex-col">
                                                                                     <div className="flex flex-col gap-1 py-1 w-full overflow-hidden">
                                                                                         <div className="flex items-center justify-between gap-1 w-full overflow-hidden">
                                                                                             <div className="flex items-center gap-1 min-w-0 flex-1 overflow-hidden">
-                                                                                                <span className="truncate opacity-70 text-[10px] leading-tight block w-0 flex-1">{i + 1}. {item.uuid}</span>
+                                                                                                <span className="truncate opacity-70 text-[10px] leading-tight block w-0 flex-1">{i + 1}. {item.qr_id}</span>
                                                                                                 <Button
                                                                                                     type="button"
                                                                                                     variant="ghost"
                                                                                                     size="icon"
                                                                                                     className="h-3.5 w-3.5 shrink-0 opacity-50 hover:opacity-100"
-                                                                                                    onClick={() => handleCopy(item.uuid)}
+                                                                                                    onClick={() => handleCopy(item.qr_id)}
                                                                                                 >
-                                                                                                    {copiedId === item.uuid ? (
+                                                                                                    {copiedId === item.qr_id ? (
                                                                                                         <Check className="h-2.5 w-2.5 text-green-500" />
                                                                                                     ) : (
                                                                                                         <Copy className="h-2.5 w-2.5" />
@@ -1288,11 +1294,11 @@ export default function ShopPage() {
                                                                         </ul>
                                                                     </div>
                                                                 )}
-                                                                {isManualInput && !(isContinuousScan && scannedUuids.length > 0) && (
+                                                                {isManualInput && !(isContinuousScan && scannedQrIds.length > 0) && (
                                                                     <div className="flex w-full flex-col sm:flex-row gap-3">
                                                                         <Input
-                                                                            id="uuid_manual"
-                                                                            name="uuid_manual"
+                                                                            id="qr_id_manual"
+                                                                            name="qr_id_manual"
                                                                             placeholder={t('linkQr.placeholder')}
                                                                             value={manualInput}
                                                                             onChange={(e) => setManualInput(e.target.value)}
@@ -1327,25 +1333,25 @@ export default function ShopPage() {
                                             <div className="space-y-6">
                                                 <div className="space-y-4">
                                                     {/* Linked Section */}
-                                                    {scannedUuids.filter(item => item.status?.product_linked).length > 0 && (
+                                                    {scannedQrIds.filter(item => item.status?.product_linked).length > 0 && (
                                                         <div className="space-y-2">
                                                             <Label className="text-sm font-bold text-gray-500 flex items-center gap-2">
                                                                 <div className="w-1 h-4 bg-amber-400 rounded-full" />
                                                                 {t('linkQr.linkedTitle')}
                                                             </Label>
                                                             <div className="bg-amber-50/50 rounded-lg border border-amber-100 divide-y divide-amber-100 max-h-[150px] overflow-y-auto">
-                                                                {scannedUuids.filter(item => item.status?.product_linked).map((item) => (
-                                                                    <div key={item.uuid} className="p-3 flex justify-between items-center bg-white/40">
+                                                                {scannedQrIds.filter(item => item.status?.product_linked).map((item) => (
+                                                                    <div key={item.qr_id} className="p-3 flex justify-between items-center bg-white/40">
                                                                         <div className="flex items-center gap-2">
-                                                                            <span className="font-mono text-xs">{item.uuid}</span>
+                                                                            <span className="font-mono text-xs">{item.qr_id}</span>
                                                                             <Button
                                                                                 type="button"
                                                                                 variant="ghost"
                                                                                 size="icon"
                                                                                 className="h-4 w-4"
-                                                                                onClick={(e) => { e.stopPropagation(); handleCopy(item.uuid); }}
+                                                                                onClick={(e) => { e.stopPropagation(); handleCopy(item.qr_id); }}
                                                                             >
-                                                                                {copiedId === item.uuid ? (
+                                                                                {copiedId === item.qr_id ? (
                                                                                     <Check className="h-3 w-3 text-green-500" />
                                                                                 ) : (
                                                                                     <Copy className="h-3 w-3" />
@@ -1362,24 +1368,24 @@ export default function ShopPage() {
                                                     )}
 
                                                     {/* Available Section */}
-                                                    {scannedUuids.filter(item => item.status && !item.status.product_linked).length > 0 && (
+                                                    {scannedQrIds.filter(item => item.status && !item.status.product_linked).length > 0 && (
                                                         <div className="space-y-2">
                                                             <Label className="text-sm font-bold text-blue-600 flex items-center gap-2">
                                                                 <div className="w-1 h-4 bg-blue-500 rounded-full" />
                                                                 {t('linkQr.availableTitle')}
                                                             </Label>
                                                             <div className="bg-blue-50/30 rounded-lg border border-blue-100 divide-y divide-blue-100 max-h-[150px] overflow-y-auto">
-                                                                {scannedUuids.filter(item => item.status && !item.status.product_linked).map((item) => (
-                                                                    <div key={item.uuid} className="p-3 bg-white/40 flex items-center gap-2">
-                                                                        <span className="font-mono text-xs">{item.uuid}</span>
+                                                                {scannedQrIds.filter(item => item.status && !item.status.product_linked).map((item) => (
+                                                                    <div key={item.qr_id} className="p-3 bg-white/40 flex items-center gap-2">
+                                                                        <span className="font-mono text-xs">{item.qr_id}</span>
                                                                         <Button
                                                                             type="button"
                                                                             variant="ghost"
                                                                             size="icon"
                                                                             className="h-4 w-4"
-                                                                            onClick={(e) => { e.stopPropagation(); handleCopy(item.uuid); }}
+                                                                            onClick={(e) => { e.stopPropagation(); handleCopy(item.qr_id); }}
                                                                         >
-                                                                            {copiedId === item.uuid ? (
+                                                                            {copiedId === item.qr_id ? (
                                                                                 <Check className="h-3 w-3 text-green-500" />
                                                                             ) : (
                                                                                 <Copy className="h-3 w-3" />
@@ -1395,12 +1401,12 @@ export default function ShopPage() {
                                                 {/* Unified Action Area */}
                                                 <div className="space-y-4 pt-4 border-t border-gray-100">
                                                     <div className="space-y-4 bg-gray-50 p-4 rounded-xl border-dashed border-2">
-                                                        {scannedUuids.some(item => item.status && !item.status.product_linked) && (
+                                                        {scannedQrIds.some(item => item.status && !item.status.product_linked) && (
                                                             <select
                                                                 id="product_id"
                                                                 name="product_id"
                                                                 className="flex h-12 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                                                                required={scannedUuids.some(item => item.status && !item.status.product_linked)}
+                                                                required={scannedQrIds.some(item => item.status && !item.status.product_linked)}
                                                                 defaultValue=""
                                                             >
                                                                 <option value="" disabled>{t('linkQr.selectPlaceholder')}</option>
@@ -1440,7 +1446,7 @@ export default function ShopPage() {
                                                     </div>
 
                                                     <div className="flex justify-center">
-                                                        <Button type="button" variant="ghost" size="sm" onClick={() => { setScannedUuid(''); setScannedUuids([]); setQrStatusDetails(null); setShowOptions(false); lastScannedTimeRef.current = {}; }} className="text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors">
+                                                        <Button type="button" variant="ghost" size="sm" onClick={() => { setScannedQrId(''); setScannedQrIds([]); setQrStatusDetails(null); setShowOptions(false); lastScannedTimeRef.current = {}; }} className="text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors">
                                                             {t('linkQr.clear')}
                                                         </Button>
                                                     </div>
@@ -1458,6 +1464,10 @@ export default function ShopPage() {
 
                     </div>
                 )}
+
+
+
+
 
                 {/* --- Wrapper for Shipping --- */}
                 {activeTab === 'shipping' && (
@@ -1551,17 +1561,17 @@ export default function ShopPage() {
                                     </div>
 
 
-                                    {/* filter by uuid */}
+                                    {/* filter by qr_id */}
                                     <div className="flex flex-col w-full space-y-2 md:flex-row md:items-center md:space-x-2 md:space-y-0 md:w-auto">
                                         <div className="flex w-full items-center space-x-2">
                                             <Input
                                                 placeholder={t('search.placeholder')}
-                                                value={searchUuid}
-                                                onChange={(e) => setSearchUuid(e.target.value)}
+                                                value={searchQrId}
+                                                onChange={(e) => setSearchQrId(e.target.value)}
                                                 className="w-full"
                                             />
-                                            {searchUuid && (
-                                                <Button variant="ghost" onClick={() => setSearchUuid('')} className="shrink-0">
+                                            {searchQrId && (
+                                                <Button variant="ghost" onClick={() => setSearchQrId('')} className="shrink-0">
                                                     {t('search.clear')}
                                                 </Button>
                                             )}
@@ -1586,14 +1596,14 @@ export default function ShopPage() {
                                         ) : orders
                                             .filter(o => orderStatusFilter === 'ALL' || o.status === orderStatusFilter)
                                             .filter(o => !orderProductFilter || o.product_id === orderProductFilter)
-                                            .filter(o => !searchUuid || (o.id || o.qr_id).includes(searchUuid))
+                                            .filter(o => !searchQrId || (o.id || o.qr_id).includes(searchQrId))
                                             .length === 0 ? (
                                             <TableRow><TableCell colSpan={4} className="text-center">{t('orders.noOrders')}</TableCell></TableRow>
                                         ) : (
                                             orders
                                                 .filter(o => orderStatusFilter === 'ALL' || o.status === orderStatusFilter)
                                                 .filter(o => !orderProductFilter || o.product_id === orderProductFilter)
-                                                .filter(o => !searchUuid || (o.id || o.qr_id).includes(searchUuid))
+                                                .filter(o => !searchQrId || (o.id || o.qr_id).includes(searchQrId))
                                                 .sort((a, b) => {
                                                     const sortorder: { [name: string]: number } = { 'LINKED': 3, 'ACTIVE': 2, 'USED': 4, 'SHIPPED': 1, 'COMPLETED': 0, "EXPIRED": -1, "BANNED": -2 };
                                                     // 1. Status: compare
@@ -1605,7 +1615,7 @@ export default function ShopPage() {
                                                 })
                                                 .map((order: any) => {
                                                     const product = products.find(p => p.product_id === order.product_id);
-                                                    const uuid = order.id || order.qr_id.replace('QR#', '');
+                                                    const qrId = order.id || order.qr_id.replace('QR#', '');
 
                                                     return (
                                                         <Dialog key={order.qr_id}>
@@ -1640,15 +1650,15 @@ export default function ShopPage() {
                                                                 <DialogHeader>
                                                                     <DialogTitle>{t('orders.details')}</DialogTitle>
                                                                     <DialogDescription className="font-mono text-xs text-gray-500 flex items-center gap-2">
-                                                                        ID: {uuid}
+                                                                        ID: {qrId}
                                                                         <Button
                                                                             type="button"
                                                                             variant="ghost"
                                                                             size="icon"
                                                                             className="h-6 w-6"
-                                                                            onClick={(e) => { e.stopPropagation(); handleCopy(uuid); }}
+                                                                            onClick={(e) => { e.stopPropagation(); handleCopy(qrId); }}
                                                                         >
-                                                                            {copiedId === uuid ? (
+                                                                            {copiedId === qrId ? (
                                                                                 <Check className="h-3 w-3 text-green-500" />
                                                                             ) : (
                                                                                 <Copy className="h-3 w-3" />
@@ -1747,22 +1757,22 @@ export default function ShopPage() {
                                                                                 e.preventDefault();
                                                                                 const fd = new FormData(e.target as HTMLFormElement);
                                                                                 handleUpdateOrderMeta(
-                                                                                    uuid,
+                                                                                    qrId,
                                                                                     fd.get('delivery_company') as string,
                                                                                     fd.get('tracking') as string
                                                                                 );
                                                                             }} className="space-y-4">
                                                                                 <div className="space-y-2">
-                                                                                    <Label htmlFor={`delivery_company-${uuid}`} className="text-orange-900/70">{t('orders.shipDialog.deliveryCompany')}</Label>
-                                                                                    <Input id={`delivery_company-${uuid}`} name="delivery_company" placeholder={t('orders.shipDialog.deliveryCompanyPlaceholder')} required className="bg-white border-orange-100 focus:border-orange-500 focus:ring-orange-500" />
+                                                                                    <Label htmlFor={`delivery_company-${qrId}`} className="text-orange-900/70">{t('orders.shipDialog.deliveryCompany')}</Label>
+                                                                                    <Input id={`delivery_company-${qrId}`} name="delivery_company" placeholder={t('orders.shipDialog.deliveryCompanyPlaceholder')} required className="bg-white border-orange-100 focus:border-orange-500 focus:ring-orange-500" />
                                                                                 </div>
                                                                                 <div className="space-y-2">
-                                                                                    <Label htmlFor={`tracking-${uuid}`} className="text-orange-900/70">{t('orders.shipDialog.label')}</Label>
-                                                                                    <Input id={`tracking-${uuid}`} name="tracking" placeholder="1234-5678..." required className="bg-white border-orange-100 focus:border-orange-500 focus:ring-orange-500" />
+                                                                                    <Label htmlFor={`tracking-${qrId}`} className="text-orange-900/70">{t('orders.shipDialog.label')}</Label>
+                                                                                    <Input id={`tracking-${qrId}`} name="tracking" placeholder="1234-5678..." required className="bg-white border-orange-100 focus:border-orange-500 focus:ring-orange-500" />
                                                                                 </div>
 
-                                                                                <Button type="submit" className="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold h-10 shadow-md transition-all active:scale-[0.98]" disabled={shippingOrderId === uuid}>
-                                                                                    {shippingOrderId === uuid ? (
+                                                                                <Button type="submit" className="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold h-10 shadow-md transition-all active:scale-[0.98]" disabled={shippingOrderId === qrId}>
+                                                                                    {shippingOrderId === qrId ? (
                                                                                         <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> {t('linkQr.processing')}</>
                                                                                     ) : (
                                                                                         t('orders.shipDialog.submit')
@@ -1783,7 +1793,7 @@ export default function ShopPage() {
                                                                             e.preventDefault();
                                                                             const fd = new FormData(e.currentTarget);
                                                                             await handleUpdateOrderMeta(
-                                                                                uuid,
+                                                                                qrId,
                                                                                 undefined,
                                                                                 undefined,
                                                                                 fd.get('memo_for_users') as string,
@@ -1792,9 +1802,9 @@ export default function ShopPage() {
                                                                         }} className="space-y-4">
 
                                                                             <div className="space-y-2">
-                                                                                <Label htmlFor={`m_u-${uuid}`} className="text-xs text-gray-500">{t('orders.userMessage')}</Label>
+                                                                                <Label htmlFor={`m_u-${qrId}`} className="text-xs text-gray-500">{t('orders.userMessage')}</Label>
                                                                                 <Textarea
-                                                                                    id={`m_u-${uuid}`}
+                                                                                    id={`m_u-${qrId}`}
                                                                                     name="memo_for_users"
                                                                                     defaultValue={order.memo_for_users || ""}
                                                                                     disabled={['COMPLETED', 'EXPIRED', 'BANNED'].includes(order.status)}
@@ -1804,9 +1814,9 @@ export default function ShopPage() {
                                                                             </div>
 
                                                                             <div className="space-y-2">
-                                                                                <Label htmlFor={`m_s-${uuid}`} className="text-xs text-gray-500">{t('orders.shopMemo')}</Label>
+                                                                                <Label htmlFor={`m_s-${qrId}`} className="text-xs text-gray-500">{t('orders.shopMemo')}</Label>
                                                                                 <Textarea
-                                                                                    id={`m_s-${uuid}`}
+                                                                                    id={`m_s-${qrId}`}
                                                                                     name="memo_for_shop"
                                                                                     defaultValue={order.memo_for_shop || ""}
                                                                                     className="text-sm min-h-[60px]"
@@ -1816,10 +1826,10 @@ export default function ShopPage() {
                                                                             <Button
                                                                                 type="submit"
                                                                                 className="w-full"
-                                                                                disabled={shippingOrderId === uuid}
+                                                                                disabled={shippingOrderId === qrId}
                                                                             >
-                                                                                {shippingOrderId === uuid ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}
-                                                                                {shippingOrderId === uuid ? t('orders.processing') : t('shopSettings.submit')}
+                                                                                {shippingOrderId === qrId ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}
+                                                                                {shippingOrderId === qrId ? t('orders.processing') : t('shopSettings.submit')}
                                                                             </Button>
                                                                         </form>
                                                                     </div>
@@ -1941,6 +1951,10 @@ export default function ShopPage() {
                         </Card>
                     </div>
                 )}
+
+
+
+
 
                 {/* --- Wrapper for Products --- */}
                 {activeTab === 'products' && (
@@ -2345,6 +2359,8 @@ export default function ShopPage() {
 
 
 
+
+
                 {/* --- Wrapper for Card Ordering --- */}
                 {activeTab === 'orderCard' && (
                     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
@@ -2448,7 +2464,7 @@ export default function ShopPage() {
                                                                 ) : (
                                                                     <div className="w-full h-full bg-gray-200 flex items-center justify-center"><ImageIcon className="w-12 h-12 text-gray-300" /></div>
                                                                 )}
-                                                                <div className="absolute top-3 left-3 px-3 py-1 bg-black/60 backdrop-blur-md text-[10px] font-black text-white rounded-full uppercase tracking-widest shadow-lg">Front View</div>
+                                                                <div className="absolute top-3 left-3 px-3 py-1 bg-black/60 backdrop-blur-md text-[10px] font-black text-white rounded-full uppercase tracking-widest shadow-lg">{t('frontView')}</div>
                                                             </div>
                                                         </div>
                                                         {/* Back */}
@@ -2463,7 +2479,7 @@ export default function ShopPage() {
                                                                 ) : (
                                                                     <div className="w-full h-full bg-gray-200 flex items-center justify-center"><ImageIcon className="w-12 h-12 text-gray-300" /></div>
                                                                 )}
-                                                                <div className="absolute top-3 left-3 px-3 py-1 bg-black/60 backdrop-blur-md text-[10px] font-black text-white rounded-full uppercase tracking-widest shadow-lg">Back View</div>
+                                                                <div className="absolute top-3 left-3 px-3 py-1 bg-black/60 backdrop-blur-md text-[10px] font-black text-white rounded-full uppercase tracking-widest shadow-lg">{t('backView')}</div>
                                                             </div>
                                                         </div>
                                                     </div>
@@ -2471,80 +2487,126 @@ export default function ShopPage() {
                                             </div>
                                         </div>
 
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-end">
+                                        <div className="grid grid-cols-1 gap-8 items-end">
                                             <div className="space-y-4">
-                                                <Label htmlFor="order-quantity" className="text-sm font-bold block">{t('cardOrder.quantity')}</Label>
+
+                                                <Label className="text-sm font-bold flex items-center gap-2">
+                                                    <div className="w-1 h-4 bg-primary rounded-full" />
+                                                    {t('cardOrder.quantity')}
+                                                </Label>
+                                                <div className="text-[10px] font-bold block text-gray-500">{t('cardOrder.quantitydescription')}</div>
                                                 <div className="flex items-center gap-4">
                                                     <Input
                                                         id="order-quantity"
                                                         type="number"
-                                                        min={100}
-                                                        step={100}
+                                                        min={10}
+                                                        max={100}
+                                                        step={10}
                                                         value={orderQuantity}
-                                                        onChange={(e) => setOrderQuantity(Number(e.target.value))}
+                                                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                                                            setOrderQuantity(Number(e.target.value));
+                                                        }}
+                                                        onBlur={(e: React.FocusEvent<HTMLInputElement>) => {
+                                                            let val = Number(e.target.value);
+                                                            val = Math.ceil(val / 10) * 10;
+                                                            if (val > 100) val = 100;
+                                                            if (val < 10) val = 10;
+                                                            setOrderQuantity(val);
+                                                        }}
+                                                        onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => {
+                                                            if (e.key === 'Enter') {
+                                                                (e.currentTarget as HTMLInputElement).blur();
+                                                            }
+                                                        }}
                                                         className="max-w-[200px] h-12 text-lg font-bold"
                                                     />
-                                                    <span className="text-gray-500 font-medium">枚</span>
+                                                    <span className="text-gray-500 font-medium">{tc('unitCard')}</span>
                                                 </div>
-                                            </div>
-                                            <Dialog open={isConfirmOrderDialogOpen} onOpenChange={setIsConfirmOrderDialogOpen}>
-                                                <DialogTrigger asChild>
-                                                    <Button className="h-12 px-8 text-lg font-bold shadow-xl hover:shadow-2xl transition-all active:scale-[0.98]">
-                                                        <ShoppingBasket className="w-5 h-5 mr-3" />
-                                                        {t('cardOrder.placeOrder')}
-                                                    </Button>
-                                                </DialogTrigger>
-                                                <DialogContent>
-                                                    <DialogHeader>
-                                                        <DialogTitle>{t('cardOrder.confirmTitle')}</DialogTitle>
-                                                        <DialogDescription>
-                                                            {t('cardOrder.confirmDesc', {
-                                                                product: selectedOrderProduct.name,
-                                                                quantity: orderQuantity.toLocaleString()
-                                                            })}
-                                                        </DialogDescription>
-                                                    </DialogHeader>
-                                                    <div className="py-6 flex flex-col items-center gap-4">
-                                                        <div className="w-full max-w-[300px] aspect-[84/52] relative rounded-xl border shadow-2xl overflow-hidden ring-4 ring-primary/5">
-                                                            {(selectedOrderProduct.design || cardformats[selectedOrderProduct.card_design_id]) ? (
-                                                                <img
-                                                                    src={selectedOrderProduct.design?.thumbf || selectedOrderProduct.design?.bgimgf || cardformats[selectedOrderProduct.card_design_id]?.bgimgf}
-                                                                    alt="Confirm Preview"
-                                                                    className="w-full h-full object-cover"
-                                                                    crossOrigin="anonymous"
-                                                                />
-                                                            ) : (
-                                                                <div className="w-full h-full bg-gray-200 flex items-center justify-center">
-                                                                    <ImageIcon className="w-12 h-12 text-gray-400" />
-                                                                </div>
-                                                            )}
-
+                                                <Dialog open={isConfirmOrderDialogOpen} onOpenChange={setIsConfirmOrderDialogOpen}>
+                                                    <DialogTrigger asChild>
+                                                        <Button className="h-12 px-8 text-lg font-bold shadow-xl hover:shadow-2xl transition-all active:scale-[0.98] w-full mt-4">
+                                                            <ShoppingBasket className="w-5 h-5 mr-3" />
+                                                            {t('cardOrder.placeOrder')}
+                                                        </Button>
+                                                    </DialogTrigger>
+                                                    <DialogContent>
+                                                        <DialogHeader>
+                                                            <DialogTitle>{t('cardOrder.confirmTitle')}</DialogTitle>
+                                                            <DialogDescription>
+                                                                {t('cardOrder.confirmDesc', {
+                                                                    product: selectedOrderProduct.name,
+                                                                    quantity: orderQuantity.toLocaleString()
+                                                                })}
+                                                            </DialogDescription>
+                                                        </DialogHeader>
+                                                        <div className="py-6 flex flex-col items-center">
                                                             {/* 商品画像 (小) */}
                                                             {selectedOrderProduct.image_url && (
-                                                                <div className="absolute bottom-3 right-3 w-12 h-12 rounded-lg overflow-hidden border-2 border-white shadow-xl bg-white animate-in zoom-in fade-in duration-500 delay-200">
-                                                                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                                                                    <img
-                                                                        src={selectedOrderProduct.image_url}
-                                                                        alt={selectedOrderProduct.name}
-                                                                        className="w-full h-full object-cover"
-                                                                    />
+                                                                <div className="w-full flex flex-col items-center justify-center mb-4 relative">
+                                                                    <div className="text-xs text-gray-500">{t('cardOrder.product')}:{selectedOrderProduct.name}</div>
+                                                                    <div className="h-20 rounded-lg items-center justify-center overflow-hidden border-2 border-white shadow-xl bg-white animate-in zoom-in fade-in duration-500 delay-200 ">
+                                                                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                                                                        <img
+                                                                            src={selectedOrderProduct.image_url}
+                                                                            alt={selectedOrderProduct.name}
+                                                                            className="w-full h-full object-cover"
+                                                                        />
+                                                                    </div>
+                                                                    <div className="relative top-[5] text-[10px] font-bold text-gray-400 uppercase tracking-tight">{t('cardOrder.link')}</div>
+                                                                    <ArrowBigDownDash className="w-12 h-12 text-gray-500" />
                                                                 </div>
+
                                                             )}
+                                                            <div className="flex flex-col items-center p-4 border rounded-xl border-dashed border-gray-300 border-2 mb-2">
+                                                                <div className="w-full max-w-[300px] aspect-[84/52] relative rounded-xl border shadow-2xl overflow-hidden ring-4 ring-primary/5">
+                                                                    {(selectedOrderProduct.design || cardformats[selectedOrderProduct.card_design_id]) ? (
+                                                                        <img
+                                                                            src={selectedOrderProduct.design?.thumbf || selectedOrderProduct.design?.bgimgf || cardformats[selectedOrderProduct.card_design_id]?.bgimgf}
+                                                                            alt="Confirm Preview"
+                                                                            className="w-full h-full object-cover"
+                                                                            crossOrigin="anonymous"
+                                                                        />
+                                                                    ) : (
+                                                                        <div className="w-full h-full bg-gray-200 flex items-center justify-center">
+                                                                            <ImageIcon className="w-12 h-12 text-gray-400" />
+                                                                        </div>
+                                                                    )}
+
+                                                                </div>
+                                                                <div className="text-xs text-gray-500 mt-1 mb-4">{t('cardOrder.card front')}</div>
+                                                                <div className="w-full max-w-[300px] aspect-[84/52] relative rounded-xl border shadow-2xl overflow-hidden ring-4 ring-primary/5">
+                                                                    {(selectedOrderProduct.design || cardformats[selectedOrderProduct.card_design_id]) ? (
+                                                                        <img
+                                                                            src={selectedOrderProduct.design?.thumbb || selectedOrderProduct.design?.bgimgb || cardformats[selectedOrderProduct.card_design_id]?.bgimgb}
+                                                                            alt="Confirm Preview"
+                                                                            className="w-full h-full object-cover"
+                                                                            crossOrigin="anonymous"
+                                                                        />
+                                                                    ) : (
+                                                                        <div className="w-full h-full bg-gray-200 flex items-center justify-center">
+                                                                            <ImageIcon className="w-12 h-12 text-gray-400" />
+                                                                        </div>
+                                                                    )}
+
+                                                                </div>
+                                                                <div className="text-xs text-gray-500 mt-1">{t('cardOrder.card back')}</div>
+                                                            </div>
+
+                                                            <div className="text-center mt-4">
+                                                                <p className="text-2xl font-black text-primary">{orderQuantity.toLocaleString()} <span className="text-sm">{tc('unitCard')}</span></p>
+                                                            </div>
                                                         </div>
-                                                        <div className="text-center">
-                                                            <p className="text-2xl font-black text-primary">{orderQuantity.toLocaleString()} <span className="text-sm">枚</span></p>
-                                                        </div>
-                                                    </div>
-                                                    <DialogFooter className="gap-2 sm:gap-2">
-                                                        <Button variant="outline" onClick={() => setIsConfirmOrderDialogOpen(false)} disabled={isCreatingCardOrder}>
-                                                            {tc('cancel')}
-                                                        </Button>
-                                                        <Button onClick={handleCreateCardOrder} disabled={isCreatingCardOrder} className="bg-primary hover:bg-primary/90 min-w-[120px]">
-                                                            {isCreatingCardOrder ? <Loader2 className="w-4 h-4 animate-spin" /> : t('cardOrder.placeOrder')}
-                                                        </Button>
-                                                    </DialogFooter>
-                                                </DialogContent>
-                                            </Dialog>
+                                                        <DialogFooter className="gap-2">
+                                                            <Button variant="outline" onClick={() => setIsConfirmOrderDialogOpen(false)} disabled={isCreatingCardOrder}>
+                                                                {tc('cancel')}
+                                                            </Button>
+                                                            <Button onClick={handleCreateCardOrder} disabled={isCreatingCardOrder} className="bg-primary hover:bg-primary/90 min-w-[120px]">
+                                                                {isCreatingCardOrder ? <Loader2 className="w-4 h-4 animate-spin" /> : t('cardOrder.placeOrder')}
+                                                            </Button>
+                                                        </DialogFooter>
+                                                    </DialogContent>
+                                                </Dialog>
+                                            </div>
                                         </div>
                                     </div>
                                 )}
@@ -2646,6 +2708,11 @@ export default function ShopPage() {
                         </Card>
                     </div>
                 )}
+
+
+
+
+
             </div>
         </div >
     );

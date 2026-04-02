@@ -20,6 +20,7 @@ import { CognitoIdentityProviderClient, AdminGetUserCommand } from '@aws-sdk/cli
 import { successResponse, errorResponse } from './utils/response';
 import { ddb, TABLE_NAME, USER_POOL_ID } from './share/db';
 import { getShopId, getUserId, getAction } from './utils/request';
+import { AdminApiSchema } from '@shared/api-types';
 
 const cognito = new CognitoIdentityProviderClient({});
 
@@ -30,18 +31,9 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 
         const body = JSON.parse(event.body || '{}');
         const userId = getUserId(event);
-        const shopId = getShopId(event, body);
         const action = getAction(event, body);
-        const { newUserId } = body;
 
-        // 必須項目のチェック
-        if (!shopId || !newUserId || !action) {
-            return errorResponse(400, 'Missing required fields: shopId, newUserId, action');
-        }
-
-        // 接頭辞(SHOP#, USER#)が混在していても正常に動作するよう正規化
-        const cleanShopId = shopId.replace(/^SHOP#/, '');
-        const cleanNewUserId = newUserId.replace(/^USER#/, '');
+        if (!userId) return errorResponse(401, 'Unauthorized');
 
         // ====================================================================
         // ACTION: validate (オーナー変更の事前確認)
@@ -49,6 +41,12 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         // 目的: 現在のオーナーと新オーナーの情報を取得し、不整合がないか確認します。
         // ====================================================================
         if (action === 'validate') {
+            const { shop_id, new_user_id } = body as AdminApiSchema['admin_changeowner'];
+            if (!shop_id || !new_user_id) return errorResponse(400, 'Missing shop_id or new_user_id');
+
+            const cleanShopId = shop_id.replace(/^SHOP#/, '');
+            const cleanNewUserId = new_user_id.replace(/^USER#/, '');
+
             /**
              * 【ステップ1: ショップ情報の取得】
              * 指定ショップの現在のオーナーID(oldOwnerId)とショップ名(shopName)を確認。
@@ -100,6 +98,12 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         // 目的: 複数テーブルの整合性を保ちつつ、オーナー権限を一括譲渡します。
         // ====================================================================
         if (action === 'execute') {
+            const { shop_id, new_user_id } = body as AdminApiSchema['admin_changeowner'];
+            if (!shop_id || !new_user_id) return errorResponse(400, 'Missing shop_id or new_user_id');
+
+            const cleanShopId = shop_id.replace(/^SHOP#/, '');
+            const cleanNewUserId = new_user_id.replace(/^USER#/, '');
+
             const now = new Date().toISOString();
 
             /**
@@ -203,4 +207,4 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         console.error('Change owner error:', error);
         return errorResponse(500, 'Internal Server Error', error.message);
     }
-}
+};

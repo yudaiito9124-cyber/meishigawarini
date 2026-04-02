@@ -3,7 +3,9 @@
     "error": "Error",
     "unknownError": "Unknown error",
     "failed": "Failed",
-    "all": "All"
+    "all": "All",
+    "cancel": "Cancel",
+    "unitCard": "cards"
   },
   "Site": {
     "name": "Meishigawarini"
@@ -95,7 +97,7 @@
       "confirmButton": "Confirm Linking",
       "manualInputButton": "Enter ID Manually",
       "manualInputLabel": "Manual Add",
-      "manualInputPlaceholder": "Enter URL or UUID",
+      "manualInputPlaceholder": "Enter URL or QR ID",
       "addButton": "Add",
       "invalidFormat": "Invalid format. Please enter a valid QR URL or ID.",
       "successReport": "Linked {count} gifts successfully.",
@@ -189,7 +191,9 @@
     "created": "Created: {date}"
   },
   "ShopPage": {
-    "loading": "Loading Dashboard...",
+    "frontView": "Front View",
+    "backView": "Back View",
+    "loading": "Loading shop dashboard...",
     "title": "Shop Dashboard",
     "movetoshops": "Back to shop list",
     "logout": "Logout",
@@ -207,13 +211,21 @@
     },
     "cardOrder": {
       "title": "Order Cards",
+      "errors": {
+        "tooManyCards": "Order quantity is limited to 100 cards."
+      },
       "subtitle": "Order physical shop cards (business cards with QR code).",
       "selectProduct": "Select Product",
       "selectProductDesc": "Please select the card design (product) to order.",
       "quantity": "Quantity",
+      "quantitydescription": "Order in units of 10 (10–100 cards).",
       "placeOrder": "Place Order",
       "confirmTitle": "Confirm Order",
-      "confirmDesc": "Are you sure you want to order {quantity} cards of {product}?",
+      "confirmDesc": "Are you sure you want to order {quantity} cards for {product} with the design shown below?",
+      "link": "Linked to card",
+      "product": "Product",
+      "card front": "Card Front Design",
+      "card back": "Card Back Design",
       "historyTitle": "Order History",
       "noOrders": "No order history found.",
       "cancel": "Cancel",
@@ -235,7 +247,7 @@
       "preferredDateTime": "Preferred Date/Time",
       "status": "Status",
       "action": "Action",
-      "uuid": "ID",
+      "qrId": "ID",
       "productName": "Product Name",
       "noOrders": "No active orders",
       "ship": "Ship",
@@ -265,7 +277,7 @@
       "deleteConfirm": "Are you sure you want to delete \"{name}\"?"
     },
     "search": {
-      "placeholder": "Search by UUID...",
+      "placeholder": "Search by ID...",
       "go": "Search",
       "clear": "Clear"
     },
@@ -302,7 +314,7 @@
       "title": "Link QR Code",
       "cardDesign": "Card Design",
       "description": "Connect a physical QR card to a product.",
-      "uuidLabel": "QR UUID (Scan or Type)",
+      "qrIdLabel": "QR ID (Scan or Type)",
       "placeholder": "e.g. 123e4567-...",
       "productName": "Product Name",
       "scan": "Scan QR Code",
@@ -465,6 +477,7 @@
       "subMessage": "Expiration: {date}"
     },
     "errors": {
+      "loadFailed": "Failed to load messages or user data. ",
       "invalidPin": "Invalid PIN or Gift not found",
       "inactive": "This card is not active.",
       "submitFailed": "Failed to submit address.",
@@ -596,6 +609,7 @@
     }
   },
   "AdminPage": {
+    "verifyingAdmin": "Verifying Admin Access...",
     "title": "Admin Dashboard",
     "qrAdminLoginPage": "Admin Login Page",
     "helpButton": "Help",
@@ -613,8 +627,8 @@
       "quantity": "Quantity to Generate",
       "shopId": "Shop ID (Optional)",
       "productId": "Product ID (Optional)",
-      "ownerUuid": "Owner UUID (Optional)",
-      "senderId": "Sender ID (Optional, Format: USER#[uuid])",
+      "ownerUserId": "Owner User ID (Optional)",
+      "senderId": "Sender ID (Optional, Format: USER#[userId])",
       "expiryDate": "Expiry Date (Optional)",
       "activateNow": "Activate Now (Required Shop ID and Product ID)",
       "useMetadata": "Use optional information",
@@ -641,7 +655,7 @@
       "downloadCsv": "Download CSV & Images",
       "downloading": "Preparing download...",
       "table": {
-        "uuid": "UUID",
+        "qrId": "ID",
         "pin": "PIN"
       },
       "alerts": {
@@ -665,12 +679,13 @@
         "completed": "COMPLETED",
         "banned": "BANNED",
         "expired": "EXPIRED",
-        "search": "Search by UUID",
+        "search": "Search by ID",
         "undefined": "undefined"
       },
       "info": "Showing status: {status} • Count: {count}",
       "table": {
-        "uuid": "UUID",
+        "qrId": "ID",
+        "qrIdLabel": "ID",
         "pin": "PIN",
         "status": "Status",
         "createdAt": "Created At",
@@ -692,7 +707,7 @@
         "error": "Error deleting Banned codes"
       },
       "keyword": {
-        "placeholder": "Enter keyword to search by UUID (at least 8 characters)",
+        "placeholder": "Enter keyword to search by ID (at least 8 characters)",
         "tooShort": "Keyword must be at least 8 characters long."
       },
       "raw": "Raw Data",

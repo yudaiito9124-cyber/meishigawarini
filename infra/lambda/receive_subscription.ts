@@ -11,23 +11,24 @@ import { APIGatewayProxyHandler } from 'aws-lambda';
 import { GetCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
 import { successResponse, errorResponse } from './utils/response';
 import { ddb, TABLE_NAME } from './share/db';
-import { getUUID, getPIN } from './utils/request';
+import { getQrId, getPIN } from './utils/request';
+import { ReceiveApiSchema } from '@shared/api-types';
 
 export const handler: APIGatewayProxyHandler = async (event) => {
     try {
         if (event.httpMethod === 'OPTIONS') return successResponse();
 
-        const body = JSON.parse(event.body || '{}');
-        const uuid = getUUID(event, body);
+        const body = JSON.parse(event.body || '{}') as ReceiveApiSchema['receive_subscription'];
+        const qr_id = getQrId(event, body);
         const pin = getPIN(event, body);
         const { email, locale } = body;
         
-        if (!uuid || !pin || !email) return errorResponse(400, 'Missing required fields');
+        if (!qr_id || !pin || !email) return errorResponse(400, 'Missing required fields');
 
         // 【DB操作: GetItem】
         // 理由: 署名、PIN、およびステータスの妥当性を確認。
         const qrRes = await ddb.send(new GetCommand({
-            TableName: TABLE_NAME, Key: { PK: `QR#${uuid}`, SK: 'METADATA' }
+            TableName: TABLE_NAME, Key: { PK: `QR#${qr_id}`, SK: 'METADATA' }
         }));
 
         if (!qrRes.Item || String(qrRes.Item.pin) !== String(pin)) {
@@ -40,7 +41,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         // 理由: notification_emails(String Set)にメールを追加し、email_preferences Mapを初期化(if_not_exists)。
         await ddb.send(new UpdateCommand({
             TableName: TABLE_NAME,
-            Key: { PK: `QR#${uuid}`, SK: 'CHAT' },
+            Key: { PK: `QR#${qr_id}`, SK: 'CHAT' },
             UpdateExpression: 'ADD notification_emails :new_email SET email_preferences = if_not_exists(email_preferences, :empty_map), ts_updated_at = :now',
             ExpressionAttributeValues: { ':new_email': new Set([email]), ':empty_map': {}, ':now': new Date().toISOString() }
         }));
@@ -49,7 +50,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         // 理由: Step1でemail_preferencesが確実に初期化された後に言語キーをセット（元の2ステップ方式と同一）。
         await ddb.send(new UpdateCommand({
             TableName: TABLE_NAME,
-            Key: { PK: `QR#${uuid}`, SK: 'CHAT' },
+            Key: { PK: `QR#${qr_id}`, SK: 'CHAT' },
             UpdateExpression: 'SET email_preferences.#em = :lang',
             ExpressionAttributeNames: { '#em': email },
             ExpressionAttributeValues: { ':lang': lang }
@@ -61,7 +62,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             if (qrRes.Item.failed_attempts || qrRes.Item.locked_until) {
                 await ddb.send(new UpdateCommand({
                     TableName: TABLE_NAME,
-                    Key: { PK: `QR#${uuid}`, SK: 'METADATA' },
+                    Key: { PK: `QR#${qr_id}`, SK: 'METADATA' },
                     UpdateExpression: 'REMOVE failed_attempts, locked_until'
                 }));
             }

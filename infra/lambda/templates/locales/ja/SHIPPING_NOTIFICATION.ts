@@ -5,6 +5,6 @@ export const body = `
 また、受取り後は、「受け取り完了ボタン」の押下にご協力ください。
 
 追跡番号の確認・受け取り完了の報告はこちら:
-{{baseUrl}}/receive/{{uuid}}
+{{baseUrl}}/receive/{{qr_id}}
 PIN: {{pin}}
 `.trim();

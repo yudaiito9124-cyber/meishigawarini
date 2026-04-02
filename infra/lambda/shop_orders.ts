@@ -15,7 +15,8 @@ import { signUrlIfS3 } from './utils/s3';
 import { getSystemDesign } from './utils/designs';
 import { successResponse, errorResponse } from './utils/response';
 import { ddb, TABLE_NAME, BUCKET_NAME } from './share/db';
-import { getUUID, getShopId, getAction, getUserId } from './utils/request';
+import { getQrId, getShopId, getAction, getUserId } from './utils/request';
+import { ShopApiSchema } from '@shared/api-types';
 
 export const handler: APIGatewayProxyHandler = async (event) => {
     try {
@@ -43,14 +44,14 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         // ACTION: list (ショップ注文一覧の取得)
         // ====================================================================
         if (action === 'list') {
-            const { uuid } = body;
+            const { qr_id: body_qr_id } = body as ShopApiSchema['shop_orders_list'];
             let metaItems: any[] = [];
 
-            if (uuid) {
+            if (body_qr_id) {
                 // 【DB操作: Query】
                 // 理由: 指定された単一QRの情報を取得。
                 const res = await ddb.send(new QueryCommand({
-                    TableName: TABLE_NAME, KeyConditionExpression: 'PK = :pk', ExpressionAttributeValues: { ':pk': `QR#${uuid}` }
+                    TableName: TABLE_NAME, KeyConditionExpression: 'PK = :pk', ExpressionAttributeValues: { ':pk': `QR#${body_qr_id}` }
                 }));
                 const items = res.Items || [];
                 const metadata = items.find(i => i.SK === 'METADATA');
@@ -121,8 +122,8 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         // ACTION: update (発送情報・各種メモの更新)
         // ====================================================================
         if (action === 'update') {
-            const qr_id = getUUID(event, body);
-            const { delivery_company, tracking_number, memo_for_users, memo_for_shop } = body;
+            const { qr_id: body_qr_id, delivery_company, tracking_number, memo_for_users, memo_for_shop } = body as ShopApiSchema['shop_orders_update'];
+            const qr_id = getQrId(event, body);
             
             if (!qr_id) return errorResponse(400, 'Missing qr_id');
 
@@ -177,7 +178,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                         const email = orderRes.Item?.email;
                         if (email && metaRes.Item.pin) {
                             try {
-                                await sendLocalizedEmail({ type: 'SHIPPING_NOTIFICATION', to: email, params: { uuid: qr_id, pin: metaRes.Item.pin }, lang: 'ja' });
+                                await sendLocalizedEmail({ type: 'SHIPPING_NOTIFICATION', to: email, params: { qr_id: qr_id, pin: metaRes.Item.pin }, lang: 'ja' });
                             } catch (e) {
                                 console.error('Failed to send shipping notification email', e);
                             }
@@ -202,7 +203,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
  */
 function formatOrderDetails(meta: any, order: any): any {
     return {
-        id: meta.PK.replace('QR#', ''), qr_id: meta.PK, product_id: meta.product_id, status: meta.status,
+        qr_id: meta.PK.replace('QR#', ''), product_id: meta.product_id, status: meta.status,
         recipient_name: order.name || '-', address: order.address || '-',
         postal_code: order.zipCode || order.postal_code || '',
         preferred_date: order.preferredDate || '-', preferred_time: order.preferredTime || '-',

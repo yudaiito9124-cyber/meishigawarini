@@ -107,7 +107,7 @@ export default function ReceivePage() {
     const tb = useTranslations('Backend');
     const params = useParams();
     const router = useRouter();
-    const uuid = params?.uuid as string;
+    const qr_id = params?.qr_id as string;
     const locale = params?.locale as string;
 
     const [loading, setLoading] = useState(false);
@@ -203,7 +203,7 @@ export default function ReceivePage() {
 
         if (!silent) setSenderInfoLoading(true);
         try {
-            const data = await receiveApi.receive_sender_load(uuid, pin, { id: importId });
+            const data = await receiveApi.receive_sender_load(qr_id, pin, { id: importId });
             data.sender_id = importId;
             if (data.sender_info) {
                 // Sanitize: Convert null values to empty strings
@@ -233,7 +233,7 @@ export default function ReceivePage() {
         } finally {
             if (!silent) setSenderInfoLoading(false);
         }
-    }, [uuid, pin, t]);
+    }, [qr_id, pin, t]);
     const [chatcontent, setChatcontent] = useState("");
 
     // Steps: PIN -> FORM (or SHIPPED/SUCCESS) -> RESTRICTED (if blocked)
@@ -263,7 +263,7 @@ export default function ReceivePage() {
         setError(null);
 
         try {
-            const data = await receiveApi.verify(uuid, pin);
+            const data = await receiveApi.verify(qr_id, pin);
 
             // Start expansion animation after successful verification
             setIsExpanding(true);
@@ -317,7 +317,7 @@ export default function ReceivePage() {
         e.preventDefault();
         setLoading(true);
         try {
-            const data = await receiveApi.verify(uuid, pin, unlockPassword);
+            const data = await receiveApi.verify(qr_id, pin, unlockPassword);
 
             if (data.is_authorized) {
                 // Start expansion animation after successful verification
@@ -398,9 +398,7 @@ export default function ReceivePage() {
 
         try {
             const isSubscribed = !!notificationEmail; // Check if notificationEmail is set
-            await receiveApi.receive_submit(uuid, pin, {
-                uuid,
-                pin,
+            await receiveApi.receive_submit(qr_id, pin, {
                 shipping_info: {
                     name,
                     address,
@@ -426,7 +424,7 @@ export default function ReceivePage() {
         e.preventDefault();
         setLoading(true);
         try {
-            await receiveApi.receive_completed(uuid, pin, { uuid, pin });
+            await receiveApi.receive_completed(qr_id, pin, {});
             setStep("COMPLETED");
         } catch (error: any) {
             // console.error("Receive error:", error);
@@ -439,7 +437,7 @@ export default function ReceivePage() {
     const loadMessages = useCallback(async () => {
         try {
             const [data, authUser, receiverData] = await Promise.all([
-                receiveApi.receive_chat_get(uuid, pin, {}),
+                receiveApi.receive_chat_get(qr_id, pin, {}),
                 getCurrentUser().catch(() => null),
                 userApi.user_receiver_get({}).catch(() => null)
             ]);
@@ -496,7 +494,7 @@ export default function ReceivePage() {
             console.error("Failed to load messages or user data:", e);
             alert(t('errors.loadFailed') + (tb(e.message.replace(/\./g, '_')) || e.message));
         }
-    }, [uuid, pin, handleImportFromId]);
+    }, [qr_id, pin, handleImportFromId]);
 
     const handleSenderRoleSelect = async () => {
         if (!window.confirm(t('roleSelection.confirmSender'))) return;
@@ -508,7 +506,7 @@ export default function ReceivePage() {
             if (profileData.user_id) {
                 const fullImportId = `USER#${profileData.user_id}`;
                 // Register this user as the sender and update history (SENDLOG)
-                await userApi.user_history_sendgift({ uuid, pin });
+                await userApi.user_history_sendgift({ qr_id, pin });
 
                 // Load the profile info from the template to display it in the UI
                 await handleImportFromId(fullImportId, true);
@@ -587,7 +585,7 @@ export default function ReceivePage() {
                     }
                 }
 
-                const { uploadUrl, fileUrl } = await receiveApi.receive_uploadurl_get(uuid, pin, {
+                const { uploadUrl, fileUrl } = await receiveApi.receive_uploadurl_get(qr_id, pin, {
                     filename: finalFilename,
                     content_type: uploadFile.type,
                     file_size: uploadFile.size
@@ -609,7 +607,7 @@ export default function ReceivePage() {
                 };
             }
 
-            await receiveApi.receive_chat_send(uuid, pin, {
+            await receiveApi.receive_chat_send(qr_id, pin, {
                 username: chatName,
                 message: chatMessage,
                 file_url: fileData?.fileUrl,
@@ -644,7 +642,7 @@ export default function ReceivePage() {
                 delete updatedSenderInfo.sender_id;
             }
 
-            await receiveApi.receive_sender_update(uuid, pin, {
+            await receiveApi.receive_sender_update(qr_id, pin, {
                 sender_info: updatedSenderInfo
             });
 
@@ -660,7 +658,7 @@ export default function ReceivePage() {
     const handleSaveAsNewUser = async () => {
         setSenderInfoLoading(true);
         try {
-            const data = await receiveApi.receive_sender_save(uuid, pin, {
+            const data = await receiveApi.receive_sender_save(qr_id, pin, {
                 sender_info: senderForm,
                 id: senderInfo?.sender_id
             });
@@ -679,7 +677,7 @@ export default function ReceivePage() {
     };
 
     const handleHtmlImageUpload = async (file: File) => {
-        if (!uuid || !pin) return;
+        if (!qr_id || !pin) return;
         setSenderInfoLoading(true);
         try {
             let uploadFile: File | Blob = file;
@@ -693,7 +691,7 @@ export default function ReceivePage() {
                 }
             }
 
-            const { uploadUrl, fileUrl } = await receiveApi.receive_uploadurl_get(uuid, pin, { filename: finalFilename, content_type: uploadFile.type, file_size: uploadFile.size });
+            const { uploadUrl, fileUrl } = await receiveApi.receive_uploadurl_get(qr_id, pin, { filename: finalFilename, content_type: uploadFile.type, file_size: uploadFile.size });
 
             const s3Res = await fetch(uploadUrl, {
                 method: 'PUT',
@@ -709,7 +707,7 @@ export default function ReceivePage() {
             setHtmlImageUrls(newUrlsForState);
 
             const newSenderInfo = { ...senderForm, html_image_urls: newUrlsForBackend };
-            await receiveApi.receive_sender_update(uuid, pin, {
+            await receiveApi.receive_sender_update(qr_id, pin, {
                 sender_info: newSenderInfo
             });
             // Update local senderInfo with clean URLs for next save, but UI uses htmlImageUrls for display
@@ -735,7 +733,7 @@ export default function ReceivePage() {
                 ts_updated_at: new Date().toISOString()
             };
 
-            await receiveApi.receive_sender_update(uuid, pin, {
+            await receiveApi.receive_sender_update(qr_id, pin, {
                 sender_info: updatedSenderInfo
             });
 
@@ -762,7 +760,7 @@ export default function ReceivePage() {
             }
 
             const { uploadUrl, fileUrl } = await receiveApi.receive_uploadurl_get(
-                uuid,
+                qr_id,
                 pin,
                 { filename: finalFilename, content_type: uploadFile.type, file_size: uploadFile.size }
             );
@@ -782,7 +780,7 @@ export default function ReceivePage() {
                 ts_updated_at: new Date().toISOString()
             };
 
-            await receiveApi.receive_sender_update(uuid, pin, {
+            await receiveApi.receive_sender_update(qr_id, pin, {
                 sender_info: newSenderInfo
             });
 
@@ -833,7 +831,7 @@ export default function ReceivePage() {
 
         setSubscribing(true);
         try {
-            await receiveApi.receive_subscription(uuid, pin, {
+            await receiveApi.receive_subscription(qr_id, pin, {
                 email: notificationEmail,
                 locale
             });
@@ -1147,7 +1145,7 @@ export default function ReceivePage() {
                             {/* SNS Share Button - Witty Place */}
                             <div className="mt-8 animate-reveal reveal-delay-500">
                                 <ShareDialog
-                                    uuid={uuid}
+                                    qr_id={qr_id}
                                     product={{ name: gift.product.name, image_url: gift.product.image_url }}
                                     card={{ image_url: gift.design?.thumbf || gift.card_design_thumbf || gift.card_image_url }}
                                     shop={{ name: gift.shop_name }}
@@ -1559,7 +1557,7 @@ export default function ReceivePage() {
                                             <div className="space-y-2">
                                                 <Label className="text-xs text-gray-500">{t('contactInfo.orderId')}</Label>
                                                 <div className="p-3 bg-gray-50 rounded-md border border-gray-200 font-mono text-sm select-all text-center">
-                                                    {uuid}
+                                                    {qr_id}
                                                 </div>
                                             </div>
                                             {gift?.shop_name && (

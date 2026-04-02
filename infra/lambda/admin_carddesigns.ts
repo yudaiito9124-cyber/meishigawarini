@@ -16,6 +16,7 @@ import { signUrlIfS3, stripSignature, deleteFileByUrl, localizeS3Image, getPresi
 import { successResponse, errorResponse, apiResponse } from './utils/response';
 import { ddb, TABLE_NAME, BUCKET_NAME } from './share/db';
 import { getAction, getUserId } from './utils/request';
+import { AdminApiSchema } from '@shared/api-types';
 
 export const handler: APIGatewayProxyHandler = async (event) => {
     try {
@@ -43,6 +44,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         // 目的: 管理画面やユーザー選択画面での表示用に、登録済み全デザインをリストアップします。
         // ====================================================================
         if (action === 'list') {
+            const {} = body as AdminApiSchema['admin_carddesigns_list'];
             const res = await ddb.send(new QueryCommand({
                 TableName: TABLE_NAME,
                 KeyConditionExpression: 'PK = :pk',
@@ -69,31 +71,31 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         // 目的: 新規デザインを登録し、アセットを恒久ディレクトリへ移動(localize)します。
         // ====================================================================
         if (action === 'create') {
-            const { design } = body;
-            const designId = body.design_id || generateId();
+            const { design, design_id } = body as AdminApiSchema['admin_carddesigns_create'];
+            const finalDesignId = design_id || generateId();
             if (!design) return errorResponse(400, 'Missing design data');
 
             const item: any = {
                 ...design,
                 PK: 'CARD_DESIGN#METADATA',
-                SK: designId,
-                design_id: designId,
+                SK: finalDesignId,
+                design_id: finalDesignId,
                 ts_created_at: now,
                 ts_updated_at: now
             };
 
             // 画像のローカライズ (デザインIDごとの恒久ディレクトリへ移動)
-            if (item.bgimgf) item.bgimgf = await localizeS3Image(item.bgimgf, BUCKET_NAME, designId, 'front');
-            if (item.bgimgb) item.bgimgb = await localizeS3Image(item.bgimgb, BUCKET_NAME, designId, 'back');
-            if (item.thumbf) item.thumbf = await localizeS3Image(item.thumbf, BUCKET_NAME, designId, 'thumbf');
-            if (item.thumbb) item.thumbb = await localizeS3Image(item.thumbb, BUCKET_NAME, designId, 'thumbb');
+            if (item.bgimgf) item.bgimgf = await localizeS3Image(item.bgimgf, BUCKET_NAME, finalDesignId, 'front');
+            if (item.bgimgb) item.bgimgb = await localizeS3Image(item.bgimgb, BUCKET_NAME, finalDesignId, 'back');
+            if (item.thumbf) item.thumbf = await localizeS3Image(item.thumbf, BUCKET_NAME, finalDesignId, 'thumbf');
+            if (item.thumbb) item.thumbb = await localizeS3Image(item.thumbb, BUCKET_NAME, finalDesignId, 'thumbb');
 
             await ddb.send(new PutCommand({
                 TableName: TABLE_NAME,
                 Item: item
             }));
 
-            return apiResponse(201, { design_id: designId, message: 'Card design created' });
+            return apiResponse(201, { design_id: finalDesignId, message: 'Card design created' });
         }
 
         // ====================================================================
@@ -102,8 +104,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         // 目的: デザインアセットのアップロード先URLを発行します。
         // ====================================================================
         if (action === 'uploadurl') {
-            const content_type = body.content_type || body.contentType;
-            const { filename, design_id } = body;
+            const { filename, content_type, design_id } = body as AdminApiSchema['admin_carddesigns_uploadurl'];
             if (!filename || !content_type || !design_id) return errorResponse(400, 'Missing params');
 
             const tempId = generateId();
@@ -126,7 +127,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         // 目的: デザイン属性を部分更新し、必要に応じてアセットを再ローカライズします。
         // ====================================================================
         if (action === 'update') {
-            const { design_id, design } = body;
+            const { design_id, design } = body as AdminApiSchema['admin_carddesigns_update'];
             if (!design_id || !design) return errorResponse(400, 'Missing design_id or design data');
 
             // ローカライズ処理
@@ -169,7 +170,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         // 目的: デザイン項目を削除し、S3上の関連フォルダを一括削除します。
         // ====================================================================
         if (action === 'delete') {
-            const { design_id } = body;
+            const { design_id } = body as AdminApiSchema['admin_carddesigns_delete'];
             if (!design_id) return errorResponse(400, 'Missing design_id');
 
             await ddb.send(new DeleteCommand({

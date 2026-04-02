@@ -12,7 +12,7 @@ const SYSTEM_USERNAME = 'System';
 
 /**
  * Sends a system notification message to the chat and emails the recipients.
- * @param qr_id The UUID of the QR code/Order
+ * @param qr_id The QR ID of the QR code/Order
  * @param message The message content to send
  * @param pin The PIN code (required for the email template)
  */
@@ -90,7 +90,7 @@ export async function sendSystemNotification(qr_id: string, message: string, pin
                         to: email,
                         params: {
                             message: displayMessage,
-                            uuid: qr_id,
+                            qr_id: qr_id,
                             pin
                         },
                         lang

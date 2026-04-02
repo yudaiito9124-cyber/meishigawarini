@@ -12,7 +12,7 @@ export async function appendToHistory(
     tableName: string,
     userId: string,
     logType: 'SENDLOG' | 'RECEIVEDLOG',
-    uuid: string
+    qr_id: string
 ): Promise<void> {
     const pk = `USER#${userId}`;
     const baseSk = `${logType}#`;
@@ -49,19 +49,19 @@ export async function appendToHistory(
     const targetSk = `${baseSk}${paddedIndex}`;
     const nowIso = new Date().toISOString();
 
-    // UUIDのリストに追記
+    // QR IDのリストに追記
     // 重複を避ける＆順序を維持するためにはList型を使用するか、Set(SS)を使用するか
     // ここでは単純な時刻とのペアを持ったリスト情報を保存する
     
     // 【DB操作: UpdateItem】
-    // ターゲットの履歴レコードに新しいUUIDを追加
+    // ターゲットの履歴レコードに新しいQR IDを追加
     await ddb.send(new UpdateCommand({
         TableName: tableName,
         Key: { PK: pk, SK: targetSk },
         UpdateExpression: 'SET logs = list_append(if_not_exists(logs, :empty_list), :new_log), ts_updated_at = :now',
         ExpressionAttributeValues: {
             ':empty_list': [],
-            ':new_log': [{ uuid, timestamp: nowIso }],
+            ':new_log': [{ qr_id, timestamp: nowIso }],
             ':now': nowIso
         }
     }));

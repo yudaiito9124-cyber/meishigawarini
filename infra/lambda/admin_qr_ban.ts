@@ -10,7 +10,8 @@ import { APIGatewayProxyHandler } from 'aws-lambda';
 import { UpdateCommand, GetCommand } from '@aws-sdk/lib-dynamodb';
 import { successResponse, errorResponse } from './utils/response';
 import { ddb, TABLE_NAME } from './share/db';
-import { getUUID, getAction } from './utils/request';
+import { getQrId, getAction } from './utils/request';
+import { AdminApiSchema } from '@shared/api-types';
 
 /**
  * アイテムの属性から、BAN解除後に戻すべきステータスを判定します。
@@ -34,16 +35,16 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         if (event.httpMethod === 'OPTIONS') return successResponse();
         if (event.httpMethod !== 'POST') return errorResponse(405, 'Method Not Allowed');
 
-        const body = JSON.parse(event.body || '{}');
-        const uuid = getUUID(event, body);
+        const body = JSON.parse(event.body || '{}') as AdminApiSchema['admin_qr_ban'];
+        const qr_id = getQrId(event, body);
         const reason = body.reason || 'No reason provided';
         
-        if (!uuid) return errorResponse(400, 'Missing UUID');
+        if (!qr_id) return errorResponse(400, 'Missing QR ID');
 
         // 【DB操作: GetItem】
         // 現在のステータスと、解除時の復帰判定に必要なタイムスタンプ類を取得
         const currentRes = await ddb.send(new GetCommand({
-            TableName: TABLE_NAME, Key: { PK: `QR#${uuid}`, SK: 'METADATA' }
+            TableName: TABLE_NAME, Key: { PK: `QR#${qr_id}`, SK: 'METADATA' }
         }));
 
         const item = currentRes.Item;
@@ -57,13 +58,13 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             // ACTION: UNBAN (復元)
             // ====================================================================
             const revertStatus = getRevertStatus(item);
-            console.log(`Unbanning QR ${uuid}: Reverting to ${revertStatus}`);
+            console.log(`Unbanning QR ${qr_id}: Reverting to ${revertStatus}`);
 
             // 【DB操作: UpdateItem】
             // statusを復元し、GSI1_PKも同期。BAN関連フィールドを削除。
             await ddb.send(new UpdateCommand({
                 TableName: TABLE_NAME,
-                Key: { PK: `QR#${uuid}`, SK: 'METADATA' },
+                Key: { PK: `QR#${qr_id}`, SK: 'METADATA' },
                 UpdateExpression: 'SET #status = :s, GSI1_PK = :gsi_pk, ts_updated_at = :now REMOVE ban_reason, ts_banned_at',
                 ExpressionAttributeNames: { '#status': 'status' },
                 ExpressionAttributeValues: {
@@ -71,18 +72,18 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 }
             }));
 
-            return successResponse({ message: 'QR Code Unbanned', uuid, status: revertStatus });
+            return successResponse({ message: 'QR Code Unbanned', qr_id, status: revertStatus });
         } else {
             // ====================================================================
             // ACTION: BAN (停止)
             // ====================================================================
-            console.log(`Banning QR ${uuid} (current: ${currentStatus})`);
+            console.log(`Banning QR ${qr_id} (current: ${currentStatus})`);
 
             // 【DB操作: UpdateItem】
             // statusをBANNEDに変更し、理由と実行日時を記録。
             await ddb.send(new UpdateCommand({
                 TableName: TABLE_NAME,
-                Key: { PK: `QR#${uuid}`, SK: 'METADATA' },
+                Key: { PK: `QR#${qr_id}`, SK: 'METADATA' },
                 UpdateExpression: 'SET #status = :banned, GSI1_PK = :gsi_pk, ts_updated_at = :now, ts_banned_at = :now, ban_reason = :reason',
                 ExpressionAttributeNames: { '#status': 'status' },
                 ExpressionAttributeValues: {
@@ -90,7 +91,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 }
             }));
 
-            return successResponse({ message: 'QR Code Banned', uuid, status: 'BANNED' });
+            return successResponse({ message: 'QR Code Banned', qr_id, status: 'BANNED' });
         }
     } catch (error: any) {
         console.error('Admin QR Ban error:', error);

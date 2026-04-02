@@ -21,7 +21,7 @@ export default function SharePage() {
     const t = useTranslations('ReceivePage');
     const params = useParams();
     const searchParams = useSearchParams();
-    const uuid = params?.uuid as string;
+    const qr_id = params?.qr_id as string;
 
     const [loading, setLoading] = useState(true);
     const [data, setData] = useState<any>(null);
@@ -36,7 +36,7 @@ export default function SharePage() {
     useEffect(() => {
         const fetchData = async () => {
             try {
-                const res = await receiveApi.share_get(uuid);
+                const res = await receiveApi.share_get(qr_id);
                 setData(res);
             } catch (err: any) {
                 console.error(err);
@@ -46,7 +46,7 @@ export default function SharePage() {
             }
         };
         fetchData();
-    }, [uuid]);
+    }, [qr_id]);
 
     if (loading) {
         return (

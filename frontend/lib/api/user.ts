@@ -1,4 +1,5 @@
 import { fetchAuthSession } from 'aws-amplify/auth';
+import { UserApiSchema } from '@shared/api-types';
 
 const NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
@@ -56,17 +57,3 @@ function createUserApi<T extends Record<string, any>>(base: typeof userApiBase) 
 
 // 外部公開用のインスタンス
 export const userApi = createUserApi<UserApiSchema>(userApiBase);
-
-/**
- * ユーザー用 API の型定義
- */
-type UserApiSchema = {
-    user_profile_get: {};
-    user_profile_update: { profile: any; deleted_html_image_urls?: string[] };
-    user_profile_uploadurl: { filename: string; content_type: string };
-    user_receiver_get: {};
-    user_receiver_update: { receiver_info: any };
-    user_history_get: {};
-    user_history_sendgift: { uuid: string; pin?: string };
-};
-

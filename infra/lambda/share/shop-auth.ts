@@ -52,8 +52,8 @@ export async function checkUserShopPermission(ddb: DynamoDBDocumentClient, table
  * ユーザーがGlobalAdmin、ショップのオーナーまたはGMであるか確認する
  * @param ddb DynamoDBDocumentClient
  * @param tableName テーブル名
- * @param shopuuid ショップのUUID
- * @param userid ユーザーのID (sub)
+ * @param shop_id ショップのID
+ * @param user_id ユーザーのID (sub)
  * @param event APIGatewayProxyEvent (認証情報を抽出するため)
  * @param groups Cognitoグループ配列 (オーソライザー用)
  * @returns ショップのメタデータ、または権限がない場合はfalse
@@ -61,12 +61,12 @@ export async function checkUserShopPermission(ddb: DynamoDBDocumentClient, table
 export async function checkShopOwnerOrGM(
     ddb: DynamoDBDocumentClient,
     tableName: string,
-    shopuuid: string | undefined,
-    userid: string,
+    shop_id: string | undefined,
+    user_id: string,
     event: any = null,
     groups: string[] = []
 ) {
-    if (!shopuuid || !userid) return false;
+    if (!shop_id || !user_id) return false;
 
     // 1. GlobalAdmin, Administratorのチェック
     let userGroups = groups;
@@ -82,13 +82,13 @@ export async function checkShopOwnerOrGM(
         // GlobalAdminのみは全ショップにアクセス可能
         const shopRes = await ddb.send(new GetCommand({
             TableName: tableName,
-            Key: { PK: `SHOP#${shopuuid}`, SK: 'METADATA' },
+            Key: { PK: `SHOP#${shop_id}`, SK: 'METADATA' },
             ConsistentRead: true
         }));
         return shopRes.Item || false;
     }
 
     // 2. ショップ個別権限のチェック
-    return checkUserShopPermission(ddb, tableName, shopuuid, userid);
+    return checkUserShopPermission(ddb, tableName, shop_id, user_id);
 }
 

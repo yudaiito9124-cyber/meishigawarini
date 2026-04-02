@@ -15,6 +15,7 @@ import { getPublicUrl, getPresignedViewUrl } from './utils/s3';
 import { successResponse, errorResponse } from './utils/response';
 import { ddb, TABLE_NAME, BUCKET_NAME } from './share/db';
 import { getShopId, getUserId, getProductId } from './utils/request';
+import { ShopApiSchema } from '@shared/api-types';
 
 const s3 = new S3Client({});
 
@@ -22,12 +23,12 @@ export const handler: APIGatewayProxyHandler = async (event) => {
     try {
         if (event.httpMethod === 'OPTIONS') return successResponse();
 
-        const body = JSON.parse(event.body || '{}');
+        const body = JSON.parse(event.body || '{}') as ShopApiSchema['shop_products_uploadurl'];
         const userId = getUserId(event);
         const shopId = getShopId(event, body);
         const productId = getProductId(event, body);
-        const { filename, contentType, content_type, folder } = body;
-        const finalContentType = contentType || content_type || 'image/jpeg';
+        const { filename, content_type, folder } = body;
+        const finalContentType = content_type || 'image/jpeg';
         
         if (!shopId || !filename) return errorResponse(400, 'Missing required fields');
         if (!userId) return errorResponse(401, 'Unauthorized');

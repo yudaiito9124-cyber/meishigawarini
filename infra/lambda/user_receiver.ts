@@ -19,6 +19,7 @@ import { GetCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
 import { successResponse, errorResponse } from './utils/response';
 import { ddb, TABLE_NAME } from './share/db';
 import { getUserId, getAction } from './utils/request';
+import { UserApiSchema } from '@shared/api-types';
 
 export const handler: APIGatewayProxyHandler = async (event) => {
     try {
@@ -37,6 +38,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         // DB上の camelCase (zipCode) を API仕様の snake_case (zip_code) に変換します。
         // ====================================================================
         if (action === 'get') {
+            const {} = body as UserApiSchema['user_receiver_get'];
             const getRes = await ddb.send(new GetCommand({
                 TableName: TABLE_NAME,
                 Key: { PK: `USER#${userId}`, SK: 'RECEIVER' }
@@ -66,13 +68,13 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         // API仕様の snake_case (zip_code) を DB上の camelCase (zipCode) に変換して保存します。
         // ====================================================================
         if (action === 'update') {
-            const raw_receiver_info = body.receiverInfo || body.receiver_info;
-            if (!raw_receiver_info) return errorResponse(400, 'Missing receiver_info data');
+            const { receiver_info } = body as UserApiSchema['user_receiver_update'];
+            if (!receiver_info) return errorResponse(400, 'Missing receiver_info data');
 
             // API Payload -> DB Attributes への変換
-            const dbFields: any = { ...raw_receiver_info };
-            if (raw_receiver_info.zip_code !== undefined) {
-                dbFields.zipCode = raw_receiver_info.zip_code;
+            const dbFields: any = { ...receiver_info };
+            if (receiver_info.zip_code !== undefined) {
+                dbFields.zipCode = receiver_info.zip_code;
                 delete dbFields.zip_code;
             }
 

@@ -2,6 +2,6 @@ export const body = `
 {{message}}
 ----------------------------------
 Check here:
-{{baseUrl}}/receive/{{uuid}}
+{{baseUrl}}/receive/{{qr_id}}
 PIN: {{pin}}
 `.trim();

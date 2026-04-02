@@ -28,8 +28,9 @@ export class ShopApi extends cdk.NestedStack {
 
     // Shop Authorizer (Custom Lambda Authorizer)
     const lampath = (name: string) => path.join(__dirname, `../../lambda/${name}.ts`);
+    const authpath = (name: string) => path.join(__dirname, `../../lambda/authorizer/${name}.ts`);
     const shopAuthFn = new nodejs.NodejsFunction(this, 'ShopAuthorizerFn', {
-      entry: lampath('shopAuthorizer'),
+      entry: authpath('shopAuthorizer'),
       environment: {
         USER_POOL_ID: userPool.userPoolId,
         CLIENT_ID: userPoolClient.userPoolClientId,

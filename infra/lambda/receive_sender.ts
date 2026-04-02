@@ -16,7 +16,8 @@ import { stripSignature, deleteFileByUrl, copyS3Object, signUrlIfS3, signUrlsInH
 import { generateId } from './utils/id';
 import { successResponse, errorResponse } from './utils/response';
 import { ddb, TABLE_NAME, BUCKET_NAME } from './share/db';
-import { getUUID, getAction, getUserId } from './utils/request';
+import { getQrId, getAction, getUserId } from './utils/request';
+import { ReceiveApiSchema } from '@shared/api-types';
 
 export const handler: APIGatewayProxyHandler = async (event) => {
     try {
@@ -24,7 +25,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 
         const body = JSON.parse(event.body || '{}');
         const userId = getUserId(event);
-        const uuid = getUUID(event, body);
+        const qr_id = getQrId(event, body);
         let action = getAction(event, body);
 
         // リソースパスに基づくアクションの自動補完 (パスベースのルーティング互換性)
@@ -34,21 +35,20 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         else if (resPath.endsWith('/save')) action = 'save_as_new_user';
         else if (resPath.endsWith('/delete-images')) action = 'delete-images';
 
-        if (!uuid) return errorResponse(400, 'Missing UUID');
+        if (!qr_id) return errorResponse(400, 'Missing QR ID');
 
         // ====================================================================
         // ACTION: update_sender_info (チャット送り主情報の更新)
         // --------------------------------------------------------------------
-        // 目的: 指定されたギフト(UUID)のチャット画面に表示するプロフィールを更新します。
+        // 目的: 指定されたギフト(qr_id)のチャット画面に表示するプロフィールを更新します。
         // ====================================================================
         if (action === 'update_sender_info') {
-            const sender_info = body.senderInfo || body.sender_info;
-            const deleted_html_image_urls = body.deletedHtmlImageUrls || body.deleted_html_image_urls;
-            if (!sender_info) return errorResponse(400, 'Missing senderInfo');
+            const { sender_info, deleted_html_image_urls } = body as ReceiveApiSchema['receive_sender_update'];
+            if (!sender_info) return errorResponse(400, 'Missing sender_info');
 
             // 【ステータスチェック】送り主情報を登録できるのはActiveの状態のみ
             const metaRes = await ddb.send(new GetCommand({
-                TableName: TABLE_NAME, Key: { PK: `QR#${uuid}`, SK: 'METADATA' }
+                TableName: TABLE_NAME, Key: { PK: `QR#${qr_id}`, SK: 'METADATA' }
             }));
             if (!metaRes.Item || metaRes.Item.status !== 'ACTIVE') {
                 return errorResponse(403, 'Sender info can only be updated for active gifts.');
@@ -56,7 +56,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 
             const res = await ddb.send(new UpdateCommand({
                 TableName: TABLE_NAME,
-                Key: { PK: `QR#${uuid}`, SK: 'CHAT' },
+                Key: { PK: `QR#${qr_id}`, SK: 'CHAT' },
                 UpdateExpression: 'SET sender_info = :info',
                 ExpressionAttributeValues: {
                     ':info': {
@@ -77,7 +77,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 if (oldEmail) {
                     await ddb.send(new UpdateCommand({
                         TableName: TABLE_NAME,
-                        Key: { PK: `QR#${uuid}`, SK: 'CHAT' },
+                        Key: { PK: `QR#${qr_id}`, SK: 'CHAT' },
                         UpdateExpression: 'DELETE notification_emails :old_email REMOVE email_preferences.#em',
                         ExpressionAttributeNames: { '#em': oldEmail },
                         ExpressionAttributeValues: { ':old_email': new Set([oldEmail]) }
@@ -86,7 +86,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 if (newEmail) {
                     await ddb.send(new UpdateCommand({
                         TableName: TABLE_NAME,
-                        Key: { PK: `QR#${uuid}`, SK: 'CHAT' },
+                        Key: { PK: `QR#${qr_id}`, SK: 'CHAT' },
                         UpdateExpression: 'ADD notification_emails :new_email',
                         ExpressionAttributeValues: { ':new_email': new Set([newEmail]) }
                     })).catch(e => console.warn('Failed to add new sender email to mailing list:', e));
@@ -119,9 +119,8 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         // 目的: 入力情報をユーザーの「送り主テンプレート」(USER#SENDER)として保存します。
         // ====================================================================
         if (action === 'save_as_new_user') {
-            const sender_info = body.senderInfo || body.sender_info;
-            const id = body.id;
-            if (!sender_info) return errorResponse(400, 'Missing senderInfo');
+            const { sender_info, id } = body as ReceiveApiSchema['receive_sender_save'];
+            if (!sender_info) return errorResponse(400, 'Missing sender_info');
 
             const userid = id ? id.replace('USER#', '').trim() : generateId();
 
@@ -177,7 +176,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         // 目的: ユーザーのテンプレートを現在のチャット(CHAT)へコピーします。
         // ====================================================================
         if (action === 'load_from_id') {
-            let { id } = body;
+            const { id } = body as ReceiveApiSchema['receive_sender_load'];
             if (!id || typeof id !== 'string') return errorResponse(400, 'Missing or invalid ID');
 
             let trimid = id.startsWith("USER#") ? id.replace("USER#", "") : id;
@@ -198,7 +197,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             // チャットレコードへの参照IDセット
             await ddb.send(new UpdateCommand({
                 TableName: TABLE_NAME,
-                Key: { PK: `QR#${uuid}`, SK: 'CHAT' },
+                Key: { PK: `QR#${qr_id}`, SK: 'CHAT' },
                 UpdateExpression: 'SET sender_id = :id',
                 ExpressionAttributeValues: { ':id': trimid }
             }));
@@ -210,11 +209,11 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         // ACTION: delete-images (画像物理削除)
         // ====================================================================
         if (action === 'delete-images') {
-            const { urls } = body;
+            const { urls } = body as ReceiveApiSchema['receive_sender_delete_images'];
             if (!urls || !Array.isArray(urls)) return errorResponse(400, 'Missing urls');
             for (const url of urls) {
                 const cleanUrl = stripSignature(url);
-                if (cleanUrl && cleanUrl.includes(BUCKET_NAME) && (cleanUrl.includes(`qrcode/${uuid}/`) || cleanUrl.includes(`user/`))) {
+                if (cleanUrl && cleanUrl.includes(BUCKET_NAME) && (cleanUrl.includes(`qrcode/${qr_id}/`) || cleanUrl.includes(`user/`))) {
                     await deleteFileByUrl(cleanUrl, BUCKET_NAME);
                 }
             }

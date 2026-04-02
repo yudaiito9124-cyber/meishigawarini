@@ -54,10 +54,11 @@ export class AdminApi extends cdk.NestedStack {
 
 
     const lampath = (name: string) => path.join(__dirname, `../../lambda/${name}.ts`);
+    const authpath = (name: string) => path.join(__dirname, `../../lambda/authorizer/${name}.ts`);
 
     // AdminAuthorizer の作成 （ユーザーがAdminかチェックするための認証処理）
     const adminAuthorizer = new nodejs.NodejsFunction(this, 'adminAuthorizer', {
-      entry: lampath('adminAuthorizer'),
+      entry: authpath('adminAuthorizer'),
       environment: {
         USER_POOL_ID: userPool.userPoolId,
         CLIENT_ID: userPoolClient.userPoolClientId,

@@ -29,8 +29,9 @@ export class UserApi extends cdk.NestedStack {
     // Use Shop Authorizer logic since it correctly authorizes based on Cognito ID Token
     // If no shopId is provided in path, it simply checks token validity and returns userId.
     const lampath = (name: string) => path.join(__dirname, `../../lambda/${name}.ts`);
+    const authpath = (name: string) => path.join(__dirname, `../../lambda/authorizer/${name}.ts`);
     const userAuthFn = new nodejs.NodejsFunction(this, 'UserAuthorizerFn', {
-      entry: lampath('shopAuthorizer'),
+      entry: authpath('shopAuthorizer'),
       environment: {
         USER_POOL_ID: userPool.userPoolId,
         CLIENT_ID: userPoolClient.userPoolClientId,

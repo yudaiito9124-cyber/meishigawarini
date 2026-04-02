@@ -12,6 +12,7 @@ import { CognitoIdentityProviderClient, AdminGetUserCommand } from '@aws-sdk/cli
 import { generateId } from './utils/id';
 import { successResponse, errorResponse, apiResponse } from './utils/response';
 import { ddb, TABLE_NAME } from './share/db';
+import { AdminApiSchema } from '@shared/api-types';
 
 const cognito = new CognitoIdentityProviderClient({});
 const USER_POOL_ID = process.env.USER_POOL_ID;
@@ -21,7 +22,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         if (event.httpMethod === 'OPTIONS') return successResponse();
         if (event.httpMethod !== 'POST') return errorResponse(405, 'Method Not Allowed');
 
-        const body = JSON.parse(event.body || '{}');
+        const body = JSON.parse(event.body || '{}') as AdminApiSchema['admin_shop_create'];
         const { owner_id, name, gm_ids } = body;
         
         if (!owner_id || !name) return errorResponse(400, 'Missing owner_id or name');

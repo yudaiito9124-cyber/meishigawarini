@@ -13,6 +13,7 @@ import { generateId } from './utils/id';
 import { successResponse, errorResponse, apiResponse } from './utils/response';
 import { ddb, TABLE_NAME } from './share/db';
 import { getShopId, getAction, getUserId } from './utils/request';
+import { ShopApiSchema } from '@shared/api-types';
 
 export const handler: APIGatewayProxyHandler = async (event) => {
     try {
@@ -38,7 +39,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         // 目的: ショップに紐づく新規カード発注(CARD_ORDER)レコードの作成
         // ====================================================================
         if (action === 'create') {
-            const { quantity, design_id, product_id, shop_user_id, sender_user_id, expiration_date, activate_now } = body;
+            const { quantity, design_id, product_id, shop_user_id, sender_user_id, expiration_date, activate_now } = body as ShopApiSchema['shop_card_orders_create'];
 
             if (!quantity || !design_id) {
                 return errorResponse(400, 'Missing quantity or design_id');
@@ -101,7 +102,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         // 目的: 「ORDERED」状態の発注をキャンセル済みに変更します。
         // ====================================================================
         if (action === 'cancel') {
-            const { order_id } = body;
+            const { order_id } = body as ShopApiSchema['shop_card_orders_cancel'];
             if (!order_id) return errorResponse(400, 'Missing order_id');
 
             const currentOrder = await ddb.send(new GetCommand({
@@ -135,7 +136,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         // 目的: 発送済み(SHIPPED)の発注を完了(COMPLETED)に変更します。
         // ====================================================================
         if (action === 'complete') {
-            const { order_id } = body;
+            const { order_id } = body as ShopApiSchema['shop_card_orders_complete'];
             if (!order_id) return errorResponse(400, 'Missing order_id');
 
             const currentOrder = await ddb.send(new GetCommand({

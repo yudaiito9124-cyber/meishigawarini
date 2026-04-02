@@ -19,31 +19,31 @@ export async function validateQRParams(
     params: {
         shopId?: string;
         productId?: string;
-        ownerUuid?: string;
+        owner_id?: string;
         activateNow?: boolean;
         senderId?: string;
         senderInfo?: any;
     }
 ) {
-    const { shopId, productId, ownerUuid, activateNow, senderId, senderInfo } = params;
+    const { shopId, productId, owner_id, activateNow, senderId, senderInfo } = params;
 
-    // 1. owner_uuid の検証 (提供されている場合)
+    // 1. owner_id の検証 (提供されている場合)
     let user_shop_ids: string[] = [];
-    if (ownerUuid) {
+    if (owner_id) {
         // 【DB操作: GetItem】
         // - 目的: オーナー指定がある場合、ユーザー情報の存在とショップ権限を確認
         // - テーブル: tableName
-        // - 検索条件: PK = USER#{ownerUuid}, SK = "SHOP"
+        // - 検索条件: PK = USER#{owner_id}, SK = "SHOP"
         // - 取得属性: owner_shop_ids, gm_shop_ids
         const userRes = await ddbDocClient.send(new GetCommand({
             TableName: tableName,
-            Key: { PK: `USER#${ownerUuid}`, SK: 'SHOP' }
+            Key: { PK: `USER#${owner_id}`, SK: 'SHOP' }
         }));
         if (!userRes.Item) {
             throw { 
                 statusCode: 400, 
                 message: 'User ID not found', 
-                detail: { ownerUuid } 
+                detail: { owner_id } 
             };
         }
         user_shop_ids = [
@@ -102,7 +102,7 @@ export async function validateQRParams(
 
     // 4. 整合性チェック (admin_qr_generate.ts と同一のアルゴリズム)
     let isLinkeable = false;
-    if (shopId && productId && ownerUuid) {
+    if (shopId && productId && owner_id) {
         if (!product_shopids.includes(shopId)) {
             throw { 
                 statusCode: 400, 
@@ -127,7 +127,7 @@ export async function validateQRParams(
             };
         }
         isLinkeable = true;
-    } else if (shopId && ownerUuid) {
+    } else if (shopId && owner_id) {
         if (!user_shop_ids.includes(shopId)) {
             throw { 
                 statusCode: 400, 
@@ -135,7 +135,7 @@ export async function validateQRParams(
                 detail: { user_shop_ids, shopId } 
             };
         }
-    } else if (productId && ownerUuid) {
+    } else if (productId && owner_id) {
         let set_shopids_fromproductid = new Set(product_shopids);
         if (!user_shop_ids.some((item: any) => set_shopids_fromproductid.has(item))) {
             throw { 

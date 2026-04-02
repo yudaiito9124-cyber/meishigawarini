@@ -17,7 +17,8 @@ import { signUrlIfS3, signUrlsInHtml } from './utils/s3';
 import { getSystemDesign } from './utils/designs';
 import { successResponse, errorResponse } from './utils/response';
 import { ddb, TABLE_NAME, BUCKET_NAME } from './share/db';
-import { getUUID, getPIN } from './utils/request';
+import { getQrId, getPIN } from './utils/request';
+import { ReceiveApiSchema } from '@shared/api-types';
 
 const cognito = new CognitoIdentityProviderClient({});
 const USER_POOL_ID = process.env.USER_POOL_ID || '';
@@ -27,17 +28,17 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         if (event.httpMethod === 'OPTIONS') return successResponse();
         if (event.httpMethod !== 'POST') return errorResponse(405, 'Method Not Allowed');
 
-        const body = JSON.parse(event.body || '{}');
-        const uuid = getUUID(event, body);
+        const body = JSON.parse(event.body || '{}') as ReceiveApiSchema['receive_verify'];
+        const qr_id = getQrId(event, body);
         const pin = getPIN(event, body);
         const { password } = body;
 
-        if (!uuid || !pin) return errorResponse(400, 'Missing uuid or pin');
+        if (!qr_id || !pin) return errorResponse(400, 'Missing qr_id or pin');
 
         // 【確認フェーズ 1: QRコードの状態確認】
         // Note: PIN認証と連続試行制限は receiveAuthorizer.ts で既に検証済みです。
         const qrRes = await ddb.send(new GetCommand({
-            TableName: TABLE_NAME, Key: { PK: `QR#${uuid}`, SK: 'METADATA' }
+            TableName: TABLE_NAME, Key: { PK: `QR#${qr_id}`, SK: 'METADATA' }
         }));
         if (!qrRes.Item) return errorResponse(404, 'Invalid Gift or PIN');
 
@@ -63,7 +64,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         if (status === 'ACTIVE' && item.ts_expired_at && now > new Date(item.ts_expired_at)) {
             status = 'EXPIRED';
             await ddb.send(new UpdateCommand({
-                TableName: TABLE_NAME, Key: { PK: `QR#${uuid}`, SK: 'METADATA' },
+                TableName: TABLE_NAME, Key: { PK: `QR#${qr_id}`, SK: 'METADATA' },
                 UpdateExpression: 'SET #status = :expired, GSI1_PK = :gsi_pk, ts_updated_at = :now',
                 ExpressionAttributeNames: { '#status': 'status' },
                 ExpressionAttributeValues: { ':expired': 'EXPIRED', ':gsi_pk': 'QR#EXPIRED', ':now': now.toISOString() }
@@ -85,7 +86,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         if (shopId) keys.push({ PK: `SHOP#${shopId}`, SK: 'METADATA' });
         if (shopId && productId) keys.push({ PK: `SHOP#${shopId}`, SK: `PRODUCT#${productId}` });
         if (designId) keys.push({ PK: 'CARD_DESIGN#METADATA', SK: designId });
-        if (isAuthorizedByPassword && status === 'SHIPPED') keys.push({ PK: `QR#${uuid}`, SK: 'ORDER' });
+        if (isAuthorizedByPassword && status === 'SHIPPED') keys.push({ PK: `QR#${qr_id}`, SK: 'ORDER' });
 
         const batchRes = await ddb.send(new BatchGetCommand({
             RequestItems: { [TABLE_NAME]: { Keys: keys } }
@@ -96,7 +97,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         const product = responses.find(r => r.PK === `SHOP#${shopId}` && r.SK === `PRODUCT#${productId}`);
         const designMeta = responses.find(r => r.PK === 'CARD_DESIGN#METADATA' && r.SK === designId);
         const design = designMeta || getSystemDesign(designId);
-        const order = responses.find(r => r.PK === `QR#${uuid}` && r.SK === 'ORDER');
+        const order = responses.find(r => r.PK === `QR#${qr_id}` && r.SK === 'ORDER');
 
         // ショップオーナーのEmailフォールバック (Cognito)
         let shopEmail = shop?.email;
@@ -108,7 +109,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         }
 
         const result: any = {
-            uuid, status, shop_id: shopId, product_id: productId,
+            qr_id, status, shop_id: shopId, product_id: productId,
             shop_name: shop?.name,
             shop_detail_html: shop?.detail_html ? await signUrlsInHtml(shop.detail_html, BUCKET_NAME) : undefined,
             shop_email: shopEmail,

@@ -1,4 +1,5 @@
 import { fetchAuthSession } from 'aws-amplify/auth';
+import { AdminApiSchema } from '@shared/api-types';
 
 const NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
@@ -60,50 +61,5 @@ function createAdminApi<T extends Record<string, any>>(base: typeof adminApiBase
 
 // 外部公開用のインスタンス
 export const adminApi = createAdminApi<AdminApiSchema>(adminApiBase);
-
-
-
-////////////////////////////////////////////////////////////////////////////////////////
-// lambda関数を変更したら以下の型定義を更新してください
-////////////////////////////////////////////////////////////////////////////////////////
-/**
- * 管理者用 API の型定義
- * キー名がそのまま API パス（/admin/キー名）として使用されます。
- * _ は / に置換されます
- */
-type AdminApiSchema = {
-    // 管理
-    admin_dump: { pks: string[] }; //PKでレコードを取得
-    admin_links: { shop_ids: string[]; user_ids: string[]; action: "validate" | "execute" }; //ショップと別の管理者をリンク
-    admin_changeowner: { shop_id: string, new_user_id: string, action: "validate" | "execute" }; // ショップのオーナー変更
-    admin_shop_create: { name: string; description?: string; owner_id?: string; gm_ids?: string[] }; // ショップの作成
-    admin_shop_carddesign_link_get: { shop_id: string }; // ショップとカードデザインの紐付け取得
-    admin_shop_carddesign_link_update: { shop_id: string; card_designs: string[] }; // ショップとカードデザインの紐付け更新
-    // QRコード
-    admin_qr_ban: { uuid: string; reason?: string }; //QRコードをBAN / 解除
-    admin_qr_deleteban: { target?: string }; //BANされたQRコードを削除 (指定がない場合は全件)
-    admin_qr_generate: {
-        count: number;
-        shop_id?: string;
-        product_id?: string;
-        expiry_date?: string;
-        owner_uuid?: string;
-        sender_info?: { [key: string]: any };
-        sender_id?: string;
-        activate_now?: boolean;
-        card_design: string
-    }; //QRコードを生成
-    admin_qr_list: { status: string, keyword?: string, limit?: number }; //QRコードのリストを取得 (limit: 取得件数制限)
-    // カードデザイン
-    admin_carddesigns_list: {}; //カードデザインのリストを取得
-    admin_carddesigns_create: { design_id: string; design: { [key: string]: any } }; //カードデザインを作成
-    admin_carddesigns_update: { design_id: string; design: { [key: string]: any } }; //カードデザインを更新
-    admin_carddesigns_delete: { design_id: string }; //カードデザインを削除
-    admin_carddesigns_uploadurl: { filename: string; content_type: string; design_id: string }; //カードデザインのアップロードURLを取得
-    admin_card_orders_list: { status?: string; limit?: number }; //カード発注のリストを取得
-    admin_card_orders_update: { shop_id: string; order_id: string; status: string }; //カード発注のステータスを更新
-};
-
-
 
 // {@link /documents/ADMIN_API_REFERENCE.md}

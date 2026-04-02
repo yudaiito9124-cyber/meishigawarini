@@ -86,8 +86,8 @@ async function getRawDataUrl(url: string | null, appBase: string, mimeType: stri
   return `data:${mimeType};base64,${buffer.toString('base64')}`;
 }
 
-export default async function Image({ params }: { params: Promise<{ uuid: string; locale: string }> }) {
-  const { uuid } = await params;
+export default async function Image({ params }: { params: Promise<{ qr_id: string; locale: string }> }) {
+  const { qr_id } = await params;
   const headerList = await headers();
   const host = headerList.get('host') || 'localhost:3000';
   const protocol = host.includes('localhost') ? 'http' : 'https';
@@ -110,7 +110,7 @@ export default async function Image({ params }: { params: Promise<{ uuid: string
   let data: any = null;
   try {
     if (apiBase) {
-      const res = await fetch(`${apiBase}/share/${uuid}`, { next: { revalidate: 3600 } });
+      const res = await fetch(`${apiBase}/share/${qr_id}`, { next: { revalidate: 3600 } });
       if (res.ok) data = await res.json();
     }
   } catch (e) {

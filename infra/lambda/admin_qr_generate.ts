@@ -15,23 +15,24 @@ import { validateQRParams } from './utils/qr-validation';
 import { successResponse, errorResponse } from './utils/response';
 import { ddb, TABLE_NAME, BUCKET_NAME } from './share/db';
 import { getShopId, getUserId, getProductId } from './utils/request';
+import { AdminApiSchema } from '@shared/api-types';
 
 export const handler: APIGatewayProxyHandler = async (event) => {
     try {
         if (event.httpMethod === 'OPTIONS') return successResponse();
 
-        const body = JSON.parse(event.body || '{}');
+        const body = JSON.parse(event.body || '{}') as AdminApiSchema['admin_qr_generate'];
         const count = body.count || 1;
         const shopId = getShopId(event, body);
         const productId = getProductId(event, body);
-        const expiryDate = body.expiry_date || body.expiryDate;
-        const ownerUuid = body.owner_uuid || body.ownerUuid;
-        const senderInfo = body.sender_info || body.senderInfo;
-        let senderId = body.senderId || body.sender_id;
-        const activateNow = body.activate_now === true || body.activateNow === true;
-        const cardDesign = body.card_design || body.cardDesign;
+        const expiryDate = body.expiry_date;
+        const owner_id = body.owner_id || body.owner_user_id || (body as any).owner_uuid;
+        const senderInfo = body.sender_info;
+        let senderId = body.sender_id;
+        const activateNow = body.activate_now === true;
+        const cardDesign = body.card_design;
 
-        // 生成件数の上限チェック (25件の倍数等を考慮しつつ100件まで)
+        // 生成件数の上限チェック (一旦100件まで)
         if (count > 100) {
             return errorResponse(400, 'Max 100 items per batch', { count });
         }
@@ -40,7 +41,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         const validationResult: any = await validateQRParams(ddb, TABLE_NAME, BUCKET_NAME, {
             shopId,
             productId,
-            ownerUuid,
+            owner_id,
             activateNow,
             senderId,
             senderInfo
@@ -60,7 +61,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         const writeRequests = [];
 
         for (let i = 0; i < count; i++) {
-            const uuid = generateId();
+            const qr_id = generateId();
             let pin = '';
             do {
                 // 8桁のPIN生成 (ゾロ目を避ける)
@@ -71,7 +72,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 
             // METADATA 項目の構築
             const item: any = {
-                PK: `QR#${uuid}`,
+                PK: `QR#${qr_id}`,
                 SK: 'METADATA',
                 pin: pin,
                 batch_id: batch_id,
@@ -80,7 +81,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             };
 
             if (expiryDate) item.ts_expired_at = expiryDate;
-            if (ownerUuid) item.owner_id = ownerUuid;
+            if (owner_id) item.owner_id = owner_id;
             if (shopId) {
                 item.shop_id = shopId;
                 item.GSI2_PK = `SHOP#${shopId}`;
@@ -120,7 +121,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 writeRequests.push({
                     PutRequest: {
                         Item: {
-                            PK: `QR#${uuid}`,
+                            PK: `QR#${qr_id}`,
                             SK: 'CHAT',
                             sender_id: processedSenderInfo.sender_id,
                             ts_created_at: now,
@@ -130,7 +131,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 });
             }
 
-            ids.push({ uuid, pin });
+            ids.push({ qr_id, pin });
         }
 
         // 25件ずつのバッチ書き込みを実行 (BatchWriteCommand は DocumentClient 用)

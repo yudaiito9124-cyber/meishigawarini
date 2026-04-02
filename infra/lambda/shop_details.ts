@@ -14,6 +14,7 @@ import { getSystemDesign } from './utils/designs';
 import { successResponse, errorResponse } from './utils/response';
 import { ddb, TABLE_NAME, BUCKET_NAME } from './share/db';
 import { getShopId, getAction, getUserId } from './utils/request';
+import { ShopApiSchema } from '@shared/api-types';
 
 export const handler: APIGatewayProxyHandler = async (event) => {
     try {
@@ -86,7 +87,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         // ACTION: update (ショップ詳細の更新)
         // ====================================================================
         if (action === 'update') {
-            const { name, detail_html, html_image_urls, deleted_html_image_urls } = body;
+            const { name, detail_html, html_image_urls, deleted_html_image_urls } = body as ShopApiSchema['shop_details_update'];
             const updateExpr: string[] = ['ts_updated_at = :now'];
             const attrNames: any = {};
             const attrValues: any = { ':now': new Date().toISOString() };

@@ -5,6 +5,6 @@ You have a new message from {{username}}.
 ----------------------------------
 
 Check here:
-{{baseUrl}}/receive/{{uuid}}
+{{baseUrl}}/receive/{{qr_id}}
 PIN: {{pin}}
 `.trim();

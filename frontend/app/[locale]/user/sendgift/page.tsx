@@ -16,13 +16,13 @@ export default function SendGiftPage() {
     const router = useRouter();
 
     const [isScanning, setIsScanning] = useState(false);
-    const [scannedUuids, setScannedUuids] = useState<string[]>([]);
+    const [scannedQrIds, setScannedQrIds] = useState<string[]>([]);
     const [scannedUrl, setScannedUrl] = useState("");
     const [showManualInput, setShowManualInput] = useState(false);
     const [processing, setProcessing] = useState(false);
     const [successMsg, setSuccessMsg] = useState("");
     const [errorMsg, setErrorMsg] = useState("");
-    const [bulkResults, setBulkResults] = useState<Array<{ uuid: string, status: 'success' | 'error', message?: string }>>([]);
+    const [bulkResults, setBulkResults] = useState<Array<{ qrId: string, status: 'success' | 'error', message?: string }>>([]);
     const [isConfirming, setIsConfirming] = useState(false);
     const [completedCount, setCompletedCount] = useState(0);
 
@@ -35,31 +35,31 @@ export default function SendGiftPage() {
             if (!trimmedInput) return;
 
             // 1. URL解析
-            let extractedUuid = "";
+            let extractedQrId = "";
             try {
                 if (trimmedInput.includes('://') || trimmedInput.startsWith('/') || trimmedInput.startsWith('receive/')) {
                     const url = trimmedInput.includes('://') ? new URL(trimmedInput) : new URL(trimmedInput.startsWith('/') ? trimmedInput : `/${trimmedInput}`, window.location.origin);
                     const pathParts = url.pathname.split('/');
-                    const uuidIndex = pathParts.findIndex(p => p === 'receive');
-                    if (uuidIndex !== -1 && pathParts[uuidIndex + 1]) {
-                        extractedUuid = pathParts[uuidIndex + 1];
+                    const qrIdIndex = pathParts.findIndex(p => p === 'receive');
+                    if (qrIdIndex !== -1 && pathParts[qrIdIndex + 1]) {
+                        extractedQrId = pathParts[qrIdIndex + 1];
                     }
                 }
             } catch (e) {
                 // Ignore
             }
 
-            // 2. UUID形式チェック (URLでなかったら生のID)
-            if (!extractedUuid) {
+            // 2. ID形式チェック (URLでなかったら生のID)
+            if (!extractedQrId) {
                 const idRegex = /^[a-zA-Z0-9\-_]+$/;
                 if (idRegex.test(trimmedInput) && trimmedInput.length >= 8) {
-                    extractedUuid = trimmedInput;
+                    extractedQrId = trimmedInput;
                 }
             }
 
-            if (extractedUuid) {
-                if (!scannedUuids.includes(extractedUuid)) {
-                    setScannedUuids(prev => [...prev, extractedUuid]);
+            if (extractedQrId) {
+                if (!scannedQrIds.includes(extractedQrId)) {
+                    setScannedQrIds(prev => [...prev, extractedQrId]);
                 }
                 setScannedUrl(""); // 手動入力欄をクリア
             } else {
@@ -72,22 +72,22 @@ export default function SendGiftPage() {
     };
 
     const handleBulkLink = async () => {
-        if (scannedUuids.length === 0) return;
+        if (scannedQrIds.length === 0) return;
 
         setIsConfirming(false);
         setProcessing(true);
         setCompletedCount(0);
-        const results: Array<{ uuid: string, status: 'success' | 'error', message?: string }> = [];
+        const results: Array<{ qrId: string, status: 'success' | 'error', message?: string }> = [];
 
-        for (let i = 0; i < scannedUuids.length; i++) {
-            const uuid = scannedUuids[i];
+        for (let i = 0; i < scannedQrIds.length; i++) {
+            const qrId = scannedQrIds[i];
             try {
                 // PINは一旦無効化
-                await userApi.user_history_sendgift({ uuid, pin: "" });
-                results.push({ uuid, status: 'success' });
+                await userApi.user_history_sendgift({ qr_id: qrId, pin: "" });
+                results.push({ qrId, status: 'success' });
             } catch (e: any) {
                 results.push({
-                    uuid,
+                    qrId,
                     status: 'error',
                     message: e.message
                 });
@@ -148,7 +148,7 @@ export default function SendGiftPage() {
                                     {bulkResults.map((res, idx) => (
                                         <div key={idx} className={`p-3 rounded-xl border flex justify-between items-center ${res.status === 'success' ? 'bg-green-50 border-green-100' : 'bg-red-50 border-red-100'}`}>
                                             <div className="flex flex-col overflow-hidden">
-                                                <span className="text-[10px] font-mono text-gray-400 truncate">{res.uuid}</span>
+                                                <span className="text-[10px] font-mono text-gray-400 truncate">{res.qrId}</span>
                                                 {res.message && <span className="text-xs text-red-600 font-medium mt-1">{tb(res.message) || res.message}</span>}
                                             </div>
                                             {res.status === 'success' ? <CheckCircle2 className="w-4 h-4 text-green-600 shrink-0" /> : <X className="w-4 h-4 text-red-600 shrink-0" />}
@@ -161,7 +161,7 @@ export default function SendGiftPage() {
                                 <Button
                                     onClick={() => {
                                         setSuccessMsg("");
-                                        setScannedUuids([]);
+                                        setScannedQrIds([]);
                                         setBulkResults([]);
                                         setIsConfirming(false);
                                     }}
@@ -184,7 +184,7 @@ export default function SendGiftPage() {
                                 <QrCode className="w-12 h-12 text-orange-600 mx-auto" />
                                 <h3 className="text-xl font-black text-gray-900">{t('bulkScan.confirmTitle')}</h3>
                                 <p className="text-sm text-gray-500">
-                                    {t('bulkScan.confirmDesc', { count: scannedUuids.length })}
+                                    {t('bulkScan.confirmDesc', { count: scannedQrIds.length })}
                                 </p>
                                 <div className="text-[10px] text-gray-400 space-y-1">
                                     <p>{t('bulkScan.undoNotice')}</p>
@@ -194,10 +194,10 @@ export default function SendGiftPage() {
 
                             <div className="bg-gray-50 rounded-2xl p-4 max-h-40 overflow-y-auto border border-gray-100">
                                 <ul className="space-y-2">
-                                    {scannedUuids.map((uuid, idx) => (
+                                    {scannedQrIds.map((qrId, idx) => (
                                         <li key={idx} className="text-[10px] font-mono text-gray-500 flex items-center gap-2">
                                             <span className="w-1.5 h-1.5 bg-orange-300 rounded-full" />
-                                            {uuid}
+                                            {qrId}
                                         </li>
                                     ))}
                                 </ul>
@@ -240,7 +240,7 @@ export default function SendGiftPage() {
                                                     {t('bulkScan.scanningNotice')}
                                                 </div>
                                                 <div className="text-[12px] bg-black/60 text-white font-bold px-3 py-1 rounded-full border border-white/20">
-                                                    {t('bulkScan.scannedCount', { count: scannedUuids.length })}
+                                                    {t('bulkScan.scannedCount', { count: scannedQrIds.length })}
                                                 </div>
                                             </div>
                                         </div>
@@ -267,26 +267,26 @@ export default function SendGiftPage() {
                                             </div>
                                         </Button>
 
-                                        {scannedUuids.length > 0 && (
+                                        {scannedQrIds.length > 0 && (
                                             <div className="bg-orange-50/50 rounded-[2rem] p-6 border border-orange-100/50 space-y-6 animate-in fade-in zoom-in-95 duration-500">
                                                 <div className="flex justify-between items-center">
                                                     <div className="flex items-center gap-2">
                                                         <span className="w-2 h-2 bg-orange-500 rounded-full animate-pulse" />
-                                                        <h4 className="text-sm font-black text-orange-800 uppercase tracking-widest">{t('bulkScan.scannedListTitle', { count: scannedUuids.length })}</h4>
+                                                        <h4 className="text-sm font-black text-orange-800 uppercase tracking-widest">{t('bulkScan.scannedListTitle', { count: scannedQrIds.length })}</h4>
                                                     </div>
-                                                    <Button variant="ghost" size="sm" onClick={() => setScannedUuids([])} className="h-8 rounded-full text-[10px] font-black text-orange-600 hover:bg-orange-100">
+                                                    <Button variant="ghost" size="sm" onClick={() => setScannedQrIds([])} className="h-8 rounded-full text-[10px] font-black text-orange-600 hover:bg-orange-100">
                                                         {t('bulkScan.clearAll')}
                                                     </Button>
                                                 </div>
                                                 <div className="max-h-44 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
-                                                    {scannedUuids.map((uuid, idx) => (
+                                                    {scannedQrIds.map((qrId, idx) => (
                                                         <div key={idx} className="text-[10px] font-mono font-bold text-orange-600 bg-white px-4 py-3 rounded-2xl flex justify-between items-center group shadow-sm border border-orange-50">
-                                                            <span className="truncate mr-4">{uuid}</span>
+                                                            <span className="truncate mr-4">{qrId}</span>
                                                             <Button
                                                                 variant="ghost"
                                                                 size="icon"
                                                                 className="w-6 h-6 rounded-full hover:bg-red-50 hover:text-red-500 text-gray-300 transition-colors"
-                                                                onClick={() => setScannedUuids(prev => prev.filter(u => u !== uuid))}
+                                                                onClick={() => setScannedQrIds(prev => prev.filter(u => u !== qrId))}
                                                             >
                                                                 <X className="w-3.5 h-3.5" />
                                                             </Button>
@@ -356,7 +356,7 @@ export default function SendGiftPage() {
                             <Loader2 className="w-16 h-16 text-orange-500 animate-spin" />
                             <div className="absolute inset-0 flex items-center justify-center">
                                 <span className="text-[10px] font-bold text-orange-600">
-                                    {Math.round((completedCount / scannedUuids.length) * 100)}%
+                                    {Math.round((completedCount / scannedQrIds.length) * 100)}%
                                 </span>
                             </div>
                         </div>
@@ -364,12 +364,12 @@ export default function SendGiftPage() {
                             <h3 className="font-black text-xl text-gray-900">{t('bulkScan.processingTitle')}</h3>
                             <div className="flex flex-col items-center gap-1">
                                 <p className="text-gray-500 font-bold">
-                                    {completedCount} / {scannedUuids.length}
+                                    {completedCount} / {scannedQrIds.length}
                                 </p>
                                 <div className="w-48 h-1.5 bg-gray-100 rounded-full overflow-hidden">
                                     <div
                                         className="h-full bg-gradient-to-r from-orange-500 to-red-500 transition-all duration-300 ease-out"
-                                        style={{ width: `${(completedCount / scannedUuids.length) * 100}%` }}
+                                        style={{ width: `${(completedCount / scannedQrIds.length) * 100}%` }}
                                     />
                                 </div>
                             </div>

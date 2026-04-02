@@ -150,7 +150,7 @@ export default function AdminPage() {
                 ...(useMetadataOptions ? {
                     shop_id: shopId || undefined,
                     product_id: productId || undefined,
-                    owner_uuid: ownerUuid || undefined,
+                    owner_user_id: ownerUuid || undefined,
                     sender_id: senderId || undefined,
                     expiry_date: expiryDate ? new Date(expiryDate).toISOString() : undefined,
                     activate_now: activateNow
@@ -272,6 +272,10 @@ export default function AdminPage() {
                     </button>
                 </div>
 
+
+
+
+
                 {activeTab === "qrcodes" && (
                     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
 
@@ -286,6 +290,11 @@ export default function AdminPage() {
                         />
                     </div>
                 )}
+
+
+
+
+
                 {activeTab === "cardorders" && (
                     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
                         <CardOrderListSection
@@ -330,10 +339,10 @@ export default function AdminPage() {
                                                     onChange={(e) => setCardFormat(e.target.value)}
                                                 >
                                                     {Object.entries(cardformats).map(([key, value]: [string, any]) => (
-                                                        <option key={key} value={key}>{value.description || key} [System]</option>
+                                                        <option key={key} value={key}>{value.name || key} [System]</option>
                                                     ))}
                                                     {dbCardDesigns.map((d: any) => (
-                                                        <option key={d.design_id} value={d.design_id}>{d.description} [DB]</option>
+                                                        <option key={d.design_id} value={d.design_id}>{d.name || d.design_id} [DB]</option>
                                                     ))}
                                                 </select>
                                             </div>
@@ -416,7 +425,7 @@ export default function AdminPage() {
                                         <div className="grid w-full items-center gap-1.5">
                                             <div className="flex items-center gap-2">
                                                 <div className={cn("w-3 h-3 rounded-full items-center justify-center", ownerUuid ? "bg-red-500" : "bg-gray-500")}></div>
-                                                <label htmlFor="ownerUuid" className="text-sm font-medium">{t('generate.ownerUuid')}</label>
+                                                <label htmlFor="ownerUuid" className="text-sm font-medium">{t('generate.ownerUserId')}</label>
                                             </div>
                                             <Input
                                                 id="ownerUuid"
@@ -508,21 +517,21 @@ export default function AdminPage() {
                                                 <div className="flex flex-wrap items-center mb-2">
                                                     <div className="flex gap-2 flex-wrap flex-rows items-center">
                                                         <div>
-                                                        <div className="flex items-center gap-1">
-                                                            <p className="font-medium">{t('batches.batchId', { id: batch.id })}</p>
-                                                            <Button
-                                                                variant="ghost"
-                                                                size="icon"
-                                                                className="h-4 w-4"
-                                                                onClick={() => handleCopy(batch.id)}
-                                                            >
-                                                                {copiedId === batch.id ? (
-                                                                    <Check className="h-3 w-3 text-green-500" />
-                                                                ) : (
-                                                                    <Copy className="h-3 w-3" />
-                                                                )}
-                                                            </Button>
-                                                        </div>
+                                                            <div className="flex items-center gap-1">
+                                                                <p className="font-medium">{t('batches.batchId', { id: batch.id })}</p>
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="icon"
+                                                                    className="h-4 w-4"
+                                                                    onClick={() => handleCopy(batch.id)}
+                                                                >
+                                                                    {copiedId === batch.id ? (
+                                                                        <Check className="h-3 w-3 text-green-500" />
+                                                                    ) : (
+                                                                        <Copy className="h-3 w-3" />
+                                                                    )}
+                                                                </Button>
+                                                            </div>
                                                             <p className="text-sm text-gray-500">{t('batches.info', { count: batch.count, date: batch.date })}</p>
                                                         </div>
                                                         <p className="flex justify-center items-center text-sm bg-green-100 text-green-800 px-3 py-1 rounded-xl">{batch.status}</p>
@@ -591,23 +600,23 @@ export default function AdminPage() {
                                                     <table className="w-full text-left">
                                                         <thead>
                                                             <tr>
-                                                                <th>{t('batches.table.uuid')}</th>
+                                                                <th>{t('batches.table.qrId')}</th>
                                                                 <th>{t('batches.table.pin')}</th>
                                                             </tr>
                                                         </thead>
                                                         <tbody>
                                                             {batch.codes?.map((code: any) => (
-                                                                <tr key={code.uuid} className="border-b border-gray-200 last:border-0 group">
+                                                                <tr key={code.qrId || (code as any).uuid} className="border-b border-gray-200 last:border-0 group">
                                                                     <td className="pr-4 py-0.5 select-all text-[10px] break-all">
                                                                         <div className="flex items-center gap-1">
-                                                                            {code.uuid}
+                                                                            {code.qrId || (code as any).uuid}
                                                                             <Button
                                                                                 variant="ghost"
                                                                                 size="icon"
                                                                                 className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity"
-                                                                                onClick={() => handleCopy(code.uuid)}
+                                                                                onClick={() => handleCopy(code.qrId || (code as any).uuid)}
                                                                             >
-                                                                                {copiedId === code.uuid ? (
+                                                                                {copiedId === (code.qrId || (code as any).uuid) ? (
                                                                                     <Check className="h-2 w-2 text-green-500" />
                                                                                 ) : (
                                                                                     <Copy className="h-2 w-2" />
@@ -647,6 +656,10 @@ export default function AdminPage() {
                     </div>
                 )}
 
+
+
+
+
                 {activeTab === "shops" && (
                     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
                         {/* ショップのメタデータ管理 (NEW) */}
@@ -663,6 +676,10 @@ export default function AdminPage() {
                     </div>
                 )}
 
+
+
+
+
                 {activeTab === "tools" && (
                     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
                         {/* データダンプ */}
@@ -670,11 +687,19 @@ export default function AdminPage() {
                     </div>
                 )}
 
+
+
+
+
                 {activeTab === "designs" && (
                     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
                         <CardDesignEditor apiUrl={NEXT_PUBLIC_API_URL} />
                     </div>
                 )}
+
+
+
+
 
             </div>
         </div>
@@ -709,7 +734,7 @@ function QRCodeListSection({ apiUrl, onGeneratePDF, paperFormat, cardFormat, dbC
 
         // Header for CSV
         const headers = [
-            t('list.table.uuid'),
+            t('list.table.qrId'),
             t('list.table.pin'),
             t('list.table.status'),
             t('list.table.createdAt'),
@@ -729,7 +754,7 @@ function QRCodeListSection({ apiUrl, onGeneratePDF, paperFormat, cardFormat, dbC
 
         // Map data to rows
         const rows = codes.map(item => {
-            const uuid = item.PK.replace('QR#', '');
+            const qrId = item.PK.replace('QR#', '');
             const statusLabel = st(item.status ? item.status.toLowerCase() : 'active');
             const updatedAt = item.ts_updated_at ? new Date(item.ts_updated_at).toLocaleString() : '-';
             const email = item.shipping_info?.email || '-';
@@ -738,7 +763,7 @@ function QRCodeListSection({ apiUrl, onGeneratePDF, paperFormat, cardFormat, dbC
             const preferredDateTime = `${item.preferred_date ? item.preferred_date : '-'} / ${item.preferred_time ? tt(item.preferred_time) : '-'}`;
 
             return [
-                uuid,
+                qrId,
                 item.pin || '-',
                 statusLabel,
                 updatedAt,
@@ -902,7 +927,7 @@ function QRCodeListSection({ apiUrl, onGeneratePDF, paperFormat, cardFormat, dbC
                                 <TableHead className={cn("py-1 ", isDense ? "w-[90px] h-6 px-1 text-[9px]" : "w-[120px] h-8 px-2")}>{t('list.table.createdAt')}</TableHead>
                                 <TableHead className={cn("py-1 text-center", isDense ? "w-[100px] h-6 px-1 text-[9px]" : "w-[120px] h-8 px-2")}>{t('list.table.status')}</TableHead>
                                 <TableHead className={cn("py-1 w-[90px] text-center hidden sm:table-cell", isDense ? "h-6 px-1 text-[9px]" : "h-8 px-2")}>{t('list.table.pin')}</TableHead>
-                                <TableHead className={cn("py-1 min-w-[110px] break-all", isDense ? "h-6 px-1 text-[9px]" : "h-8 px-2")}>{t('list.table.uuid')}</TableHead>
+                                <TableHead className={cn("py-1 min-w-[110px] break-all", isDense ? "h-6 px-1 text-[9px]" : "h-8 px-2")}>{t('list.table.qrIdLabel')}</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -962,7 +987,7 @@ function QRCodeRow({ item, apiUrl, onGeneratePDF, onRefresh, paperFormat, cardFo
         });
     };
 
-    const uuid = item.PK.replace('QR#', '');
+    const qrId = item.PK.replace('QR#', '');
 
     const statusColor = (
         item.status === 'UNASSIGNED' ? 'bg-gray-100' :
@@ -992,7 +1017,7 @@ function QRCodeRow({ item, apiUrl, onGeneratePDF, onRefresh, paperFormat, cardFo
                         {item.pin}
                     </TableCell>
                     <TableCell className={cn("font-mono select-all py-0 min-w-[110px] break-all", isDense ? "text-[9px] px-1" : "text-[11px] px-2")}>
-                        {uuid}
+                        {qrId}
                     </TableCell>
                 </TableRow>
             </DialogTrigger>
@@ -1002,21 +1027,21 @@ function QRCodeRow({ item, apiUrl, onGeneratePDF, onRefresh, paperFormat, cardFo
                     <DialogDescription asChild>
                         <div className="font-mono text-sm text-gray-500 w-full flex flex-col gap-0 text-left mt-4 text-center sm:text-left">
                             <div className="flex items-center gap-2">
-                                ID:
+                                {t('list.table.qrIdLabel')}:
                                 <Button
                                     variant="ghost"
                                     size="icon"
                                     className="h-6 w-6"
-                                    onClick={() => handleCopy(uuid)}
+                                    onClick={() => handleCopy(qrId)}
                                 >
-                                    {copiedId === uuid ? (
+                                    {copiedId === qrId ? (
                                         <Check className="h-3 w-3 text-green-500" />
                                     ) : (
                                         <Copy className="h-3 w-3" />
                                     )}
                                 </Button>
-                                <ExternalLink className="cursor-pointer w-4 h-4 shrink-0" onClick={() => window.open(`/${locale}/receive/${uuid}`, '_blank')} />
-                                {uuid}
+                                <ExternalLink className="cursor-pointer w-4 h-4 shrink-0" onClick={() => window.open(`/${locale}/receive/${qrId}`, '_blank')} />
+                                {qrId}
                             </div>
                             <div className="flex items-center gap-2">
                                 PIN:
@@ -1272,8 +1297,8 @@ function QRCodeRow({ item, apiUrl, onGeneratePDF, onRefresh, paperFormat, cardFo
                                 };
                                 const design = resolveDesign(item.card_design);
                                 onGeneratePDF({
-                                    id: uuid,
-                                    codes: [{ uuid, pin: item.pin }]
+                                    id: qrId,
+                                    codes: [{ qrId, pin: item.pin }]
                                 }, paperFormat, design, Boolean(item.status === "PROMOTION"));
                             }}
                         >
@@ -1296,8 +1321,8 @@ function QRCodeRow({ item, apiUrl, onGeneratePDF, onRefresh, paperFormat, cardFo
                                 };
                                 const design = resolveDesign(item.card_design);
                                 await generateCSVExport({
-                                    id: uuid,
-                                    codes: [{ uuid, pin: item.pin }]
+                                    id: qrId,
+                                    codes: [{ qrId, pin: item.pin }]
                                 }, design);
                             }}
                         >
@@ -1308,7 +1333,7 @@ function QRCodeRow({ item, apiUrl, onGeneratePDF, onRefresh, paperFormat, cardFo
                     {item.status !== 'BANNED' ? (
                         <div className="flex-1 sm:flex-none">
                             <BanButton
-                                uuid={uuid}
+                                qrId={qrId}
                                 apiUrl={apiUrl}
                                 isBanned={false}
                                 size="default"
@@ -1322,7 +1347,7 @@ function QRCodeRow({ item, apiUrl, onGeneratePDF, onRefresh, paperFormat, cardFo
                     ) : (
                         <div className="flex flex-wrap gap-2 flex-1 sm:flex-none">
                             <BanButton
-                                uuid={uuid}
+                                qrId={qrId}
                                 apiUrl={apiUrl}
                                 isBanned={true}
                                 size="default"
@@ -1340,7 +1365,7 @@ function QRCodeRow({ item, apiUrl, onGeneratePDF, onRefresh, paperFormat, cardFo
                                     e.stopPropagation();
                                     if (!confirm(t('list.deleteBanned.confirm'))) return;
                                     try {
-                                        await adminApi.admin_qr_deleteban({ target: uuid });
+                                        await adminApi.admin_qr_deleteban({ target: qrId });
                                         alert(t('list.deleteBanned.success', { count: 1 }));
                                         setOpen(false);
                                         onRefresh();
@@ -1360,8 +1385,8 @@ function QRCodeRow({ item, apiUrl, onGeneratePDF, onRefresh, paperFormat, cardFo
     );
 }
 
-function BanButton({ uuid, apiUrl, onSuccess, size = "sm", className, isBanned = false }: {
-    uuid: string,
+function BanButton({ qrId, apiUrl, onSuccess, size = "sm", className, isBanned = false }: {
+    qrId: string,
     apiUrl: string,
     onSuccess: () => void,
     size?: "default" | "sm" | "lg" | "icon",
@@ -1388,7 +1413,7 @@ function BanButton({ uuid, apiUrl, onSuccess, size = "sm", className, isBanned =
 
         setLoading(true);
         try {
-            const params: any = { uuid };
+            const params: any = { qr_id: qrId };
             if (comment) params.reason = comment;
             await adminApi.admin_qr_ban(params);
             onSuccess();
@@ -2156,7 +2181,7 @@ function CardOrderListSection({
                                     <TableHead>{tc('table.shop')}</TableHead>
                                     <TableHead className="text-right">{tc('table.quantity')}</TableHead>
                                     <TableHead className="text-center">{tc('table.status')}</TableHead>
-                                    <TableHead className="text-right">Actions</TableHead>
+                                    <TableHead className="text-center">{tc('table.actions')}</TableHead>
                                     <TableHead className="w-[150px]">{tc('table.dateupdated')}</TableHead>
                                 </TableRow>
                             </TableHeader>
@@ -2205,13 +2230,13 @@ function CardOrderListSection({
                                                 </span>
                                             </TableCell>
                                             <TableCell className="text-right">
-                                                <div className="flex justify-end gap-2">
+                                                <div className="flex justify-end gap-0.5 ">
                                                     {(order.status === 'ORDERED' || order.status === 'PRINTING') && (
-                                                        <>
+                                                        <div className="gap-1 rounded-sm p-1 bg-green-100">
                                                             <Button
-                                                                variant="outline"
+                                                                variant="ghost"
                                                                 size="sm"
-                                                                className="h-8 text-xs bg-white text-black"
+                                                                className="h-6 text-xs text-black hover:bg-green-300"
                                                                 onClick={() => handleExport(order, 'pdf')}
                                                                 disabled={!!isProcessing}
                                                             >
@@ -2219,32 +2244,33 @@ function CardOrderListSection({
                                                                 PDF
                                                             </Button>
                                                             <Button
-                                                                variant="outline"
+                                                                variant="ghost"
                                                                 size="sm"
-                                                                className="h-8 text-xs bg-white text-black"
+                                                                className="h-6 text-xs text-black hover:bg-green-300"
                                                                 onClick={() => handleExport(order, 'csv')}
                                                                 disabled={!!isProcessing}
                                                             >
                                                                 {isProcessing === order.order_id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3 mr-1" />}
                                                                 CSV
                                                             </Button>
-                                                        </>
+                                                        </div>
                                                     )}
                                                     {order.status === 'PRINTING' && (
                                                         <Button
                                                             variant="default"
                                                             size="sm"
-                                                            className="h-8 text-xs bg-indigo-600 hover:bg-indigo-700"
+                                                            className="flex h-8 rounded-sm text-xs bg-indigo-300 hover:bg-indigo-500 text-indigo-800 font-bold hover:text-indigo-100"
                                                             onClick={() => onUpdateStatus(order.shop_id, order.order_id, 'SHIPPED')}
                                                         >
                                                             {tc('markAsShipped')}
                                                         </Button>
                                                     )}
                                                     {(order.status === 'ORDERED' || order.status === 'PRINTING') && (
+
                                                         <Button
                                                             variant="ghost"
                                                             size="sm"
-                                                            className="h-8 w-8 p-0 text-red-500 hover:text-red-700 hover:bg-red-50 mr-1"
+                                                            className="h-8 w-8 p-0 h-8 rounded-sm items-center justify-center text-red-500 bg-red-100 hover:bg-red-500 hover:text-white"
                                                             onClick={() => {
                                                                 if (window.confirm(tc('rejectConfirm'))) {
                                                                     onUpdateStatus(order.shop_id, order.order_id, 'REJECTED');
@@ -2255,6 +2281,7 @@ function CardOrderListSection({
                                                             <X className="w-4 h-4" />
                                                         </Button>
                                                     )}
+
                                                 </div>
                                             </TableCell>
                                             <TableCell className="text-xs text-gray-500">

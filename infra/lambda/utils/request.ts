@@ -1,13 +1,19 @@
 import { APIGatewayProxyEvent } from 'aws-lambda';
 
 /**
- * リクエストから UUID を安全に取得します。
+ * リクエストから QR ID を安全に取得します。
  * 優先順位: 1. Authorizer, 2. PathParameters, 3. Headers, 4. Body
  */
-export const getUUID = (event: APIGatewayProxyEvent, body: any = {}): string | undefined => {
+export const getQrId = (event: APIGatewayProxyEvent, body: any = {}): string | undefined => {
     return (
+        event.requestContext?.authorizer?.qr_id ||
+        event.requestContext?.authorizer?.qrId ||
         event.requestContext?.authorizer?.uuid ||
+        event.pathParameters?.qr_id ||
+        event.pathParameters?.qrId ||
         event.pathParameters?.uuid ||
+        event.headers['X-QR-ID'] ||
+        event.headers['x-qr-id'] ||
         event.headers['X-QR-UUID'] ||
         event.headers['x-qr-uuid'] ||
         body?.qr_id ||

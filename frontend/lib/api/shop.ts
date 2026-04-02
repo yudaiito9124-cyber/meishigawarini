@@ -1,4 +1,5 @@
 import { fetchAuthSession } from 'aws-amplify/auth';
+import { ShopApiSchema } from '@shared/api-types';
 
 const NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
@@ -30,10 +31,6 @@ export const shopApiBase = {
         });
 
         if (!res.ok) {
-            // API Gateway 401/403 -> 404 偽装への対応
-            // if (res.status === 404) {
-            //     throw { status: 404, message: "fetch error" + " error: " + res?.statusText };
-            // }
             const error = await res.json().catch(() => ({ message: res.statusText }));
             throw { status: res.status, ...error };
         }
@@ -60,36 +57,3 @@ function createShopApi<T extends Record<string, any>>(base: typeof shopApiBase) 
 
 // 外部公開用のインスタンス
 export const shopApi = createShopApi<ShopApiSchema>(shopApiBase);
-
-////////////////////////////////////////////////////////////////////////////////////////
-// lambda関数を変更したら以下の型定義を更新してください
-////////////////////////////////////////////////////////////////////////////////////////
-/**
- * ショップ用 API の型定義
- * キー名がそのまま API パス（/shop/キー名）として使用されます。
- * _ は / に置換されます
- */
-type ShopApiSchema = {
-    shop_list: { no_create?: boolean };
-    shop_details_get: { shop_id: string };
-    shop_details_update: { shop_id: string; name?: string; description?: string; detail_html?: string; html_image_urls?: string[]; deleted_html_image_urls?: string[] };
-    shop_admins: { shop_id: string };
-    shop_delete_images: { shop_id: string; keys?: string[]; urls?: string[] };
-    shop_orders_list: { shop_id: string; uuid?: string };
-    shop_orders_update: { shop_id: string; uuid: string; status?: string; delivery_company?: string; tracking_number?: string; memo_for_users?: string; memo_for_shop?: string };
-    shop_products_list: { shop_id: string };
-    shop_products_create: { shop_id: string; name: string; description?: string; image_url?: string; price?: number; valid_days?: number; detail_html?: string; card_design_id: string };
-    shop_products_update: { shop_id: string; product_id: string; status?: "ACTIVE" | "STOPPED"; name?: string; description?: string; image_url?: string; price?: number; valid_days?: number; detail_html?: string; card_design_id?: string };
-    shop_products_delete: { shop_id: string; product_id: string };
-    shop_products_import_list: { shop_id: string };
-    shop_products_import_execute: { shop_id: string; import_shop_id: string };
-    shop_products_uploadurl: { shop_id: string; filename: string; content_type: string; folder?: string };
-    shop_qr_list: { shop_id: string };
-    shop_qr_link: { shop_id: string; uuid: string; product_id: string; activate_now?: boolean; memo_for_users?: string; memo_for_shop?: string };
-    shop_qr_activate: { shop_id: string; uuid: string };
-    shop_qrcodecheck: { shop_id: string; uuid: string };
-    shop_card_orders_create: { shop_id: string; quantity: number; design_id: string; product_id?: string; shop_user_id?: string; sender_user_id?: string; expiration_date?: string; activate_now?: boolean };
-    shop_card_orders_list: { shop_id: string };
-    shop_card_orders_cancel: { shop_id: string; order_id: string };
-    shop_card_orders_complete: { shop_id: string; order_id: string };
-};

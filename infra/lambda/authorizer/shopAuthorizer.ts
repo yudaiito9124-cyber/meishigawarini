@@ -2,7 +2,7 @@ import { APIGatewayAuthorizerResult, APIGatewayRequestAuthorizerEvent } from 'aw
 import { CognitoJwtVerifier } from 'aws-jwt-verify';
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient } from '@aws-sdk/lib-dynamodb';
-import { checkShopOwnerOrGM } from './share/shop-auth';
+import { checkShopOwnerOrGM } from '../share/shop-auth';
 
 const USER_POOL_ID = process.env.USER_POOL_ID || '';
 const CLIENT_ID = process.env.CLIENT_ID || '';

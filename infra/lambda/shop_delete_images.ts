@@ -12,12 +12,13 @@ import { stripSignature, deleteFileByUrl } from './utils/s3';
 import { successResponse, errorResponse } from './utils/response';
 import { ddb, TABLE_NAME, BUCKET_NAME } from './share/db';
 import { getShopId, getUserId } from './utils/request';
+import { ShopApiSchema } from '@shared/api-types';
 
 export const handler: APIGatewayProxyHandler = async (event) => {
     try {
         if (event.httpMethod === 'OPTIONS') return successResponse();
 
-        const body = JSON.parse(event.body || '{}');
+        const body = JSON.parse(event.body || '{}') as ShopApiSchema['shop_delete_images'];
         const userId = getUserId(event);
         const shopId = getShopId(event, body);
         const { urls } = body;

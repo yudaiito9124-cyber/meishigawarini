@@ -12,14 +12,14 @@ export const EXPIRABLE_STATUSES = ['UNASSIGNED', 'LINKED', 'ACTIVE'];
  * 
  * @param ddb DynamoDBDocumentClient
  * @param tableName テーブル名
- * @param uuid QRコードのUUID
+ * @param qr_id QRコードのQR_ID
  * @param item QRコードのメタデータ項目（status, ts_expired_at を含む）
  * @returns 判定・更新後のステータス
  */
 export async function checkAndExpire(
     ddb: DynamoDBDocumentClient,
     tableName: string,
-    uuid: string,
+    qr_id: string,
     item: { status: string; ts_expired_at?: string }
 ): Promise<string> {
     const { status, ts_expired_at } = item;
@@ -33,7 +33,7 @@ export async function checkAndExpire(
         try {
             await ddb.send(new UpdateCommand({
                 TableName: tableName,
-                Key: { PK: `QR#${uuid}`, SK: 'METADATA' },
+                Key: { PK: `QR#${qr_id}`, SK: 'METADATA' },
                 UpdateExpression: 'SET #status = :expired, GSI1_PK = :gsi_pk, ts_updated_at = :now',
                 ExpressionAttributeNames: { '#status': 'status' },
                 ExpressionAttributeValues: {
@@ -44,7 +44,7 @@ export async function checkAndExpire(
             }));
             return updatedStatus;
         } catch (e) {
-            console.error(`Failed lazy expire update for ${uuid}`, e);
+            console.error(`Failed lazy expire update for ${qr_id}`, e);
             // DB更新に失敗しても、メモリ上のステータスはEXPIREDとして返して後続処理を制限する
             return updatedStatus;
         }

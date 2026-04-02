@@ -2,7 +2,7 @@
  * 概要: 送信・受信履歴の取得およびギフトの紐付け
  * 詳細:
  *  - ユーザーに関連するすべての送信ログ(SENDLOG)と受信ログ(RECEIVEDLOG)を取得します。
- *  - また、新しくギフト（QRコード）をスキャンした際に、それを自分の送信履歴として登録する機能を提供します。
+ *  - また、新しくギフト（QR ID）をスキャンした際に、それを自分の送信履歴として登録する機能を提供します。
  *
  * エンドポイント:
  *  - POST /user/history/get (送信・受信履歴の一覧取得)
@@ -16,7 +16,8 @@ import { getSystemDesign } from './utils/designs';
 import { checkAndExpire } from './utils/expiration';
 import { successResponse, errorResponse } from './utils/response';
 import { ddb, TABLE_NAME, BUCKET_NAME } from './share/db';
-import { getUUID, getPIN, getAction, getUserId } from './utils/request';
+import { getQrId, getPIN, getAction, getUserId } from './utils/request';
+import { UserApiSchema } from '@shared/api-types';
 
 export const handler: APIGatewayProxyHandler = async (event) => {
     try {
@@ -45,15 +46,19 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                         ':skPrefix': `${logType}#`
                     }
                 }));
-                const allUuids: Array<{ uuid: string, timestamp: string }> = [];
+                const allQrIds: Array<{ qr_id: string, timestamp: string }> = [];
                 for (const item of queryRes.Items || []) {
                     if (item.logs && Array.isArray(item.logs)) {
-                        allUuids.push(...item.logs);
+                        // 互換性のため uuid もチェック
+                        allQrIds.push(...item.logs.map((l: any) => ({
+                            qr_id: l.qr_id || l.uuid,
+                            timestamp: l.timestamp
+                        })));
                     }
                 }
                 // Timestamp降順でソート
-                allUuids.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-                return allUuids;
+                allQrIds.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+                return allQrIds;
             };
 
             const [sentLogs, receivedLogs] = await Promise.all([
@@ -73,28 +78,23 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         // ====================================================================
         // ACTION: sendgift (ギフトの紐付け)
         // --------------------------------------------------------------------
-        // 目的: QRをスキャンして、自分を送信者として登録し、送信履歴に追加します。
+        // 目的: QR IDをスキャンして、自分を送信者として登録し、送信履歴に追加します。
         // ====================================================================
         if (action === 'sendgift') {
-            const uuid = getUUID(event, body);
+            const { qr_id: body_qr_id, pin: body_pin } = body as UserApiSchema['user_history_sendgift'];
+            const qr_id = getQrId(event, body);
             const pin = getPIN(event, body);
 
-            if (!uuid) return errorResponse(400, 'Missing UUID');
+            if (!qr_id) return errorResponse(400, 'Missing QR ID');
 
             // 1. PINの妥当性とステータスを確認
             const qrRes = await ddb.send(new GetCommand({
                 TableName: TABLE_NAME,
-                Key: { PK: `QR#${uuid}`, SK: 'METADATA' }
+                Key: { PK: `QR#${qr_id}`, SK: 'METADATA' }
             }));
             if (!qrRes.Item) {
                 return errorResponse(404, 'QR code not found');
             }
-            // PINチェックは一旦無効化 (フロントエンドでのバルクスキャン対応のため)
-            /*
-            if (String(qrRes.Item.pin) !== String(pin)) {
-                return errorResponse(403, 'Invalid PIN or QR code');
-            }
-            */
 
             // ユーザーの最新プロフィール（SENDER）を取得してスナップショットとして保存する
             const profileRes = await ddb.send(new GetCommand({
@@ -109,7 +109,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             try {
                 await ddb.send(new UpdateCommand({
                     TableName: TABLE_NAME,
-                    Key: { PK: `QR#${uuid}`, SK: 'CHAT' },
+                    Key: { PK: `QR#${qr_id}`, SK: 'CHAT' },
                     UpdateExpression: 'SET sender_id = :sid, sender_info = :sinfo, ts_updated_at = :now',
                     ConditionExpression: 'attribute_not_exists(sender_id)',
                     ExpressionAttributeValues: {
@@ -126,7 +126,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             }
 
             // 2. SENDLOG に追記する
-            await appendToHistory(ddb, TABLE_NAME, userId, 'SENDLOG', uuid);
+            await appendToHistory(ddb, TABLE_NAME, userId, 'SENDLOG', qr_id);
 
             return successResponse({ message: 'Gift successfully linked to your sender profile' });
         }
@@ -142,21 +142,21 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 /**
  * 履歴用の項目をメタデータによって多重化(Enrichment)
  */
-async function enrichLogs(logs: Array<{ uuid: string, timestamp: string }>) {
+async function enrichLogs(logs: Array<{ qr_id: string, timestamp: string }>) {
     if (logs.length === 0) return [];
 
-    const uuids = logs.map(l => l.uuid);
+    const qrIds = logs.map(l => l.qr_id);
     const results = [];
 
     // 100件ずつのバッチ取得
-    for (let i = 0; i < uuids.length; i += 100) {
-        const chunk = uuids.slice(i, i + 100);
+    for (let i = 0; i < qrIds.length; i += 100) {
+        const chunk = qrIds.slice(i, i + 100);
 
         // METADATA, ORDER, CHAT(sender_info)などの一括取得
         const keys = [
-            ...chunk.map(uuid => ({ PK: `QR#${uuid}`, SK: 'METADATA' })),
-            ...chunk.map(uuid => ({ PK: `QR#${uuid}`, SK: 'ORDER' })),
-            ...chunk.map(uuid => ({ PK: `QR#${uuid}`, SK: 'CHAT' }))
+            ...chunk.map(qr_id => ({ PK: `QR#${qr_id}`, SK: 'METADATA' })),
+            ...chunk.map(qr_id => ({ PK: `QR#${qr_id}`, SK: 'ORDER' })),
+            ...chunk.map(qr_id => ({ PK: `QR#${qr_id}`, SK: 'CHAT' }))
         ];
 
         const batchRes = await ddb.send(new BatchGetCommand({ RequestItems: { [TABLE_NAME]: { Keys: keys } } }));
@@ -198,15 +198,15 @@ async function enrichLogs(logs: Array<{ uuid: string, timestamp: string }>) {
             sRes.Responses?.[TABLE_NAME]?.forEach(s => shopMap.set(s.PK, s));
         }
 
-        for (const uuid of chunk) {
-            const meta = itemMap.get(`QR#${uuid}#METADATA`);
+        for (const qr_id of chunk) {
+            const meta = itemMap.get(`QR#${qr_id}#METADATA`);
             if (!meta) continue;
 
-            const order = itemMap.get(`QR#${uuid}#ORDER`) || {};
-            const chat = itemMap.get(`QR#${uuid}#CHAT`) || {};
+            const order = itemMap.get(`QR#${qr_id}#ORDER`) || {};
+            const chat = itemMap.get(`QR#${qr_id}#CHAT`) || {};
 
             // 期限切れチェック(遅延評価)
-            const currentStatus = await checkAndExpire(ddb, TABLE_NAME, uuid, meta);
+            const currentStatus = await checkAndExpire(ddb, TABLE_NAME, qr_id, meta);
 
             const designId = meta.card_design;
             const design = designId ? (designMap.get(designId) || getSystemDesign(designId)) : null;
@@ -214,7 +214,7 @@ async function enrichLogs(logs: Array<{ uuid: string, timestamp: string }>) {
             const shop = shopMap.get(`SHOP#${meta.shop_id}`);
 
             results.push({
-                uuid,
+                qr_id,
                 status: currentStatus,
                 pin: meta.pin,
                 product_id: meta.product_id,
@@ -229,7 +229,7 @@ async function enrichLogs(logs: Array<{ uuid: string, timestamp: string }>) {
                 sender_info: chat.sender_info,
                 ts_created_at: meta.ts_created_at,
                 ts_updated_at: meta.ts_updated_at,
-                timestamp: logs.find(l => l.uuid === uuid)?.timestamp
+                timestamp: logs.find(l => l.qr_id === qr_id)?.timestamp
             });
         }
     }

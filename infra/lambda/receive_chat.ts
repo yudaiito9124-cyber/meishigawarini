@@ -13,7 +13,8 @@ import { signUrlIfS3, signUrlsInHtml, stripSignature } from './utils/s3';
 import { sendLocalizedEmail } from './templates/email';
 import { successResponse, errorResponse } from './utils/response';
 import { ddb, TABLE_NAME, BUCKET_NAME } from './share/db';
-import { getUUID, getPIN, getAction } from './utils/request';
+import { getQrId, getPIN, getAction } from './utils/request';
+import { ReceiveApiSchema } from '@shared/api-types';
 import { generateId } from './utils/id';
 
 const CHAT_CAPACITY_LIMIT_MB = 100;
@@ -23,16 +24,11 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         if (event.httpMethod === 'OPTIONS') return successResponse();
 
         const body = JSON.parse(event.body || '{}');
-        const uuid = getUUID(event, body);
+        const qr_id = getQrId(event, body);
         const pin = getPIN(event, body);
         let action = getAction(event, body);
 
-        // パスベースのルーティング互換性 (/get -> list)
-        if (action === 'get') action = 'list';
-
-        const { username, message, type, file_url, file_size, file_name, file_type } = body;
-
-        if (!uuid || !pin) return errorResponse(400, 'Missing uuid or pin');
+        if (!qr_id || !pin) return errorResponse(400, 'Missing qr_id or pin');
 
         // Note: PIN verification and Rate Limiting are handled by receiveAuthorizer.ts
         // so we can proceed directly to business logic.
@@ -41,11 +37,12 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         // ====================================================================
         // ACTION: list (チャット履歴の取得)
         // ====================================================================
-        if (action === 'list') {
+        if (action === 'get') {
+            const { } = body as ReceiveApiSchema['receive_chat_get'];
             // 【DB操作: GetItem】
             // 理由: SK=CHATレコードを取得し、蓄積された全メッセージ(messages)を返します。
             const chatRes = await ddb.send(new GetCommand({
-                TableName: TABLE_NAME, Key: { PK: `QR#${uuid}`, SK: 'CHAT' }
+                TableName: TABLE_NAME, Key: { PK: `QR#${qr_id}`, SK: 'CHAT' }
             }));
             const chatLog = chatRes.Item || { messages: [], total_size_bytes: 0, sender_info: null };
 
@@ -86,6 +83,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         // ACTION: send (メッセージの送信)
         // ====================================================================
         if (action === 'send') {
+            const { username, message, type, file_url, file_size, file_name, file_type } = body as ReceiveApiSchema['receive_chat_send'];
             if (!message && !file_url) return errorResponse(400, 'Empty message');
 
             const now = new Date().toISOString();
@@ -103,7 +101,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             };
 
             // 容量制限のチェック
-            const chatRes = await ddb.send(new GetCommand({ TableName: TABLE_NAME, Key: { PK: `QR#${uuid}`, SK: 'CHAT' } }));
+            const chatRes = await ddb.send(new GetCommand({ TableName: TABLE_NAME, Key: { PK: `QR#${qr_id}`, SK: 'CHAT' } }));
             const currentTotalSize = chatRes.Item?.total_size_bytes || 0;
             if (currentTotalSize + (file_size || 0) > CHAT_CAPACITY_LIMIT_MB * 1024 * 1024) {
                 return errorResponse(403, 'Chat storage capacity exceeded');
@@ -113,7 +111,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             // 理由: messagesリストに新メッセージを追記(list_append)し、累計ファイルサイズを加算(ADD)。
             await ddb.send(new UpdateCommand({
                 TableName: TABLE_NAME,
-                Key: { PK: `QR#${uuid}`, SK: 'CHAT' },
+                Key: { PK: `QR#${qr_id}`, SK: 'CHAT' },
                 UpdateExpression: 'SET messages = list_append(if_not_exists(messages, :empty_list), :msg), total_size_bytes = if_not_exists(total_size_bytes, :zero) + :fsize, ts_updated_at = :now',
                 ExpressionAttributeValues: {
                     ':msg': [newMessage], ':empty_list': [], ':now': now,
@@ -132,7 +130,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                     return sendLocalizedEmail({
                         type: 'MESSAGE_NOTIFICATION',
                         to: emailTo,
-                        params: { username: 'Recipient', message: message || '', uuid, pin },
+                        params: { username: 'Recipient', message: message || '', qr_id, pin },
                         lang
                     });
                 });

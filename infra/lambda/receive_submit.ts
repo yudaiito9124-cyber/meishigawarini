@@ -15,8 +15,8 @@ import * as bcrypt from 'bcryptjs';
 import { sendLocalizedEmail } from './templates/email';
 import { successResponse, errorResponse } from './utils/response';
 import { ddb, TABLE_NAME } from './share/db';
-
-import { getUUID, getPIN } from './utils/request';
+import { getQrId, getPIN } from './utils/request';
+import { ReceiveApiSchema } from '@shared/api-types';
 
 const cognito = new CognitoIdentityProviderClient({});
 const USER_POOL_ID = process.env.USER_POOL_ID || '';
@@ -25,32 +25,25 @@ export const handler: APIGatewayProxyHandler = async (event) => {
     try {
         if (event.httpMethod === 'OPTIONS') return successResponse();
 
-        const body = JSON.parse(event.body || '{}');
-        const uuid = getUUID(event, body);
+        const body = JSON.parse(event.body || '{}') as ReceiveApiSchema['receive_submit'];
+        const qr_id = getQrId(event, body);
         const pin = getPIN(event, body);
 
-        // フロントエンドの入れ子構造(shipping_info)に対応
+        // フロントエンドの入れ子構造(shipping_info)を使用
         const shipping = body.shipping_info || {};
-        const name = body.name || shipping.name;
-        const address = body.address || shipping.address;
-        const zip_code = body.zip_code || body.zipCode || shipping.zip_code || shipping.zipCode;
-        const phone = body.phone || shipping.phone;
-        const email = body.email || shipping.email;
-        const preferred_date = body.preferred_date || body.preferredDate || shipping.preferred_date || shipping.preferredDate;
-        const preferred_time = body.preferred_time || body.preferredTime || shipping.preferred_time || shipping.preferredTime;
-        const client_timestamp = body.client_timestamp || shipping.client_timestamp;
+        const { name, address, zip_code, phone, email, preferred_date, preferred_time, client_timestamp } = shipping;
 
         // その他のパラメータ
         const password = body.password;
 
-        if (!uuid || !pin || !name || !address) {
-            return errorResponse(400, 'Missing required fields (uuid, pin, name, or address)');
+        if (!qr_id || !pin || !name || !address) {
+            return errorResponse(400, 'Missing required fields (qr_id, pin, name, or address)');
         }
 
         // 【確認フェーズ 1: QRコードの状態確認】
         // Note: PINとレートリミットは receiveAuthorizer.ts で検証済みです。
         const qrRes = await ddb.send(new GetCommand({
-            TableName: TABLE_NAME, Key: { PK: `QR#${uuid}`, SK: 'METADATA' }
+            TableName: TABLE_NAME, Key: { PK: `QR#${qr_id}`, SK: 'METADATA' }
         }));
         if (!qrRes.Item) return errorResponse(404, 'QR Code not found');
 
@@ -69,7 +62,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         // 期限切れチェック (遅延評価)
         if (item.ts_expired_at && now > new Date(item.ts_expired_at)) {
             await ddb.send(new UpdateCommand({
-                TableName: TABLE_NAME, Key: { PK: `QR#${uuid}`, SK: 'METADATA' },
+                TableName: TABLE_NAME, Key: { PK: `QR#${qr_id}`, SK: 'METADATA' },
                 UpdateExpression: 'SET #status = :expired, GSI1_PK = :gsi_pk, ts_updated_at = :now',
                 ExpressionAttributeNames: { '#status': 'status' },
                 ExpressionAttributeValues: { ':expired': 'EXPIRED', ':gsi_pk': 'QR#EXPIRED', ':now': nowIso }
@@ -91,7 +84,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 {
                     Update: {
                         TableName: TABLE_NAME,
-                        Key: { PK: `QR#${uuid}`, SK: 'METADATA' },
+                        Key: { PK: `QR#${qr_id}`, SK: 'METADATA' },
                         UpdateExpression: 'SET #status = :used, GSI1_PK = :gsi_pk, ts_submitted_at = :now, ts_updated_at = :now' +
                             (password_hash ? ', password_hash = :ph' : '') + ' REMOVE #fa, #lu',
                         ConditionExpression: '#status = :active',
@@ -106,7 +99,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                     Put: {
                         TableName: TABLE_NAME,
                         Item: {
-                            PK: `QR#${uuid}`, SK: 'ORDER',
+                            PK: `QR#${qr_id}`, SK: 'ORDER',
                             name, address, zip_code, phone, preferred_date, preferred_time, email,
                             ts_submitted_at: nowIso, ts_updated_at: nowIso
                         }
@@ -124,12 +117,12 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             try {
                 // 通知リストへ追加
                 await ddb.send(new UpdateCommand({
-                    TableName: TABLE_NAME, Key: { PK: `QR#${uuid}`, SK: 'CHAT' },
+                    TableName: TABLE_NAME, Key: { PK: `QR#${qr_id}`, SK: 'CHAT' },
                     UpdateExpression: 'ADD notification_emails :new_email SET email_preferences = if_not_exists(email_preferences, :empty_map)',
                     ExpressionAttributeValues: { ':new_email': new Set([email]), ':empty_map': {} }
                 }));
                 await ddb.send(new UpdateCommand({
-                    TableName: TABLE_NAME, Key: { PK: `QR#${uuid}`, SK: 'CHAT' },
+                    TableName: TABLE_NAME, Key: { PK: `QR#${qr_id}`, SK: 'CHAT' },
                     UpdateExpression: 'SET email_preferences.#em = :lang',
                     ExpressionAttributeNames: { '#em': email },
                     ExpressionAttributeValues: { ':lang': 'ja' }
@@ -138,7 +131,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 await sendLocalizedEmail({
                     type: 'ADDRESS_REGISTRATION_CONFIRMATION',
                     to: email,
-                    params: { uuid, pin },
+                    params: { qr_id, pin },
                     lang: 'ja'
                 });
             } catch (e) { console.error('Recipient notification/subscription failed', e); }
@@ -169,7 +162,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                         params: {
                             shopName: shopRes.Item?.name || '不明なショップ',
                             productName: productRes.Item?.name || '不明な商品',
-                            qr_id: uuid,
+                            qr_id: qr_id,
                             shopId: shopId,
                             timestamp: client_timestamp || now.toLocaleString('ja-JP')
                         },
@@ -179,7 +172,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             } catch (e) { console.error('Shop provider notification failed', e); }
         }
 
-        return successResponse({ message: 'Address submitted successfully', order_id: `ORDER#${uuid}` });
+        return successResponse({ message: 'Address submitted successfully', order_id: `ORDER#${qr_id}` });
 
     } catch (error: any) {
         console.error('Receive submit error:', error);

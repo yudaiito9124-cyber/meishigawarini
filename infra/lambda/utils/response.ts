@@ -2,7 +2,7 @@ import { APIGatewayProxyResult } from 'aws-lambda';
 
 export const getCorsHeaders = (methods: string = 'GET,POST,OPTIONS') => ({
     'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type,Authorization,X-QR-UUID,X-QR-PIN',
+    'Access-Control-Allow-Headers': 'Content-Type,Authorization,X-QR-ID,X-QR-UUID,X-QR-PIN',
     'Access-Control-Allow-Methods': methods
 });
 

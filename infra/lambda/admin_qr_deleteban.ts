@@ -10,7 +10,8 @@ import { QueryCommand, BatchWriteCommand } from '@aws-sdk/lib-dynamodb';
 import { APIGatewayProxyHandler } from 'aws-lambda';
 import { successResponse, errorResponse } from './utils/response';
 import { ddb, TABLE_NAME } from './share/db';
-import { getUUID, getAction } from './utils/request';
+import { getQrId, getAction } from './utils/request';
+import { AdminApiSchema } from '@shared/api-types';
 
 const INDEX_NAME = 'GSI1';
 
@@ -19,11 +20,11 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         if (event.httpMethod === 'OPTIONS') return successResponse();
         if (event.httpMethod !== 'POST') return errorResponse(405, 'Method Not Allowed');
 
-        const body = JSON.parse(event.body || '{}');
-        const uuid = getUUID(event, body);
+        const body = JSON.parse(event.body || '{}') as AdminApiSchema['admin_qr_deleteban'];
+        const qr_id = body.target;
         const action = getAction(event, body);
 
-        console.log('Delete BAN event started:', { uuid, action });
+        console.log('Delete BAN event started:', { qr_id, action });
 
         let deletedCount = 0;
         let lastEvaluatedKey: Record<string, any> | undefined;
@@ -34,16 +35,16 @@ export const handler: APIGatewayProxyHandler = async (event) => {
          */
         do {
             let result;
-            if (uuid) {
+            if (qr_id) {
                 // 【DB操作: Query】
-                // - 目的: 特定のUUIDのQRコードを検索 (BANNED状態であることも確認)
+                // - 目的: 特定のQR IDのQRコードを検索 (BANNED状態であることも確認)
                 // - 抽出: status = "BANNED" のもののみを対象とする
                 result = await ddb.send(new QueryCommand({
                     TableName: TABLE_NAME,
                     KeyConditionExpression: 'PK = :pk',
                     FilterExpression: '#status = :status',
                     ExpressionAttributeNames: { '#status': 'status' },
-                    ExpressionAttributeValues: { ':pk': `QR#${uuid}`, ':status': 'BANNED' },
+                    ExpressionAttributeValues: { ':pk': `QR#${qr_id}`, ':status': 'BANNED' },
                     ProjectionExpression: 'PK, SK'
                 }));
             } else {
@@ -78,8 +79,8 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             }
 
             lastEvaluatedKey = result.LastEvaluatedKey;
-            // 単体指定(uuid)の場合はループを抜ける
-            if (uuid) break;
+            // 単体指定(qr_id)の場合はループを抜ける
+            if (qr_id) break;
         } while (lastEvaluatedKey);
 
         return successResponse({ message: 'Successfully deleted BANNED items', count: deletedCount });
