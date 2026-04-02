@@ -18,7 +18,7 @@ import { useTranslations } from 'next-intl';
 import { generatePDF } from '@/lib/generatePDF';
 import { cardformats, paperformats } from '@/lib/constants/designs';
 import { generateCSVExport } from '@/lib/generateCSVExport';
-import { ExternalLink, Copy, Check, Eye, QrCode, Store, Wrench, Layers, HelpCircle, Home, Trash2, RotateCcw, Loader2, Plus, X, Search, Save, FileText, Download, CreditCard, Printer, Paintbrush, ChevronDown } from 'lucide-react';
+import { ExternalLink, Copy, Check, Eye, QrCode, Store, Wrench, Layers, HelpCircle, Home, Trash2, RotateCcw, Loader2, Plus, X, Search, Save, FileText, Download, CreditCard, Printer, Paintbrush, ChevronDown, Settings } from 'lucide-react';
 import CardDesignEditor from "@/components/admin/CardDesignEditor";
 const NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 const NEXT_PUBLIC_APP_URL = process.env.NEXT_PUBLIC_APP_URL || "";
@@ -84,7 +84,7 @@ export default function AdminPage() {
     };
 
     useEffect(() => {
-        if (reloadDbCardDesigns && activeTab === "qrcodes") {
+        if (reloadDbCardDesigns && (activeTab === "qrcodes" || activeTab === "cardorders")) {
             fetchDbCardDesigns();
             setReloadDbCardDesigns(false);
         }
@@ -297,6 +297,29 @@ export default function AdminPage() {
 
                 {activeTab === "cardorders" && (
                     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
+
+                        <Card>
+                            <CardHeader className="flex flex-row items-center gap-2">
+                                <Settings />
+                                <CardTitle>Config</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="flex flex-col w-full gap-1 ">
+                                    <label className="mt-4 w-full flex  items-center text-[11px] sm:text-xs text-gray-700 font-medium">{t('generate.paperFormat')}</label>
+                                    <select
+                                        className="w-full rounded-md p-2 text-sm border border-gray-200 shadow-sm text-black bg-white"
+                                        value={paperFormat}
+                                        onChange={(e) => setPaperFormat(e.target.value)}
+                                    >
+                                        {Object.entries(paperformats).map(([key, value]: [string, any]) => (
+                                            <option key={key} value={key}>{value.description || key}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            </CardContent>
+                        </Card>
+
+
                         <CardOrderListSection
                             orders={cardOrders}
                             loading={cardOrdersLoading}
@@ -474,23 +497,10 @@ export default function AdminPage() {
                                         </div>
                                     </div>
 
-                                    <div className="flex flex-col w-full gap-1 border-t mt-4 mb-2">
-                                        <label className="mt-4 w-full flex  items-center text-[11px] sm:text-xs text-gray-700 font-medium">{t('generate.paperFormat')}</label>
-                                        <select
-                                            className="w-full rounded-md p-2 text-sm border border-gray-200 shadow-sm text-black bg-white"
-                                            value={paperFormat}
-                                            onChange={(e) => setPaperFormat(e.target.value)}
-                                        >
-                                            {Object.entries(paperformats).map(([key, value]: [string, any]) => (
-                                                <option key={key} value={key}>{value.description || key}</option>
-                                            ))}
-                                        </select>
-                                    </div>
-
                                     <div className="grid w-full items-center gap-1.5 mt-4">
                                         <Button
                                             onClick={handleGenerate}
-                                            className="w-full items-center gap-1.5 h-12"
+                                            className="w-full items-center gap-1.5 h-24"
                                             disabled={isGenerating}
                                         >
                                             {isGenerating ? (
@@ -503,13 +513,14 @@ export default function AdminPage() {
                                             )}
                                         </Button>
                                     </div>
+
                                 </div>
                             </CardContent>
                             {/* このページを開いてから生成したQRコードのバッチ一覧 */}
                             <CardFooter className="border-t">
 
 
-                                <div className="space-y-4">
+                                <div className="space-y-4 w-full">
                                     <CardTitle>{t('batches.title')}</CardTitle>
                                     {generatedBatches.length === 0 ? <p className="text-gray-500">{t('batches.noBatches')}</p> : (
                                         generatedBatches.map(batch => (

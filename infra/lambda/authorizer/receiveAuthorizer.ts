@@ -2,7 +2,7 @@ import { APIGatewayAuthorizerResult, APIGatewayRequestAuthorizerEvent } from 'aw
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, GetCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
 import { CognitoJwtVerifier } from 'aws-jwt-verify';
-import { isLocked, getRateLimitUpdate, getResetRateLimitUpdate } from './utils/rate-limit';
+import { isLocked, getRateLimitUpdate, getResetRateLimitUpdate } from '../utils/rate-limit';
 
 const USER_POOL_ID = process.env.USER_POOL_ID || '';
 const CLIENT_ID = process.env.CLIENT_ID || '';

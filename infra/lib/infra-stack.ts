@@ -215,11 +215,6 @@ export class InfraStack extends cdk.Stack {
       restApiName: `MeishiGawarini Service${suffix}`,
       description: `Backend API for MeishiGawarini`,
       deploy: false, // Disabling auto-deployment to resolve circular dependency with NestedStacks
-      defaultCorsPreflightOptions: {
-        allowOrigins: allowedOrigins,
-        allowMethods: apigateway.Cors.ALL_METHODS,
-        allowHeaders: [...apigateway.Cors.DEFAULT_HEADERS, 'X-QR-UUID', 'X-QR-PIN'],
-      },
     });
 
     // --- 認証エラー(401)を 404 に偽装しつつ CORS を許可 ---
@@ -342,6 +337,7 @@ export class InfraStack extends cdk.Stack {
       userPoolClient,
       api,
       commonProps,
+      allowedOrigins,
       grantTablePermissions,
     });
 
@@ -353,6 +349,7 @@ export class InfraStack extends cdk.Stack {
       userPoolClient,
       api,
       commonProps,
+      allowedOrigins,
       grantTablePermissions,
     });
 
@@ -364,6 +361,7 @@ export class InfraStack extends cdk.Stack {
       userPoolClient,
       api,
       commonProps,
+      allowedOrigins,
       grantTablePermissions,
     });
 
@@ -375,6 +373,7 @@ export class InfraStack extends cdk.Stack {
       userPoolClient,
       api,
       commonProps,
+      allowedOrigins,
       grantTablePermissions,
     });
 

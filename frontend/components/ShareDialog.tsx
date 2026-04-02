@@ -98,9 +98,12 @@ export function ShareDialog({ qr_id, product, card, shop }: ShareDialogProps) {
                 <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-emerald-400 via-teal-500 to-emerald-400" />
 
                 <DialogHeader className="pt-6">
-                    <DialogTitle className="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2 justify-center">
-                        <Sparkles className="w-6 h-6 text-amber-500 animate-pulse" />
-                        {t('title')}
+                    <DialogTitle className="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2 justify-center flex-col">
+                        <div className="flex items-center gap-2">
+                            <Sparkles className="w-6 h-6 text-amber-500 animate-pulse" />
+                            {t('title')}
+                        </div>
+                        <span className="text-amber-500 font-bold text-md bg-amber-500/10 px-2 py-1 rounded-full border border-amber-300">{t('title2')}</span>
                     </DialogTitle>
                     <DialogDescription className="text-center font-medium text-slate-500 pt-1">
                         {t('description')}
@@ -151,7 +154,7 @@ export function ShareDialog({ qr_id, product, card, shop }: ShareDialogProps) {
 
                     {/* Settings Toggles */}
                     <div className="grid grid-cols-1 gap-4 px-2">
-                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-1">{t('options.title')}</p>
+                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">{t('options.title')}</p>
 
                         <div className="flex items-center justify-between p-3 bg-slate-50/50 rounded-2xl hover:bg-slate-50 transition-colors border border-transparent hover:border-slate-100">
                             <div className="flex flex-col">
@@ -175,6 +178,7 @@ export function ShareDialog({ qr_id, product, card, shop }: ShareDialogProps) {
                             </div>
                             <Switch checked={includeShop} onCheckedChange={setIncludeShop} />
                         </div>
+                        <p className="text-[8px] text-center font-black uppercase tracking-[0.2em] text-slate-400 mb-1">{t('options.description')}</p>
                     </div>
 
                     {/* Share Buttons */}

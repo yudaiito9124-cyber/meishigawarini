@@ -1142,6 +1142,32 @@ export default function ReceivePage() {
                                 </div>
                             )}
 
+
+                            {/* 有効期限 */}
+
+                            <div className="pr-8 pl-8">
+                                {/* Remaining Days for Active Gift */}
+                                {step === "FORM" && gift.ts_expired_at && (
+                                    <div className="border border-red-400 bg-orange-50 p-3 rounded text-center rounded-xl border-dashed border-2">
+                                        <p className="text-sm font-semibold text-red-600 ">
+                                            {t('daysRemaining', getRemainingTime(gift.ts_expired_at)!)}
+                                        </p>
+                                        <p className="text-sm text-center text-gray-500 mt-1">
+                                            {t('limitdatetime', { datetime: new Date(gift.ts_expired_at).toLocaleString() })}
+                                        </p>
+                                    </div>
+                                )}
+
+                                {/* Expired Message */}
+                                {step === "EXPIRED" && (
+                                    <div className="mt-6 p-4 bg-red-50 border border-red-200 rounded-xl text-center">
+                                        <p className="text-red-600 font-bold">{t('expiredStep.message')}</p>
+                                        <p className="text-red-500 text-sm mt-1">{t('expiredStep.subMessage', { date: new Date(gift.ts_expired_at).toLocaleDateString() })}</p>
+                                    </div>
+                                )}
+
+                            </div>
+
                             {/* SNS Share Button - Witty Place */}
                             <div className="mt-8 animate-reveal reveal-delay-500">
                                 <ShareDialog
@@ -1192,30 +1218,6 @@ export default function ReceivePage() {
                                 </Button>
                             </div>
                         </form>
-                    )}
-                    {/* 有効期限 */}
-                    {!loading && step !== "PIN" && gift && gift.product && (
-                        <div className="pr-8 pl-8">
-                            {/* Remaining Days for Active Gift */}
-                            {step === "FORM" && gift.ts_expired_at && (
-                                <div className="border border-red-400 bg-orange-50 p-3 rounded text-center rounded-xl border-dashed border-2">
-                                    <p className="text-sm font-semibold text-red-600 ">
-                                        {t('daysRemaining', getRemainingTime(gift.ts_expired_at)!)}
-                                    </p>
-                                    <p className="text-sm text-center text-gray-500 mt-1">
-                                        {t('limitdatetime', { datetime: new Date(gift.ts_expired_at).toLocaleString() })}
-                                    </p>
-                                </div>
-                            )}
-
-                            {/* Expired Message */}
-                            {step === "EXPIRED" && (
-                                <div className="mt-6 p-4 bg-red-50 border border-red-200 rounded-xl text-center">
-                                    <p className="text-red-600 font-bold">{t('expiredStep.message')}</p>
-                                    <p className="text-red-500 text-sm mt-1">{t('expiredStep.subMessage', { date: new Date(gift.ts_expired_at).toLocaleDateString() })}</p>
-                                </div>
-                            )}
-                        </div>
                     )}
                 </CardContent>
             </Card>

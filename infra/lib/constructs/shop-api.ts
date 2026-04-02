@@ -13,8 +13,9 @@ export interface ShopApiProps {
   bucket: s3.IBucket;
   userPool: cognito.IUserPool;
   userPoolClient: cognito.IUserPoolClient;
-  api: apigateway.IRestApi;
+  api: apigateway.RestApi;
   commonProps: any;
+  allowedOrigins: string[];
   grantTablePermissions: (fn: lambda.IFunction, write?: boolean) => void;
 }
 
@@ -24,7 +25,7 @@ export class ShopApi extends cdk.NestedStack {
   constructor(scope: cdk.Stack, id: string, props: ShopApiProps) {
     super(scope, id);
 
-    const { table, bucket, userPool, userPoolClient, api, commonProps, grantTablePermissions } = props;
+    const { table, bucket, userPool, userPoolClient, api, commonProps, allowedOrigins, grantTablePermissions } = props;
 
     // Shop Authorizer (Custom Lambda Authorizer)
     const lampath = (name: string) => path.join(__dirname, `../../lambda/${name}.ts`);
@@ -84,13 +85,24 @@ export class ShopApi extends cdk.NestedStack {
 
     // Helper to add resource
     const addResourceWithCors = (parent: apigateway.IResource, pathPart: string): apigateway.Resource => {
-      return parent.addResource(pathPart) as apigateway.Resource;
+      const res = parent.addResource(pathPart) as apigateway.Resource;
+      res.addCorsPreflight({
+        allowOrigins: allowedOrigins,
+        allowMethods: apigateway.Cors.ALL_METHODS,
+        allowHeaders: [...apigateway.Cors.DEFAULT_HEADERS, 'X-QR-ID', 'X-QR-UUID', 'X-QR-PIN'],
+      });
+      return res;
     };
 
     // Shop Routes
     this.shopResource = new apigateway.Resource(this, 'ShopTopResource', {
       parent: api.root,
       pathPart: 'shop'
+    });
+    this.shopResource.addCorsPreflight({
+      allowOrigins: allowedOrigins,
+      allowMethods: apigateway.Cors.ALL_METHODS,
+      allowHeaders: [...apigateway.Cors.DEFAULT_HEADERS, 'X-QR-ID', 'X-QR-UUID', 'X-QR-PIN'],
     });
 
     const routeOptions = { authorizer, authorizationType: apigateway.AuthorizationType.CUSTOM };

@@ -14,8 +14,9 @@ export interface ReceiveApiProps {
   bucket: s3.IBucket;
   userPool: cognito.IUserPool;
   userPoolClient: cognito.IUserPoolClient;
-  api: apigateway.IRestApi;
+  api: apigateway.RestApi;
   commonProps: any;
+  allowedOrigins: string[];
   grantTablePermissions: (fn: lambda.IFunction, write?: boolean) => void;
 }
 
@@ -25,7 +26,7 @@ export class ReceiveApi extends cdk.NestedStack {
   constructor(scope: cdk.Stack, id: string, props: ReceiveApiProps) {
     super(scope, id);
 
-    const { table, bucket, userPool, userPoolClient, api, commonProps, grantTablePermissions } = props;
+    const { table, bucket, userPool, userPoolClient, api, commonProps, allowedOrigins, grantTablePermissions } = props;
 
     // Helper for lambda paths
     const lampath = (name: string) => path.join(__dirname, `../../lambda/${name}.ts`);
@@ -46,9 +47,7 @@ export class ReceiveApi extends cdk.NestedStack {
       handler: receive_authorizer_fn,
       identitySources: [
         apigateway.IdentitySource.header('X-QR-ID'),
-        apigateway.IdentitySource.header('X-QR-UUID'),
         apigateway.IdentitySource.header('X-QR-PIN'),
-        apigateway.IdentitySource.header('Authorization'),
       ],
       resultsCacheTtl: cdk.Duration.minutes(5),
     });
@@ -125,12 +124,23 @@ export class ReceiveApi extends cdk.NestedStack {
     // --- Routes ---
     // Helper to add resource
     const addResourceWithCors = (parent: apigateway.IResource, pathPart: string): apigateway.Resource => {
-      return parent.addResource(pathPart) as apigateway.Resource;
+      const res = parent.addResource(pathPart) as apigateway.Resource;
+      res.addCorsPreflight({
+        allowOrigins: allowedOrigins,
+        allowMethods: apigateway.Cors.ALL_METHODS,
+        allowHeaders: [...apigateway.Cors.DEFAULT_HEADERS, 'X-QR-ID', 'X-QR-UUID', 'X-QR-PIN'],
+      });
+      return res;
     };
 
     this.receiveResource = new apigateway.Resource(this, 'ReceiveTopResource', {
       parent: api.root,
       pathPart: 'receive'
+    });
+    this.receiveResource.addCorsPreflight({
+      allowOrigins: allowedOrigins,
+      allowMethods: apigateway.Cors.ALL_METHODS,
+      allowHeaders: [...apigateway.Cors.DEFAULT_HEADERS, 'X-QR-ID', 'X-QR-UUID', 'X-QR-PIN'],
     });
 
     const routeOptions = { authorizer, authorizationType: apigateway.AuthorizationType.CUSTOM };

@@ -13,8 +13,9 @@ export interface AdminApiProps {
   bucket: s3.IBucket;
   userPool: cognito.IUserPool;
   userPoolClient: cognito.IUserPoolClient;
-  api: apigateway.IRestApi;
+  api: apigateway.RestApi;
   commonProps: any;
+  allowedOrigins: string[];
   grantTablePermissions: (fn: lambda.IFunction, write?: boolean) => void;
 }
 
@@ -24,7 +25,7 @@ export class AdminApi extends cdk.NestedStack {
   constructor(scope: cdk.Stack, id: string, props: AdminApiProps) {
     super(scope, id);
 
-    const { bucket, userPool, userPoolClient, api, commonProps, grantTablePermissions } = props;
+    const { bucket, userPool, userPoolClient, api, commonProps, allowedOrigins, grantTablePermissions } = props;
 
 
     ////////////////////////////////////////////////////////////////////////////////
@@ -177,13 +178,24 @@ export class AdminApi extends cdk.NestedStack {
 
     // Helper to add resource
     const addResourceWithCors = (parent: apigateway.IResource, pathPart: string): apigateway.Resource => {
-      return parent.addResource(pathPart) as apigateway.Resource;
+      const res = parent.addResource(pathPart) as apigateway.Resource;
+      res.addCorsPreflight({
+        allowOrigins: allowedOrigins,
+        allowMethods: apigateway.Cors.ALL_METHODS,
+        allowHeaders: [...apigateway.Cors.DEFAULT_HEADERS, 'X-QR-ID', 'X-QR-UUID', 'X-QR-PIN'],
+      });
+      return res;
     };
 
     // /admin
     this.adminResource = new apigateway.Resource(this, 'AdminTopResource', {
       parent: api.root,
       pathPart: 'admin'
+    });
+    this.adminResource.addCorsPreflight({
+      allowOrigins: allowedOrigins,
+      allowMethods: apigateway.Cors.ALL_METHODS,
+      allowHeaders: [...apigateway.Cors.DEFAULT_HEADERS, 'X-QR-ID', 'X-QR-UUID', 'X-QR-PIN'],
     });
 
     this.adminResource.addMethod('GET', new apigateway.LambdaIntegration(admin_check), { authorizer: authorizerOfAdmin, });
