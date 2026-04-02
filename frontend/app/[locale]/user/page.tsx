@@ -136,7 +136,7 @@ export default function UserDashboardPage() {
                                     </Button>
                                 )}
                             </div>
-                            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest ml-4">{t('userEmail')} : {userEmail ? userEmail : "..."}</p>
+                            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest ml-2">{t('userEmail')} : {userEmail ? userEmail : "..."}</p>
                         </div>
                     </div>
                     <div className="flex items-center gap-2">
@@ -160,7 +160,7 @@ export default function UserDashboardPage() {
                             <CardContent className="p-8 flex flex-col items-center justify-center text-center gap-6 h-full relative overflow-hidden">
                                 {/* Subtle background glow */}
                                 <div className={`absolute -right-4 -bottom-4 w-24 h-24 rounded-full ${item.bg} opacity-20 blur-2xl group-hover:scale-150 transition-transform`} />
-                                
+
                                 <div className={`p-5 rounded-2xl ${item.bg} shadow-inner transition-transform group-hover:scale-110`}>
                                     <item.icon className={`w-10 h-10 ${item.color}`} />
                                 </div>
@@ -174,9 +174,9 @@ export default function UserDashboardPage() {
                 </div>
             </main>
             <div className="flex justify-center p-8 pb-12">
-                <Button 
-                    className="rounded-full px-8 h-12 bg-white/50 backdrop-blur-sm border border-gray-200 text-gray-400 hover:text-red-500 hover:bg-red-50 hover:border-red-100 transition-all font-bold" 
-                    variant="outline" 
+                <Button
+                    className="rounded-full px-8 h-12 bg-white/50 backdrop-blur-sm border border-gray-200 text-gray-400 hover:text-red-500 hover:bg-red-50 hover:border-red-100 transition-all font-bold"
+                    variant="outline"
                     onClick={handleCreatesop}
                 >
                     {t("createMyShop")}

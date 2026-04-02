@@ -4,8 +4,8 @@
  */
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
-import { RefreshCw, ArrowRight, HelpCircle, Camera, Settings, ShoppingBasket, Eye, Plus, Trash2, Copy, ImageIcon, Save, Loader2, Pencil, ChevronDown, Download, Check, QrCode, Package, Truck, CreditCard, Gift, LogOut, ArrowBigDownDash } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { RefreshCw, ArrowRight, HelpCircle, Camera, Settings, ShoppingBasket, Eye, Plus, Trash2, Copy, ImageIcon, Save, Loader2, Pencil, ChevronDown, Download, Check, QrCode, Package, Truck, CreditCard, Gift, LogOut, ArrowBigDownDash, ArrowUp, ArrowDown, Columns, PackageOpen, Search, Filter, Minimize2, Clock, User, Home, MessageCircleWarning, SlidersHorizontal, Table2 } from 'lucide-react';
 import { notFound, useParams } from 'next/navigation';
 import { useRouter } from '@/i18n/routing';
 import { useTranslations } from 'next-intl';
@@ -26,6 +26,7 @@ import { generateId } from '@/lib/id';
 import { resizeImage } from "@/lib/image-utils";
 import { generatePDF } from '@/lib/generatePDF';
 import { cardformats } from '@/lib/constants/designs';
+import { cn } from '@/lib/utils';
 
 const NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
@@ -70,6 +71,72 @@ export default function ShopPage() {
     const [searchQrId, setSearchQrId] = useState('');
     const [orderStatusFilter, setOrderStatusFilter] = useState<string>('ALL');
     const [orderProductFilter, setOrderProductFilter] = useState<string | null>(null);
+
+    // --- Table Configuration ---
+    const [orderSortConfig, setOrderSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' } | null>(null);
+    const [visibleOrderColumns, setVisibleOrderColumns] = useState<string[]>(['ts_updated_at', 'product_id', 'status', 'memo_for_shop']);
+    const [isColumnSettingsOpen, setIsColumnSettingsOpen] = useState(false);
+
+    const ORDER_COL_GROUPS = [
+        {
+            title: '基本情報',
+            columns: [
+                { key: 'ts_updated_at', label: t('orders.date'), icon: <RefreshCw className="w-3.5 h-3.5" /> },
+                { key: 'ts_created_at', label: ts('ts_created_at'), icon: <Plus className="w-3.5 h-3.5" /> },
+                { key: 'qr_id', label: t('orders.qrId'), icon: <QrCode className="w-3.5 h-3.5" /> },
+                { key: 'product_id', label: t('orders.productName'), icon: <Package className="w-3.5 h-3.5" /> },
+                { key: 'status', label: t('orders.status'), icon: <SlidersHorizontal className="w-3.5 h-3.5" /> },
+            ]
+        },
+        {
+            title: 'お届け先情報',
+            columns: [
+                { key: 'recipient_name', label: t('orders.recipient'), icon: <User className="w-3.5 h-3.5" /> },
+                { key: 'address', label: t('orders.address'), icon: <Truck className="w-3.5 h-3.5" /> },
+                { key: 'preferred_date', label: t('orders.preferredDateTime'), icon: <Clock className="w-3.5 h-3.5" /> },
+            ]
+        },
+        {
+            title: 'メモ・メッセージ',
+            columns: [
+                { key: 'memo_for_shop', label: t('orders.shopMemo'), icon: <Pencil className="w-3.5 h-3.5" /> },
+                { key: 'memo_for_users', label: t('orders.userMessage'), icon: <MessageCircleWarning className="w-3.5 h-3.5" /> },
+            ]
+        }
+    ];
+
+    const ORDER_COL_OPTIONS = ORDER_COL_GROUPS.flatMap(g => g.columns);
+
+    const handleOrderSort = (key: string) => {
+        let direction: 'asc' | 'desc' = 'asc';
+        if (orderSortConfig && orderSortConfig.key === key && orderSortConfig.direction === 'asc') direction = 'desc';
+        setOrderSortConfig({ key, direction });
+    };
+
+    const getOrderCellContent = (order: any, colKey: string) => {
+        const product = products.find(p => p.product_id === order.product_id);
+        const qrId = order.id || order.qr_id?.replace('QR#', '');
+
+        switch (colKey) {
+            case 'ts_updated_at':
+            case 'ts_created_at':
+                const dateVal = order[colKey];
+                return dateVal ? (
+                    <div className="flex flex-col">
+                        <span className="whitespace-nowrap">{new Date(dateVal).toLocaleDateString()}</span>
+                        <span className="text-[10px] text-gray-500 whitespace-nowrap">{new Date(dateVal).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                    </div>
+                ) : "-";
+            case 'qr_id': return <span className="font-mono text-xs">{qrId}</span>;
+            case 'product_id': return <span className="font-bold">{product?.name || order.product_id}</span>;
+            case 'status':
+                return (
+                    <span className={`px-2 py-1 rounded text-xs border ${statusCss(order.status.toLowerCase())}`}>{st(order.status.toLowerCase())}</span>
+                );
+            default: return <span className="truncate max-w-[150px] inline-block">{order[colKey] || "-"}</span>;
+        }
+    };
+
     const [shippingOrderId, setShippingOrderId] = useState<string | null>(null);
     const [isCreatingProduct, setIsCreatingProduct] = useState(false);
     const [isAddProductDialogOpen, setIsAddProductDialogOpen] = useState(false);
@@ -99,6 +166,7 @@ export default function ShopPage() {
     const [orderQuantity, setOrderQuantity] = useState<number>(100);
     const [isCreatingCardOrder, setIsCreatingCardOrder] = useState(false);
     const [isConfirmOrderDialogOpen, setIsConfirmOrderDialogOpen] = useState(false);
+    const [isDetailFiltering, setIsDetailFiltering] = useState(false);
 
     const [selectedCardDesignId, setSelectedCardDesignId] = useState<string>('');
 
@@ -801,6 +869,35 @@ export default function ShopPage() {
         alert(translatedError);
     };
 
+    const statusList = [
+        st("short.una"),
+        st("short.lin"),
+        st("short.act"),
+        st("short.use"),
+        st("short.shi"),
+        st("short.com"),
+        st("short.exp"),
+        st("short.ban"),
+        st("short.pro"),
+    ];
+
+
+    const statusCss = (status: string, bg: boolean = true, border: boolean = true, text: boolean = true) => {
+        switch (status) {
+            case st('short.una'): return (bg ? 'bg-gray-100    ' : '') + (border ? 'border-gray-200.  ' : '') + (text ? ' text-gray-700.  ' : '');
+            case st('short.lin'): return (bg ? 'bg-emerald-100 ' : '') + (border ? 'border-emerald-200' : '') + (text ? ' text-emerald-800' : '');
+            case st('short.act'): return (bg ? 'bg-yellow-100  ' : '') + (border ? 'border-yellow-200 ' : '') + (text ? ' text-yellow-800 ' : '');
+            case st('short.use'): return (bg ? 'bg-orange-100  ' : '') + (border ? 'border-orange-200 ' : '') + (text ? ' text-orange-800 ' : '');
+            case st('short.shi'): return (bg ? 'bg-indigo-100  ' : '') + (border ? 'border-indigo-200 ' : '') + (text ? ' text-indigo-800 ' : '');
+            case st('short.com'): return (bg ? 'bg-purple-100  ' : '') + (border ? 'border-purple-200 ' : '') + (text ? ' text-purple-800 ' : '');
+            case st('short.exp'): return (bg ? 'bg-gray-200    ' : '') + (border ? 'border-gray-300   ' : '') + (text ? ' text-gray-800   ' : '');
+            case st('short.ban'): return (bg ? 'bg-red-100     ' : '') + (border ? 'border-red-200    ' : '') + (text ? ' text-red-800    ' : '');
+            case st('short.pro'): return (bg ? 'bg-green-100   ' : '') + (border ? 'border-green-200  ' : '') + (text ? ' text-green-800  ' : '');
+            default: return (bg ? 'bg-gray-100 ' : '') + (border ? 'border-gray-200' : '') + (text ? ' text-gray-700' : '');
+        }
+    }
+
+
     if (error) return <div className="p-8 text-red-500">Error: {error}</div>;
 
     return (
@@ -978,7 +1075,7 @@ export default function ShopPage() {
                                                         <ImageIcon className="w-4 h-4" />
                                                         <span className="font-semibold">{tr('senderInfo.labels.detail_html-images')}</span>
                                                     </div>
-                                                    <ChevronDown className={`w-4 h-4 transition-transform ${isHtmlImageSectionOpen ? 'rotate-180' : ''}`} />
+                                                    <ChevronDown className={`w-4 h-4 transition-transform ${isHtmlImageSectionOpen ? 'rotate-0' : '240'}`} />
                                                 </Button>
 
                                                 {isHtmlImageSectionOpen && (
@@ -1477,117 +1574,207 @@ export default function ShopPage() {
                         {/* Incoming Orders */}
                         <Card>
                             <CardHeader>
-                                <div className="flex flex-col space-y-4 ">
-                                    <div>
-                                        <CardTitle>{t('incomingOrders')}</CardTitle>
-                                        <CardDescription>{t('ordersDesc')}</CardDescription>
+                                <div className="flex flex-col space-y-4">
+                                    <div className="flex w-full justify-between">
 
-                                    </div>
-                                    <Button variant="outline" size="sm" className="w-full shrink-0 md:w-auto" onClick={() => fetchShopData(true)} disabled={isRefreshing}>
-                                        <RefreshCw className={`mr-2 h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-                                        {t('refresh')}
-                                    </Button>
+                                        <div>
+                                            <CardTitle>{t('incomingOrders')}</CardTitle>
+                                            <CardDescription>{t('ordersDesc')}</CardDescription>
 
-
-
-
-                                    {/* Product Filter Grid */}
-                                    <div className="grid grid-cols-2 xs:grid-cols-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
-                                        <Card
-                                            className={`overflow-hidden cursor-pointer transition-all relative aspect-[84/52] flex items-center justify-center bg-gray-50 border-2 ${orderProductFilter === null ? 'ring-2 ring-primary border-primary' : 'border-dashed border-gray-200 hover:bg-gray-100'}`}
-                                            onClick={() => setOrderProductFilter(null)}
-                                        >
-                                            <span className={`font-bold text-sm ${orderProductFilter === null ? 'text-primary' : 'text-gray-500'}`}>{tc('all')}</span>
-                                        </Card>
-                                        {products.map((product) => (
-                                            <Card
-                                                key={product.product_id}
-                                                className={`overflow-hidden cursor-pointer transition-all relative aspect-[84/52] ${orderProductFilter === product.product_id ? 'ring-2 ring-offset-2 ring-primary' : 'hover:ring-2 hover:ring-primary/50'}`}
-                                                onClick={() => setOrderProductFilter(orderProductFilter === product.product_id ? null : product.product_id)}
-                                            >
-                                                {/* 背景: カードデザイン */}
-                                                {product.design && (
-                                                    <img
-                                                        src={product.design.thumbf || product.design.bgimgf}
-                                                        alt={product.design.name}
-                                                        className="absolute inset-0 w-full h-full object-cover"
-                                                        crossOrigin="anonymous"
-                                                    />
-                                                )}
-                                                {/* オーバーレイ */}
-                                                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
-
-                                                {/* 商品画像 (小) */}
-                                                {product.image_url && (
-                                                    <div className="absolute bottom-2 right-2 w-8 h-8 rounded-md overflow-hidden border border-white/50 shadow-md bg-white">
-                                                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                                                        <img
-                                                            src={product.image_url}
-                                                            alt={product.name}
-                                                            className="w-full h-full object-cover"
-                                                        />
-                                                    </div>
-                                                )}
-
-                                                {/* 商品名 */}
-                                                <div className="absolute bottom-0 left-0 right-0 p-2 text-white">
-                                                    <h3 className="font-bold text-[10px] truncate drop-shadow-lg">{product.name}</h3>
-                                                </div>
-
-                                                {/* 選択済みバッジ */}
-                                                {orderProductFilter === product.product_id && (
-                                                    <div className="absolute top-2 right-2 flex gap-1">
-                                                        <span className="bg-primary text-white rounded-full px-1.5 py-0.5 shadow-md flex items-center justify-center">
-                                                            <Check className="w-3 h-3" />
-                                                        </span>
-                                                    </div>
-                                                )}
-                                            </Card>
-                                        ))}
-                                    </div>
-
-                                    <div className="mt-4 flex flex-wrap gap-2">
-                                        {["ALL", "UNASSIGNED", "LINKED", "ACTIVE", "USED", "SHIPPED", "COMPLETED", "EXPIRED", "BANNED", "PROMOTION"].map((s) => (
-                                            <Button
-                                                key={s}
-                                                variant={orderStatusFilter === s ? "default" : "secondary"}
-                                                size="sm"
-                                                onClick={() => setOrderStatusFilter(s)}
-                                                className="text-xs"
-                                            >
-                                                {s === 'ALL' ? tc('all') : st(s.toLowerCase())}
-                                            </Button>
-                                        ))}
-                                    </div>
-
-
-                                    {/* filter by qr_id */}
-                                    <div className="flex flex-col w-full space-y-2 md:flex-row md:items-center md:space-x-2 md:space-y-0 md:w-auto">
-                                        <div className="flex w-full items-center space-x-2">
-                                            <Input
-                                                placeholder={t('search.placeholder')}
-                                                value={searchQrId}
-                                                onChange={(e) => setSearchQrId(e.target.value)}
-                                                className="w-full"
-                                            />
-                                            {searchQrId && (
-                                                <Button variant="ghost" onClick={() => setSearchQrId('')} className="shrink-0">
-                                                    {t('search.clear')}
-                                                </Button>
-                                            )}
                                         </div>
                                     </div>
 
                                 </div>
+
                             </CardHeader>
                             <CardContent className="p-4 w-full">
+
+                                <div className="mb-2">
+                                    <div className={cn("flex gap-2 flex", isDetailFiltering ? "flex-col" : "")}>
+
+                                        {/* 絞り込み */}
+                                        <div className={cn("", isDetailFiltering ? "border rounded-xl border-2 border-dashed border-gray-300 p-2 mb-4 flex justify-start flex-col mt-1 w-full bg-mist-400/50" : "")}>
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() => setIsDetailFiltering(!isDetailFiltering)}
+                                                className={`justify-start gap-2 text-xs border-gray-200 rounded-lg shadow-sm hover:ring-2 hover:ring-primary/10 transition-all text-primary border-primary/20 bg-primary/5 max-w-10`}
+                                            >
+                                                {isDetailFiltering ? (
+                                                    <>
+                                                        <Minimize2 className={`w-3.5 h-3.5 mr-2`} />
+                                                    </>
+                                                ) : (
+                                                    // <Minimize2 className={`w-3.5 h-3.5`} />
+                                                    <>
+                                                        <Filter className={`w-3.5 h-3.5 mr-2`} />
+                                                    </>
+                                                )}
+                                            </Button>
+
+                                            {isDetailFiltering && (
+                                                <div className="mt-1">
+
+                                                    {/* 商品/カードフィルター */}
+                                                    < div className=" text-[15px] text-gray-500 flex flex-row gap-2 items-center mt-0">
+                                                        <div className={cn("w-4 h-4 rounded-full items-center justify-center bg-gray-900 border border-white")}></div>
+                                                        Design
+                                                    </div>
+                                                    <div className="grid grid-cols-2 xs:grid-cols-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 border-gray-200 rounded-md p-2">
+                                                        <Card
+                                                            className={`overflow-hidden cursor-pointer transition-all relative aspect-[84/52] flex items-center justify-center bg-gray-50 border-2 ${orderProductFilter === null ? 'ring-2 ring-primary border-primary' : 'border-dashed border-gray-200 hover:bg-gray-100'}`}
+                                                            onClick={() => setOrderProductFilter(null)}
+                                                        >
+                                                            <span className={`font-bold text-sm ${orderProductFilter === null ? 'text-primary' : 'text-gray-500'}`}>{tc('all')}</span>
+                                                        </Card>
+                                                        {products.map((product) => (
+                                                            <Card
+                                                                key={product.product_id}
+                                                                className={`overflow-hidden cursor-pointer transition-all relative aspect-[84/52] ${orderProductFilter === product.product_id ? 'ring-2 ring-offset-2 ring-primary' : 'hover:ring-2 hover:ring-primary/50'}`}
+                                                                onClick={() => setOrderProductFilter(orderProductFilter === product.product_id ? null : product.product_id)}
+                                                            >
+                                                                {/* 背景: カードデザイン */}
+                                                                {product.design && (
+                                                                    <img
+                                                                        src={product.design.thumbf || product.design.bgimgf}
+                                                                        alt={product.design.name}
+                                                                        className="absolute inset-0 w-full h-full object-cover"
+                                                                        crossOrigin="anonymous"
+                                                                    />
+                                                                )}
+                                                                {/* オーバーレイ */}
+                                                                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+
+                                                                {/* 商品画像 (小) */}
+                                                                {product.image_url && (
+                                                                    <div className="absolute bottom-2 right-2 w-8 h-8 rounded-md overflow-hidden border border-white/50 shadow-md bg-white">
+                                                                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                                                                        <img
+                                                                            src={product.image_url}
+                                                                            alt={product.name}
+                                                                            className="w-full h-full object-cover"
+                                                                        />
+                                                                    </div>
+                                                                )}
+
+                                                                {/* 商品名 */}
+                                                                <div className="absolute bottom-0 left-0 right-0 p-2 text-white">
+                                                                    <h3 className="font-bold text-[10px] truncate drop-shadow-lg">{product.name}</h3>
+                                                                </div>
+
+                                                                {/* 選択済みバッジ */}
+                                                                {orderProductFilter === product.product_id && (
+                                                                    <div className="absolute top-2 right-2 flex gap-1">
+                                                                        <span className="bg-primary text-white rounded-full px-1.5 py-0.5 shadow-md flex items-center justify-center">
+                                                                            <Check className="w-3 h-3" />
+                                                                        </span>
+                                                                    </div>
+                                                                )}
+                                                            </Card>
+                                                        ))}
+                                                    </div>
+
+                                                    {/* ステータスフィルター */}
+                                                    <div className=" text-[15px] text-gray-800 flex flex-row gap-2 items-center mt-4">
+                                                        <div className={cn("w-4 h-4 rounded-full items-center justify-center bg-gray-900 border border-white")}></div>
+                                                        Status
+                                                    </div>
+                                                    <div className="border-gray-200 flex flex-wrap gap-2  rounded-md p-2">
+                                                        {['ALL'].concat(statusList).map((s) => (
+                                                            <Button
+                                                                key={s.toUpperCase()}
+                                                                variant={orderStatusFilter === s.toUpperCase() ? "default" : "secondary"}
+                                                                size="sm"
+                                                                onClick={() => setOrderStatusFilter(s.toUpperCase() == orderStatusFilter ? "ALL" : s.toUpperCase())}
+                                                                className={cn("text-xs border border-3", statusCss(s, true, orderStatusFilter === s.toUpperCase() ? false : true, true), orderStatusFilter === s.toUpperCase() ? "border-black " : "")}
+                                                            >
+                                                                {s === 'ALL' ? tc('all') : st(s)}
+                                                            </Button>
+                                                        ))}
+                                                    </div>
+
+                                                    {/* Search and Column Settings Row */}
+                                                    <div className=" text-[15px] text-gray-500 flex flex-row gap-2 items-center mt-4">
+                                                        <div className={cn("w-4 h-4 rounded-full items-center justify-center bg-gray-900 border border-white")}></div>
+                                                        ID
+                                                    </div>
+                                                    <div className="flex flex-col sm:flex-row gap-2 border-gray-200 flex flex-wrap gap-2 rounded-md p-2 mb-4">
+                                                        <div className="relative flex-1 group">
+                                                            <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
+                                                                <Search className={`w-3.5 h-3.5 text-gray-400 group-focus-within:text-primary transition-colors`} />
+                                                            </div>
+                                                            <Input
+                                                                placeholder={t('search.placeholder')}
+                                                                value={searchQrId}
+                                                                onChange={(e) => setSearchQrId(e.target.value)}
+                                                                className={cn("pl-9 h-9 border-gray-200 bg-white hover:border-gray-300 focus:border-primary/50 focus:ring-primary/10 transition-all rounded-lg text-sm", searchQrId ? "border-black border-3" : "")}
+                                                            />
+                                                            <div className="absolute inset-y-0 right-3 flex items-center gap-1.5">
+                                                                {ordersLoading && <Loader2 className="w-3.5 h-3.5 animate-spin text-gray-300" />}
+                                                                {searchQrId && (
+                                                                    <button
+                                                                        onClick={() => setSearchQrId('')}
+                                                                        className="text-gray-400 hover:text-gray-600 p-1"
+                                                                        title={t('search.clear')}
+                                                                    >
+                                                                        <Plus className="w-3.5 h-3.5 rotate-45" />
+                                                                    </button>
+                                                                )}
+                                                            </div>
+                                                        </div>
+
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                        </div>
+
+
+                                        <div className="w-full flex gap-2 justify-between">
+                                            {/* カラム設定ボタン */}
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() => setIsColumnSettingsOpen(true)}
+                                                className={`flex justify-end gap-2 text-xs border-gray-200 rounded-lg shadow-sm hover:ring-2 hover:ring-primary/10 transition-all ${visibleOrderColumns.length < ORDER_COL_OPTIONS.length ? 'text-primary border-primary/20 bg-primary/5' : 'text-gray-600'}`}
+                                            >
+                                                <Table2 className="w-3.5 h-3.5" />
+                                                {t('orders.columnSettings')}
+                                                {visibleOrderColumns.length < ORDER_COL_OPTIONS.length && (
+                                                    <span className="flex items-center justify-center w-4 h-4 text-[10px] bg-primary text-white rounded-full font-bold">
+                                                        {visibleOrderColumns.length}
+                                                    </span>
+                                                )}
+                                            </Button>
+
+                                            {/* 更新ボタン */}
+                                            <Button variant="outline" size="sm" className="" onClick={() => fetchShopData(true)} disabled={isRefreshing}>
+                                                <RefreshCw className={`mr-2 h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+                                                {t('refresh')}
+                                            </Button>
+                                        </div>
+                                    </div>
+                                </div>
+
                                 <Table wrapperStyle={{ maxHeight: 'calc(100vh - 200px)' }}>
                                     <TableHeader className="sticky top-0 bg-white z-10 drop-shadow-sm">
                                         <TableRow>
-                                            <TableHead className="text-xs md:text-sm">{t('orders.date')}</TableHead>
-                                            <TableHead className="text-xs md:text-sm hidden sm:table-cell">{t('orders.productName')}</TableHead>
-                                            <TableHead className="text-xs md:text-sm">{t('orders.status')}</TableHead>
-                                            <TableHead className="text-xs md:text-sm hidden md:table-cell">{t('orders.shopMemo')}</TableHead>
+                                            {ORDER_COL_OPTIONS.filter(col => visibleOrderColumns.includes(col.key)).map(col => (
+                                                <TableHead
+                                                    key={col.key}
+                                                    className="text-xs md:text-sm cursor-pointer select-none hover:bg-gray-50 transition-colors"
+                                                    onClick={() => handleOrderSort(col.key)}
+                                                >
+                                                    <div className="flex items-center gap-2">
+                                                        {col.label}
+                                                        {orderSortConfig?.key === col.key ? (
+                                                            orderSortConfig.direction === 'asc' ? <ArrowUp className="w-3 h-3 text-primary" /> : <ArrowDown className="w-3 h-3 text-primary" />
+                                                        ) : (
+                                                            <ArrowDown className="w-3 h-3 text-gray-300 opacity-0 group-hover:opacity-100" />
+                                                        )}
+                                                    </div>
+                                                </TableHead>
+                                            ))}
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
@@ -1605,13 +1792,22 @@ export default function ShopPage() {
                                                 .filter(o => !orderProductFilter || o.product_id === orderProductFilter)
                                                 .filter(o => !searchQrId || (o.id || o.qr_id).includes(searchQrId))
                                                 .sort((a, b) => {
-                                                    const sortorder: { [name: string]: number } = { 'LINKED': 3, 'ACTIVE': 2, 'USED': 4, 'SHIPPED': 1, 'COMPLETED': 0, "EXPIRED": -1, "BANNED": -2 };
-                                                    // 1. Status: compare
-                                                    if (a.status !== b.status) return sortorder[b.status] - sortorder[a.status];
-                                                    // 2. Date: Newest first
-                                                    const dateA = new Date(a.ts_updated_at || a.ts_created_at).getTime();
-                                                    const dateB = new Date(b.ts_updated_at || b.ts_created_at).getTime();
-                                                    return dateB - dateA;
+                                                    if (!orderSortConfig) {
+                                                        const sortorder: { [name: string]: number } = { 'LINKED': 3, 'ACTIVE': 2, 'USED': 4, 'SHIPPED': 1, 'COMPLETED': 0, "EXPIRED": -1, "BANNED": -2 };
+                                                        if (a.status !== b.status) return sortorder[b.status] - sortorder[a.status];
+                                                        return new Date(b.ts_updated_at || b.ts_created_at).getTime() - new Date(a.ts_updated_at || a.ts_created_at).getTime();
+                                                    }
+                                                    const { key, direction } = orderSortConfig;
+                                                    let valA = a[key] || "", valB = b[key] || "";
+                                                    if (key === 'status') {
+                                                        const sortorder: { [name: string]: number } = { 'LINKED': 3, 'ACTIVE': 2, 'USED': 4, 'SHIPPED': 1, 'COMPLETED': 0, "EXPIRED": -1, "BANNED": -2 };
+                                                        valA = sortorder[a.status] || 0; valB = sortorder[b.status] || 0;
+                                                    } else if (key.startsWith('ts_')) {
+                                                        valA = new Date(a[key] || 0).getTime(); valB = new Date(b[key] || 0).getTime();
+                                                    }
+                                                    if (valA < valB) return direction === 'asc' ? -1 : 1;
+                                                    if (valA > valB) return direction === 'asc' ? 1 : -1;
+                                                    return 0;
                                                 })
                                                 .map((order: any) => {
                                                     const product = products.find(p => p.product_id === order.product_id);
@@ -1621,29 +1817,11 @@ export default function ShopPage() {
                                                         <Dialog key={order.qr_id}>
                                                             <DialogTrigger asChild>
                                                                 <TableRow className="cursor-pointer hover:bg-gray-100">
-                                                                    {/* <TableCell className="text-xs md:text-sm">{order.ts_updated_at ? new Date(order.ts_updated_at).toLocaleString() : "-"}</TableCell> */}
-                                                                    <TableCell className="text-xs md:text-sm">
-                                                                        {order.ts_updated_at ? (
-                                                                            <div className="flex flex-col">
-                                                                                <span className="whitespace-nowrap">{new Date(order.ts_updated_at).toLocaleDateString()}</span>
-                                                                                <span className="text-[10px] text-gray-500 whitespace-nowrap">{new Date(order.ts_updated_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                                                                            </div>
-                                                                        ) : "-"}
-                                                                    </TableCell>
-                                                                    <TableCell className="text-xs md:text-sm font-bold hidden sm:table-cell">{product?.name || order.product_id}</TableCell>
-                                                                    <TableCell>
-                                                                        <span className={`px-2 py-1 rounded text-xs ${order.status === 'UNASSIGNED' ? 'bg-gray-100' :
-                                                                            order.status === 'LINKED' ? 'bg-emerald-100 text-emerald-800' :
-                                                                                order.status === 'ACTIVE' ? 'bg-yellow-100 text-yellow-800' :
-                                                                                    order.status === 'USED' ? 'bg-orange-100 text-orange-800' :
-                                                                                        order.status === 'SHIPPED' ? 'bg-indigo-100 text-indigo-800' :
-                                                                                            order.status === 'COMPLETED' ? 'bg-purple-100 text-purple-800' :
-                                                                                                order.status === 'EXPIRED' ? 'bg-gray-100 text-gray-800' :
-                                                                                                    order.status === 'BANNED' ? 'bg-red-100 text-red-800' :
-                                                                                                        'bg-green-100 text-green-800'
-                                                                            }`}>{st(order.status.toLowerCase())}</span>
-                                                                    </TableCell>
-                                                                    <TableCell className="text-xs md:text-sm hidden md:table-cell">{order.memo_for_shop}</TableCell>
+                                                                    {ORDER_COL_OPTIONS.filter(col => visibleOrderColumns.includes(col.key)).map(col => (
+                                                                        <TableCell key={col.key} className="text-xs md:text-sm">
+                                                                            {getOrderCellContent(order, col.key)}
+                                                                        </TableCell>
+                                                                    ))}
                                                                 </TableRow>
                                                             </DialogTrigger>
                                                             <DialogContent className="max-w-md">
@@ -1677,17 +1855,7 @@ export default function ShopPage() {
                                                                     {/* Status */}
                                                                     <div>
                                                                         <h4 className="text-sm font-semibold text-gray-500">{t('orders.status')}</h4>
-
-                                                                        <span className={`px-2 py-1 rounded text-xs ${order.status === 'UNASSIGNED' ? 'bg-gray-100' :
-                                                                            order.status === 'LINKED' ? 'bg-emerald-100 text-emerald-800' :
-                                                                                order.status === 'ACTIVE' ? 'bg-yellow-100 text-yellow-800' :
-                                                                                    order.status === 'USED' ? 'bg-orange-100 text-orange-800' :
-                                                                                        order.status === 'SHIPPED' ? 'bg-indigo-100 text-indigo-800' :
-                                                                                            order.status === 'COMPLETED' ? 'bg-purple-100 text-purple-800' :
-                                                                                                order.status === 'EXPIRED' ? 'bg-gray-100 text-gray-800' :
-                                                                                                    order.status === 'BANNED' ? 'bg-red-100 text-red-800' :
-                                                                                                        'bg-green-100 text-green-800'
-                                                                            }`}>{st(order.status.toLowerCase())}</span>
+                                                                        <span className={`px-2 py-1 rounded text-xs border ${statusCss(order.status.toLowerCase())}`}>{st(order.status.toLowerCase())}</span>
                                                                     </div>
 
                                                                     {/* Card Preview */}
@@ -1875,80 +2043,111 @@ export default function ShopPage() {
                                 <div className="space-y-4">
                                     <h3 className="font-bold text-gray-700">{t('statusGuide.flow')}</h3>
                                     <div className="flex flex-wrap items-center gap-2 text-sm">
-                                        <span className="px-3 py-1 bg-gray-100 text-gray-700">    {st('unassigned')}</span>                                <ArrowRight className="w-4 h-4 text-gray-400" />
-                                        <span className="px-3 py-1 bg-emerald-100 text-emerald-800">  {st('linked')}    </span>                                <ArrowRight className="w-4 h-4 text-gray-400" />
-                                        <span className="px-3 py-1 bg-yellow-100 text-yellow-800">{st('active')}    </span>                                <ArrowRight className="w-4 h-4 text-gray-400" />
-                                        <span className="px-3 py-1 bg-orange-100 text-orange-800">{st('used')}      </span>                                <ArrowRight className="w-4 h-4 text-gray-400" />
-                                        <span className="px-3 py-1 bg-indigo-100 text-indigo-800">  {st('shipped')}   </span>                                <ArrowRight className="w-4 h-4 text-gray-400" />
-                                        <span className="px-3 py-1 bg-purple-100 text-purple-800">{st('completed')} </span>
+                                        <span className={cn("px-3 py-1 rounded border", statusCss(st("short.una")))}>{st(st("short.una"))}</span> <ArrowRight className="w-4 h-4 text-gray-400" />
+                                        <span className={cn("px-3 py-1 rounded border", statusCss(st("short.lin")))}>{st(st("short.lin"))}</span> <ArrowRight className="w-4 h-4 text-gray-400" />
+                                        <span className={cn("px-3 py-1 rounded border", statusCss(st("short.act")))}>{st(st("short.act"))}</span> <ArrowRight className="w-4 h-4 text-gray-400" />
+                                        <span className={cn("px-3 py-1 rounded border", statusCss(st("short.use")))}>{st(st("short.use"))}</span> <ArrowRight className="w-4 h-4 text-gray-400" />
+                                        <span className={cn("px-3 py-1 rounded border", statusCss(st("short.shi")))}>{st(st("short.shi"))}</span> <ArrowRight className="w-4 h-4 text-gray-400" />
+                                        <span className={cn("px-3 py-1 rounded border", statusCss(st("short.com")))}>{st(st("short.com"))}</span>
                                     </div>
                                 </div>
-
-                                {/* <span className={`px-2 py-1 rounded text-xs ${order.status === 'UNASSIGNED' ? 'bg-gray-100' :
-                            order.status === 'LINKED' ? 'bg-emerald-100 text-emerald-800' :
-                                order.status === 'ACTIVE' ? 'bg-yellow-100 text-yellow-800' :
-                                    order.status === 'USED' ? 'bg-orange-100 text-orange-800' :
-                                        order.status === 'SHIPPED' ? 'bg-indigo-100 text-indigo-800' :
-                                            order.status === 'COMPLETED' ? 'bg-purple-100 text-purple-800' :
-                                                order.status === 'EXPIRED' ? 'bg-gray-100 text-gray-800' :
-                                                    order.status === 'BANNED' ? 'bg-red-100 text-red-800' :
-                                                        'bg-green-100 text-green-800' */}
                                 {/* List */}
                                 <div className="space-y-4">
                                     <h3 className="font-bold text-gray-700">{t('statusGuide.list')}</h3>
-                                    <div className="grid gap-4 sm:grid-cols-2">
-                                        <div className="space-y-2">
-                                            <div className="flex items-center gap-2">
-                                                <span className="bg-gray-100 text-gray-700 px-2 py-1 rounded text-xs">{st('unassigned')}</span>
-                                            </div>
-                                            <p className="text-sm text-gray-600 pl-2 border-l-2 border-gray-200">{t('statusGuide.statuses.unassigned')}</p>
-                                        </div>
-                                        <div className="space-y-2">
-                                            <div className="flex items-center gap-2">
-                                                <span className="bg-emerald-100 text-emerald-800 px-2 py-1 rounded text-xs">{st('linked')}</span>
-                                            </div>
-                                            <p className="text-sm text-gray-600 pl-2 border-l-2 border-emerald-200">{t('statusGuide.statuses.linked')}</p>
-                                        </div>
-                                        <div className="space-y-2">
-                                            <div className="flex items-center gap-2">
-                                                <span className="bg-yellow-100 text-yellow-800 px-2 py-1 rounded text-xs">{st('active')}</span>
-                                            </div>
-                                            <p className="text-sm text-gray-600 pl-2 border-l-2 border-yellow-200">{t('statusGuide.statuses.active')}</p>
-                                        </div>
-                                        <div className="space-y-2">
-                                            <div className="flex items-center gap-2">
-                                                <span className="bg-orange-100 text-orange-800 px-2 py-1 rounded text-xs">{st('used')}</span>
-                                            </div>
-                                            <p className="text-sm text-gray-600 pl-2 border-l-2 border-orange-200">{t('statusGuide.statuses.used')}</p>
-                                        </div>
-                                        <div className="space-y-2">
-                                            <div className="flex items-center gap-2">
-                                                <span className="bg-indigo-100 text-indigo-800 px-2 py-1 rounded text-xs">{st('shipped')}</span>
-                                            </div>
-                                            <p className="text-sm text-gray-600 pl-2 border-l-2 border-indigo-200">{t('statusGuide.statuses.shipped')}</p>
-                                        </div>
-                                        <div className="space-y-2">
-                                            <div className="flex items-center gap-2">
-                                                <span className="bg-purple-100 text-purple-800 px-2 py-1 rounded text-xs">{st('completed')}</span>
-                                            </div>
-                                            <p className="text-sm text-gray-600 pl-2 border-l-2 border-purple-200">{t('statusGuide.statuses.completed')}</p>
-                                        </div>
-                                        <div className="space-y-2">
-                                            <div className="flex items-center gap-2">
-                                                <span className="bg-gray-200 text-gray-800 px-2 py-1 rounded text-xs">{st('expired')}</span>
-                                            </div>
-                                            <p className="text-sm text-gray-600 pl-2 border-l-2 border-gray-300">{t('statusGuide.statuses.expired')}</p>
-                                        </div>
-                                        <div className="space-y-2">
-                                            <div className="flex items-center gap-2">
-                                                <span className="bg-red-100 text-red-800 px-2 py-1 rounded text-xs">{st('banned')}</span>
-                                            </div>
-                                            <p className="text-sm text-gray-600 pl-2 border-l-2 border-red-200">{t('statusGuide.statuses.banned')}</p>
-                                        </div>
+                                    <div className="grid gap-4 md:grid-cols-2">
+                                        {
+                                            statusList.map((key, index) => (
+                                                <div key={index} className="space-y-2"><div className="flex items-center gap-2"><span className={cn("px-2 py-1 rounded border text-xs", statusCss(key))}>{st(key)}</span> </div><p className={cn("text-sm text-gray-600 pl-2 border-l-2 bg-white/50", statusCss(key, false, true, false))}>{t('statusGuide.statuses.' + key)}</p></div>
+                                            ))
+                                        }
                                     </div>
                                 </div>
                             </CardContent>
                         </Card>
+
+
+                        {/* Column Settings Dialog */}
+                        <Dialog open={isColumnSettingsOpen} onOpenChange={setIsColumnSettingsOpen}>
+                            <DialogContent className="max-w-md sm:max-w-lg p-0 gap-0 overflow-hidden rounded-2xl">
+                                <DialogHeader className="p-6 pb-4 border-b bg-gray-50/50">
+                                    <div className="flex items-center gap-2 mb-1">
+                                        <div className="p-2 bg-primary/10 rounded-lg">
+                                            <Table2 className="w-5 h-5 text-primary" />
+                                        </div>
+                                        <DialogTitle className="text-xl">表示項目の設定</DialogTitle>
+                                    </div>
+                                    <DialogDescription>テーブルに表示する項目を選択してください。</DialogDescription>
+                                </DialogHeader>
+
+                                <div className="p-6 py-4 max-h-[60vh] overflow-y-auto space-y-6">
+                                    {ORDER_COL_GROUPS.map((group, gIdx) => (
+                                        <div key={gIdx} className="space-y-3">
+                                            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-2">
+                                                <span className="w-1 h-3 bg-gray-300 rounded-full" />
+                                                {group.title}
+                                            </h3>
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                                {group.columns.map(col => (
+                                                    <div
+                                                        key={col.key}
+                                                        onClick={() => {
+                                                            const isVisible = visibleOrderColumns.includes(col.key);
+                                                            if (isVisible && visibleOrderColumns.length > 1) {
+                                                                setVisibleOrderColumns(prev => prev.filter(k => k !== col.key));
+                                                            } else if (!isVisible) {
+                                                                setVisibleOrderColumns(prev => [...prev, col.key]);
+                                                            }
+                                                        }}
+                                                        className={`flex items-center justify-between p-3 rounded-xl border-2 transition-all cursor-pointer group ${visibleOrderColumns.includes(col.key)
+                                                            ? 'border-primary/20 bg-primary/5'
+                                                            : 'border-transparent bg-gray-50 hover:bg-gray-100'
+                                                            }`}
+                                                    >
+                                                        <div className="flex items-center gap-3">
+                                                            <div className={`p-1.5 rounded-lg transition-colors ${visibleOrderColumns.includes(col.key) ? 'bg-primary/10 text-primary' : 'bg-white text-gray-400 group-hover:text-gray-600'}`}>
+                                                                {col.icon}
+                                                            </div>
+                                                            <Label className="text-sm font-medium cursor-pointer">{col.label}</Label>
+                                                        </div>
+                                                        <Switch
+                                                            checked={visibleOrderColumns.includes(col.key)}
+                                                            onCheckedChange={(checked) => {
+                                                                if (checked) setVisibleOrderColumns(prev => [...prev, col.key]);
+                                                                else if (visibleOrderColumns.length > 1) setVisibleOrderColumns(prev => prev.filter(k => k !== col.key));
+                                                            }}
+                                                            className="scale-90"
+                                                            onClick={(e) => e.stopPropagation()} // Prevent double trigger
+                                                        />
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                <DialogFooter className="p-4 border-t bg-gray-50/50 flex flex-row items-center justify-between gap-2 sm:gap-0">
+                                    <div className="flex gap-2">
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => setVisibleOrderColumns(['ts_updated_at', 'product_id', 'status', 'memo_for_shop'])}
+                                            className="text-[11px] text-gray-500 hover:text-primary"
+                                        >
+                                            デフォルトに戻す
+                                        </Button>
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => setVisibleOrderColumns(ORDER_COL_OPTIONS.map(c => c.key))}
+                                            className="text-[11px] text-gray-500 hover:text-primary"
+                                        >
+                                            すべて選択
+                                        </Button>
+                                    </div>
+                                    <Button onClick={() => setIsColumnSettingsOpen(false)} className="px-6 rounded-full shadow-md">閉じる</Button>
+                                </DialogFooter>
+                            </DialogContent>
+                        </Dialog>
                     </div>
                 )}
 

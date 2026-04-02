@@ -34,7 +34,22 @@
     "ordered": "発注済み",
     "printing": "印刷中",
     "rejected": "却下",
-    "cancelled": "キャンセル済み"
+    "cancelled": "キャンセル済み",
+    "short": {
+      "una": "unassigned",
+      "lin": "linked",
+      "act": "active",
+      "use": "used",
+      "shi": "shipped",
+      "com": "completed",
+      "exp": "expired",
+      "ban": "banned",
+      "pro": "promotion",
+      "ord": "ordered",
+      "pri": "printing",
+      "rej": "rejected",
+      "can": "cancelled"
+    }
   },
   "Time": {
     "timeMorning": "午前中",
@@ -273,6 +288,7 @@
       "updateFailed": "更新に失敗しました",
       "updateError": "更新中にエラーが発生しました",
       "timestamps": "タイムスタンプ",
+      "columnSettings": "表示設定",
       "shipDialog": {
         "description": "{name} 様への発送情報を入力してください。",
         "label": "追跡番号(なし等でも可)",
@@ -396,7 +412,8 @@
         "shipped": "ショップが商品を発送し、追跡番号が登録された状態です。",
         "completed": "取引が正常に完了しました（受取人が受取完了報告を行った場合など）。",
         "expired": "使用期限が切れ、ギフトが無効になった状態です。",
-        "banned": "不正利用などにより、システム管理者が利用停止させた状態です。"
+        "banned": "不正利用などにより、システム管理者が利用停止させた状態です。",
+        "promotion": "プロモーション用で、閲覧のみできるカードを表します。"
       }
     },
     "shopSettings": {
@@ -987,7 +1004,8 @@
     "User data not found": "ユーザーデータが見つかりません。",
     "User updated successfully": "ユーザー情報が更新されました。",
     "This gift is already linked to a sender": "このギフトはすでに送り主が紐付けられています。",
-    "Gift successfully linked to your sender profile": "ギフトがお使いのプロフィールに紐付けられました。"
+    "Gift successfully linked to your sender profile": "ギフトがお使いのプロフィールに紐付けられました。",
+    "No products found to import": "インポートする商品がありません。"
   },
   "MFASetupPage": {
     "title": "2段階認証(MFA)の設定",
