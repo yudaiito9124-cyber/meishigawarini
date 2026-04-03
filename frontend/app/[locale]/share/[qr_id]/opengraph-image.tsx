@@ -130,7 +130,7 @@ export default async function Image({ params }: { params: Promise<{ qr_id: strin
   const cardUrlRaw = toAbsoluteUrl(
     data?.design?.thumbf ||
     data?.design?.bgimgf ||
-    data?.card_design_thumbf ||
+    data?.thumbf ||
     data?.card_image_url ||
     null
   );

@@ -59,7 +59,7 @@ export default function AdminLayout({
                 const token = session.tokens?.idToken?.toString();
 
                 const res = await fetch(`${NEXT_PUBLIC_API_URL}/admin`, {
-                    headers: { "Authorization": `Bearer ${token}` }
+                    headers: { "authorization": `Bearer ${token}` }
                 });
 
                 if (res.ok) {

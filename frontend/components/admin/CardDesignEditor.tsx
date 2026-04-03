@@ -154,12 +154,12 @@ export default function CardDesignEditor({ apiUrl }: { apiUrl: string }) {
                 fetch(mainUploadUrl, {
                     method: "PUT",
                     body: file,
-                    headers: { "Content-Type": file.type }
+                    headers: { "content-type": file.type }
                 }),
                 fetch(thumbUploadUrl, {
                     method: "PUT",
                     body: thumbFile,
-                    headers: { "Content-Type": "image/webp" }
+                    headers: { "content-type": "image/webp" }
                 })
             ]);
 
@@ -327,7 +327,7 @@ export default function CardDesignEditor({ apiUrl }: { apiUrl: string }) {
                                                     <Label className="text-xs">Front Background</Label>
                                                     <div className="flex flex-col gap-2">
                                                         <div className="bg-mist-800 rounded border border-mist-600 overflow-hidden" style={{ aspectRatio: `${editingDesign.width} / ${editingDesign.height}` }}>
-                                                            {editingDesign.bgimgf && <img src={editingDesign.bgimgf} className="w-full h-full object-cover" crossOrigin="anonymous" />}
+                                                            {editingDesign.bgimgf && <img src={editingDesign.bgimgf} className="w-full h-full object-fill" crossOrigin="anonymous" />}
                                                         </div>
                                                         <Button variant="outline" size="sm" className="relative cursor-pointer bg-mist-800" disabled={!!uploadingImage}>
                                                             {uploadingImage === 'bgimgf' ? "Uploading..." : "Upload Front Image"}
@@ -339,7 +339,7 @@ export default function CardDesignEditor({ apiUrl }: { apiUrl: string }) {
                                                     <Label className="text-xs">Back Background</Label>
                                                     <div className="flex flex-col gap-2">
                                                         <div className="bg-mist-800 rounded border border-mist-600 overflow-hidden" style={{ aspectRatio: `${editingDesign.width} / ${editingDesign.height}` }}>
-                                                            {editingDesign.bgimgb && <img src={editingDesign.bgimgb} className="w-full h-full object-cover" crossOrigin="anonymous" />}
+                                                            {editingDesign.bgimgb && <img src={editingDesign.bgimgb} className="w-full h-full object-fill" crossOrigin="anonymous" />}
                                                         </div>
                                                         <Button variant="outline" size="sm" className="relative cursor-pointer bg-mist-800" disabled={!!uploadingImage}>
                                                             {uploadingImage === 'bgimgb' ? "Uploading..." : "Upload Back Image"}
@@ -408,7 +408,7 @@ export default function CardDesignEditor({ apiUrl }: { apiUrl: string }) {
                                             >
                                                 <div className="absolute inset-0 bg-mist-950/20 shadow-[0_0_50px_rgba(0,0,0,0.4)] border border-mist-600 overflow-hidden">
                                                     <div className="absolute inset-0 bg-white" />
-                                                    {editingDesign.bgimgf && <img src={editingDesign.bgimgf} className="absolute inset-0 w-full h-full object-cover" crossOrigin="anonymous" />}
+                                                    {editingDesign.bgimgf && <img src={editingDesign.bgimgf} className="absolute inset-0 w-full h-full object-fill" crossOrigin="anonymous" />}
 
                                                     {editingDesign.isfront_qr && (
                                                         <div
@@ -479,7 +479,7 @@ export default function CardDesignEditor({ apiUrl }: { apiUrl: string }) {
                                             >
                                                 <div className="absolute inset-0 bg-mist-950/20 shadow-[0_0_50px_rgba(0,0,0,0.4)] border border-mist-600 overflow-hidden">
                                                     <div className="absolute inset-0 bg-white" />
-                                                    {editingDesign.bgimgb && <img src={editingDesign.bgimgb} className="absolute inset-0 w-full h-full object-cover" crossOrigin="anonymous" />}
+                                                    {editingDesign.bgimgb && <img src={editingDesign.bgimgb} className="absolute inset-0 w-full h-full object-fill" crossOrigin="anonymous" />}
 
                                                     {!editingDesign.isfront_qr && (
                                                         <div
@@ -542,6 +542,7 @@ export default function CardDesignEditor({ apiUrl }: { apiUrl: string }) {
 
             )
             }
+
             <Card className="bg-mist-900 border-mist-700">
                 <CardHeader className="flex flex-row items-center justify-between">
                     <CardTitle className="text-white flex items-center gap-2">
@@ -560,24 +561,30 @@ export default function CardDesignEditor({ apiUrl }: { apiUrl: string }) {
                     </div>
                 </CardHeader>
                 <CardContent>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div className="flex flex-wrap items-start gap-4">
                         {designs.map(d => (
-                            <div key={d.design_id} className="group relative border border-mist-700 rounded-xl overflow-hidden bg-mist-800 hover:border-mist-500 transition-all">
-                                <div className="bg-mist-950 relative overflow-hidden" style={{ aspectRatio: `${d.width} / ${d.height}` }}>
+                            <div key={d.design_id} className="group relative border border-mist-700 rounded-xl overflow-hidden bg-mist-800 hover:border-mist-500 transition-all w-[150px] flex flex-col items-center">
+                                <div className="bg-mist-950 relative overflow-hidden h-24" style={{ aspectRatio: `${d.width} / ${d.height}` }}>
                                     {d.thumbf || d.bgimgf ? (
-                                        <img src={d.thumbf || d.bgimgf} className="w-full h-full object-cover" alt="Front" crossOrigin="anonymous" />
+                                        <img src={d.thumbf || d.bgimgf} className="w-full h-full object-fill select-none pointer-events-none" alt="Front" crossOrigin="anonymous" />
                                     ) : (
                                         <div className="w-full h-full flex items-center justify-center text-mist-500 text-xs text-center p-4">
                                             No Background
                                         </div>
                                     )}
                                 </div>
-                                <div className="p-3">
-                                    <h3 className="font-bold text-sm text-white truncate">{d.name || "(No Name)"}</h3>
-                                    <p className="text-[10px] text-mist-400 mt-1 truncate">{d.description}</p>
-                                    <p className="text-[10px] text-mist-500 mt-0.5">ID: {d.design_id}</p>
+                                <div className="p-2 pt-1 text-center w-full max-w-[150px]">
+                                    <h3 className="text-[11px] font-bold text-mist-100 truncate mb-0.5" title={d.name || "(No Name)"}>
+                                        {d.name || <span className="opacity-30 italic">(No Name)</span>}
+                                    </h3>
+                                    <p className="text-[9px] text-mist-400 line-clamp-1 h-3 leading-tight" title={d.description || "No description"}>
+                                        {d.description || <span className="opacity-30 italic">No description</span>}
+                                    </p>
+                                    <p className="text-[8px] text-mist-500 mt-0.5 font-mono truncate">
+                                        {d.design_id}
+                                    </p>
                                     <div className="flex gap-2 mt-3">
-                                        <Button variant="secondary" size="sm" className="flex-1 h-8 text-xs" onClick={() => setEditingDesign(d)}>Edit</Button>
+                                        <Button variant="secondary" size="sm" className="flex-1 h-8 text-xs" onClick={() => setEditingDesign(d)}><Paintbrush className="!w-6 !h-6" /></Button>
                                         <Button variant="destructive" size="icon" className="h-8 w-8" onClick={() => handleDelete(d.SK || d.design_id)}><Trash2 className="w-4 h-4" /></Button>
                                     </div>
                                 </div>

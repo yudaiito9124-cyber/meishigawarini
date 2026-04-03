@@ -12,6 +12,7 @@ import { userApi } from '@/lib/api/user';
 
 export default function DeliverySettingsPage() {
     const t = useTranslations('ReceivePage.formStep');
+    const te = useTranslations('ReceivePage.errors');
     const tp = useTranslations('UserProfilePage');
     const router = useRouter();
 
@@ -22,6 +23,7 @@ export default function DeliverySettingsPage() {
     const [address, setAddress] = useState('');
     const [phone, setPhone] = useState('');
     const [email, setEmail] = useState('');
+    const [email2, setEmail2] = useState('');
 
     useEffect(() => {
         const loadData = async () => {
@@ -34,6 +36,7 @@ export default function DeliverySettingsPage() {
                     setAddress(data.receiver_info.address || '');
                     setPhone(data.receiver_info.phone || '');
                     setEmail(data.receiver_info.email || '');
+                    setEmail2(data.receiver_info.email || '');
                 }
             } catch (error) {
                 console.error("Failed to load receiver info", error);
@@ -46,6 +49,33 @@ export default function DeliverySettingsPage() {
 
     const handleSave = async (e: React.FormEvent) => {
         e.preventDefault();
+
+        const form = e.currentTarget as HTMLFormElement;
+
+        if (!form.checkValidity()) {
+            form.reportValidity();
+            return;
+        }
+
+        // この辺の処理がないとpatternに設定しているのに素通りします
+        const zipDigits = zip_code.replace(/\D/g, '').length;
+        const phoneDigits = phone.replace(/\D/g, '').length;
+
+        if (zipDigits !== 7) {
+            alert(te('invalidZip'));
+            return;
+        }
+
+        if (phoneDigits < 10 || phoneDigits > 11) {
+            alert(te('invalidPhone'));
+            return;
+        }
+
+        if (email && email !== email2) {
+            alert(t('email-mismatch-error'));
+            return;
+        }
+
         setSaving(true);
         try {
             await userApi.user_receiver_update({
@@ -58,9 +88,9 @@ export default function DeliverySettingsPage() {
                 }
             });
             alert(tp('deliverySettingsSuccess'));
-        } catch (error) {
+        } catch (error: any) {
             console.error("Failed to save receiver info", error);
-            alert('Failed to save');
+            alert(error.message || 'Failed to save');
         } finally {
             setSaving(false);
         }
@@ -95,14 +125,14 @@ export default function DeliverySettingsPage() {
     return (
         <div className="min-h-screen bg-slate-50 flex flex-col items-center py-12 px-4 text-gray-900 font-sans">
             <div className="w-full max-w-3xl flex justify-start mb-6">
-                 <Button 
-                    variant="outline" 
-                    size="sm" 
+                <Button
+                    variant="outline"
+                    size="sm"
                     className="rounded-full bg-white/50 backdrop-blur-sm border-gray-200 text-gray-500 hover:text-gray-900 shadow-sm h-9 px-4"
                     onClick={() => router.push('/user')}
-                 >
+                >
                     <ChevronDown className="h-4 w-4 mr-1 rotate-90" /> {tp('back')}
-                 </Button>
+                </Button>
             </div>
 
             <Card className="w-full max-w-3xl rounded-[2rem] shadow-2xl border-none overflow-hidden bg-white/80 backdrop-blur-xl animate-in fade-in zoom-in-95 duration-500">
@@ -120,9 +150,10 @@ export default function DeliverySettingsPage() {
                 <CardContent className="p-10 space-y-10">
                     <form id="delivery-form" onSubmit={handleSave} className="space-y-10">
                         <div className="space-y-3">
-                            <Label htmlFor="name" className="text-xs font-black text-slate-600 uppercase tracking-widest ml-1">{t('name')}</Label>
+                            <Label htmlFor="name" className="text-md font-black text-slate-600 uppercase tracking-widest ml-1">{t('name')}</Label>
                             <Input
                                 id="name"
+                                required
                                 value={name}
                                 onChange={(e) => setName(e.target.value)}
                                 placeholder={t('name-placeholder')}
@@ -130,33 +161,24 @@ export default function DeliverySettingsPage() {
                             />
                         </div>
 
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-10">
-                            <div className="space-y-3">
-                                <Label htmlFor="zip_code" className="text-xs font-black text-slate-600 uppercase tracking-widest ml-1">{t('zip_code')}</Label>
-                                <Input
-                                    id="zip_code"
-                                    value={zip_code}
-                                    onChange={handleZipCodeChange}
-                                    placeholder={t('zip_code-placeholder')}
-                                    className="rounded-2xl border-gray-200 focus:ring-rose-500 focus:border-rose-500 h-14 bg-gray-50/50 text-lg shadow-inner"
-                                />
-                            </div>
-                            <div className="space-y-3">
-                                <Label htmlFor="phone" className="text-xs font-black text-slate-600 uppercase tracking-widest ml-1">{t('phone')}</Label>
-                                <Input
-                                    id="phone"
-                                    value={phone}
-                                    onChange={handlePhoneChange}
-                                    placeholder={t('phone-placeholder')}
-                                    className="rounded-2xl border-gray-200 focus:ring-rose-500 focus:border-rose-500 h-14 bg-gray-50/50 text-lg shadow-inner"
-                                />
-                            </div>
+                        <div className="space-y-3">
+                            <Label htmlFor="zip_code" className="text-md font-black text-slate-600 uppercase tracking-widest ml-1">{t('zip_code')}</Label>
+                            <Input
+                                id="zip_code"
+                                required
+                                value={zip_code}
+                                pattern="^(?=([^0-9]*[0-9]){7}[^0-9]*$)[0-9\-]*$"
+                                onChange={handleZipCodeChange}
+                                placeholder={t('zip_code-placeholder')}
+                                className="rounded-2xl border-gray-200 focus:ring-rose-500 focus:border-rose-500 h-14 bg-gray-50/50 text-lg shadow-inner"
+                            />
                         </div>
 
                         <div className="space-y-3">
-                            <Label htmlFor="address" className="text-xs font-black text-slate-600 uppercase tracking-widest ml-1">{t('address')}</Label>
+                            <Label htmlFor="address" className="text-md font-black text-slate-600 uppercase tracking-widest ml-1">{t('address')}</Label>
                             <Input
                                 id="address"
+                                required
                                 value={address}
                                 onChange={(e) => setAddress(e.target.value)}
                                 placeholder={t('address-placeholder')}
@@ -165,7 +187,21 @@ export default function DeliverySettingsPage() {
                         </div>
 
                         <div className="space-y-3">
-                            <Label htmlFor="email" className="text-xs font-black text-slate-600 uppercase tracking-widest ml-1">{t('email')}</Label>
+                            <Label htmlFor="phone" className="text-md font-black text-slate-600 uppercase tracking-widest ml-1">{t('phone')}</Label>
+                            <Input
+                                id="phone"
+                                required
+                                type="tel"
+                                value={phone}
+                                pattern="^(?=([^0-9]*[0-9]){10,11}[^0-9]*$)[0-9\-]*$"
+                                onChange={handlePhoneChange}
+                                placeholder={t('phone-placeholder')}
+                                className="rounded-2xl border-gray-200 focus:ring-rose-500 focus:border-rose-500 h-14 bg-gray-50/50 text-lg shadow-inner"
+                            />
+                        </div>
+
+                        <div className="space-y-3">
+                            <Label htmlFor="email" className="text-md font-black text-slate-600 uppercase tracking-widest ml-1">{t('email')}</Label>
                             <Input
                                 id="email"
                                 type="email"
@@ -174,6 +210,22 @@ export default function DeliverySettingsPage() {
                                 placeholder={t('email-placeholder')}
                                 className="rounded-2xl border-gray-200 focus:ring-rose-500 focus:border-rose-500 h-14 bg-gray-50/50 text-lg shadow-inner"
                             />
+                            {email && (
+                                <div className="space-y-3 mt-4 animate-in fade-in slide-in-from-top-2">
+                                    <Input
+                                        id="email2"
+                                        type="email"
+                                        required
+                                        value={email2}
+                                        onPaste={(e) => e.preventDefault()}
+                                        onChange={(e) => setEmail2(e.target.value)}
+                                        pattern={email ? email.replace(/[.*+?^${}()|[\]\\/\-]/g, '\\$&') : undefined}
+                                        title={t('email-mismatch-error')}
+                                        placeholder={t('email-confirm-placeholder')}
+                                        className="rounded-2xl border-gray-200 focus:ring-rose-500 focus:border-rose-500 h-14 bg-gray-50/50 text-lg shadow-inner"
+                                    />
+                                </div>
+                            )}
                         </div>
                     </form>
                 </CardContent>

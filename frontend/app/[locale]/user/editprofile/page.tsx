@@ -120,7 +120,7 @@ export default function UserProfilePage() {
             const res = await fetch(uploadUrl, {
                 method: "PUT",
                 body: uploadFile,
-                headers: { "Content-Type": uploadFile.type }
+                headers: { "content-type": uploadFile.type }
             });
 
             if (!res.ok) {
@@ -166,7 +166,7 @@ export default function UserProfilePage() {
             const res = await fetch(uploadUrl, {
                 method: "PUT",
                 body: uploadFile,
-                headers: { "Content-Type": uploadFile.type }
+                headers: { "content-type": uploadFile.type }
             });
 
             if (!res.ok) {

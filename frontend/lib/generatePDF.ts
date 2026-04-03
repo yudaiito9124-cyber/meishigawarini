@@ -221,7 +221,8 @@ export const generatePDF = async (batch: any, paperformat: string, cardformat: s
 
             // Draw QR
             if (cf.isfront_qr && cf.qrsize && cf.qrsize > 0) {
-                const base64data = await genQR(code.uuid);
+                const qr_id = code.qr_id || (code as any).uuid;
+                const base64data = await genQR(qr_id);
                 if (!base64data) continue;
                 const qrSize = cf.qrsize;
                 doc.addImage(base64data, 'PNG', scaleofx + ax + cf.qrpos.x * pf.scale, scaleofy + ay + cf.qrpos.y * pf.scale, qrSize * pf.scale, qrSize * pf.scale);
@@ -244,7 +245,8 @@ export const generatePDF = async (batch: any, paperformat: string, cardformat: s
                 doc.setTextColor(0, 0, 0);
                 doc.setFontSize(cf.codesize * pf.scale);
                 doc.setFont("helvetica", "normal");
-                const uuidText = `${code.uuid.substring(18, 34)}...`;
+                const qr_id = code.qr_id || (code as any).uuid;
+                const uuidText = `${qr_id.substring(18, 34)}...`;
                 const uuidWidth = doc.getTextWidth(uuidText);
                 const uuidHeight = doc.getTextDimensions(uuidText).h;
                 doc.text(uuidText, scaleofx + ax + (cardWidth * pf.scale - uuidWidth) / 2 + cf.codepos.x * pf.scale, scaleofy + ay + cf.codepos.y * pf.scale, {
@@ -288,7 +290,8 @@ export const generatePDF = async (batch: any, paperformat: string, cardformat: s
 
             // Draw QR
             if (!cf.isfront_qr && cf.qrsize && cf.qrsize > 0) {
-                const base64data = await genQR(code.uuid);
+                const qr_id = code.qr_id || (code as any).uuid;
+                const base64data = await genQR(qr_id);
                 if (!base64data) continue;
                 const qrSize = cf.qrsize;
                 doc.addImage(base64data, 'PNG', scaleofx + ax + cf.qrpos.x * pf.scale, scaleofy + ay + cf.qrpos.y * pf.scale, qrSize * pf.scale, qrSize * pf.scale);
@@ -311,7 +314,8 @@ export const generatePDF = async (batch: any, paperformat: string, cardformat: s
                 doc.setTextColor(0, 0, 0);
                 doc.setFontSize(cf.codesize * pf.scale);
                 doc.setFont("helvetica", "normal");
-                const uuidText = `${code.uuid.substring(18, 34)}...`;
+                const qr_id = code.qr_id || (code as any).uuid;
+                const uuidText = `${qr_id.substring(18, 34)}...`;
                 const uuidWidth = doc.getTextWidth(uuidText);
                 const uuidHeight = doc.getTextDimensions(uuidText).h;
                 doc.text(uuidText, scaleofx + ax + (cardWidth * pf.scale - uuidWidth) / 2 + (cf.codepos.x) * pf.scale, scaleofy + ay + cf.codepos.y * pf.scale, {

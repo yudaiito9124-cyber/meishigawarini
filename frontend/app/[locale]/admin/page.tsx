@@ -139,7 +139,7 @@ export default function AdminPage() {
                 const targetId = designId || cardFormat;
                 const dbDesign = dbCardDesigns.find(d => d.design_id === targetId);
                 if (dbDesign) return dbDesign;
-                if (cardformats[targetId]) return targetId;
+                if (cardformats[targetId]) return cardformats[targetId];
                 // Fallback to currently selected global design
                 const globalDesign = dbCardDesigns.find(d => d.design_id === cardFormat);
                 return globalDesign || cardFormat;
@@ -155,7 +155,7 @@ export default function AdminPage() {
                     expiry_date: expiryDate ? new Date(expiryDate).toISOString() : undefined,
                     activate_now: activateNow
                 } : {}),
-                card_design: cardFormat
+                design_id: cardFormat
             });
 
             const batchid = `batch-${data.batch_id}`;
@@ -181,6 +181,9 @@ export default function AdminPage() {
             setIsGenerating(false);
         }
     };
+
+    const currentSelectedDesign = dbCardDesigns.find(d => d.design_id === cardFormat) || cardformats[cardFormat] || cardformats['gakuchousenbeiv1'];
+    const previewAspectRatio = `${currentSelectedDesign.width || 84} / ${currentSelectedDesign.height || 52}`;
 
 
 
@@ -375,22 +378,28 @@ export default function AdminPage() {
                                         <div className="w-full overflow-hidden">
                                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                                 <div className="space-y-1 w-full">
-                                                    <div className="aspect-[84/52] w-full relative rounded shadow-lg overflow-hidden border border-gray-700 bg-white">
+                                                    <div
+                                                        className="w-full relative rounded shadow-lg overflow-hidden border border-gray-700 bg-white"
+                                                        style={{ aspectRatio: previewAspectRatio }}
+                                                    >
                                                         <img
                                                             src={(dbCardDesigns.find(d => d.design_id === cardFormat)?.thumbf || dbCardDesigns.find(d => d.design_id === cardFormat)?.bgimgf) || cardformats[cardFormat]?.bgimgf}
                                                             alt={t('generate.frontPreview')}
-                                                            className="absolute inset-0 w-full h-full object-cover"
+                                                            className="absolute inset-0 w-full h-full object-fill"
                                                             crossOrigin="anonymous"
                                                         />
                                                     </div>
                                                     <p className="text-[10px] text-gray-500 text-center uppercase tracking-wider">{t('generate.front')}</p>
                                                 </div>
                                                 <div className="space-y-1 w-full">
-                                                    <div className="aspect-[84/52] w-full relative rounded shadow-lg overflow-hidden border border-gray-700 bg-white">
+                                                    <div
+                                                        className="w-full relative rounded shadow-lg overflow-hidden border border-gray-700 bg-white"
+                                                        style={{ aspectRatio: previewAspectRatio }}
+                                                    >
                                                         <img
                                                             src={(dbCardDesigns.find(d => d.design_id === cardFormat)?.thumbb || dbCardDesigns.find(d => d.design_id === cardFormat)?.bgimgb) || cardformats[cardFormat]?.bgimgb}
                                                             alt={t('generate.backPreview')}
-                                                            className="absolute inset-0 w-full h-full object-cover"
+                                                            className="absolute inset-0 w-full h-full object-fill"
                                                             crossOrigin="anonymous"
                                                         />
                                                     </div>
@@ -525,7 +534,7 @@ export default function AdminPage() {
                                     {generatedBatches.length === 0 ? <p className="text-gray-500">{t('batches.noBatches')}</p> : (
                                         generatedBatches.map(batch => (
                                             <div key={batch.id} className="bg-white border p-4 rounded-md">
-                                                <div className="flex flex-wrap items-center mb-2">
+                                                <div className="flex items-center mb-2">
                                                     <div className="flex gap-2 flex-wrap flex-rows items-center">
                                                         <div>
                                                             <div className="flex items-center gap-1">
@@ -558,7 +567,7 @@ export default function AdminPage() {
                                                                 const globalDesign = dbCardDesigns.find(d => d.design_id === cardFormat);
                                                                 return globalDesign || cardFormat;
                                                             };
-                                                            const design = resolveDesign(batch.card_design);
+                                                            const design = resolveDesign(batch.design_id);
                                                             generatePDF(batch, paperFormat, design);
                                                         } finally {
                                                             setIsExportingCsv(null);
@@ -587,7 +596,7 @@ export default function AdminPage() {
                                                                 const globalDesign = dbCardDesigns.find(d => d.design_id === cardFormat);
                                                                 return globalDesign || cardFormat;
                                                             };
-                                                            const design = resolveDesign(batch.card_design);
+                                                            const design = resolveDesign(batch.design_id);
                                                             await generateCSVExport(batch, design);
                                                         } finally {
                                                             setIsExportingCsv(null);
@@ -617,17 +626,17 @@ export default function AdminPage() {
                                                         </thead>
                                                         <tbody>
                                                             {batch.codes?.map((code: any) => (
-                                                                <tr key={code.qrId || (code as any).uuid} className="border-b border-gray-200 last:border-0 group">
+                                                                <tr key={code.qr_id} className="border-b border-gray-200 last:border-0 group">
                                                                     <td className="pr-4 py-0.5 select-all text-[10px] break-all">
                                                                         <div className="flex items-center gap-1">
-                                                                            {code.qrId || (code as any).uuid}
+                                                                            {code.qr_id}
                                                                             <Button
                                                                                 variant="ghost"
                                                                                 size="icon"
                                                                                 className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity"
-                                                                                onClick={() => handleCopy(code.qrId || (code as any).uuid)}
+                                                                                onClick={() => handleCopy(code.qr_id)}
                                                                             >
-                                                                                {copiedId === (code.qrId || (code as any).uuid) ? (
+                                                                                {copiedId === code.qr_id ? (
                                                                                     <Check className="h-2 w-2 text-green-500" />
                                                                                 ) : (
                                                                                     <Copy className="h-2 w-2" />
@@ -765,7 +774,7 @@ function QRCodeListSection({ apiUrl, onGeneratePDF, paperFormat, cardFormat, dbC
 
         // Map data to rows
         const rows = codes.map(item => {
-            const qrId = item.PK.replace('QR#', '');
+            const qr_id = item.qr_id || item.PK?.replace('QR#', '');
             const statusLabel = st(item.status ? item.status.toLowerCase() : 'active');
             const updatedAt = item.ts_updated_at ? new Date(item.ts_updated_at).toLocaleString() : '-';
             const email = item.shipping_info?.email || '-';
@@ -774,7 +783,7 @@ function QRCodeListSection({ apiUrl, onGeneratePDF, paperFormat, cardFormat, dbC
             const preferredDateTime = `${item.preferred_date ? item.preferred_date : '-'} / ${item.preferred_time ? tt(item.preferred_time) : '-'}`;
 
             return [
-                qrId,
+                qr_id,
                 item.pin || '-',
                 statusLabel,
                 updatedAt,
@@ -998,7 +1007,7 @@ function QRCodeRow({ item, apiUrl, onGeneratePDF, onRefresh, paperFormat, cardFo
         });
     };
 
-    const qrId = item.PK.replace('QR#', '');
+    const qr_id = item.qr_id || item.PK?.replace('QR#', '');
 
     const statusColor = (
         item.status === 'UNASSIGNED' ? 'bg-gray-100' :
@@ -1028,7 +1037,7 @@ function QRCodeRow({ item, apiUrl, onGeneratePDF, onRefresh, paperFormat, cardFo
                         {item.pin}
                     </TableCell>
                     <TableCell className={cn("font-mono select-all py-0 min-w-[110px] break-all", isDense ? "text-[9px] px-1" : "text-[11px] px-2")}>
-                        {qrId}
+                        {qr_id}
                     </TableCell>
                 </TableRow>
             </DialogTrigger>
@@ -1043,16 +1052,16 @@ function QRCodeRow({ item, apiUrl, onGeneratePDF, onRefresh, paperFormat, cardFo
                                     variant="ghost"
                                     size="icon"
                                     className="h-6 w-6"
-                                    onClick={() => handleCopy(qrId)}
+                                    onClick={() => handleCopy(qr_id)}
                                 >
-                                    {copiedId === qrId ? (
+                                    {copiedId === qr_id ? (
                                         <Check className="h-3 w-3 text-green-500" />
                                     ) : (
                                         <Copy className="h-3 w-3" />
                                     )}
                                 </Button>
-                                <ExternalLink className="cursor-pointer w-4 h-4 shrink-0" onClick={() => window.open(`/${locale}/receive/${qrId}`, '_blank')} />
-                                {qrId}
+                                <ExternalLink className="cursor-pointer w-4 h-4 shrink-0" onClick={() => window.open(`/${locale}/receive/${qr_id}`, '_blank')} />
+                                {qr_id}
                             </div>
                             <div className="flex items-center gap-2">
                                 PIN:
@@ -1126,31 +1135,39 @@ function QRCodeRow({ item, apiUrl, onGeneratePDF, onRefresh, paperFormat, cardFo
                         </div>
 
                         {/* Card Design */}
-                        {item.card_design && (
+                        {item.design_id && (
                             <div className="space-y-2">
                                 <div>
                                     <h4 className="text-sm font-semibold text-gray-500">{t('generate.cardFormat')}</h4>
-                                    <p className="text-sm font-medium">{item.card_design}</p>
+                                    <p className="text-sm font-medium">{item.design_id}</p>
                                 </div>
-                                {(item.thumbf || item.thumbb || cardformats[item.card_design]) && (
-                                    <div className="grid grid-cols-2 gap-2">
+                                {(item.thumbf || item.thumbb || cardformats[item.design_id]) && (
+                                    <div className="flex flex-wrap gap-4">
                                         <div className="space-y-1">
-                                            <div className="aspect-[84/52] relative rounded shadow-sm overflow-hidden border border-gray-100 bg-white">
+                                            <div
+                                                className="relative rounded shadow-sm overflow-hidden border border-gray-100 bg-white h-24"
+                                                style={{ aspectRatio: (dbCardDesigns.find(d => d.design_id === item.design_id)?.width && dbCardDesigns.find(d => d.design_id === item.design_id)?.height) ? `${dbCardDesigns.find(d => d.design_id === item.design_id).width} / ${dbCardDesigns.find(d => d.design_id === item.design_id).height}` : '84 / 52' }}
+                                            >
                                                 <img
-                                                    src={item.thumbf || dbCardDesigns.find(d => d.design_id === item.card_design)?.thumbf || dbCardDesigns.find(d => d.design_id === item.card_design)?.bgimgf || cardformats[item.card_design]?.bgimgf}
+                                                    src={item.thumbf || dbCardDesigns.find(d => d.design_id === item.design_id)?.thumbf || dbCardDesigns.find(d => d.design_id === item.design_id)?.bgimgf || cardformats[item.design_id]?.bgimgf}
                                                     alt="Front"
-                                                    className="w-full h-full object-cover"
+                                                    className="w-full h-full object-fill select-none"
+                                                    draggable={false}
                                                     crossOrigin="anonymous"
                                                 />
                                             </div>
                                             <p className="text-[9px] text-gray-400 text-center uppercase tracking-tighter">{t('generate.front')}</p>
                                         </div>
                                         <div className="space-y-1">
-                                            <div className="aspect-[84/52] relative rounded shadow-sm overflow-hidden border border-gray-100 bg-white">
+                                            <div
+                                                className="relative rounded shadow-sm overflow-hidden border border-gray-100 bg-white h-24"
+                                                style={{ aspectRatio: (dbCardDesigns.find(d => d.design_id === item.design_id)?.width && dbCardDesigns.find(d => d.design_id === item.design_id)?.height) ? `${dbCardDesigns.find(d => d.design_id === item.design_id).width} / ${dbCardDesigns.find(d => d.design_id === item.design_id).height}` : '84 / 52' }}
+                                            >
                                                 <img
-                                                    src={item.thumbb || dbCardDesigns.find(d => d.design_id === item.card_design)?.thumbb || dbCardDesigns.find(d => d.design_id === item.card_design)?.bgimgb || cardformats[item.card_design]?.bgimgb}
+                                                    src={item.thumbb || dbCardDesigns.find(d => d.design_id === item.design_id)?.thumbb || dbCardDesigns.find(d => d.design_id === item.design_id)?.bgimgb || cardformats[item.design_id]?.bgimgb}
                                                     alt="Back"
-                                                    className="w-full h-full object-cover"
+                                                    className="w-full h-full object-fill select-none"
+                                                    draggable={false}
                                                     crossOrigin="anonymous"
                                                 />
                                             </div>
@@ -1299,17 +1316,17 @@ function QRCodeRow({ item, apiUrl, onGeneratePDF, onRefresh, paperFormat, cardFo
                             onClick={(e) => {
                                 e.stopPropagation();
                                 const resolveDesign = (designId?: string) => {
-                                    const targetId = item.card_design || cardFormat;
+                                    const targetId = item.design_id || cardFormat;
                                     const dbDesign = dbCardDesigns.find(d => d.design_id === targetId);
                                     if (dbDesign) return dbDesign;
                                     if (cardformats[targetId]) return targetId;
                                     const globalDesign = dbCardDesigns.find(d => d.design_id === cardFormat);
                                     return globalDesign || cardFormat;
                                 };
-                                const design = resolveDesign(item.card_design);
+                                const design = resolveDesign(item.design_id);
                                 onGeneratePDF({
-                                    id: qrId,
-                                    codes: [{ qrId, pin: item.pin }]
+                                    id: qr_id,
+                                    codes: [{ qr_id, pin: item.pin }]
                                 }, paperFormat, design, Boolean(item.status === "PROMOTION"));
                             }}
                         >
@@ -1323,17 +1340,17 @@ function QRCodeRow({ item, apiUrl, onGeneratePDF, onRefresh, paperFormat, cardFo
                             onClick={async (e) => {
                                 e.stopPropagation();
                                 const resolveDesign = (designId?: string) => {
-                                    const targetId = item.card_design || cardFormat;
+                                    const targetId = item.design_id || cardFormat;
                                     const dbDesign = dbCardDesigns.find(d => d.design_id === targetId);
                                     if (dbDesign) return dbDesign;
                                     if (cardformats[targetId]) return targetId;
                                     const globalDesign = dbCardDesigns.find(d => d.design_id === cardFormat);
                                     return globalDesign || cardFormat;
                                 };
-                                const design = resolveDesign(item.card_design);
+                                const design = resolveDesign(item.design_id);
                                 await generateCSVExport({
-                                    id: qrId,
-                                    codes: [{ qrId, pin: item.pin }]
+                                    id: qr_id,
+                                    codes: [{ qr_id, pin: item.pin }]
                                 }, design);
                             }}
                         >
@@ -1344,7 +1361,7 @@ function QRCodeRow({ item, apiUrl, onGeneratePDF, onRefresh, paperFormat, cardFo
                     {item.status !== 'BANNED' ? (
                         <div className="flex-1 sm:flex-none">
                             <BanButton
-                                qrId={qrId}
+                                qr_id={qr_id}
                                 apiUrl={apiUrl}
                                 isBanned={false}
                                 size="default"
@@ -1358,7 +1375,7 @@ function QRCodeRow({ item, apiUrl, onGeneratePDF, onRefresh, paperFormat, cardFo
                     ) : (
                         <div className="flex flex-wrap gap-2 flex-1 sm:flex-none">
                             <BanButton
-                                qrId={qrId}
+                                qr_id={qr_id}
                                 apiUrl={apiUrl}
                                 isBanned={true}
                                 size="default"
@@ -1376,7 +1393,7 @@ function QRCodeRow({ item, apiUrl, onGeneratePDF, onRefresh, paperFormat, cardFo
                                     e.stopPropagation();
                                     if (!confirm(t('list.deleteBanned.confirm'))) return;
                                     try {
-                                        await adminApi.admin_qr_deleteban({ target: qrId });
+                                        await adminApi.admin_qr_deleteban({ target: qr_id });
                                         alert(t('list.deleteBanned.success', { count: 1 }));
                                         setOpen(false);
                                         onRefresh();
@@ -1396,8 +1413,8 @@ function QRCodeRow({ item, apiUrl, onGeneratePDF, onRefresh, paperFormat, cardFo
     );
 }
 
-function BanButton({ qrId, apiUrl, onSuccess, size = "sm", className, isBanned = false }: {
-    qrId: string,
+function BanButton({ qr_id, apiUrl, onSuccess, size = "sm", className, isBanned = false }: {
+    qr_id: string,
     apiUrl: string,
     onSuccess: () => void,
     size?: "default" | "sm" | "lg" | "icon",
@@ -1424,7 +1441,7 @@ function BanButton({ qrId, apiUrl, onSuccess, size = "sm", className, isBanned =
 
         setLoading(true);
         try {
-            const params: any = { qr_id: qrId };
+            const params: any = { qr_id: qr_id };
             if (comment) params.reason = comment;
             await adminApi.admin_qr_ban(params);
             onSuccess();
@@ -1922,7 +1939,7 @@ function AdminShopCardDesignLinkSection({ apiUrl, dbCardDesigns }: { apiUrl: str
         try {
             const data = await adminApi.admin_shop_carddesign_link_get({ shop_id: shopId.trim() });
             setShopData(data);
-            setSelectedDesignIds(data.card_designs || []);
+            setSelectedDesignIds(data.design_ids || []);
         } catch (e: any) {
             alert(tLink('notFound') + ": " + (e.message || ""));
             setShopData(null);
@@ -1937,7 +1954,7 @@ function AdminShopCardDesignLinkSection({ apiUrl, dbCardDesigns }: { apiUrl: str
         try {
             await adminApi.admin_shop_carddesign_link_update({
                 shop_id: shopData.PK.replace(/^SHOP#/, ""),
-                card_designs: selectedDesignIds
+                design_ids: selectedDesignIds
             });
             alert(tLink('saveSuccess'));
         } catch (e: any) {
@@ -1996,7 +2013,7 @@ function AdminShopCardDesignLinkSection({ apiUrl, dbCardDesigns }: { apiUrl: str
                             <Label className="text-gray-500">{tLink('allowedDesignsLabel')}</Label>
                             <p className="text-xs text-gray-400 mb-2 italic">{tLink('allowedDesignsDesc')}</p>
 
-                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+                            <div className="flex flex-wrap items-start gap-2">
                                 {dbCardDesigns.map((design) => {
                                     const isSelected = selectedDesignIds.includes(design.design_id);
                                     return (
@@ -2004,7 +2021,7 @@ function AdminShopCardDesignLinkSection({ apiUrl, dbCardDesigns }: { apiUrl: str
                                             key={design.design_id}
                                             onClick={() => toggleDesign(design.design_id)}
                                             className={cn(
-                                                "relative cursor-pointer rounded-lg border-2 p-1 transition-all group overflow-hidden",
+                                                "relative cursor-pointer rounded-lg border-2 p-1 transition-all group overflow-hidden flex flex-col items-center",
                                                 isSelected
                                                     ? "border-green-500 bg-green-50"
                                                     : "border-transparent bg-gray-100 hover:border-gray-200"
@@ -2015,11 +2032,14 @@ function AdminShopCardDesignLinkSection({ apiUrl, dbCardDesigns }: { apiUrl: str
                                                     LINK
                                                 </div>
                                             )}
-                                            <div className="aspect-[84/52] relative rounded overflow-hidden">
+                                            <div
+                                                className="relative rounded overflow-hidden h-24"
+                                                style={{ aspectRatio: `${design.width || 84} / ${design.height || 52}` }}
+                                            >
                                                 <img
                                                     src={design.thumbf || design.bgimgf}
                                                     alt={design.description}
-                                                    className="w-full h-full object-cover"
+                                                    className="w-full h-full object-fill select-none pointer-events-none"
                                                     crossOrigin="anonymous"
                                                 />
                                                 {isSelected && (
@@ -2030,9 +2050,12 @@ function AdminShopCardDesignLinkSection({ apiUrl, dbCardDesigns }: { apiUrl: str
                                                     </div>
                                                 )}
                                             </div>
-                                            <div className="mt-1 px-1">
-                                                <p className="text-[10px] font-medium truncate text-black" title={design.description}>
-                                                    {design.description}
+                                            <div className="mt-2 px-1 text-center w-full max-w-[120px]">
+                                                <p className="text-[10px] font-medium truncate text-black" title={design.name || "No Name"}>
+                                                    {design.name || <span className="opacity-30 italic">No Name</span>}
+                                                </p>
+                                                <p className="text-[8px] font-medium truncate text-black" title={design.description || "No Description"}>
+                                                    {design.description || <span className="opacity-30 italic">No Description</span>}
                                                 </p>
                                                 <p className="text-[8px] text-gray-500 font-mono truncate">
                                                     {design.design_id}
@@ -2100,7 +2123,7 @@ function CardOrderListSection({
                 count: order.quantity,
                 shop_id: order.shop_id,
                 product_id: order.product_id,
-                card_design: order.card_design || cardFormat,
+                design_id: order.design_id || cardFormat,
                 activate_now: false
             });
 
@@ -2125,7 +2148,7 @@ function CardOrderListSection({
                 const globalDesign = dbCardDesigns.find(d => d.design_id === cardFormat);
                 return globalDesign || cardFormat;
             };
-            const design = resolveDesign(order.card_design);
+            const design = resolveDesign(order.design_id);
 
             if (type === 'pdf') {
                 await generatePDF(batch, paperFormat, design);

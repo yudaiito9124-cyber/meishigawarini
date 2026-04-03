@@ -8,9 +8,10 @@
 フロントエンド（React/Next.jsなど）からのHTTPリクエスト（GET, POSTなど）を受け取り、適切なバックエンド処理（Lambda関数）へ振り分ける「受付窓口」の役割を果たします。
 
 このプロジェクトでは、主に以下の3つの機能をAPI Gatewayで設定しています。
-1. **ルーティング**: URLパスパス（例: `/shop`, `/admin`）に応じたLambdaの呼び出し
+1. **ルーティング**: URLパス（例: `/shop`, `/admin`）に応じたLambdaの呼び出し
 2. **CORS設定**: フロントエンド（異なるドメイン）からの安全なアクセス許可
 3. **認証 (Authorizer)**: ログイン済みユーザー（Cognito）のみアクセスできるルートの保護
+4. **ヘッダー正規化**: ブラウザやインフラによるヘッダーの揺れを防ぐための小文字統一定義
 
 ---
 
@@ -20,6 +21,7 @@
 
 ```typescript
 import * as apigateway from 'aws-cdk-lib/aws-apigateway';
+import { SHOP_ALLOW_HEADERS } from '../../../shared/constants'; // 共通定数の利用
 
 // API Gateway本体の定義とデフォルトCORS設定
 const allowedOrigins = ['https://meishigawarini.com', 'http://localhost:3000'];
@@ -29,10 +31,17 @@ const api = new apigateway.RestApi(this, 'MeishiGawariniApi', {
   defaultCorsPreflightOptions: {
     allowOrigins: allowedOrigins,
     allowMethods: apigateway.Cors.ALL_METHODS,
-    allowHeaders: apigateway.Cors.DEFAULT_HEADERS,
+    allowHeaders: SHOP_ALLOW_HEADERS, // 厳格な小文字定義を使用
   },
 });
 ```
+
+### ヘッダーの小文字統一ポリシー
+ブラウザや API Gateway 経由のリクエストでは、ヘッダー名が正規化（`Authorization` -> `authorization` 等）されることがあります。プロジェクト全体で一貫性を保つため、以下の対応を徹底しています。
+
+1. **定義の集約**: `shared/constants.ts` にて、全ての許可ヘッダーを**小文字**で定義しています。
+2. **構築時の利用**: 各APIリソースの `addCorsPreflight` では、この定数から必要なもののみを抽出して設定します。
+3. **Lambdaでの利用**: バックエンドの `getCorsHeaders` ユーティリティも同じ定数を参照し、レスポンスヘッダーを生成します。
 
 ### 特殊なCORSエラー対策（Gateway Responses）
 認証エラー（401）などでLambdaに到達する前にAPI Gatewayがエラーを返す場合、デフォルトではCORSヘッダーが付与されず、フロントエンドで原因不明のCORSエラーになります。これを防ぐためにレスポンスをカスタマイズしています。
@@ -45,7 +54,8 @@ api.addGatewayResponse('Default401Response', {
   statusCode: '404',
   responseParameters: {
     'gatewayresponse.header.Access-Control-Allow-Origin': "'*'",
-    'gatewayresponse.header.Access-Control-Allow-Headers': "'*'",
+    // 全APIで使用しうるヘッダーの論理和を明示的に指定
+    'gatewayresponse.header.Access-Control-Allow-Headers': `'${joinHeaders(ALL_ALLOW_HEADERS)}'`,
     'gatewayresponse.header.Access-Control-Allow-Methods': "'GET,POST,PUT,DELETE,OPTIONS,PATCH'",
   },
   templates: {
@@ -60,13 +70,13 @@ api.addGatewayResponse('Default401Response', {
 本プロジェクトでは、セキュリティ要件（MFAの強制やカスタム権限チェック等）を満たすため、標準のCognito Authorizerではなく、**Custom Lambda Authorizer (`RequestAuthorizer`)** を採用しています。
 
 *   **ShopAuthorizer**: `Authorization` ヘッダーを受け取り、JWT検証・グループチェック・MFA認証済みかを確認します。
-*   **ReceiveAuthorizer**: `X-QR-UUID` および `X-QR-PIN` ヘッダーを受け取り、QRの有効性と所有権を動的に検証します。
+*   **ReceiveAuthorizer**: `x-qr-id` および `x-qr-pin` ヘッダーを受け取り、QRの有効性と所有権を動的に検証します。
 
 ```typescript
 // Shop/Admin用 Authorizerの定義例 (cdk)
 const authorizer = new apigateway.RequestAuthorizer(this, 'ShopAuthorizer', {
   handler: shopAuthFn,
-  identitySources: [apigateway.IdentitySource.header('Authorization')],
+  identitySources: [apigateway.IdentitySource.header('authorization')],
 });
 ```
 

@@ -18,10 +18,10 @@ export const receiveApiBase = {
 
         const headers = {
             ...options.headers,
-            ...(idToken && { "Authorization": `Bearer ${idToken}` }),
-            "X-QR-ID": qr_id,
-            "X-QR-PIN": pin,
-            "Content-Type": options.body ? "application/json" : (options.headers as any)?.["Content-Type"] || undefined,
+            ...(idToken && { "authorization": `Bearer ${idToken}` }),
+            "x-qr-id": qr_id,
+            "x-qr-pin": pin,
+            "content-type": options.body ? "application/json" : (options.headers as any)?.["content-type"] || undefined,
         };
 
         const res = await fetch(`${NEXT_PUBLIC_API_URL}${path.startsWith('/') ? '' : '/'}${path}`, {
@@ -51,7 +51,7 @@ export const receiveApiBase = {
     async verify(qr_id: string, pin: string, password?: string) {
         const res = await fetch(`${NEXT_PUBLIC_API_URL}/receive/verify`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'content-type': 'application/json' },
             body: JSON.stringify({ qr_id, pin, password })
         });
         if (!res.ok) throw await res.json().catch(() => ({ message: res.statusText }));

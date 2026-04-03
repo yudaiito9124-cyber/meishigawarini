@@ -593,7 +593,7 @@ export default function ReceivePage() {
 
                 const uploadRes = await fetch(uploadUrl, {
                     method: "PUT",
-                    headers: { "Content-Type": uploadFile.type },
+                    headers: { "content-type": uploadFile.type },
                     body: uploadFile
                 });
 
@@ -695,7 +695,7 @@ export default function ReceivePage() {
 
             const s3Res = await fetch(uploadUrl, {
                 method: 'PUT',
-                headers: { 'Content-Type': uploadFile.type },
+                headers: { 'content-type': uploadFile.type },
                 body: uploadFile
             });
             if (!s3Res.ok) throw new Error('Failed to upload to S3');
@@ -767,7 +767,7 @@ export default function ReceivePage() {
 
             const uploadRes = await fetch(uploadUrl, {
                 method: "PUT",
-                headers: { "Content-Type": uploadFile.type },
+                headers: { "content-type": uploadFile.type },
                 body: uploadFile
             });
 
@@ -1173,7 +1173,7 @@ export default function ReceivePage() {
                                 <ShareDialog
                                     qr_id={qr_id}
                                     product={{ name: gift.product.name, image_url: gift.product.image_url }}
-                                    card={{ image_url: gift.design?.thumbf || gift.card_design_thumbf || gift.card_image_url }}
+                                    card={{ image_url: gift.design?.thumbf || gift.thumbf || gift.card_image_url }}
                                     shop={{ name: gift.shop_name }}
                                 />
                             </div>
@@ -1834,7 +1834,7 @@ export default function ReceivePage() {
                                                                                         const newSenderInfo = { ...senderForm, html_image_urls: next };
                                                                                         fetch(`${NEXT_PUBLIC_API_URL}/receive/chat`, {
                                                                                             method: 'POST',
-                                                                                            headers: { "Content-Type": "application/json" },
+                                                                                            headers: { "content-type": "application/json" },
                                                                                             body: JSON.stringify({
                                                                                                 type: 'update_sender_info',
                                                                                                 pin,

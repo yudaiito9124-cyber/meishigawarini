@@ -26,5 +26,5 @@
 
 ---
 > [!NOTE]
-> すべてのエンドポイントにおいて、`Authorization` ヘッダーによるCognitoユーザー認証が必須です。
+> すべてのエンドポイントにおいて、`authorization` ヘッダーによるCognitoユーザー認証が必須です。
 > また、各API内部で、対象ショップのオーナーまたはGMであるかの権限チェック(`checkShopOwnerOrGM`)が実行されます。

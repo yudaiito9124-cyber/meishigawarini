@@ -104,10 +104,10 @@ export const generateCSVExport = async (batch: any, cardformat: string | any) =>
     const bgImgb = await loadImg(cf.bgimgb);
 
     const codes = batch.codes || [];
-    const csvRows: string[][] = [["uuid", "pin", "front_image", "back_image"]];
+    const csvRows: string[][] = [["qr_id", "pin", "front_image", "back_image"]];
 
     for (const code of codes) {
-        const uuid = code.uuid;
+        const qr_id = code.qr_id || (code as any).uuid;
         const pin = code.pin;
 
         // --- Render Front ---
@@ -123,7 +123,7 @@ export const generateCSVExport = async (batch: any, cardformat: string | any) =>
 
             // QR
             if (cf.isfront_qr && cf.qrsize && cf.qrsize > 0) {
-                const qrCanvas = await genQRCanvas(uuid, cf.qrsize);
+                const qrCanvas = await genQRCanvas(qr_id, cf.qrsize);
                 if (qrCanvas) {
                     ctxF.drawImage(qrCanvas, cf.qrpos.x * CANVAS_SCALE, cf.qrpos.y * CANVAS_SCALE, cf.qrsize * CANVAS_SCALE, cf.qrsize * CANVAS_SCALE);
                 }
@@ -144,7 +144,7 @@ export const generateCSVExport = async (batch: any, cardformat: string | any) =>
                 ctxF.font = `${cf.codesize * 0.3527 * CANVAS_SCALE}px Helvetica`;
                 ctxF.textAlign = "center";
                 ctxF.textBaseline = "middle";
-                const uuidText = `${uuid.substring(18, 34)}...`;
+                const uuidText = `${qr_id.substring(18, 34)}...`;
                 ctxF.fillText(uuidText, (cf.width / 2 + cf.codepos.x) * CANVAS_SCALE, cf.codepos.y * CANVAS_SCALE);
             }
         }
@@ -162,7 +162,7 @@ export const generateCSVExport = async (batch: any, cardformat: string | any) =>
 
             // QR (if on back)
             if (!cf.isfront_qr && cf.qrsize && cf.qrsize > 0) {
-                const qrCanvas = await genQRCanvas(uuid, cf.qrsize);
+                const qrCanvas = await genQRCanvas(qr_id, cf.qrsize);
                 if (qrCanvas) {
                     ctxB.drawImage(qrCanvas, cf.qrpos.x * CANVAS_SCALE, cf.qrpos.y * CANVAS_SCALE, cf.qrsize * CANVAS_SCALE, cf.qrsize * CANVAS_SCALE);
                 }
@@ -183,14 +183,14 @@ export const generateCSVExport = async (batch: any, cardformat: string | any) =>
                 ctxB.font = `${cf.codesize * 0.3527 * CANVAS_SCALE}px Helvetica`;
                 ctxB.textAlign = "center";
                 ctxB.textBaseline = "middle";
-                const uuidText = `${uuid.substring(18, 34)}...`;
+                const uuidText = `${qr_id.substring(18, 34)}...`;
                 ctxB.fillText(uuidText, (cf.width / 2 + cf.codepos.x) * CANVAS_SCALE, cf.codepos.y * CANVAS_SCALE);
             }
         }
 
         // --- Save to ZIP ---
-        const frontFileName = `${uuid}_front.png`;
-        const backFileName = `${uuid}_back.png`;
+        const frontFileName = `${qr_id}_front.png`;
+        const backFileName = `${qr_id}_back.png`;
 
         const blobF = await new Promise<Blob | null>(res => canvasF.toBlob(res, 'image/png'));
         const blobB = await new Promise<Blob | null>(res => canvasB.toBlob(res, 'image/png'));
@@ -199,7 +199,7 @@ export const generateCSVExport = async (batch: any, cardformat: string | any) =>
         if (blobB && folder) folder.file(backFileName, blobB);
 
         // --- Add to CSV ---
-        csvRows.push([uuid, pin, `${frontFileName}`, `${backFileName}`]);
+        csvRows.push([qr_id, pin, `${frontFileName}`, `${backFileName}`]);
     }
 
     // --- Generate CSV File ---

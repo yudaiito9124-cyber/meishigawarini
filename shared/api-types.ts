@@ -14,7 +14,7 @@ export type AdminApiSchema = {
     admin_changeowner: { shop_id: string, new_user_id: string, action: "validate" | "execute" }; // ショップのオーナー変更
     admin_shop_create: { name: string; description?: string; owner_id?: string; gm_ids?: string[] }; // ショップの作成
     admin_shop_carddesign_link_get: { shop_id: string }; // ショップとカードデザインの紐付け取得
-    admin_shop_carddesign_link_update: { shop_id: string; card_designs: string[] }; // ショップとカードデザインの紐付け更新
+    admin_shop_carddesign_link_update: { shop_id: string; design_ids: string[] }; // ショップとカードデザインの紐付け更新
     // QRコード
     admin_qr_ban: { qr_id: string; reason?: string }; //QRコードをBAN / 解除
     admin_qr_deleteban: { target?: string }; //BANされたQRコードを削除 (指定がない場合は全件)
@@ -28,7 +28,7 @@ export type AdminApiSchema = {
         sender_info?: { [key: string]: any };
         sender_id?: string;
         activate_now?: boolean;
-        card_design: string
+        design_id: string
     }; //QRコードを生成
     admin_qr_list: { status: string, keyword?: string, limit?: number }; //QRコードのリストを取得 (limit: 取得件数制限)
     // カードデザイン
@@ -53,8 +53,8 @@ export type ShopApiSchema = {
     shop_orders_list: { shop_id: string; qr_id?: string };
     shop_orders_update: { shop_id: string; qr_id: string; status?: string; delivery_company?: string; tracking_number?: string; memo_for_users?: string; memo_for_shop?: string };
     shop_products_list: { shop_id: string };
-    shop_products_create: { shop_id: string; name: string; description?: string; image_url?: string; price?: number; valid_days?: number; detail_html?: string; card_design_id: string };
-    shop_products_update: { shop_id: string; product_id: string; status?: "ACTIVE" | "STOPPED"; name?: string; description?: string; image_url?: string; price?: number; valid_days?: number; detail_html?: string; card_design_id?: string };
+    shop_products_create: { shop_id: string; name: string; description?: string; image_url?: string; price?: number; valid_days?: number; detail_html?: string; design_id: string };
+    shop_products_update: { shop_id: string; product_id: string; status?: "ACTIVE" | "STOPPED"; name?: string; description?: string; image_url?: string; price?: number; valid_days?: number; detail_html?: string; design_id?: string };
     shop_products_delete: { shop_id: string; product_id: string };
     shop_products_import_list: { shop_id: string };
     shop_products_import_execute: { shop_id: string; source_shop_id: string; product_ids?: string[] };

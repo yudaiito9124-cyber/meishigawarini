@@ -34,12 +34,12 @@ export default function ReceivedHistoryPage() {
 
     const [loading, setLoading] = useState(true);
     const [history, setHistory] = useState<Array<{
-        uuid: string,
+        qr_id: string,
         timestamp: string,
         pin?: string,
         product_name?: string,
         product_image_url?: string,
-        card_design_thumbf?: string,
+        thumbf?: string,
         shop_name?: string
     }>>([]);
     const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -127,7 +127,7 @@ export default function ReceivedHistoryPage() {
                 ) : (
                     <div className={viewMode === 'grid'
                         ? "grid grid-cols-1 md:grid-cols-2 gap-10 p-10"
-                        : "flex flex-col items-center w-full max-w-xl mx-auto space-y-0 pb-32 pt-24"
+                        : "flex flex-col items-center w-full max-w-xl mx-auto space-y-0 pb-32 pt-0"
                     }>
                         {activeId && (
                             <div
@@ -139,14 +139,14 @@ export default function ReceivedHistoryPage() {
                             />
                         )}
                         {history.map((item, index) => {
-                            const isPeeked = activeId === item.uuid && activeStage === 'peek';
-                            const isFlipped = activeId === item.uuid && activeStage === 'flipped';
+                            const isPeeked = activeId === item.qr_id && activeStage === 'peek';
+                            const isFlipped = activeId === item.qr_id && activeStage === 'flipped';
                             const isActive = isPeeked || isFlipped;
-                            const isHovered = hoveredId === item.uuid && !isActive;
+                            const isHovered = hoveredId === item.qr_id && !isActive;
                             const isFixedGrid = isActive && viewMode === 'grid';
 
                             const wrapperStyle = viewMode === 'stack' ? {
-                                marginTop: index === 0 ? '0' : '-45%',
+                                marginTop: index === 0 ? '0' : '-40%',
                                 // Stack cards start at z-20. Backdrop is z-10.
                                 zIndex: isActive ? 500 : 20 + (history.length - index),
                             } : {
@@ -156,7 +156,7 @@ export default function ReceivedHistoryPage() {
                             const stackTransformStyle = viewMode === 'stack' ? {
                                 transform: `
                                     rotate(${(index % 2 === 0 ? 1 : -1) * (index * 0.5)}deg)
-                                    ${isActive ? 'translateY(-100%)' : (isHovered ? 'translateY(0px)' : '')} 
+                                    ${isActive ? 'translateY(-50%)' : (isHovered ? 'translateY(1px)' : '')} 
                                     scale(${isActive ? 1.05 : (isHovered ? 1.0 : 1)})
                                 `,
                             } : {};
@@ -172,20 +172,20 @@ export default function ReceivedHistoryPage() {
 
                             return (
                                 <div
-                                    key={item.uuid}
-                                    className="relative aspect-[84/52] w-full transition-all duration-0 pointer-events-none"
+                                    key={item.qr_id}
+                                    className="relative aspect-[84/52] w-full transition-all duration-5 pointer-events-none"
                                     style={wrapperStyle}
                                 >
                                     <div
-                                        className={cn(`group relative aspect-[84/52] w-full cursor-pointer transition-all rounded-3xl pointer-events-auto`, viewMode === "grid" ? "duration-0" : "duration-1000")}
+                                        className={cn(`group relative aspect-[84/52] w-full cursor-pointer transition-all rounded-3xl pointer-events-auto select-none`, viewMode === "grid" ? "duration-0" : "duration-1000")}
                                         style={{
                                             perspective: '1400px',
                                             transformStyle: 'preserve-3d',
                                             ...stackTransformStyle,
                                             ...gridFixedStyle
                                         }}
-                                        onClick={() => handleItemClick(item.uuid)}
-                                        onMouseEnter={() => setHoveredId(item.uuid)}
+                                        onClick={() => handleItemClick(item.qr_id)}
+                                        onMouseEnter={() => setHoveredId(item.qr_id)}
                                         onMouseLeave={() => setHoveredId(null)}
                                     >
                                         {/* Main Shine/Reflection Layer */}
@@ -224,12 +224,13 @@ export default function ReceivedHistoryPage() {
                                                     <CardContent className="p-0 h-full relative rounded-2xl overflow-hidden">
                                                         {/* Card Design Image */}
                                                         <div className="absolute inset-0 w-full h-full pointer-events-none rounded-2xl overflow-hidden">
-                                                            {item.card_design_thumbf ? (
+                                                            {item.thumbf ? (
                                                                 <img
-                                                                    src={item.card_design_thumbf}
+                                                                    src={item.thumbf}
                                                                     alt="Card Design"
                                                                     className="w-full h-full object-cover"
                                                                     crossOrigin="anonymous"
+                                                                    draggable={false}
                                                                 />
                                                             ) : (
                                                                 <div className="w-full h-full bg-slate-200/80 flex items-center justify-center">
@@ -250,6 +251,7 @@ export default function ReceivedHistoryPage() {
                                                                             src={item.product_image_url}
                                                                             alt=""
                                                                             className="w-full h-full object-cover"
+                                                                            draggable={false}
                                                                         />
                                                                     </div>
                                                                 )}
@@ -278,52 +280,58 @@ export default function ReceivedHistoryPage() {
                                                 }}
                                             >
                                                 <Card className="w-full h-full p-0 border-b-4 border-indigo-950 bg-indigo-950 rounded-2xl shadow-2xl overflow-hidden">
-                                                    <CardContent className="p-6 h-full flex flex-col justify-between text-white border-2 border-white/10 rounded-2xl">
-                                                        <div className="space-y-4">
-                                                            <div className="pointer-events-none">
-                                                                {item.shop_name && (
-                                                                    <p className="text-[9px] text-purple-300 font-black uppercase tracking-[0.2em] leading-none">{item.shop_name}</p>
-                                                                )}
-                                                            </div>
+                                                    <CardContent className="p-6 h-full flex flex-col text-white border-2 border-white/10 rounded-2xl">
+                                                        {/* Top Section */}
+                                                        <div className="pointer-events-none">
+                                                            {item.shop_name ? (
+                                                                <p className="text-[9px] text-purple-300 text-center font-black uppercase tracking-[0.2em] leading-none">{item.shop_name}</p>
+                                                            ) : (
+                                                                <div className="h-[9px]" />
+                                                            )}
+                                                        </div>
 
-                                                            {/* PIN Section */}
+                                                        {/* Center Section: PIN */}
+                                                        <div className="flex-1 flex items-center justify-center py-2">
                                                             {item.pin && (
-                                                                <div className="flex items-center justify-between p-3 rounded-xl bg-purple-500/10 border border-purple-500/20 hover:bg-purple-500/20 transition-all">
-                                                                    <div className="flex flex-col pointer-events-none">
-                                                                        <span className="text-[7px] font-black text-purple-300/40 uppercase tracking-widest">PIN</span>
-                                                                        <span className="text-base font-mono font-black text-white tracking-[0.3em]">{item.pin}</span>
+                                                                <div className="w-full relative flex items-center justify-center p-3 rounded-xl bg-purple-500/10 border border-purple-500/20 hover:bg-purple-500/20 transition-all min-h-[80px]">
+                                                                    <div className="flex flex-col items-center pointer-events-none">
+                                                                        <span className="text-[15px] font-black text-purple-300/40 uppercase tracking-widest leading-none mb-1">PIN</span>
+                                                                        <span className="text-[32px] font-mono font-black text-white tracking-[0.3em] leading-none">{item.pin}</span>
                                                                     </div>
-                                                                    <Button
-                                                                        variant="ghost"
-                                                                        size="icon"
-                                                                        className="h-8 w-8 text-purple-300/50 hover:text-white hover:bg-white/10 rounded-lg shrink-0"
-                                                                        onClick={(e) => { e.stopPropagation(); handleCopy(item.pin!); }}
-                                                                    >
-                                                                        {copiedId === item.pin ? <Check className="h-3 w-3 text-green-400" /> : <Copy className="h-3 w-3" />}
-                                                                    </Button>
+                                                                    <div className="absolute right-3">
+                                                                        <Button
+                                                                            variant="ghost"
+                                                                            size="icon"
+                                                                            className="h-10 w-10 text-purple-300/50 hover:text-white hover:bg-white/10 rounded-lg shrink-0"
+                                                                            onClick={(e) => { e.stopPropagation(); handleCopy(item.pin!); }}
+                                                                        >
+                                                                            {copiedId === item.pin ? <Check className="h-4 w-4 text-green-400" /> : <Copy className="h-4 w-4" />}
+                                                                        </Button>
+                                                                    </div>
                                                                 </div>
                                                             )}
                                                         </div>
 
+                                                        {/* Bottom Section */}
                                                         <div className="flex flex-col items-center gap-3">
                                                             <Button
-                                                                className="w-fit h-11 px-10 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-black text-[10px] uppercase tracking-[0.1em] shadow-xl gap-3 group/btn shrink-0"
-                                                                onClick={(e) => { e.stopPropagation(); window.open(`/receive/${item.uuid}`, '_blank'); }}
+                                                                className="rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-black text-[20px] uppercase tracking-[0.1em] shadow-xl gap-2 group/btn shrink-0 p-3"
+                                                                onClick={(e) => { e.stopPropagation(); window.open(`/receive/${item.qr_id}`, '_blank'); }}
                                                             >
-                                                                {t('details')}
-                                                                <ExternalLink className="w-4 h-4 transition-transform group-hover/btn:translate-x-0.5 group-hover/btn:-translate-y-0.5" />
+                                                                {t('opencard')}
+                                                                <ExternalLink className="!w-6 !h-6 transition-transform group-hover/btn:translate-x-0.5 group-hover/btn:-translate-y-0.5" />
                                                             </Button>
 
                                                             {/* ID Row */}
                                                             <div className="flex items-center gap-1.5 opacity-30 hover:opacity-100 transition-opacity">
-                                                                <span className="text-[8px] font-mono font-bold text-white/50 truncate tracking-tighter pointer-events-none">ID: {item.uuid}</span>
+                                                                <span className="text-[8px] font-mono font-bold text-white/50 truncate tracking-tighter pointer-events-none">ID: {item.qr_id}</span>
                                                                 <Button
                                                                     variant="ghost"
                                                                     size="icon"
                                                                     className="h-5 w-5 text-white/20 hover:text-white rounded shrink-0"
-                                                                    onClick={(e) => { e.stopPropagation(); handleCopy(item.uuid); }}
+                                                                    onClick={(e) => { e.stopPropagation(); handleCopy(item.qr_id); }}
                                                                 >
-                                                                    {copiedId === item.uuid ? <Check className="h-2.5 w-2.5 text-green-400" /> : <Copy className="h-2.5 w-2.5" />}
+                                                                    {copiedId === item.qr_id ? <Check className="h-2.5 w-2.5 text-green-400" /> : <Copy className="h-2.5 w-2.5" />}
                                                                 </Button>
                                                             </div>
                                                         </div>

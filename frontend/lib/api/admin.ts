@@ -21,8 +21,8 @@ export const adminApiBase = {
 
         const headers = {
             ...options.headers,
-            "Authorization": `Bearer ${token}`,
-            "Content-Type": options.body ? "application/json" : (options.headers as any)?.["Content-Type"] || undefined,
+            "authorization": `Bearer ${token}`,
+            "content-type": options.body ? "application/json" : (options.headers as any)?.["content-type"] || undefined,
         };
 
         const res = await fetch(`${NEXT_PUBLIC_API_URL}${path.startsWith('/') ? '' : '/'}${path}`, {

@@ -40,7 +40,7 @@
 | `ts_created_at` | String | 作成日時 （ISO 8601形式のUTC日時文字列） |
 
 ### 2.2 User (ユーザー・送り主プロフィール情報)
-プレゼントを渡す人（sender）が自己紹介として公開するプロフィール情報です。`/receive` 画面で入力・保存（エクスポート）すると作成され、自身のユーザーIDに紐付けて管理・再利用が可能です。
+プレゼントを渡す人（sender）が自己紹介として公開するプロフィール情報です。`/user/editprofile` 画面で自身のユーザーIDに紐付けて管理・再利用が可能です。また、`/receive` 画面で入力・保存（エクスポート）しても作成することができます。
 
 | 属性名 | 型 | 説明 |
 | --- | --- | --- |
@@ -99,7 +99,7 @@
 | --- | --- | --- |
 | `PK` | String | `USER#{userId}` |
 | `SK` | String | `SENDLOG#{index}` または `RECEIVEDLOG#{index}` (例: `001`) |
-| `logs` | Array | 履歴データの配列。形式: `[{ uuid: "QRのUUID", timestamp: "ISO時間" }]` |
+| `logs` | Array | 履歴データの配列。形式: `[{ qr_id: "ID", timestamp: "ISO時間" }]` ※旧データは `uuid` キーを使用 |
 | `ts_updated_at` | String | レコードの最終更新日時 |
 
 ### 2.5 User (履歴管理用メタデータ)
@@ -112,6 +112,8 @@
 | `current_index` | Number | 現在書き込みを行っているログレコードのインデックス |
 | `current_count` | Number | 現在のログレコードに含まれるエントリー数 |
 | `ts_updated_at` | String | 最終更新日時 |
+| `failed_attempts` | Number | (ログイン試行制限) PINコードの試行失敗回数 (SK=METADATA) |
+| `locked_until` | String | (ログイン試行制限) アカウントロック解除時刻 (ISO 8601) |
 
 ### 2.6 Shop (ショップ情報)
 ショップの基本情報とオーナー情報を保持します。現在はショップユーザーのメールアドレスがそのまま問い合わせ先となっています。
@@ -128,7 +130,9 @@
 | `card_designs` | Array<String> | ショップが利用可能なカードデザインIDのリスト |
 | `ts_created_at` | String | 作成日時 （ISO 8601形式のUTC日時文字列、例: `2024-03-01T12:00:00.000Z`） |
 | `GSI2_PK` | String | `USER#{owner_id}` （オーナーのショップ一覧取得用、例: `USER#123e4567-...`） |
-| `GSI2_SK` | String | 作成日時等ソートキー （ISO 8601形式のUTC日時文字列） |
+| `GSI2_SK` | String | ソートキー。**オーナーID (`GSI2_PK`) が変更された際のみ**、現在時刻 (ISO 8601) に更新されます。 |
+| `html_image_urls` | Array<String> | ショップ詳細HTML内で使用される画像のURL配列 |
+| `card_designs` | Array<String> | ショップが利用可能なカードデザインIDのリスト |
 
 ### 2.7 Product (商品情報)
 各ショップに紐づく商品カタログ情報です。
@@ -147,12 +151,13 @@
 | `price` | Number | 価格 （0以上の正の数値） |
 | `valid_days` | Number | QRコードの有効日数設定 （整数値、例: `90`, `180` など） |
 | `status` | String | 商品の販売状態 (`ACTIVE`, `STOPPED`, または `DELETED`) ※詳細は2.6章 |
+| `design_id` | String | カードデザインID （旧 `card_design_id`） |
 | `ts_created_at` | String | 作成日時 （ISO 8601形式のUTC日時文字列） |
 | `ts_updated_at` | String | 更新日時 （ISO 8601形式のUTC日時文字列） |
 | `GSI1_PK` | String | `PRODUCT#{status}` （アクティブな商品一覧取得用、例: `PRODUCT#ACTIVE`） |
-| `GSI1_SK` | String | 作成日時等のソートキー （ISO 8601形式のUTC日時文字列） |
+| `GSI1_SK` | String | ソートキー。**商品ステータス (`GSI1_PK`) が変更された際のみ**、現在時刻 (ISO 8601) に更新されます。 |
 | `GSI2_PK` | String | `PRODUCT#{productId}` （UUIDからの逆引き用） |
-| `GSI2_SK` | String | `SHOP#{productId}` (旧データ：作成日時等のソートキー （ISO 8601形式のUTC日時文字列）) |
+| `GSI2_SK` | String | ソートキー。商品作成時のみ現在時刻がセットされます（PKが不変のため）。 |
 
 ### 2.8 QR Metadata (QRコード及び注文ステータス)
 QRコードのライフサイクルや注文ステータス、商品との紐付けを管理します。
@@ -167,7 +172,7 @@ QRコードのライフサイクルや注文ステータス、商品との紐付
 | `product_id` | String | 紐付け先の商品ID （未連携時は存在しないか空） |
 | `batch_id` | String | QRコード生成時のバッチID（同じタイミングで生成されたQRは同じIDを持つ） |
 | `owner_id` | String | (QR生成時オプション)QRコードを扱えるショップの制限用、ユーザーID(そのユーザーがshop/画面で見れるショップに制限) （UUID形式の `sub` 属性） |
-| `card_design` | String | カードデザインID |
+| `design_id` | String | カードデザインID （旧 `card_design`） |
 | `memo_for_users` | String | ショップからの受取人向けメッセージ （任意の文字列） |
 | `memo_for_shop` | String | ショップ自身の検索・管理用メモ欄 （任意の文字列） |
 | `password_hash` | String | ユーザー設定の追加パスワードハッシュ値 (現在パスワード機能は設定画面をコメントアウトして無効化中) |
@@ -182,9 +187,9 @@ QRコードのライフサイクルや注文ステータス、商品との紐付
 | `ts_updated_at` | String | レコードの最終変更日時 （ISO 8601形式のUTC日時文字列） |
 | `ban_reason` | String | 無効化(BAN)理由 （任意の文字列） |
 | `GSI1_PK` | String | `QR#{status}` （ステータスごとの一覧取得用、例: `QR#ACTIVE`） |
-| `GSI1_SK` | String | 作成日時等のソートキー （ISO 8601形式のUTC日時文字列） |
+| `GSI1_SK` | String | ソートキー。**ステータス (`GSI1_PK`) が変更された際のみ**、現在時刻 (ISO 8601) に更新されます。 |
 | `GSI2_PK` | String | `SHOP#{shopId}` （担当ショップが持つQR一覧取得用） |
-| `GSI2_SK` | String | 作成日時等のソートキー （ISO 8601形式のUTC日時文字列） |
+| `GSI2_SK` | String | ソートキー。**紐付け先ショップ (`GSI2_PK`) が変更された際のみ**、現在時刻 (ISO 8601) に更新されます。 |
 
 ### 2.9 Order (受取人による配送先・注文詳細)
 受取人が入力した配送先情報や、発送時の追跡番号などを保持します。
@@ -217,7 +222,9 @@ QRコードのライフサイクルや注文ステータス、商品との紐付
 | `notification_emails` | StringSet | 新着通知の設定先メールリスト （購読を希望したユーザーのメールアドレス集合） |
 | `email_preferences` | Map | メール通知の設定情報マップ （言語情報等、例: `{"user@example.com": "ja"}`） |
 | `sender_info` | JSon | プレゼントを渡した人の名刺情報等（`detail_html` を含む）
-| `sender_id` | String | (QR生成時オプション) プレゼントを渡したユーザーのID(receiveの送り主情報入力画面でexportすると保存される使いまわし専用ID、これがあるとreceive画面の送り主情報は編集不可能) |
+| `sender_id` | String | (QR生成時オプション) プレゼントを渡したユーザーのID |
+| `total_size_bytes` | Number | チャットに添付されたファイルの累計サイズ (100MB制限用) |
+| `messages` | Array<Object> | メッセージ履歴。形式: `[{ id, role, username, message, type, file_url, file_size, ts_created_at }]` |
 ### 2.11 Card Design Metadata (カードデザイン)
 カードのデザイン（背景画像、QR・PIN・UUIDの配置等）を保持します。
 
@@ -267,9 +274,9 @@ QRコードのライフサイクルや注文ステータス、商品との紐付
 | `ts_created_at` | String | 作成日時 （ISO 8601形式のUTC日時文字列） |
 | `ts_updated_at` | String | 更新日時 （ISO 8601形式のUTC日時文字列） |
 | `GSI1_PK` | String | `CARD_ORDER#{status}` （アクティブな商品一覧取得用、例: `CARD_ORDER#ORDERED`） |
-| `GSI1_SK` | String | 作成日時等のソートキー （ISO 8601形式のUTC日時文字列） |
+| `GSI1_SK` | String | ソートキー。**発注ステータス (`GSI1_PK`) が変更された際のみ**、現在時刻 (ISO 8601) に更新されます。 |
 | `GSI2_PK` | String | `CARD_ORDER#{orderId}` （UUIDからの逆引き用） |
-| `GSI2_SK` | String | `SHOP#{orderId}` (旧データ：作成日時等のソートキー （ISO 8601形式のUTC日時文字列）) |
+| `GSI2_SK` | String | ソートキー。発注作成時のみ現在時刻がセットされます（PKが不変のため）。 |
  欲しい？　印刷したユーザー名，手動で生成した場合もこのフォーマットでレコードを残す？
 
 ### 2.13 レコードが保持可能な状態 (ステータス) 一覧

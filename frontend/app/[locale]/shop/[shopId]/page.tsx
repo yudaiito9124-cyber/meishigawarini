@@ -145,8 +145,6 @@ export default function ShopPage() {
     const [singleShopOwner, setSingleShopOwner] = useState<boolean>(true);
     const [editingProduct, setEditingProduct] = useState<any | null>(null);
     const [isDuplicateMode, setIsDuplicateMode] = useState(false);
-
-    // Import Product State
     const [isImporting, setIsImporting] = useState(false);
     const [importShops, setImportShops] = useState<any[]>([]);
     const [selectedImportShopId, setSelectedImportShopId] = useState('');
@@ -167,8 +165,33 @@ export default function ShopPage() {
     const [isCreatingCardOrder, setIsCreatingCardOrder] = useState(false);
     const [isConfirmOrderDialogOpen, setIsConfirmOrderDialogOpen] = useState(false);
     const [isDetailFiltering, setIsDetailFiltering] = useState(false);
+    const [selectedDesignId, setSelectedDesignId] = useState<string>('');
 
-    const [selectedCardDesignId, setSelectedCardDesignId] = useState<string>('');
+
+
+    const getDesignAspectRatio = (designId: string, designObj?: any) => {
+        if (designObj?.width && designObj?.height) return `${designObj.width} / ${designObj.height}`;
+        if (designId && shop?.allowed_designs) {
+            const custom = shop.allowed_designs.find((d: any) => d.design_id === designId);
+            if (custom?.width && custom?.height) return `${custom.width} / ${custom.height}`;
+        }
+        if (designId && cardformats[designId]) return `${cardformats[designId].width || 84} / ${cardformats[designId].height || 52}`;
+        return '84 / 52';
+    };
+
+    const getDesignImages = (designId: string, designObj?: any) => {
+        let f = designObj?.thumbf || designObj?.bgimgf || '';
+        let b = designObj?.thumbb || designObj?.bgimgb || '';
+        if (!f && designId && shop?.allowed_designs) {
+           const custom = shop.allowed_designs.find((d: any) => d.design_id === designId);
+           if (custom) { f = custom.thumbf || custom.bgimgf || ''; b = custom.thumbb || custom.bgimgb || ''; }
+        }
+        if (!f && designId && cardformats[designId]) {
+           f = cardformats[designId].thumbf || cardformats[designId].bgimgf || '';
+           b = cardformats[designId].thumbb || cardformats[designId].bgimgb || '';
+        }
+        return { front: f, back: b };
+    };
 
     const checkAdminAuth = async () => {
         try {
@@ -415,7 +438,7 @@ export default function ShopPage() {
             const res = await fetch(uploadUrl, {
                 method: 'PUT',
                 body: uploadFile,
-                headers: { 'Content-Type': 'image/webp' }
+                headers: { 'content-type': 'image/webp' }
             });
 
             if (!res.ok) {
@@ -485,7 +508,7 @@ export default function ShopPage() {
                 const s3Res = await fetch(uploadUrl, {
                     method: 'PUT',
                     headers: {
-                        'Content-Type': 'image/webp'
+                        'content-type': 'image/webp'
                     },
                     body: resizedBlob
                 });
@@ -508,7 +531,7 @@ export default function ShopPage() {
                     price: Number(formData.get('price')),
                     valid_days: Number(formData.get('valid_days')),
                     image_url: imageUrl,
-                    card_design_id: selectedCardDesignId,
+                    design_id: selectedDesignId,
                 });
                 alert(t('editProduct.success'));
             } else {
@@ -520,13 +543,13 @@ export default function ShopPage() {
                     price: Number(formData.get('price')),
                     valid_days: Number(formData.get('valid_days')),
                     image_url: imageUrl || 'https://placehold.co/1280x720?text=No+Image',
-                    card_design_id: selectedCardDesignId,
+                    design_id: selectedDesignId,
                 });
                 alert(t('addProduct.success'));
             }
 
             form.reset();
-            setSelectedCardDesignId('');
+            setSelectedDesignId('');
             setEditingProduct(null);
             setIsDuplicateMode(false);
             setIsAddProductDialogOpen(false);
@@ -546,14 +569,14 @@ export default function ShopPage() {
     const handleOpenEditDialog = (product: any) => {
         setEditingProduct(product);
         setIsDuplicateMode(false);
-        setSelectedCardDesignId(product.card_design_id || (product.design?.design_id) || '');
+        setSelectedDesignId(product.design_id || (product.design?.design_id) || '');
         setIsAddProductDialogOpen(true);
     };
 
     const handleOpenDuplicateDialog = (product: any) => {
         setEditingProduct(product);
         setIsDuplicateMode(true);
-        setSelectedCardDesignId(product.card_design_id || (product.design?.design_id) || '');
+        setSelectedDesignId(product.design_id || (product.design?.design_id) || '');
         setIsAddProductDialogOpen(true);
     };
 
@@ -697,7 +720,7 @@ export default function ShopPage() {
             await shopApi.shop_card_orders_create({
                 shop_id: shopId as string,
                 quantity: orderQuantity,
-                design_id: selectedOrderProduct.card_design_id || selectedOrderProduct.design?.design_id,
+                design_id: selectedOrderProduct.design_id || selectedOrderProduct.design?.design_id,
                 product_id: selectedOrderProduct.product_id,
                 activate_now: true
             });
@@ -881,19 +904,18 @@ export default function ShopPage() {
         st("short.pro"),
     ];
 
-
     const statusCss = (status: string, bg: boolean = true, border: boolean = true, text: boolean = true) => {
         switch (status) {
-            case st('short.una'): return (bg ? 'bg-gray-100    ' : '') + (border ? 'border-gray-200.  ' : '') + (text ? ' text-gray-700.  ' : '');
-            case st('short.lin'): return (bg ? 'bg-emerald-100 ' : '') + (border ? 'border-emerald-200' : '') + (text ? ' text-emerald-800' : '');
-            case st('short.act'): return (bg ? 'bg-yellow-100  ' : '') + (border ? 'border-yellow-200 ' : '') + (text ? ' text-yellow-800 ' : '');
-            case st('short.use'): return (bg ? 'bg-orange-100  ' : '') + (border ? 'border-orange-200 ' : '') + (text ? ' text-orange-800 ' : '');
-            case st('short.shi'): return (bg ? 'bg-indigo-100  ' : '') + (border ? 'border-indigo-200 ' : '') + (text ? ' text-indigo-800 ' : '');
-            case st('short.com'): return (bg ? 'bg-purple-100  ' : '') + (border ? 'border-purple-200 ' : '') + (text ? ' text-purple-800 ' : '');
-            case st('short.exp'): return (bg ? 'bg-gray-200    ' : '') + (border ? 'border-gray-300   ' : '') + (text ? ' text-gray-800   ' : '');
-            case st('short.ban'): return (bg ? 'bg-red-100     ' : '') + (border ? 'border-red-200    ' : '') + (text ? ' text-red-800    ' : '');
-            case st('short.pro'): return (bg ? 'bg-green-100   ' : '') + (border ? 'border-green-200  ' : '') + (text ? ' text-green-800  ' : '');
-            default: return (bg ? 'bg-gray-100 ' : '') + (border ? 'border-gray-200' : '') + (text ? ' text-gray-700' : '');
+            case st('short.una'): return ((bg ? 'bg-gray-100    ' : '') + (border ? 'border-gray-200   ' : '') + (text ? ' text-gray-700   ' : '')).trim();
+            case st('short.lin'): return ((bg ? 'bg-emerald-100 ' : '') + (border ? 'border-emerald-200' : '') + (text ? ' text-emerald-800' : '')).trim();
+            case st('short.act'): return ((bg ? 'bg-yellow-100  ' : '') + (border ? 'border-yellow-200 ' : '') + (text ? ' text-yellow-800 ' : '')).trim();
+            case st('short.use'): return ((bg ? 'bg-orange-100  ' : '') + (border ? 'border-orange-200 ' : '') + (text ? ' text-orange-800 ' : '')).trim();
+            case st('short.shi'): return ((bg ? 'bg-indigo-100  ' : '') + (border ? 'border-indigo-200 ' : '') + (text ? ' text-indigo-800 ' : '')).trim();
+            case st('short.com'): return ((bg ? 'bg-purple-100  ' : '') + (border ? 'border-purple-200 ' : '') + (text ? ' text-purple-800 ' : '')).trim();
+            case st('short.exp'): return ((bg ? 'bg-gray-200    ' : '') + (border ? 'border-gray-300   ' : '') + (text ? ' text-gray-800   ' : '')).trim();
+            case st('short.ban'): return ((bg ? 'bg-red-100     ' : '') + (border ? 'border-red-200    ' : '') + (text ? ' text-red-800    ' : '')).trim();
+            case st('short.pro'): return ((bg ? 'bg-green-100   ' : '') + (border ? 'border-green-200  ' : '') + (text ? ' text-green-800  ' : '')).trim();
+            default: return ((bg ? 'bg-gray-100 ' : '') + (border ? 'border-gray-200' : '') + (text ? ' text-gray-700' : '')).trim();
         }
     }
 
@@ -902,6 +924,8 @@ export default function ShopPage() {
 
     return (
         <div className="min-h-screen bg-gray-50 pb-12">
+
+
             {/* Header */}
             <div className="bg-white shadow">
                 <div className="max-w-7xl mx-auto px-4 py-6 flex justify-between items-center flex flex-col space-y-4 md:flex-row md:items-center md:justify-between md:space-y-0">
@@ -1214,7 +1238,11 @@ export default function ShopPage() {
                 </div>
 
             </div>
+
+
             <div className="max-w-7xl mx-auto px-4 sm:px-8 py-4 sm:py-8 space-y-6">
+
+                {/* Tabs */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
                     <button
                         onClick={() => setActiveTab("activation")}
@@ -1265,11 +1293,6 @@ export default function ShopPage() {
                 {/* --- Wrapper for Activation --- */}
                 {activeTab === 'activation' && (
                     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
-
-
-
-
-
 
                         {/* Link QR */}
                         <div className="grid grid-cols-1 lg:grid-cols-1 gap-6">
@@ -1555,10 +1578,6 @@ export default function ShopPage() {
                             </Card>
                         </div>
 
-
-
-
-
                     </div>
                 )}
 
@@ -1593,36 +1612,43 @@ export default function ShopPage() {
                                     <div className={cn("flex gap-2 flex", isDetailFiltering ? "flex-col" : "")}>
 
                                         {/* 絞り込み */}
-                                        <div className={cn("", isDetailFiltering ? "border rounded-xl border-2 border-dashed border-gray-300 p-2 mb-4 flex justify-start flex-col mt-1 w-full bg-mist-400/50" : "")}>
+                                        <div className={cn("relative", isDetailFiltering ? "rounded-xl border-dashed border-gray-300 p-2 mb-4 flex justify-start flex-col mt-1 w-full bg-gray-100" : "")}>
                                             <Button
                                                 variant="outline"
                                                 size="sm"
-                                                onClick={() => setIsDetailFiltering(!isDetailFiltering)}
-                                                className={`justify-start gap-2 text-xs border-gray-200 rounded-lg shadow-sm hover:ring-2 hover:ring-primary/10 transition-all text-primary border-primary/20 bg-primary/5 max-w-10`}
+                                                onClick={() => {
+                                                    if (isDetailFiltering) {
+                                                        setOrderProductFilter(null)
+                                                        setOrderStatusFilter('ALL')
+                                                        setSearchQrId('')
+                                                    }
+                                                    setIsDetailFiltering(!isDetailFiltering)
+                                                }}
+                                                className={cn(`justify-start gap-0 text-xs border-gray-200 rounded-lg shadow-sm hover:ring-2 hover:ring-primary/10 transition-all text-primary border-primary/20 bg-primary/5 `, isDetailFiltering ? "absolute -top-1 -left-0 bg-gray-100 max-w-10" : "max-w-25")}
                                             >
                                                 {isDetailFiltering ? (
                                                     <>
-                                                        <Minimize2 className={`w-3.5 h-3.5 mr-2`} />
+                                                        <Plus className={`w-3.5 h-3.5 mr-2 rotate-45`} />
                                                     </>
                                                 ) : (
-                                                    // <Minimize2 className={`w-3.5 h-3.5`} />
                                                     <>
-                                                        <Filter className={`w-3.5 h-3.5 mr-2`} />
+                                                        <Filter className={`w-3.5 h-3.5 mr-2`} />絞り込み
                                                     </>
                                                 )}
                                             </Button>
 
                                             {isDetailFiltering && (
-                                                <div className="mt-1">
+                                                <div className="mt-7">
 
                                                     {/* 商品/カードフィルター */}
-                                                    < div className=" text-[15px] text-gray-500 flex flex-row gap-2 items-center mt-0">
-                                                        <div className={cn("w-4 h-4 rounded-full items-center justify-center bg-gray-900 border border-white")}></div>
+                                                    < div className="relative left-3 text-[15px] text-gray-800 flex flex-row gap-2 items-center mt-0">
+                                                        {/* <div className={cn("w-4 h-4 rounded-full items-center justify-center bg-gray-900 border border-white")}></div> */}
                                                         Design
                                                     </div>
-                                                    <div className="grid grid-cols-2 xs:grid-cols-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 border-gray-200 rounded-md p-2">
+                                                    <div className="flex flex-wrap items-start gap-3 border-gray-200 p-2 bg-gray-300 rounded-xl max-h-100 overflow-y-auto w-full">
                                                         <Card
-                                                            className={`overflow-hidden cursor-pointer transition-all relative aspect-[84/52] flex items-center justify-center bg-gray-50 border-2 ${orderProductFilter === null ? 'ring-2 ring-primary border-primary' : 'border-dashed border-gray-200 hover:bg-gray-100'}`}
+                                                            className={`overflow-hidden cursor-pointer transition-all relative flex items-center justify-center bg-gray-50 border-2 h-20 ${orderProductFilter === null ? 'ring-2 ring-primary border-primary' : 'border-dashed border-gray-200 hover:bg-gray-100'}`}
+                                                            style={{ aspectRatio: '84/52' }}
                                                             onClick={() => setOrderProductFilter(null)}
                                                         >
                                                             <span className={`font-bold text-sm ${orderProductFilter === null ? 'text-primary' : 'text-gray-500'}`}>{tc('all')}</span>
@@ -1630,15 +1656,17 @@ export default function ShopPage() {
                                                         {products.map((product) => (
                                                             <Card
                                                                 key={product.product_id}
-                                                                className={`overflow-hidden cursor-pointer transition-all relative aspect-[84/52] ${orderProductFilter === product.product_id ? 'ring-2 ring-offset-2 ring-primary' : 'hover:ring-2 hover:ring-primary/50'}`}
+                                                                className={`overflow-hidden cursor-pointer transition-all relative h-20 ${orderProductFilter === product.product_id ? 'ring-2 ring-offset-2 ring-primary' : 'hover:ring-2 hover:ring-primary/50'}`}
+                                                                style={{ aspectRatio: getDesignAspectRatio(product.design_id, product.design) }}
                                                                 onClick={() => setOrderProductFilter(orderProductFilter === product.product_id ? null : product.product_id)}
                                                             >
                                                                 {/* 背景: カードデザイン */}
-                                                                {product.design && (
+                                                                {getDesignImages(product.design_id, product.design).front && (
                                                                     <img
-                                                                        src={product.design.thumbf || product.design.bgimgf}
-                                                                        alt={product.design.name}
-                                                                        className="absolute inset-0 w-full h-full object-cover"
+                                                                        src={getDesignImages(product.design_id, product.design).front}
+                                                                        alt={product.design?.name || product.name}
+                                                                        className="absolute inset-0 w-full h-full object-fill select-none"
+                                                                        draggable={false}
                                                                         crossOrigin="anonymous"
                                                                     />
                                                                 )}
@@ -1675,18 +1703,18 @@ export default function ShopPage() {
                                                     </div>
 
                                                     {/* ステータスフィルター */}
-                                                    <div className=" text-[15px] text-gray-800 flex flex-row gap-2 items-center mt-4">
-                                                        <div className={cn("w-4 h-4 rounded-full items-center justify-center bg-gray-900 border border-white")}></div>
+                                                    <div className="relative left-3 text-[15px] text-gray-800 flex flex-row gap-2 items-center mt-4">
+                                                        {/* <div className={cn("w-4 h-4 rounded-full items-center justify-center bg-gray-900 border border-white")}></div> */}
                                                         Status
                                                     </div>
-                                                    <div className="border-gray-200 flex flex-wrap gap-2  rounded-md p-2">
+                                                    <div className="border-gray-200 flex flex-wrap gap-2  rounded-md p-2 bg-gray-300 justify-center">
                                                         {['ALL'].concat(statusList).map((s) => (
                                                             <Button
                                                                 key={s.toUpperCase()}
                                                                 variant={orderStatusFilter === s.toUpperCase() ? "default" : "secondary"}
                                                                 size="sm"
                                                                 onClick={() => setOrderStatusFilter(s.toUpperCase() == orderStatusFilter ? "ALL" : s.toUpperCase())}
-                                                                className={cn("text-xs border border-3", statusCss(s, true, orderStatusFilter === s.toUpperCase() ? false : true, true), orderStatusFilter === s.toUpperCase() ? "border-black " : "")}
+                                                                className={cn("text-xs border border-3 min-w-25 max-w-30 flex-1", statusCss(s, true, true, true), orderStatusFilter === s.toUpperCase() ? "border-black hover:text-white font-bold" : "hover:" + statusCss(s, true, false, false) + " hover:font-bold")}
                                                             >
                                                                 {s === 'ALL' ? tc('all') : st(s)}
                                                             </Button>
@@ -1694,11 +1722,11 @@ export default function ShopPage() {
                                                     </div>
 
                                                     {/* Search and Column Settings Row */}
-                                                    <div className=" text-[15px] text-gray-500 flex flex-row gap-2 items-center mt-4">
-                                                        <div className={cn("w-4 h-4 rounded-full items-center justify-center bg-gray-900 border border-white")}></div>
+                                                    <div className="relative left-3 text-[15px] text-gray-800 flex flex-row gap-2 items-center mt-4">
+                                                        {/* <div className={cn("w-4 h-4 rounded-full items-center justify-center bg-gray-900 border border-white")}></div> */}
                                                         ID
                                                     </div>
-                                                    <div className="flex flex-col sm:flex-row gap-2 border-gray-200 flex flex-wrap gap-2 rounded-md p-2 mb-4">
+                                                    <div className="flex flex-col sm:flex-row gap-2 border-gray-300 flex flex-wrap gap-2 rounded-md p-2 mb-4  bg-gray-300 ">
                                                         <div className="relative flex-1 group">
                                                             <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
                                                                 <Search className={`w-3.5 h-3.5 text-gray-400 group-focus-within:text-primary transition-colors`} />
@@ -1756,7 +1784,7 @@ export default function ShopPage() {
                                     </div>
                                 </div>
 
-                                <Table wrapperStyle={{ maxHeight: 'calc(100vh - 200px)' }}>
+                                <Table wrapperStyle={{ maxHeight: 'calc(100vh - 200px)', minHeight: '300px' }}>
                                     <TableHeader className="sticky top-0 bg-white z-10 drop-shadow-sm">
                                         <TableRow>
                                             {ORDER_COL_OPTIONS.filter(col => visibleOrderColumns.includes(col.key)).map(col => (
@@ -1777,7 +1805,7 @@ export default function ShopPage() {
                                             ))}
                                         </TableRow>
                                     </TableHeader>
-                                    <TableBody>
+                                    <TableBody >
                                         {ordersLoading ? (
                                             <TableRow><TableCell colSpan={4} className="text-center py-4"><RefreshCw className="animate-spin h-5 w-5 mx-auto text-gray-400" /></TableCell></TableRow>
                                         ) : orders
@@ -1859,31 +1887,48 @@ export default function ShopPage() {
                                                                     </div>
 
                                                                     {/* Card Preview */}
-                                                                    {order.card_design && (
+                                                                    {order.design_id && (
                                                                         <div className="space-y-2">
                                                                             <h4 className="text-sm font-semibold text-gray-500">{t('linkQr.cardDesign')}</h4>
-                                                                            {(order.thumbf || order.thumbb || cardformats[order.card_design]) && (
+                                                                            {(order.thumbf || order.thumbb || cardformats[order.design_id]) && (
                                                                                 <div className="grid grid-cols-2 gap-2">
-                                                                                    <div className="space-y-1">
-                                                                                        <div className="aspect-[84/52] relative rounded shadow-sm overflow-hidden border border-gray-100 bg-white">
-                                                                                            <img
-                                                                                                src={order.thumbf || cardformats[order.card_design]?.bgimgf}
-                                                                                                alt="Front"
-                                                                                                className="w-full h-full object-cover"
-                                                                                                crossOrigin="anonymous"
-                                                                                            />
-                                                                                        </div>
-                                                                                    </div>
-                                                                                    <div className="space-y-1">
-                                                                                        <div className="aspect-[84/52] relative rounded shadow-sm overflow-hidden border border-gray-100 bg-white">
-                                                                                            <img
-                                                                                                src={order.thumbb || cardformats[order.card_design]?.bgimgb}
-                                                                                                alt="Back"
-                                                                                                className="w-full h-full object-cover"
-                                                                                                crossOrigin="anonymous"
-                                                                                            />
-                                                                                        </div>
-                                                                                    </div>
+                                                                                    {(() => {
+                                                                                        const product = products.find(p => p.product_id === order.product_id);
+                                                                                        const aspectRatio = getDesignAspectRatio(order.design_id, product?.design);
+                                                                                        const images = getDesignImages(order.design_id, product?.design);
+                                                                                        return (
+                                                                                            <>
+                                                                                                <div className="space-y-1">
+                                                                                                    <div
+                                                                                                        className="relative rounded shadow-sm overflow-hidden border border-gray-100 bg-white"
+                                                                                                        style={{ aspectRatio }}
+                                                                                                    >
+                                                                                                        <img
+                                                                                                            src={order.thumbf || images.front}
+                                                                                                            alt="Front"
+                                                                                                            className="w-full h-full object-fill select-none"
+                                                                                                            draggable={false}
+                                                                                                            crossOrigin="anonymous"
+                                                                                                        />
+                                                                                                    </div>
+                                                                                                </div>
+                                                                                                <div className="space-y-1">
+                                                                                                    <div
+                                                                                                        className="relative rounded shadow-sm overflow-hidden border border-gray-100 bg-white"
+                                                                                                        style={{ aspectRatio }}
+                                                                                                    >
+                                                                                                        <img
+                                                                                                            src={order.thumbb || images.back}
+                                                                                                            alt="Back"
+                                                                                                            className="w-full h-full object-fill select-none"
+                                                                                                            draggable={false}
+                                                                                                            crossOrigin="anonymous"
+                                                                                                        />
+                                                                                                    </div>
+                                                                                                </div>
+                                                                                            </>
+                                                                                        );
+                                                                                    })()}
                                                                                 </div>
                                                                             )}
                                                                         </div>
@@ -2027,45 +2072,6 @@ export default function ShopPage() {
                         </Card>
 
 
-
-
-                        {/* Status Guide */}
-                        <Card>
-                            <CardHeader>
-                                <CardTitle className="flex items-center gap-2">
-                                    <HelpCircle className="w-5 h-5" />
-                                    {t('statusGuide.title')}
-                                </CardTitle>
-                                <CardDescription>{t('statusGuide.description')}</CardDescription>
-                            </CardHeader>
-                            <CardContent className="space-y-8">
-                                {/* Flow */}
-                                <div className="space-y-4">
-                                    <h3 className="font-bold text-gray-700">{t('statusGuide.flow')}</h3>
-                                    <div className="flex flex-wrap items-center gap-2 text-sm">
-                                        <span className={cn("px-3 py-1 rounded border", statusCss(st("short.una")))}>{st(st("short.una"))}</span> <ArrowRight className="w-4 h-4 text-gray-400" />
-                                        <span className={cn("px-3 py-1 rounded border", statusCss(st("short.lin")))}>{st(st("short.lin"))}</span> <ArrowRight className="w-4 h-4 text-gray-400" />
-                                        <span className={cn("px-3 py-1 rounded border", statusCss(st("short.act")))}>{st(st("short.act"))}</span> <ArrowRight className="w-4 h-4 text-gray-400" />
-                                        <span className={cn("px-3 py-1 rounded border", statusCss(st("short.use")))}>{st(st("short.use"))}</span> <ArrowRight className="w-4 h-4 text-gray-400" />
-                                        <span className={cn("px-3 py-1 rounded border", statusCss(st("short.shi")))}>{st(st("short.shi"))}</span> <ArrowRight className="w-4 h-4 text-gray-400" />
-                                        <span className={cn("px-3 py-1 rounded border", statusCss(st("short.com")))}>{st(st("short.com"))}</span>
-                                    </div>
-                                </div>
-                                {/* List */}
-                                <div className="space-y-4">
-                                    <h3 className="font-bold text-gray-700">{t('statusGuide.list')}</h3>
-                                    <div className="grid gap-4 md:grid-cols-2">
-                                        {
-                                            statusList.map((key, index) => (
-                                                <div key={index} className="space-y-2"><div className="flex items-center gap-2"><span className={cn("px-2 py-1 rounded border text-xs", statusCss(key))}>{st(key)}</span> </div><p className={cn("text-sm text-gray-600 pl-2 border-l-2 bg-white/50", statusCss(key, false, true, false))}>{t('statusGuide.statuses.' + key)}</p></div>
-                                            ))
-                                        }
-                                    </div>
-                                </div>
-                            </CardContent>
-                        </Card>
-
-
                         {/* Column Settings Dialog */}
                         <Dialog open={isColumnSettingsOpen} onOpenChange={setIsColumnSettingsOpen}>
                             <DialogContent className="max-w-md sm:max-w-lg p-0 gap-0 overflow-hidden rounded-2xl">
@@ -2148,6 +2154,45 @@ export default function ShopPage() {
                                 </DialogFooter>
                             </DialogContent>
                         </Dialog>
+
+
+                        {/* Status Guide */}
+                        <Card>
+                            <CardHeader>
+                                <CardTitle className="flex items-center gap-2">
+                                    <HelpCircle className="w-5 h-5" />
+                                    {t('statusGuide.title')}
+                                </CardTitle>
+                                <CardDescription>{t('statusGuide.description')}</CardDescription>
+                            </CardHeader>
+                            <CardContent className="space-y-8">
+                                {/* Flow */}
+                                <div className="space-y-4">
+                                    <h3 className="font-bold text-gray-700">{t('statusGuide.flow')}</h3>
+                                    <div className="flex flex-wrap items-center gap-2 text-sm">
+                                        <span className={cn("px-3 py-1 rounded border", statusCss(st("short.una")))}>{st(st("short.una"))}</span> <ArrowRight className="w-4 h-4 text-gray-400" />
+                                        <span className={cn("px-3 py-1 rounded border", statusCss(st("short.lin")))}>{st(st("short.lin"))}</span> <ArrowRight className="w-4 h-4 text-gray-400" />
+                                        <span className={cn("px-3 py-1 rounded border", statusCss(st("short.act")))}>{st(st("short.act"))}</span> <ArrowRight className="w-4 h-4 text-gray-400" />
+                                        <span className={cn("px-3 py-1 rounded border", statusCss(st("short.use")))}>{st(st("short.use"))}</span> <ArrowRight className="w-4 h-4 text-gray-400" />
+                                        <span className={cn("px-3 py-1 rounded border", statusCss(st("short.shi")))}>{st(st("short.shi"))}</span> <ArrowRight className="w-4 h-4 text-gray-400" />
+                                        <span className={cn("px-3 py-1 rounded border", statusCss(st("short.com")))}>{st(st("short.com"))}</span>
+                                    </div>
+                                </div>
+                                {/* List */}
+                                <div className="space-y-4">
+                                    <h3 className="font-bold text-gray-700">{t('statusGuide.list')}</h3>
+                                    <div className="grid gap-4 md:grid-cols-2">
+                                        {
+                                            statusList.map((key, index) => (
+                                                <div key={index} className="space-y-2"><div className="flex items-center gap-2"><span className={cn("px-2 py-1 rounded border text-xs", statusCss(key))}>{st(key)}</span> </div><p className={cn("text-sm text-gray-600 pl-2 border-l-2 bg-white/50", statusCss(key, false, true, false))}>{t('statusGuide.statuses.' + key)}</p></div>
+                                            ))
+                                        }
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
+
+
                     </div>
                 )}
 
@@ -2158,28 +2203,34 @@ export default function ShopPage() {
                 {/* --- Wrapper for Products --- */}
                 {activeTab === 'products' && (
                     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
+
                         {/* Existing Products */}
                         <Card style={{ maxHeight: 'calc(100vh - 100px)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
                             <CardHeader className="flex flex-row items-center justify-between shrink-0">
                                 <CardTitle>{t('products')}</CardTitle>
                             </CardHeader>
                             <div style={{ flex: '1 1 auto', overflowY: 'auto', minHeight: 0 }} className="p-4 w-full">
-                                <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                                <div className="flex flex-wrap items-start gap-4">
                                     {productsLoading ? (
                                         <div className="col-span-full py-8 flex justify-center"><RefreshCw className="animate-spin h-6 w-6 text-gray-400" /></div>
                                     ) : products.map((product) => (
                                         <Dialog key={product.product_id}>
                                             <DialogTrigger asChild>
-                                                <Card className="overflow-hidden cursor-pointer hover:ring-2 hover:ring-primary/50 transition-all relative aspect-[84/52]">
-                                                    {/* 背景: カードデザイン */}
-                                                    {product.design && (
-                                                        <img
-                                                            src={product.design.thumbf || product.design.bgimgf}
-                                                            alt={product.design.name}
-                                                            className="absolute inset-0 w-full h-full object-cover"
-                                                            crossOrigin="anonymous"
-                                                        />
-                                                    )}
+                                                    <Card
+                                                        className="overflow-hidden cursor-pointer hover:ring-2 hover:ring-primary/50 transition-all relative h-24"
+                                                        style={{ aspectRatio: getDesignAspectRatio(product.design_id, product.design) }}
+                                                    >
+                                                        <div className="absolute inset-0 w-full h-full">
+                                                            {/* 背景: カードデザイン */}
+                                                            {getDesignImages(product.design_id, product.design).front && (
+                                                                <img
+                                                                    src={getDesignImages(product.design_id, product.design).front}
+                                                                    alt={product.design?.name || product.name}
+                                                                    className="absolute inset-0 w-full h-full object-fill select-none"
+                                                                    draggable={false}
+                                                                    crossOrigin="anonymous"
+                                                                />
+                                                            )}
                                                     {/* オーバーレイ */}
                                                     <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
 
@@ -2197,7 +2248,7 @@ export default function ShopPage() {
 
                                                     {/* 商品名と価格 */}
                                                     <div className="absolute bottom-0 left-0 right-0 p-2.5 text-white">
-                                                        <h3 className="font-bold text-xs truncate drop-shadow-lg">{product.name}</h3>
+                                                        <h3 className="font-bold text-xs truncate drop-shadow-lg">{product.name || <span className="opacity-50 italic">(No Name)</span>}</h3>
                                                         {/* <p className="text-[10px] opacity-90 drop-shadow-md">¥{product.price ? Number(product.price).toLocaleString("ja-JP") : "0"}</p> */}
                                                     </div>
 
@@ -2207,6 +2258,7 @@ export default function ShopPage() {
                                                             }`}>
                                                             {product.status}
                                                         </span>
+                                                    </div>
                                                     </div>
                                                 </Card>
                                             </DialogTrigger>
@@ -2253,15 +2305,33 @@ export default function ShopPage() {
                                                                 <div className="flex flex-wrap gap-4 w-full sm:w-auto shrink-0">
                                                                     <div className="flex flex-col gap-1">
                                                                         <p className="text-[10px] text-gray-400 font-bold">{t('productDetails.front')}</p>
-                                                                        <div className="w-full sm:w-48 aspect-[84/52] rounded-md border-2 border-white shadow-sm overflow-hidden bg-white">
-                                                                            <img src={product.design.thumbf} alt={product.design.name} className="w-full h-full object-cover" crossOrigin="anonymous" />
+                                                                        <div
+                                                                            className="w-full sm:w-48 rounded-md border-2 border-white shadow-sm overflow-hidden bg-white"
+                                                                            style={{ aspectRatio: getDesignAspectRatio(product.design_id, product.design) }}
+                                                                        >
+                                                                            <img
+                                                                                src={getDesignImages(product.design_id, product.design).front}
+                                                                                alt={product.design?.name}
+                                                                                className="w-full h-full object-fill select-none"
+                                                                                draggable={false}
+                                                                                crossOrigin="anonymous"
+                                                                            />
                                                                         </div>
                                                                     </div>
                                                                     {product.design.thumbb && (
                                                                         <div className="flex flex-col gap-1">
                                                                             <p className="text-[10px] text-gray-400 font-bold">{t('productDetails.back')}</p>
-                                                                            <div className="w-full sm:w-48 aspect-[84/52] rounded-md border-2 border-white shadow-sm overflow-hidden bg-white">
-                                                                                <img src={product.design.thumbb} alt={product.design.name} className="w-full h-full object-cover" crossOrigin="anonymous" />
+                                                                            <div
+                                                                                className="w-full sm:w-48 rounded-md border-2 border-white shadow-sm overflow-hidden bg-white"
+                                                                                style={{ aspectRatio: getDesignAspectRatio(product.design_id, product.design) }}
+                                                                            >
+                                                                                <img
+                                                                                    src={getDesignImages(product.design_id, product.design).back}
+                                                                                    alt={product.design?.name}
+                                                                                    className="w-full h-full object-fill select-none"
+                                                                                    draggable={false}
+                                                                                    crossOrigin="anonymous"
+                                                                                />
                                                                             </div>
                                                                         </div>
                                                                     )}
@@ -2391,16 +2461,17 @@ export default function ShopPage() {
                                         if (!open) {
                                             setEditingProduct(null);
                                             setIsDuplicateMode(false);
-                                            setSelectedCardDesignId('');
+                                            setSelectedDesignId('');
                                         }
                                     }}>
                                         <DialogTrigger asChild>
                                             <Card
-                                                className="overflow-hidden cursor-pointer hover:ring-2 hover:ring-primary/50 transition-all border-dashed border-2 flex flex-col items-center justify-center min-h-[120px] bg-gray-50/50 hover:bg-gray-50 aspect-[84/52]"
+                                                className="overflow-hidden cursor-pointer hover:ring-2 hover:ring-primary/50 transition-all border-dashed border-2 flex flex-col items-center justify-center h-24 bg-gray-50/50 hover:bg-gray-50"
+                                                style={{ aspectRatio: '84/52' }}
                                                 onClick={() => {
                                                     setEditingProduct(null);
                                                     setIsDuplicateMode(false);
-                                                    setSelectedCardDesignId('');
+                                                    setSelectedDesignId('');
                                                 }}
                                             >
                                                 <div className="flex flex-col items-center gap-1 text-gray-400 group-hover:text-primary">
@@ -2495,24 +2566,25 @@ export default function ShopPage() {
                                                             </span>
                                                         )}
                                                     </div>
-                                                    <div className="grid grid-cols-2 gap-3 max-h-[300px] overflow-y-auto p-1">
+                                                    <div className="flex flex-wrap items-start gap-3 max-h-[300px] overflow-y-auto p-1">
                                                         {shop?.allowed_designs?.map((design: any) => (
-                                                            <div
-                                                                key={`${design.design_id}`}
-                                                                onClick={() => setSelectedCardDesignId(design.design_id)}
-                                                                className={`group relative aspect-[84/52] rounded-lg border-2 overflow-hidden cursor-pointer transition-all hover:shadow-md ${selectedCardDesignId === design.design_id
-                                                                    ? 'border-green-500 ring-2 ring-green-500/20 shadow-lg'
-                                                                    : 'border-gray-100 hover:border-primary/30'
-                                                                    }`}
-                                                            >
-                                                                {/* eslint-disable-next-line @next/next/no-img-element */}
-                                                                <img
-                                                                    src={design.thumbf || design.bgimgf}
-                                                                    alt={design.name}
-                                                                    className="w-full h-full object-cover"
-                                                                    crossOrigin="anonymous"
-                                                                />
-                                                                <div className={`absolute bottom-0 left-0 right-0 bg-black/60 p-1.5 transition-all duration-300 ${selectedCardDesignId === design.design_id ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+                                                                <div
+                                                                    key={`${design.design_id}`}
+                                                                    onClick={() => setSelectedDesignId(design.design_id)}
+                                                                    className={`group relative h-24 rounded-lg border-2 overflow-hidden cursor-pointer transition-all hover:shadow-md ${selectedDesignId === design.design_id
+                                                                        ? 'border-green-500 ring-2 ring-green-500/20 shadow-lg'
+                                                                        : 'border-gray-100 hover:border-primary/30'
+                                                                        }`}
+                                                                    style={{ aspectRatio: `${design.width || 84} / ${design.height || 52}` }}
+                                                                >
+                                                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                                                    <img
+                                                                        src={design.thumbf || design.bgimgf}
+                                                                        alt={design.name}
+                                                                        className="w-full h-full object-fill"
+                                                                        crossOrigin="anonymous"
+                                                                    />
+                                                                <div className={`absolute bottom-0 left-0 right-0 bg-black/60 p-1.5 transition-all duration-300 ${selectedDesignId === design.design_id ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
                                                                     }`}>
                                                                     <p className="text-[10px] text-white truncate text-center font-bold">
                                                                         {design.name}
@@ -2523,7 +2595,7 @@ export default function ShopPage() {
                                                                         </p>
                                                                     )}
                                                                 </div>
-                                                                {selectedCardDesignId === design.design_id && (
+                                                                {selectedDesignId === design.design_id && (
                                                                     <div className="absolute top-0 right-0">
                                                                         <div className="bg-green-500 text-white text-[9px] font-bold px-2 py-0.5 rounded-bl shadow-sm flex items-center gap-1">
                                                                             <Check className="w-2.5 h-2.5" />
@@ -2535,7 +2607,7 @@ export default function ShopPage() {
                                                     </div>
                                                 </div>
 
-                                                <Button type="submit" className="w-full" disabled={isCreatingProduct || !selectedCardDesignId}>
+                                                <Button type="submit" className="w-full" disabled={isCreatingProduct || !selectedDesignId}>
                                                     {isCreatingProduct ? t('linkQr.processing') : (editingProduct ? t('shopSettings.submit') : t('addProduct.submit'))}
                                                 </Button>
                                             </form>
@@ -2544,14 +2616,6 @@ export default function ShopPage() {
                                 </div>
                             </div>
                         </Card>
-
-
-
-
-
-
-
-
 
                     </div>
                 )}
@@ -2563,6 +2627,7 @@ export default function ShopPage() {
                 {/* --- Wrapper for Card Ordering --- */}
                 {activeTab === 'orderCard' && (
                     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
+
                         {/* Product Selection */}
                         <Card>
                             <CardHeader>
@@ -2577,21 +2642,22 @@ export default function ShopPage() {
                                             {t('cardOrder.selectProduct')}
                                         </Label>
                                     </div>
-                                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+                                    <div className="flex flex-wrap items-start gap-4">
                                         {products.filter(p => p.status === 'ACTIVE').map((product) => (
                                             <div
                                                 key={product.product_id}
                                                 onClick={() => setSelectedOrderProduct(product)}
-                                                className={`group relative aspect-[84/52] rounded-xl border-2 overflow-hidden cursor-pointer transition-all hover:shadow-lg ${selectedOrderProduct?.product_id === product.product_id
+                                                className={`group relative h-24 rounded-xl border-2 overflow-hidden cursor-pointer transition-all hover:shadow-lg ${selectedOrderProduct?.product_id === product.product_id
                                                     ? 'border-primary ring-4 ring-primary/10 shadow-xl scale-[1.02]'
                                                     : 'border-gray-100 hover:border-primary/30'
                                                     }`}
+                                                style={{ aspectRatio: (product.design?.width && product.design?.height) ? `${product.design.width} / ${product.design.height}` : (cardformats[product.design_id]?.width && cardformats[product.design_id]?.height) ? `${cardformats[product.design_id].width} / ${cardformats[product.design_id].height}` : '84 / 52' }}
                                             >
-                                                {(product.design || cardformats[product.card_design_id]) && (
+                                                {(product.design || cardformats[product.design_id]) && (
                                                     <img
-                                                        src={product.design?.thumbf || product.design?.bgimgf || cardformats[product.card_design_id]?.bgimgf}
+                                                        src={product.design?.thumbf || product.design?.bgimgf || cardformats[product.design_id]?.bgimgf}
                                                         alt={product.name}
-                                                        className="absolute inset-0 w-full h-full object-cover"
+                                                        className="absolute inset-0 w-full h-full object-fill"
                                                         crossOrigin="anonymous"
                                                     />
                                                 )}
@@ -2653,11 +2719,15 @@ export default function ShopPage() {
                                                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                                                         {/* Front */}
                                                         <div className="space-y-2">
-                                                            <div className="aspect-[84/52] relative rounded-2xl border-4 border-white shadow-2xl overflow-hidden group ring-1 ring-gray-200/50">
-                                                                {(selectedOrderProduct.design || cardformats[selectedOrderProduct.card_design_id]) ? (
+                                                            <div
+                                                                className="relative rounded-2xl border-4 border-white shadow-2xl overflow-hidden group ring-1 ring-gray-200/50"
+                                                                style={{ aspectRatio: (selectedOrderProduct.design?.width && selectedOrderProduct.design?.height) ? `${selectedOrderProduct.design.width} / ${selectedOrderProduct.design.height}` : (cardformats[selectedOrderProduct.design_id]?.width && cardformats[selectedOrderProduct.design_id]?.height) ? `${cardformats[selectedOrderProduct.design_id].width} / ${cardformats[selectedOrderProduct.design_id].height}` : '84 / 52' }}
+                                                            >
+                                                                {(selectedOrderProduct.design || cardformats[selectedOrderProduct.design_id]) ? (
                                                                     <img
-                                                                        src={selectedOrderProduct.design?.thumbf || selectedOrderProduct.design?.bgimgf || cardformats[selectedOrderProduct.card_design_id]?.bgimgf}
-                                                                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                                                                        src={selectedOrderProduct.design?.thumbf || selectedOrderProduct.design?.bgimgf || cardformats[selectedOrderProduct.design_id]?.bgimgf}
+                                                                        className="w-full h-full object-fill select-none transition-transform duration-700 group-hover:scale-105"
+                                                                        draggable={false}
                                                                         crossOrigin="anonymous"
                                                                     />
                                                                 ) : (
@@ -2668,11 +2738,15 @@ export default function ShopPage() {
                                                         </div>
                                                         {/* Back */}
                                                         <div className="space-y-2">
-                                                            <div className="aspect-[84/52] relative rounded-2xl border-4 border-white shadow-2xl overflow-hidden group ring-1 ring-gray-200/50">
-                                                                {(selectedOrderProduct.design || cardformats[selectedOrderProduct.card_design_id]) ? (
+                                                            <div
+                                                                className="relative rounded-2xl border-4 border-white shadow-2xl overflow-hidden group ring-1 ring-gray-200/50"
+                                                                style={{ aspectRatio: (selectedOrderProduct.design?.width && selectedOrderProduct.design?.height) ? `${selectedOrderProduct.design.width} / ${selectedOrderProduct.design.height}` : (cardformats[selectedOrderProduct.design_id]?.width && cardformats[selectedOrderProduct.design_id]?.height) ? `${cardformats[selectedOrderProduct.design_id].width} / ${cardformats[selectedOrderProduct.design_id].height}` : '84 / 52' }}
+                                                            >
+                                                                {(selectedOrderProduct.design || cardformats[selectedOrderProduct.design_id]) ? (
                                                                     <img
-                                                                        src={selectedOrderProduct.design?.thumbb || selectedOrderProduct.design?.bgimgb || cardformats[selectedOrderProduct.card_design_id]?.bgimgb}
-                                                                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                                                                        src={selectedOrderProduct.design?.thumbb || selectedOrderProduct.design?.bgimgb || cardformats[selectedOrderProduct.design_id]?.bgimgb}
+                                                                        className="w-full h-full object-fill select-none transition-transform duration-700 group-hover:scale-105"
+                                                                        draggable={false}
                                                                         crossOrigin="anonymous"
                                                                     />
                                                                 ) : (
@@ -2757,12 +2831,16 @@ export default function ShopPage() {
 
                                                             )}
                                                             <div className="flex flex-col items-center p-4 border rounded-xl border-dashed border-gray-300 border-2 mb-2">
-                                                                <div className="w-full max-w-[300px] aspect-[84/52] relative rounded-xl border shadow-2xl overflow-hidden ring-4 ring-primary/5">
-                                                                    {(selectedOrderProduct.design || cardformats[selectedOrderProduct.card_design_id]) ? (
+                                                                <div
+                                                                    className="w-full max-w-[300px] relative rounded-xl border shadow-2xl overflow-hidden ring-4 ring-primary/5"
+                                                                    style={{ aspectRatio: getDesignAspectRatio(selectedOrderProduct.design_id, selectedOrderProduct.design) }}
+                                                                >
+                                                                    {getDesignImages(selectedOrderProduct.design_id, selectedOrderProduct.design).front ? (
                                                                         <img
-                                                                            src={selectedOrderProduct.design?.thumbf || selectedOrderProduct.design?.bgimgf || cardformats[selectedOrderProduct.card_design_id]?.bgimgf}
+                                                                            src={getDesignImages(selectedOrderProduct.design_id, selectedOrderProduct.design).front}
                                                                             alt="Confirm Preview"
-                                                                            className="w-full h-full object-cover"
+                                                                            className="w-full h-full object-fill select-none"
+                                                                            draggable={false}
                                                                             crossOrigin="anonymous"
                                                                         />
                                                                     ) : (
@@ -2773,12 +2851,16 @@ export default function ShopPage() {
 
                                                                 </div>
                                                                 <div className="text-xs text-gray-500 mt-1 mb-4">{t('cardOrder.card front')}</div>
-                                                                <div className="w-full max-w-[300px] aspect-[84/52] relative rounded-xl border shadow-2xl overflow-hidden ring-4 ring-primary/5">
-                                                                    {(selectedOrderProduct.design || cardformats[selectedOrderProduct.card_design_id]) ? (
+                                                                <div
+                                                                    className="w-full max-w-[300px] relative rounded-xl border shadow-2xl overflow-hidden ring-4 ring-primary/5"
+                                                                    style={{ aspectRatio: getDesignAspectRatio(selectedOrderProduct.design_id, selectedOrderProduct.design) }}
+                                                                >
+                                                                    {getDesignImages(selectedOrderProduct.design_id, selectedOrderProduct.design).back ? (
                                                                         <img
-                                                                            src={selectedOrderProduct.design?.thumbb || selectedOrderProduct.design?.bgimgb || cardformats[selectedOrderProduct.card_design_id]?.bgimgb}
+                                                                            src={getDesignImages(selectedOrderProduct.design_id, selectedOrderProduct.design).back}
                                                                             alt="Confirm Preview"
-                                                                            className="w-full h-full object-cover"
+                                                                            className="w-full h-full object-fill select-none"
+                                                                            draggable={false}
                                                                             crossOrigin="anonymous"
                                                                         />
                                                                     ) : (
@@ -2905,6 +2987,7 @@ export default function ShopPage() {
                                 </div>
                             </CardContent>
                         </Card>
+
                     </div>
                 )}
 

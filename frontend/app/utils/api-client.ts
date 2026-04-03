@@ -20,8 +20,8 @@ export async function fetchWithAuth(path: string, options: RequestInit = {}) {
 
         const headers = {
             ...options.headers,
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
+            'authorization': `Bearer ${token}`,
+            'content-type': 'application/json',
         };
 
         const response = await fetch(`${NEXT_PUBLIC_API_URL}${path}`, {
