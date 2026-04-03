@@ -313,6 +313,7 @@
     },
     "addProduct": {
       "title": "商品追加",
+      "dialogDesc": "新しい商品を登録します。",
       "name": "商品名",
       "description": "説明",
       "detailHtml": "詳細(HTML)",
@@ -332,6 +333,7 @@
     },
     "editProduct": {
       "title": "商品編集",
+      "dialogDesc": "商品の詳細情報を編集します。",
       "ifChange": "変更する場合のみ",
       "beforeImage": "変更前の画像",
       "success": "更新しました！",

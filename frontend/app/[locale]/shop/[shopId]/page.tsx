@@ -30,6 +30,527 @@ import { cn } from '@/lib/utils';
 
 const NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
+// --- Table Configuration ---
+const ORDER_COL_GROUPS_FN = (t: any, ts: any) => [
+    {
+        title: '基本情報',
+        columns: [
+            { key: 'ts_updated_at', label: t('orders.date'), icon: <RefreshCw className="w-3.5 h-3.5" /> },
+            { key: 'ts_created_at', label: ts('ts_created_at'), icon: <Plus className="w-3.5 h-3.5" /> },
+            { key: 'qr_id', label: t('orders.qrId'), icon: <QrCode className="w-3.5 h-3.5" /> },
+            { key: 'product_id', label: t('orders.productName'), icon: <Package className="w-3.5 h-3.5" /> },
+            { key: 'status', label: t('orders.status'), icon: <SlidersHorizontal className="w-3.5 h-3.5" /> },
+        ]
+    },
+    {
+        title: 'お届け先情報',
+        columns: [
+            { key: 'recipient_name', label: t('orders.recipient'), icon: <User className="w-3.5 h-3.5" /> },
+            { key: 'address', label: t('orders.address'), icon: <Truck className="w-3.5 h-3.5" /> },
+            { key: 'preferred_date', label: t('orders.preferredDateTime'), icon: <Clock className="w-3.5 h-3.5" /> },
+        ]
+    },
+    {
+        title: 'メモ・メッセージ',
+        columns: [
+            { key: 'memo_for_shop', label: t('orders.shopMemo'), icon: <Pencil className="w-3.5 h-3.5" /> },
+            { key: 'memo_for_users', label: t('orders.userMessage'), icon: <MessageCircleWarning className="w-3.5 h-3.5" /> },
+        ]
+    }
+];
+
+function OrderRow({
+    order,
+    products,
+    visibleOrderColumns,
+    ORDER_COL_OPTIONS,
+    getOrderCellContent,
+    statusCss,
+    st,
+    t,
+    ts,
+    tt,
+    copiedId,
+    handleCopy,
+    handleUpdateOrderMeta,
+    shippingOrderId,
+    getDesignAspectRatio,
+    getDesignImages,
+    cardformats
+}: any) {
+    const [open, setOpen] = useState(false);
+    const product = products.find((p: any) => p.product_id === order.product_id);
+    const qrId = order.id || order.qr_id?.replace('QR#', '');
+
+    return (
+        <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger asChild>
+                <TableRow className="cursor-pointer hover:bg-gray-100">
+                    {ORDER_COL_OPTIONS.filter((col: any) => visibleOrderColumns.includes(col.key)).map((col: any) => (
+                        <TableCell key={col.key} className="text-xs md:text-sm">
+                            {getOrderCellContent(order, col.key)}
+                        </TableCell>
+                    ))}
+                </TableRow>
+            </DialogTrigger>
+            <DialogContent className="max-w-md">
+                {open && order && (
+                    <>
+                        <DialogHeader>
+                            <DialogTitle>{t('orders.details')}</DialogTitle>
+                            <DialogDescription className="font-mono text-xs text-gray-500 flex items-center gap-2">
+                                ID: {qrId}
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-6 w-6"
+                                    onClick={(e) => { e.stopPropagation(); handleCopy(qrId); }}
+                                >
+                                    {copiedId === qrId ? (
+                                        <Check className="h-3 w-3 text-green-500" />
+                                    ) : (
+                                        <Copy className="h-3 w-3" />
+                                    )}
+                                </Button>
+                            </DialogDescription>
+                        </DialogHeader>
+
+                        <div className="space-y-4 py-4 max-h-[70vh] overflow-y-auto p-2">
+                            {/* Product Info */}
+                            <div>
+                                <h4 className="text-sm font-semibold text-gray-500">{t('orders.productName')}</h4>
+                                <p className="font-medium">{product?.name || order?.product_id || '-'}</p>
+                            </div>
+
+                            {/* Status */}
+                            <div>
+                                <h4 className="text-sm font-semibold text-gray-500">{t('orders.status')}</h4>
+                                <span className={`px-2 py-1 rounded text-xs border ${statusCss(order?.status?.toLowerCase() || '')}`}>{st(order?.status?.toLowerCase() || 'pending')}</span>
+                            </div>
+
+                            {/* Card Preview */}
+                            {order?.design_id && (
+                                <div className="space-y-2">
+                                    <h4 className="text-sm font-semibold text-gray-500">{t('linkQr.cardDesign')}</h4>
+                                    {(order?.thumbf || order?.thumbb || cardformats[order.design_id]) && (
+                                        <div className="grid grid-cols-2 gap-2">
+                                            {(() => {
+                                                const aspectRatio = getDesignAspectRatio(order.design_id, product?.design);
+                                                const images = getDesignImages(order.design_id, product?.design);
+                                                return (
+                                                    <>
+                                                        <div className="space-y-1">
+                                                            <div
+                                                                className="relative rounded shadow-sm overflow-hidden border border-gray-100 bg-white"
+                                                                style={{ aspectRatio }}
+                                                            >
+                                                                <img
+                                                                    src={order?.thumbf || images.front}
+                                                                    alt="Front"
+                                                                    className="w-full h-full object-fill select-none"
+                                                                    draggable={false}
+                                                                    crossOrigin="anonymous"
+                                                                />
+                                                            </div>
+                                                        </div>
+                                                        <div className="space-y-1">
+                                                            <div
+                                                                className="relative rounded shadow-sm overflow-hidden border border-gray-100 bg-white"
+                                                                style={{ aspectRatio }}
+                                                            >
+                                                                <img
+                                                                    src={order?.thumbb || images.back}
+                                                                    alt="Back"
+                                                                    className="w-full h-full object-fill select-none"
+                                                                    draggable={false}
+                                                                    crossOrigin="anonymous"
+                                                                />
+                                                            </div>
+                                                        </div>
+                                                    </>
+                                                );
+                                            })()}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* Recipient Info */}
+                            <div>
+                                <h4 className="text-sm font-semibold text-gray-500">{t('orders.recipient')}</h4>
+                                <p>{order?.recipient_name || '-'}</p>
+                            </div>
+                            <div>
+                                <h4 className="text-sm font-semibold text-gray-500">{t('orders.contact')}</h4>
+                                <p className="break-all">{order?.shipping_info?.email || '-'}</p>
+                                <p className="text-sm mt-1">{order?.shipping_info?.phone || '-'}</p>
+                            </div>
+
+                            <div>
+                                <h4 className="text-sm font-semibold text-gray-500">{t('orders.address')}</h4>
+                                {order?.postal_code && <p className="text-sm">〒{order.postal_code}</p>}
+                                <p className="whitespace-pre-wrap text-sm">{order?.address || '-'}</p>
+                            </div>
+
+                            <div>
+                                <h4 className="text-sm font-semibold text-gray-500">{t('orders.preferredDateTime')}</h4>
+                                <p className="text-sm">{order?.preferred_date ? order.preferred_date : '-'}  /  {order?.preferred_time ? tt(order.preferred_time) : '-'}</p>
+                            </div>
+
+                            {/* Shipping Action Section */}
+                            {order?.status === 'USED' && (
+                                <div className="mt-4 p-4 border-2 border-orange-200 rounded-xl bg-orange-50/50 shadow-sm">
+                                    <div className="flex items-center gap-2 mb-4">
+                                        <div className="w-2.5 h-2.5 rounded-full bg-orange-500 animate-pulse shadow-[0_0_8px_rgba(249,115,22,0.6)]" />
+                                        <h4 className="text-sm font-bold text-orange-900 uppercase tracking-wide">{t('orders.action')}</h4>
+                                    </div>
+                                    <form onSubmit={(e) => {
+                                        e.preventDefault();
+                                        const fd = new FormData(e.target as HTMLFormElement);
+                                        handleUpdateOrderMeta(
+                                            qrId,
+                                            fd.get('delivery_company') as string,
+                                            fd.get('tracking') as string
+                                        );
+                                    }} className="space-y-4">
+                                        <div className="space-y-2">
+                                            <Label htmlFor={`delivery_company-${qrId}`} className="text-orange-900/70">{t('orders.shipDialog.deliveryCompany')}</Label>
+                                            <Input id={`delivery_company-${qrId}`} name="delivery_company" placeholder={t('orders.shipDialog.deliveryCompanyPlaceholder')} required className="bg-white border-orange-100 focus:border-orange-500 focus:ring-orange-500" />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label htmlFor={`tracking-${qrId}`} className="text-orange-900/70">{t('orders.shipDialog.label')}</Label>
+                                            <Input id={`tracking-${qrId}`} name="tracking" placeholder="1234-5678..." required className="bg-white border-orange-100 focus:border-orange-500 focus:ring-orange-500" />
+                                        </div>
+
+                                        <Button type="submit" className="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold h-10 shadow-md transition-all active:scale-[0.98]" disabled={shippingOrderId === qrId}>
+                                            {shippingOrderId === qrId ? (
+                                                <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> {t('linkQr.processing')}</>
+                                            ) : (
+                                                t('orders.shipDialog.submit')
+                                            )}
+
+                                        </Button>
+                                    </form>
+                                </div>
+                            )}
+
+                            {/* Admin Meta Edit Section */}
+                            <div className="pt-6 border-t border-dashed mt-6">
+                                <h4 className="text-sm font-bold text-gray-900 mb-4 flex items-center gap-2">
+                                    <Pencil className="w-4 h-4 text-gray-400" />
+                                    {t('orders.updateMeta')}
+                                </h4>
+                                <form onSubmit={async (e) => {
+                                    e.preventDefault();
+                                    const fd = new FormData(e.currentTarget);
+                                    await handleUpdateOrderMeta(
+                                        qrId,
+                                        undefined,
+                                        undefined,
+                                        fd.get('memo_for_users') as string,
+                                        fd.get('memo_for_shop') as string
+                                    );
+                                }} className="space-y-4">
+                                    <div className="space-y-2">
+                                        <Label htmlFor={`m_u-${qrId}`} className="text-xs text-gray-500">{t('orders.userMessage')}</Label>
+                                        <Textarea
+                                            id={`m_u-${qrId}`}
+                                            name="memo_for_users"
+                                            defaultValue={order?.memo_for_users || ""}
+                                            disabled={['COMPLETED', 'EXPIRED', 'BANNED'].includes(order?.status || '')}
+                                            placeholder={['COMPLETED', 'EXPIRED', 'BANNED'].includes(order?.status || '') ? t('orders.shipDialog.Completed-state messages cannot be updated') : ""}
+                                            className="text-sm min-h-[60px]"
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor={`m_s-${qrId}`} className="text-xs text-gray-500">{t('orders.shopMemo')}</Label>
+                                        <Textarea
+                                            id={`m_s-${qrId}`}
+                                            name="memo_for_shop"
+                                            defaultValue={order?.memo_for_shop || ""}
+                                            className="text-sm min-h-[60px]"
+                                        />
+                                    </div>
+                                    <Button
+                                        type="submit"
+                                        className="w-full"
+                                        disabled={shippingOrderId === qrId}
+                                    >
+                                        {shippingOrderId === qrId ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}
+                                        {shippingOrderId === qrId ? t('orders.processing') : t('shopSettings.submit')}
+                                    </Button>
+                                </form>
+                            </div>
+
+                            <div className="">
+                                <div>
+                                    <h4 className="text-sm font-semibold text-gray-500">{t('orders.timestamps')}</h4>
+                                    <p className="text-sm">{ts('ts_updated_at') + ": " + (order?.ts_updated_at ? new Date(order.ts_updated_at).toLocaleString() : "-")}</p>
+                                    <p className="text-sm">{ts('ts_linked_at') + ": " + (order?.ts_linked_at ? new Date(order.ts_linked_at).toLocaleString() : "-")}</p>
+                                    <p className="text-sm">{ts('ts_activated_at') + ": " + (order?.ts_activated_at ? new Date(order.ts_activated_at).toLocaleString() : "-")}</p>
+                                    <p className="text-sm">{ts('ts_submitted_at') + ": " + (order?.ts_submitted_at ? new Date(order.ts_submitted_at).toLocaleString() : "-")}</p>
+                                    <p className="text-sm">{ts('ts_shipped_at') + ": " + (order?.ts_shipped_at ? new Date(order.ts_shipped_at).toLocaleString() : "-")}</p>
+                                    <p className="text-sm">{ts('ts_completed_at') + ": " + (order?.ts_completed_at ? new Date(order.ts_completed_at).toLocaleString() : "-")}</p>
+                                    <p className="text-sm">{ts('ts_expired_at') + ": " + (order?.ts_expired_at ? new Date(order.ts_expired_at).toLocaleString() : "-")}</p>
+                                    <p className="text-sm">{ts('ts_banned_at') + ": " + (order?.ts_banned_at ? new Date(order.ts_banned_at).toLocaleString() : "-")}</p>
+                                </div>
+                            </div>
+                        </div>
+                    </>
+                )}
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+function ProductCard({
+    product,
+    t,
+    tc,
+    st,
+    tr,
+    getDesignAspectRatio,
+    getDesignImages,
+    debouncedPreviewHtml,
+    copiedId,
+    handleCopy,
+    handleToggleStatus,
+    togglingProductId,
+    handleOpenDuplicateDialog,
+    handleOpenEditDialog,
+    handleDeleteProduct,
+    deletingProductId,
+    APP_CONFIG
+}: any) {
+    const [open, setOpen] = useState(false);
+
+    return (
+        <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger asChild>
+                <Card
+                    className="overflow-hidden cursor-pointer hover:ring-2 hover:ring-primary/50 transition-all relative h-24"
+                    style={{ aspectRatio: getDesignAspectRatio(product?.design_id, product?.design) }}
+                >
+                    <div className="absolute inset-0 w-full h-full">
+                        {/* 背景: カードデザイン */}
+                        {getDesignImages(product?.design_id, product?.design).front && (
+                            <img
+                                src={getDesignImages(product?.design_id, product?.design).front}
+                                alt={product?.design?.name || product?.name || ''}
+                                className="absolute inset-0 w-full h-full object-fill select-none"
+                                draggable={false}
+                                crossOrigin="anonymous"
+                            />
+                        )}
+                        {/* オーバーレイ */}
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+
+                        {/* 商品画像 (小) */}
+                        {product?.image_url && (
+                            <div className="absolute bottom-2 right-2 w-10 h-10 rounded-md overflow-hidden border border-white/50 shadow-md bg-white">
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img
+                                    src={product.image_url}
+                                    alt={product.name}
+                                    className="w-full h-full object-cover"
+                                />
+                            </div>
+                        )}
+
+                        {/* 商品名と価格 */}
+                        <div className="absolute bottom-0 left-0 right-0 p-2.5 text-white">
+                            <h3 className="font-bold text-xs truncate drop-shadow-lg">{product?.name || <span className="opacity-50 italic">(No Name)</span>}</h3>
+                        </div>
+
+                        {/* ステータスバッジ */}
+                        <div className="absolute top-2 left-2 flex gap-1">
+                            <span className={`px-1.5 py-0.5 rounded text-[8px] font-bold backdrop-blur-sm ${product?.status === 'ACTIVE' ? 'bg-green-500/80 text-white' : 'bg-red-500/80 text-white'
+                                }`}>
+                                {product?.status || 'UNKNOWN'}
+                            </span>
+                        </div>
+                    </div>
+                </Card>
+            </DialogTrigger>
+            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                {open && product && (
+                    <>
+                        <DialogHeader>
+                            <DialogTitle>{t('productDetails.title')}</DialogTitle>
+                            <DialogDescription>
+                                {product.description || "-"}
+                            </DialogDescription>
+                        </DialogHeader>
+                        <div className="space-y-6 py-4">
+                            {product.image_url && (
+                                <div className="aspect-[16/9] w-full relative rounded-lg overflow-hidden border">
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                    <img src={product.image_url} alt={product.name} className="w-full h-full object-cover" />
+                                </div>
+                            )}
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="space-y-1">
+                                    <p className="text-xs text-gray-500 font-medium">{t('productDetails.name')}</p>
+                                    <p className="font-bold text-lg">{product.name || '-'}</p>
+                                </div>
+                                <div className="space-y-1 col-span-2">
+                                    <p className="text-xs text-gray-500 font-medium">{t('productDetails.description')}</p>
+                                    <p className="text-sm text-gray-700 whitespace-pre-wrap">{product.description || '-'}</p>
+                                </div>
+                                <div className="space-y-1">
+                                    <p className="text-xs text-gray-500 font-medium">{t('productDetails.price')}</p>
+                                    <p className="font-bold text-lg text-emerald-600">¥{Number(product.price || 0).toLocaleString()}</p>
+                                </div>
+                                <div className="space-y-1">
+                                    <p className="text-xs text-gray-500 font-medium">{t('productDetails.validDays')}</p>
+                                    <p className="font-medium">{product.valid_days || APP_CONFIG.DEFAULT_VALID_DAYS} {t('productDetails.validDaysSuffix')}</p>
+                                </div>
+                            </div>
+
+                            {product.design && (
+                                <div className="space-y-3 p-4 bg-gray-50 rounded-lg border border-gray-100">
+                                    <div className="text-xs text-gray-500 font-bold flex items-center gap-2">
+                                        <div className="w-1 h-3 bg-primary rounded-full" />
+                                        {t('addProduct.cardDesign')}
+                                    </div>
+                                    <div className="flex-1 space-y-1 py-1">
+                                        <p className="font-bold text-gray-900">{product.design.name || '-'}</p>
+                                        <p className="text-xs text-gray-500">{product.design.description || ''}</p>
+                                    </div>
+                                    <div className="flex flex-col sm:flex-row gap-4">
+                                        <div className="flex flex-wrap gap-4 w-full sm:w-auto shrink-0">
+                                            <div className="flex flex-col gap-1">
+                                                <p className="text-[10px] text-gray-400 font-bold">{t('productDetails.front')}</p>
+                                                <div
+                                                    className="w-full sm:w-48 rounded-md border-2 border-white shadow-sm overflow-hidden bg-white"
+                                                    style={{ aspectRatio: getDesignAspectRatio(product.design_id, product.design) }}
+                                                >
+                                                    <img
+                                                        src={getDesignImages(product.design_id, product.design).front}
+                                                        alt={product.design?.name || ''}
+                                                        className="w-full h-full object-fill select-none"
+                                                        draggable={false}
+                                                        crossOrigin="anonymous"
+                                                    />
+                                                </div>
+                                            </div>
+                                            {getDesignImages(product.design_id, product.design).back && (
+                                                <div className="flex flex-col gap-1">
+                                                    <p className="text-[10px] text-gray-400 font-bold">{t('productDetails.back')}</p>
+                                                    <div
+                                                        className="w-full sm:w-48 rounded-md border-2 border-white shadow-sm overflow-hidden bg-white"
+                                                        style={{ aspectRatio: getDesignAspectRatio(product.design_id, product.design) }}
+                                                    >
+                                                        <img
+                                                            src={getDesignImages(product.design_id, product.design).back}
+                                                            alt={product.design?.name || ''}
+                                                            className="w-full h-full object-fill select-none"
+                                                            draggable={false}
+                                                            crossOrigin="anonymous"
+                                                        />
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {product.detail_html && (
+                                <div className="w-full space-y-4 pt-4 border-t">
+                                    <div className="w-full space-y-2">
+                                        <p className="w-full text-xs text-gray-500 font-medium">{t('productDetails.detailHtml')}</p>
+                                        <div className="w-full border rounded-md p-4 bg-white shadow-sm overflow-hidden">
+                                            <CardContent className="min-h-0 flex flex-1 p-0 w-full">
+                                                <div className="w-full mt-0 mr-0 ml-0 p-0 relative">
+                                                    <SandboxedHtml html={product.detail_html} />
+                                                </div>
+                                            </CardContent>
+                                        </div>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <p className="text-xs text-gray-500 font-medium">{t('productDetails.rawDetailHtml')}</p>
+                                        <textarea
+                                            readOnly
+                                            value={product.detail_html}
+                                            className="w-full h-32 p-3 text-xs font-mono bg-gray-50 border rounded-md focus:outline-none focus:ring-1 focus:ring-primary/20"
+                                        />
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                        <div className="mt-8 pt-6 border-t border-dashed border-gray-100">
+                            <div className="flex flex-col gap-1">
+                                <div className="flex items-center gap-1">
+                                    <p className="text-[9px] font-mono text-gray-400">Product ID: {product.product_id}</p>
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-3 w-3 text-gray-400 hover:text-gray-600"
+                                        onClick={() => handleCopy(product.product_id)}
+                                    >
+                                        {copiedId === product.product_id ? (
+                                            <Check className="h-2 w-2 text-green-500" />
+                                        ) : (
+                                            <Copy className="h-2 w-2" />
+                                        )}
+                                    </Button>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                    <p className="text-[9px] font-mono text-gray-400">Design ID: {product.design?.design_id}</p>
+                                    {product.design?.design_id && (
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-3 w-3 text-gray-400 hover:text-gray-600"
+                                            onClick={() => handleCopy(product.design.design_id)}
+                                        >
+                                            {copiedId === product.design.design_id ? (
+                                                <Check className="h-2 w-2 text-green-500" />
+                                            ) : (
+                                                <Copy className="h-2 w-2" />
+                                            )}
+                                        </Button>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                        <DialogFooter className="mt-6">
+                            <div className="flex w-full items-center justify-between">
+                                <div className="flex gap-2">
+                                    <Button variant="outline" size="sm" onClick={() => handleToggleStatus(product.product_id, product.status)} disabled={togglingProductId === product.product_id}>
+                                        {togglingProductId === product.product_id ? t('linkQr.processing') : (product.status === 'ACTIVE' ? t('product.stop') : t('product.activate'))}
+                                    </Button>
+                                    <Button variant="outline" size="sm" onClick={() => handleOpenDuplicateDialog(product)}>
+                                        <Copy className="w-4 h-4 mr-1" />
+                                        {t('productDetails.duplicate')}
+                                    </Button>
+                                    <Button variant="outline" size="sm" onClick={() => handleOpenEditDialog(product)}>
+                                        <Pencil className="w-4 h-4 mr-1" />
+                                        {t('productDetails.edit')}
+                                    </Button>
+                                    {product.status !== 'ACTIVE' && (
+                                        <Button variant="destructive" size="sm" onClick={() => handleDeleteProduct(product.product_id, product.name)} disabled={deletingProductId === product.product_id}>
+                                            {deletingProductId === product.product_id ? t('linkQr.processing') : t('product.delete')}
+                                        </Button>
+                                    )}
+                                </div>
+                                <DialogTrigger asChild>
+                                    <Button variant="outline" size="sm" className="px-4">{t('productDetails.close')}</Button>
+                                </DialogTrigger>
+                            </div>
+                        </DialogFooter>
+                    </>
+                )}
+            </DialogContent>
+        </Dialog>
+    );
+}
+
 // --- Effects ---
 export default function ShopPage() {
     const t = useTranslations('ShopPage');
@@ -77,34 +598,7 @@ export default function ShopPage() {
     const [visibleOrderColumns, setVisibleOrderColumns] = useState<string[]>(['ts_updated_at', 'product_id', 'status', 'memo_for_shop']);
     const [isColumnSettingsOpen, setIsColumnSettingsOpen] = useState(false);
 
-    const ORDER_COL_GROUPS = [
-        {
-            title: '基本情報',
-            columns: [
-                { key: 'ts_updated_at', label: t('orders.date'), icon: <RefreshCw className="w-3.5 h-3.5" /> },
-                { key: 'ts_created_at', label: ts('ts_created_at'), icon: <Plus className="w-3.5 h-3.5" /> },
-                { key: 'qr_id', label: t('orders.qrId'), icon: <QrCode className="w-3.5 h-3.5" /> },
-                { key: 'product_id', label: t('orders.productName'), icon: <Package className="w-3.5 h-3.5" /> },
-                { key: 'status', label: t('orders.status'), icon: <SlidersHorizontal className="w-3.5 h-3.5" /> },
-            ]
-        },
-        {
-            title: 'お届け先情報',
-            columns: [
-                { key: 'recipient_name', label: t('orders.recipient'), icon: <User className="w-3.5 h-3.5" /> },
-                { key: 'address', label: t('orders.address'), icon: <Truck className="w-3.5 h-3.5" /> },
-                { key: 'preferred_date', label: t('orders.preferredDateTime'), icon: <Clock className="w-3.5 h-3.5" /> },
-            ]
-        },
-        {
-            title: 'メモ・メッセージ',
-            columns: [
-                { key: 'memo_for_shop', label: t('orders.shopMemo'), icon: <Pencil className="w-3.5 h-3.5" /> },
-                { key: 'memo_for_users', label: t('orders.userMessage'), icon: <MessageCircleWarning className="w-3.5 h-3.5" /> },
-            ]
-        }
-    ];
-
+    const ORDER_COL_GROUPS = ORDER_COL_GROUPS_FN(t, ts);
     const ORDER_COL_OPTIONS = ORDER_COL_GROUPS.flatMap(g => g.columns);
 
     const handleOrderSort = (key: string) => {
@@ -183,12 +677,12 @@ export default function ShopPage() {
         let f = designObj?.thumbf || designObj?.bgimgf || '';
         let b = designObj?.thumbb || designObj?.bgimgb || '';
         if (!f && designId && shop?.allowed_designs) {
-           const custom = shop.allowed_designs.find((d: any) => d.design_id === designId);
-           if (custom) { f = custom.thumbf || custom.bgimgf || ''; b = custom.thumbb || custom.bgimgb || ''; }
+            const custom = shop.allowed_designs.find((d: any) => d.design_id === designId);
+            if (custom) { f = custom.thumbf || custom.bgimgf || ''; b = custom.thumbb || custom.bgimgb || ''; }
         }
         if (!f && designId && cardformats[designId]) {
-           f = cardformats[designId].thumbf || cardformats[designId].bgimgf || '';
-           b = cardformats[designId].thumbb || cardformats[designId].bgimgb || '';
+            f = cardformats[designId].thumbf || cardformats[designId].bgimgf || '';
+            b = cardformats[designId].thumbb || cardformats[designId].bgimgb || '';
         }
         return { front: f, back: b };
     };
@@ -1837,235 +2331,31 @@ export default function ShopPage() {
                                                     if (valA > valB) return direction === 'asc' ? 1 : -1;
                                                     return 0;
                                                 })
-                                                .map((order: any) => {
-                                                    const product = products.find(p => p.product_id === order.product_id);
-                                                    const qrId = order.id || order.qr_id.replace('QR#', '');
+                                                .map((order: any) => (
 
-                                                    return (
-                                                        <Dialog key={order.qr_id}>
-                                                            <DialogTrigger asChild>
-                                                                <TableRow className="cursor-pointer hover:bg-gray-100">
-                                                                    {ORDER_COL_OPTIONS.filter(col => visibleOrderColumns.includes(col.key)).map(col => (
-                                                                        <TableCell key={col.key} className="text-xs md:text-sm">
-                                                                            {getOrderCellContent(order, col.key)}
-                                                                        </TableCell>
-                                                                    ))}
-                                                                </TableRow>
-                                                            </DialogTrigger>
-                                                            <DialogContent className="max-w-md">
-                                                                <DialogHeader>
-                                                                    <DialogTitle>{t('orders.details')}</DialogTitle>
-                                                                    <DialogDescription className="font-mono text-xs text-gray-500 flex items-center gap-2">
-                                                                        ID: {qrId}
-                                                                        <Button
-                                                                            type="button"
-                                                                            variant="ghost"
-                                                                            size="icon"
-                                                                            className="h-6 w-6"
-                                                                            onClick={(e) => { e.stopPropagation(); handleCopy(qrId); }}
-                                                                        >
-                                                                            {copiedId === qrId ? (
-                                                                                <Check className="h-3 w-3 text-green-500" />
-                                                                            ) : (
-                                                                                <Copy className="h-3 w-3" />
-                                                                            )}
-                                                                        </Button>
-                                                                    </DialogDescription>
-                                                                </DialogHeader>
-
-                                                                <div className="space-y-4 py-4 max-h-[70vh] overflow-y-auto p-2">
-                                                                    {/* Product Info */}
-                                                                    <div>
-                                                                        <h4 className="text-sm font-semibold text-gray-500">{t('orders.productName')}</h4>
-                                                                        <p className="font-medium">{product?.name || order.product_id}</p>
-                                                                    </div>
-
-                                                                    {/* Status */}
-                                                                    <div>
-                                                                        <h4 className="text-sm font-semibold text-gray-500">{t('orders.status')}</h4>
-                                                                        <span className={`px-2 py-1 rounded text-xs border ${statusCss(order.status.toLowerCase())}`}>{st(order.status.toLowerCase())}</span>
-                                                                    </div>
-
-                                                                    {/* Card Preview */}
-                                                                    {order.design_id && (
-                                                                        <div className="space-y-2">
-                                                                            <h4 className="text-sm font-semibold text-gray-500">{t('linkQr.cardDesign')}</h4>
-                                                                            {(order.thumbf || order.thumbb || cardformats[order.design_id]) && (
-                                                                                <div className="grid grid-cols-2 gap-2">
-                                                                                    {(() => {
-                                                                                        const product = products.find(p => p.product_id === order.product_id);
-                                                                                        const aspectRatio = getDesignAspectRatio(order.design_id, product?.design);
-                                                                                        const images = getDesignImages(order.design_id, product?.design);
-                                                                                        return (
-                                                                                            <>
-                                                                                                <div className="space-y-1">
-                                                                                                    <div
-                                                                                                        className="relative rounded shadow-sm overflow-hidden border border-gray-100 bg-white"
-                                                                                                        style={{ aspectRatio }}
-                                                                                                    >
-                                                                                                        <img
-                                                                                                            src={order.thumbf || images.front}
-                                                                                                            alt="Front"
-                                                                                                            className="w-full h-full object-fill select-none"
-                                                                                                            draggable={false}
-                                                                                                            crossOrigin="anonymous"
-                                                                                                        />
-                                                                                                    </div>
-                                                                                                </div>
-                                                                                                <div className="space-y-1">
-                                                                                                    <div
-                                                                                                        className="relative rounded shadow-sm overflow-hidden border border-gray-100 bg-white"
-                                                                                                        style={{ aspectRatio }}
-                                                                                                    >
-                                                                                                        <img
-                                                                                                            src={order.thumbb || images.back}
-                                                                                                            alt="Back"
-                                                                                                            className="w-full h-full object-fill select-none"
-                                                                                                            draggable={false}
-                                                                                                            crossOrigin="anonymous"
-                                                                                                        />
-                                                                                                    </div>
-                                                                                                </div>
-                                                                                            </>
-                                                                                        );
-                                                                                    })()}
-                                                                                </div>
-                                                                            )}
-                                                                        </div>
-                                                                    )}
-
-                                                                    {/* Recipient Info */}
-                                                                    <div>
-                                                                        <h4 className="text-sm font-semibold text-gray-500">{t('orders.recipient')}</h4>
-                                                                        <p>{order.recipient_name}</p>
-                                                                    </div>
-                                                                    <div>
-                                                                        <h4 className="text-sm font-semibold text-gray-500">{t('orders.contact')}</h4>
-                                                                        <p className="break-all">{order.shipping_info?.email || '-'}</p>
-                                                                        <p className="text-sm mt-1">{order.shipping_info?.phone || '-'}</p>
-                                                                    </div>
-
-                                                                    <div>
-                                                                        <h4 className="text-sm font-semibold text-gray-500">{t('orders.address')}</h4>
-                                                                        {order.postal_code && <p className="text-sm">〒{order.postal_code}</p>}
-                                                                        <p className="whitespace-pre-wrap text-sm">{order.address}</p>
-                                                                    </div>
-
-                                                                    <div>
-                                                                        <h4 className="text-sm font-semibold text-gray-500">{t('orders.preferredDateTime')}</h4>
-                                                                        <p className="text-sm">{order.preferred_date ? order.preferred_date : '-'}  /  {order.preferred_time ? tt(order.preferred_time) : '-'}</p>
-                                                                    </div>
-
-                                                                    {/* User Message & Shop Memo Section (Editable - Unified for all statuses) */}
-
-
-                                                                    {/* Shipping Action Section (Visible only when status is USED) */}
-                                                                    {order.status === 'USED' && (
-                                                                        <div className="mt-4 p-4 border-2 border-orange-200 rounded-xl bg-orange-50/50 shadow-sm">
-                                                                            <div className="flex items-center gap-2 mb-4">
-                                                                                <div className="w-2.5 h-2.5 rounded-full bg-orange-500 animate-pulse shadow-[0_0_8px_rgba(249,115,22,0.6)]" />
-                                                                                <h4 className="text-sm font-bold text-orange-900 uppercase tracking-wide">{t('orders.action')}</h4>
-                                                                            </div>
-                                                                            <form onSubmit={(e) => {
-                                                                                e.preventDefault();
-                                                                                const fd = new FormData(e.target as HTMLFormElement);
-                                                                                handleUpdateOrderMeta(
-                                                                                    qrId,
-                                                                                    fd.get('delivery_company') as string,
-                                                                                    fd.get('tracking') as string
-                                                                                );
-                                                                            }} className="space-y-4">
-                                                                                <div className="space-y-2">
-                                                                                    <Label htmlFor={`delivery_company-${qrId}`} className="text-orange-900/70">{t('orders.shipDialog.deliveryCompany')}</Label>
-                                                                                    <Input id={`delivery_company-${qrId}`} name="delivery_company" placeholder={t('orders.shipDialog.deliveryCompanyPlaceholder')} required className="bg-white border-orange-100 focus:border-orange-500 focus:ring-orange-500" />
-                                                                                </div>
-                                                                                <div className="space-y-2">
-                                                                                    <Label htmlFor={`tracking-${qrId}`} className="text-orange-900/70">{t('orders.shipDialog.label')}</Label>
-                                                                                    <Input id={`tracking-${qrId}`} name="tracking" placeholder="1234-5678..." required className="bg-white border-orange-100 focus:border-orange-500 focus:ring-orange-500" />
-                                                                                </div>
-
-                                                                                <Button type="submit" className="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold h-10 shadow-md transition-all active:scale-[0.98]" disabled={shippingOrderId === qrId}>
-                                                                                    {shippingOrderId === qrId ? (
-                                                                                        <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> {t('linkQr.processing')}</>
-                                                                                    ) : (
-                                                                                        t('orders.shipDialog.submit')
-                                                                                    )}
-                                                                                </Button>
-                                                                            </form>
-                                                                        </div>
-                                                                    )}
-
-
-                                                                    {/* Admin Meta Edit Section */}
-                                                                    <div className="pt-6 border-t border-dashed mt-6">
-                                                                        <h4 className="text-sm font-bold text-gray-900 mb-4 flex items-center gap-2">
-                                                                            <Pencil className="w-4 h-4 text-gray-400" />
-                                                                            {t('orders.updateMeta')}
-                                                                        </h4>
-                                                                        <form onSubmit={async (e) => {
-                                                                            e.preventDefault();
-                                                                            const fd = new FormData(e.currentTarget);
-                                                                            await handleUpdateOrderMeta(
-                                                                                qrId,
-                                                                                undefined,
-                                                                                undefined,
-                                                                                fd.get('memo_for_users') as string,
-                                                                                fd.get('memo_for_shop') as string
-                                                                            );
-                                                                        }} className="space-y-4">
-
-                                                                            <div className="space-y-2">
-                                                                                <Label htmlFor={`m_u-${qrId}`} className="text-xs text-gray-500">{t('orders.userMessage')}</Label>
-                                                                                <Textarea
-                                                                                    id={`m_u-${qrId}`}
-                                                                                    name="memo_for_users"
-                                                                                    defaultValue={order.memo_for_users || ""}
-                                                                                    disabled={['COMPLETED', 'EXPIRED', 'BANNED'].includes(order.status)}
-                                                                                    placeholder={['COMPLETED', 'EXPIRED', 'BANNED'].includes(order.status) ? t('orders.shipDialog.Completed-state messages cannot be updated') : ""}
-                                                                                    className="text-sm min-h-[60px]"
-                                                                                />
-                                                                            </div>
-
-                                                                            <div className="space-y-2">
-                                                                                <Label htmlFor={`m_s-${qrId}`} className="text-xs text-gray-500">{t('orders.shopMemo')}</Label>
-                                                                                <Textarea
-                                                                                    id={`m_s-${qrId}`}
-                                                                                    name="memo_for_shop"
-                                                                                    defaultValue={order.memo_for_shop || ""}
-                                                                                    className="text-sm min-h-[60px]"
-                                                                                />
-                                                                            </div>
-
-                                                                            <Button
-                                                                                type="submit"
-                                                                                className="w-full"
-                                                                                disabled={shippingOrderId === qrId}
-                                                                            >
-                                                                                {shippingOrderId === qrId ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}
-                                                                                {shippingOrderId === qrId ? t('orders.processing') : t('shopSettings.submit')}
-                                                                            </Button>
-                                                                        </form>
-                                                                    </div>
-
-                                                                    <div className="">
-                                                                        <div>
-                                                                            <h4 className="text-sm font-semibold text-gray-500">{t('orders.timestamps')}</h4>
-                                                                            <p className="text-sm">{ts('ts_updated_at') + ": " + (order.ts_updated_at ? new Date(order.ts_updated_at).toLocaleString() : "-")}</p>
-                                                                            <p className="text-sm">{ts('ts_linked_at') + ": " + (order.ts_linked_at ? new Date(order.ts_linked_at).toLocaleString() : "-")}</p>
-                                                                            <p className="text-sm">{ts('ts_activated_at') + ": " + (order.ts_activated_at ? new Date(order.ts_activated_at).toLocaleString() : "-")}</p>
-                                                                            <p className="text-sm">{ts('ts_submitted_at') + ": " + (order.ts_submitted_at ? new Date(order.ts_submitted_at).toLocaleString() : "-")}</p>
-                                                                            <p className="text-sm">{ts('ts_shipped_at') + ": " + (order.ts_shipped_at ? new Date(order.ts_shipped_at).toLocaleString() : "-")}</p>
-                                                                            <p className="text-sm">{ts('ts_completed_at') + ": " + (order.ts_completed_at ? new Date(order.ts_completed_at).toLocaleString() : "-")}</p>
-                                                                            <p className="text-sm">{ts('ts_expired_at') + ": " + (order.ts_expired_at ? new Date(order.ts_expired_at).toLocaleString() : "-")}</p>
-                                                                            <p className="text-sm">{ts('ts_banned_at') + ": " + (order.ts_banned_at ? new Date(order.ts_banned_at).toLocaleString() : "-")}</p>
-                                                                        </div>
-                                                                    </div>
-                                                                </div>
-                                                            </DialogContent>
-                                                        </Dialog>
-                                                    );
-                                                })
+                                                    <OrderRow
+                                                        key={order.qr_id}
+                                                        order={order}
+                                                        products={products}
+                                                        visibleOrderColumns={visibleOrderColumns}
+                                                        ORDER_COL_OPTIONS={ORDER_COL_OPTIONS}
+                                                        getOrderCellContent={getOrderCellContent}
+                                                        statusCss={statusCss}
+                                                        st={st}
+                                                        t={t}
+                                                        ts={ts}
+                                                        tt={tt}
+                                                        copiedId={copiedId}
+                                                        handleCopy={handleCopy}
+                                                        handleUpdateOrderMeta={handleUpdateOrderMeta}
+                                                        shippingOrderId={shippingOrderId}
+                                                        getDesignAspectRatio={getDesignAspectRatio}
+                                                        getDesignImages={getDesignImages}
+                                                        cardformats={cardformats}
+                                                    />
+                                                ))
                                         )}
+
                                     </TableBody>
                                 </Table>
                             </CardContent>
@@ -2184,21 +2474,24 @@ export default function ShopPage() {
                                     <div className="grid gap-4 md:grid-cols-2">
                                         {
                                             statusList.map((key, index) => (
-                                                <div key={index} className="space-y-2"><div className="flex items-center gap-2"><span className={cn("px-2 py-1 rounded border text-xs", statusCss(key))}>{st(key)}</span> </div><p className={cn("text-sm text-gray-600 pl-2 border-l-2 bg-white/50", statusCss(key, false, true, false))}>{t('statusGuide.statuses.' + key)}</p></div>
+                                                <div key={index} className="space-y-2">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className={cn("px-2 py-1 rounded border text-xs font-bold", statusCss(key))}>
+                                                            {st(key)}
+                                                        </span>
+                                                    </div>
+                                                    <p className="text-xs text-gray-500 leading-relaxed">
+                                                        {t(`statusGuide.statuses.${key}`)}
+                                                    </p>
+                                                </div>
                                             ))
                                         }
                                     </div>
                                 </div>
                             </CardContent>
                         </Card>
-
-
                     </div>
                 )}
-
-
-
-
 
                 {/* --- Wrapper for Products --- */}
                 {activeTab === 'products' && (
@@ -2214,247 +2507,28 @@ export default function ShopPage() {
                                     {productsLoading ? (
                                         <div className="col-span-full py-8 flex justify-center"><RefreshCw className="animate-spin h-6 w-6 text-gray-400" /></div>
                                     ) : products.map((product) => (
-                                        <Dialog key={product.product_id}>
-                                            <DialogTrigger asChild>
-                                                    <Card
-                                                        className="overflow-hidden cursor-pointer hover:ring-2 hover:ring-primary/50 transition-all relative h-24"
-                                                        style={{ aspectRatio: getDesignAspectRatio(product.design_id, product.design) }}
-                                                    >
-                                                        <div className="absolute inset-0 w-full h-full">
-                                                            {/* 背景: カードデザイン */}
-                                                            {getDesignImages(product.design_id, product.design).front && (
-                                                                <img
-                                                                    src={getDesignImages(product.design_id, product.design).front}
-                                                                    alt={product.design?.name || product.name}
-                                                                    className="absolute inset-0 w-full h-full object-fill select-none"
-                                                                    draggable={false}
-                                                                    crossOrigin="anonymous"
-                                                                />
-                                                            )}
-                                                    {/* オーバーレイ */}
-                                                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
-
-                                                    {/* 商品画像 (小) */}
-                                                    {product.image_url && (
-                                                        <div className="absolute bottom-2 right-2 w-10 h-10 rounded-md overflow-hidden border border-white/50 shadow-md bg-white">
-                                                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                                                            <img
-                                                                src={product.image_url}
-                                                                alt={product.name}
-                                                                className="w-full h-full object-cover"
-                                                            />
-                                                        </div>
-                                                    )}
-
-                                                    {/* 商品名と価格 */}
-                                                    <div className="absolute bottom-0 left-0 right-0 p-2.5 text-white">
-                                                        <h3 className="font-bold text-xs truncate drop-shadow-lg">{product.name || <span className="opacity-50 italic">(No Name)</span>}</h3>
-                                                        {/* <p className="text-[10px] opacity-90 drop-shadow-md">¥{product.price ? Number(product.price).toLocaleString("ja-JP") : "0"}</p> */}
-                                                    </div>
-
-                                                    {/* ステータスバッジ */}
-                                                    <div className="absolute top-2 left-2 flex gap-1">
-                                                        <span className={`px-1.5 py-0.5 rounded text-[8px] font-bold backdrop-blur-sm ${product.status === 'ACTIVE' ? 'bg-green-500/80 text-white' : 'bg-red-500/80 text-white'
-                                                            }`}>
-                                                            {product.status}
-                                                        </span>
-                                                    </div>
-                                                    </div>
-                                                </Card>
-                                            </DialogTrigger>
-                                            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-                                                <DialogHeader>
-                                                    <DialogTitle>{t('productDetails.title')}</DialogTitle>
-                                                </DialogHeader>
-                                                <div className="space-y-6 py-4">
-                                                    <div className="aspect-[16/9] w-full relative rounded-lg overflow-hidden border">
-                                                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                                                        <img src={product.image_url} alt={product.name} className="w-full h-full object-cover" />
-                                                    </div>
-
-                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                                        <div className="space-y-1">
-                                                            <p className="text-xs text-gray-500 font-medium">{t('productDetails.name')}</p>
-                                                            <p className="font-bold text-lg">{product.name}</p>
-                                                        </div>
-                                                        <div className="space-y-1 col-span-2">
-                                                            <p className="text-xs text-gray-500 font-medium">{t('productDetails.description')}</p>
-                                                            <p className="text-sm text-gray-700 whitespace-pre-wrap">{product.description || '-'}</p>
-                                                        </div>
-                                                        <div className="space-y-1">
-                                                            <p className="text-xs text-gray-500 font-medium">{t('productDetails.price')}</p>
-                                                            <p className="font-bold text-lg text-emerald-600">¥{Number(product.price || 0).toLocaleString()}</p>
-                                                        </div>
-                                                        <div className="space-y-1">
-                                                            <p className="text-xs text-gray-500 font-medium">{t('productDetails.validDays')}</p>
-                                                            <p className="font-medium">{product.valid_days || APP_CONFIG.DEFAULT_VALID_DAYS} {t('productDetails.validDaysSuffix')}</p>
-                                                        </div>
-                                                    </div>
-
-                                                    {product.design && (
-                                                        <div className="space-y-3 p-4 bg-gray-50 rounded-lg border border-gray-100">
-                                                            <div className="text-xs text-gray-500 font-bold flex items-center gap-2">
-                                                                <div className="w-1 h-3 bg-primary rounded-full" />
-                                                                {t('addProduct.cardDesign')}
-                                                            </div>
-                                                            <div className="flex-1 space-y-1 py-1">
-                                                                <p className="font-bold text-gray-900">{product.design.name}</p>
-                                                                <p className="text-xs text-gray-500">{product.design.description}</p>
-                                                            </div>
-                                                            <div className="flex flex-col sm:flex-row gap-4">
-                                                                <div className="flex flex-wrap gap-4 w-full sm:w-auto shrink-0">
-                                                                    <div className="flex flex-col gap-1">
-                                                                        <p className="text-[10px] text-gray-400 font-bold">{t('productDetails.front')}</p>
-                                                                        <div
-                                                                            className="w-full sm:w-48 rounded-md border-2 border-white shadow-sm overflow-hidden bg-white"
-                                                                            style={{ aspectRatio: getDesignAspectRatio(product.design_id, product.design) }}
-                                                                        >
-                                                                            <img
-                                                                                src={getDesignImages(product.design_id, product.design).front}
-                                                                                alt={product.design?.name}
-                                                                                className="w-full h-full object-fill select-none"
-                                                                                draggable={false}
-                                                                                crossOrigin="anonymous"
-                                                                            />
-                                                                        </div>
-                                                                    </div>
-                                                                    {product.design.thumbb && (
-                                                                        <div className="flex flex-col gap-1">
-                                                                            <p className="text-[10px] text-gray-400 font-bold">{t('productDetails.back')}</p>
-                                                                            <div
-                                                                                className="w-full sm:w-48 rounded-md border-2 border-white shadow-sm overflow-hidden bg-white"
-                                                                                style={{ aspectRatio: getDesignAspectRatio(product.design_id, product.design) }}
-                                                                            >
-                                                                                <img
-                                                                                    src={getDesignImages(product.design_id, product.design).back}
-                                                                                    alt={product.design?.name}
-                                                                                    className="w-full h-full object-fill select-none"
-                                                                                    draggable={false}
-                                                                                    crossOrigin="anonymous"
-                                                                                />
-                                                                            </div>
-                                                                        </div>
-                                                                    )}
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    )}
-
-
-                                                    {product.detail_html && (
-                                                        <>
-                                                            <div className="w-full space-y-4 pt-4 border-t">
-                                                                <div className="w-full space-y-2">
-                                                                    <p className="w-full text-xs text-gray-500 font-medium">{t('productDetails.detailHtml')}</p>
-                                                                    <div className="w-full border rounded-md p-4 bg-white shadow-sm overflow-hidden">
-                                                                        <CardContent className="min-h-0 flex flex-1 p-0 w-full"> {/* w-fullを追加 */}
-                                                                            <div className="w-full mt-0 mr-0 ml-0 p-0 relative"> {/* w-fullを追加 */}
-                                                                                {/* Top fade effect */}
-                                                                                {/* <div className="absolute top-0 left-0 right-0 h-5 bg-gradient-to-b from-white to-transparent pointer-events-none z-10" /> */}
-
-                                                                                {/* コンテンツ */}
-                                                                                <SandboxedHtml html={debouncedPreviewHtml} />
-
-                                                                                {/* Bottom fade effect */}
-                                                                                {/* <div className="absolute bottom-0 left-0 right-0 h-5 bg-gradient-to-t from-white to-transparent pointer-events-none z-10" /> */}
-                                                                            </div>
-                                                                        </CardContent>
-                                                                    </div>
-                                                                </div>
-                                                                <div className="space-y-2">
-                                                                    <p className="text-xs text-gray-500 font-medium">{t('productDetails.rawDetailHtml')}</p>
-                                                                    <textarea
-                                                                        readOnly
-                                                                        value={product.detail_html}
-                                                                        className="w-full h-32 p-3 text-xs font-mono bg-gray-50 border rounded-md focus:outline-none focus:ring-1 focus:ring-primary/20"
-                                                                    />
-                                                                </div>
-                                                            </div>
-                                                        </>
-                                                        // <div className="w-full space-y-4 pt-4 border-t">
-                                                        //     <div className="w-full space-y-2">
-                                                        //         <p className="w-full text-xs text-gray-500 font-medium">{t('productDetails.detailHtml')}</p>
-                                                        //         <div className="w-full border rounded-md p-4 bg-white shadow-sm overflow-hidden">
-                                                        //             <SandboxedHtml html={product.detail_html} />
-                                                        //         </div>
-                                                        //     </div>
-                                                        //     <div className="space-y-2">
-                                                        //         <p className="text-xs text-gray-500 font-medium">{t('productDetails.rawDetailHtml')}</p>
-                                                        //         <textarea
-                                                        //             readOnly
-                                                        //             value={product.detail_html}
-                                                        //             className="w-full h-32 p-3 text-xs font-mono bg-gray-50 border rounded-md focus:outline-none focus:ring-1 focus:ring-primary/20"
-                                                        //         />
-                                                        //     </div>
-                                                        // </div>
-                                                    )}
-                                                </div>
-                                                <div className="mt-8 pt-6 border-t border-dashed border-gray-100">
-                                                    <div className="flex flex-col gap-1">
-                                                        <div className="flex items-center gap-1">
-                                                            <p className="text-[9px] font-mono text-gray-400">Product ID: {product.product_id}</p>
-                                                            <Button
-                                                                type="button"
-                                                                variant="ghost"
-                                                                size="icon"
-                                                                className="h-3 w-3 text-gray-400 hover:text-gray-600"
-                                                                onClick={() => handleCopy(product.product_id)}
-                                                            >
-                                                                {copiedId === product.product_id ? (
-                                                                    <Check className="h-2 w-2 text-green-500" />
-                                                                ) : (
-                                                                    <Copy className="h-2 w-2" />
-                                                                )}
-                                                            </Button>
-                                                        </div>
-                                                        <div className="flex items-center gap-1">
-                                                            <p className="text-[9px] font-mono text-gray-400">Design ID: {product.design?.design_id}</p>
-                                                            {product.design?.design_id && (
-                                                                <Button
-                                                                    type="button"
-                                                                    variant="ghost"
-                                                                    size="icon"
-                                                                    className="h-3 w-3 text-gray-400 hover:text-gray-600"
-                                                                    onClick={() => handleCopy(product.design.design_id)}
-                                                                >
-                                                                    {copiedId === product.design.design_id ? (
-                                                                        <Check className="h-2 w-2 text-green-500" />
-                                                                    ) : (
-                                                                        <Copy className="h-2 w-2" />
-                                                                    )}
-                                                                </Button>
-                                                            )}
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                                <DialogFooter className="mt-6">
-                                                    <div className="flex w-full items-center justify-between">
-                                                        <div className="flex gap-2">
-                                                            <Button variant="outline" size="sm" onClick={() => handleToggleStatus(product.product_id, product.status)} disabled={togglingProductId === product.product_id}>
-                                                                {togglingProductId === product.product_id ? t('linkQr.processing') : (product.status === 'ACTIVE' ? t('product.stop') : t('product.activate'))}
-                                                            </Button>
-                                                            <Button variant="outline" size="sm" onClick={() => handleOpenDuplicateDialog(product)}>
-                                                                <Copy className="w-4 h-4 mr-1" />
-                                                                {t('productDetails.duplicate')}
-                                                            </Button>
-                                                            <Button variant="outline" size="sm" onClick={() => handleOpenEditDialog(product)}>
-                                                                <Pencil className="w-4 h-4 mr-1" />
-                                                                {t('productDetails.edit')}
-                                                            </Button>
-                                                            {product.status !== 'ACTIVE' && (
-                                                                <Button variant="destructive" size="sm" onClick={() => handleDeleteProduct(product.product_id, product.name)} disabled={deletingProductId === product.product_id}>
-                                                                    {deletingProductId === product.product_id ? t('linkQr.processing') : t('product.delete')}
-                                                                </Button>
-                                                            )}
-                                                        </div>
-                                                        <DialogTrigger asChild>
-                                                            <Button variant="outline" size="sm" className="px-4">{t('productDetails.close')}</Button>
-                                                        </DialogTrigger>
-                                                    </div>
-                                                </DialogFooter>
-                                            </DialogContent>
-                                        </Dialog>
+                                        <ProductCard
+                                            key={product.product_id}
+                                            product={product}
+                                            t={t}
+                                            tc={tc}
+                                            st={st}
+                                            tr={tr}
+                                            getDesignAspectRatio={getDesignAspectRatio}
+                                            getDesignImages={getDesignImages}
+                                            debouncedPreviewHtml={debouncedPreviewHtml}
+                                            copiedId={copiedId}
+                                            handleCopy={handleCopy}
+                                            handleToggleStatus={handleToggleStatus}
+                                            togglingProductId={togglingProductId}
+                                            handleOpenDuplicateDialog={handleOpenDuplicateDialog}
+                                            handleOpenEditDialog={handleOpenEditDialog}
+                                            handleDeleteProduct={handleDeleteProduct}
+                                            deletingProductId={deletingProductId}
+                                            APP_CONFIG={APP_CONFIG}
+                                        />
                                     ))}
+
                                     {/* 商品追加 */}
                                     <Dialog open={isAddProductDialogOpen} onOpenChange={(open) => {
                                         setIsAddProductDialogOpen(open);
@@ -2481,147 +2555,158 @@ export default function ShopPage() {
                                             </Card>
                                         </DialogTrigger>
                                         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-                                            <DialogHeader>
-                                                <div className="flex items-center justify-between pr-8">
-                                                    <DialogTitle>{editingProduct ? t('editProduct.title') : t('addProduct.title')}</DialogTitle>
+                                            {isAddProductDialogOpen && (
+                                                <>
+                                                    <DialogHeader>
+                                                        <div className="flex items-center justify-between pr-8">
+                                                            <div>
+                                                                <DialogTitle>{editingProduct ? t('editProduct.title') : t('addProduct.title')}</DialogTitle>
+                                                                <DialogDescription>{editingProduct ? t('editProduct.dialogDesc') : t('addProduct.dialogDesc')}</DialogDescription>
+                                                            </div>
 
-                                                    {/* インポート */}
-                                                    {!editingProduct && (
-                                                        <Dialog open={isImportDialogOpen} onOpenChange={setIsImportDialogOpen}>
-                                                            <DialogTrigger asChild>
-                                                                <Button variant="outline" size="sm">{t('importProduct.button')}</Button>
-                                                            </DialogTrigger>
-                                                            <DialogContent>
-                                                                <DialogHeader>
-                                                                    <DialogTitle>{t('importProduct.dialogTitle')}</DialogTitle>
-                                                                    <DialogDescription>{t('importProduct.dialogDesc')}</DialogDescription>
-                                                                </DialogHeader>
-                                                                <div className="space-y-4 py-4">
-                                                                    <div className="space-y-2">
-                                                                        <Label htmlFor="importShop">{t('importProduct.selectShop')}</Label>
-                                                                        <select
-                                                                            id="importShop"
-                                                                            className="w-full p-2 border rounded-md"
-                                                                            value={selectedImportShopId}
-                                                                            onChange={(e) => setSelectedImportShopId(e.target.value)}
-                                                                        >
-                                                                            <option value="">{t('importProduct.placeholder')}</option>
-                                                                            {importShops.map(s => (
-                                                                                <option key={s.id} value={s.id}>{s.name || s.id}</option>
-                                                                            ))}
-                                                                        </select>
-                                                                    </div>
+                                                            {/* インポート */}
+                                                            {!editingProduct && (
+                                                                <Dialog open={isImportDialogOpen} onOpenChange={setIsImportDialogOpen}>
+                                                                    <DialogTrigger asChild>
+                                                                        <Button variant="outline" size="sm">{t('importProduct.button')}</Button>
+                                                                    </DialogTrigger>
+                                                                    <DialogContent>
+                                                                        {isImportDialogOpen && (
+                                                                            <>
+                                                                                <DialogHeader>
+                                                                                    <DialogTitle>{t('importProduct.dialogTitle')}</DialogTitle>
+                                                                                    <DialogDescription>{t('importProduct.dialogDesc')}</DialogDescription>
+                                                                                </DialogHeader>
+                                                                                <div className="space-y-4 py-4">
+                                                                                    <div className="space-y-2">
+                                                                                        <Label htmlFor="importShop">{t('importProduct.selectShop')}</Label>
+                                                                                        <select
+                                                                                            id="importShop"
+                                                                                            className="w-full p-2 border rounded-md"
+                                                                                            value={selectedImportShopId}
+                                                                                            onChange={(e) => setSelectedImportShopId(e.target.value)}
+                                                                                        >
+                                                                                            <option value="">{t('importProduct.placeholder')}</option>
+                                                                                            {importShops.map(s => (
+                                                                                                <option key={s.id} value={s.id}>{s.name || s.id}</option>
+                                                                                            ))}
+                                                                                        </select>
+                                                                                    </div>
+                                                                                </div>
+                                                                                <DialogFooter>
+                                                                                    <Button variant="ghost" onClick={() => setIsImportDialogOpen(false)} disabled={isImporting}>
+                                                                                        {t('importProduct.cancel')}
+                                                                                    </Button>
+                                                                                    <Button onClick={handleImportProducts} disabled={isImporting || !selectedImportShopId}>
+                                                                                        {isImporting ? t('linkQr.processing') : t('importProduct.submit')}
+                                                                                    </Button>
+                                                                                </DialogFooter>
+                                                                            </>
+                                                                        )}
+                                                                    </DialogContent>
+                                                                </Dialog>
+                                                            )}
+                                                        </div>
+                                                    </DialogHeader>
+
+                                                    <form key={editingProduct?.product_id || 'new'} onSubmit={handleCreateProduct} className="space-y-4 pt-4">
+                                                        <div className="space-y-2">
+                                                            <Label htmlFor="name">{t('addProduct.name')}</Label>
+                                                            <Input id="name" name="name" defaultValue={editingProduct?.name} required />
+                                                        </div>
+                                                        <div className="space-y-2">
+                                                            <Label htmlFor="description">{t('addProduct.description')}</Label>
+                                                            <Input id="description" name="description" defaultValue={editingProduct?.description} required />
+                                                        </div>
+                                                        <div className="grid grid-cols-2 gap-4">
+                                                            <div className="space-y-2">
+                                                                <Label htmlFor="price">{t('addProduct.price')}</Label>
+                                                                <Input id="price" name="price" type="number" min="0" defaultValue={editingProduct?.price} required />
+                                                            </div>
+                                                            <div className="space-y-2">
+                                                                <Label htmlFor="valid_days">{t('addProduct.validDays')}</Label>
+                                                                <Input id="valid_days" name="valid_days" type="number" defaultValue={editingProduct?.valid_days || APP_CONFIG.DEFAULT_VALID_DAYS} min={1} required />
+                                                            </div>
+                                                        </div>
+                                                        <div className="space-y-2">
+                                                            <Label htmlFor="image">{t('addProduct.image') + (editingProduct ? ' (' + t('editProduct.ifChange') + ')' : '')}</Label>
+                                                            {editingProduct?.image_url && (
+                                                                <div className="space-y-2">
+                                                                    <p className="text-xs text-gray-500">{t('editProduct.beforeImage')}</p>
+                                                                    <img src={editingProduct.image_url} className="w-full h-auto rounded-md border shadow-sm max-h-32 object-contain bg-gray-50" />
                                                                 </div>
-                                                                <DialogFooter>
-                                                                    <Button variant="ghost" onClick={() => setIsImportDialogOpen(false)} disabled={isImporting}>
-                                                                        {t('importProduct.cancel')}
-                                                                    </Button>
-                                                                    <Button onClick={handleImportProducts} disabled={isImporting || !selectedImportShopId}>
-                                                                        {isImporting ? t('linkQr.processing') : t('importProduct.submit')}
-                                                                    </Button>
-                                                                </DialogFooter>
-                                                            </DialogContent>
-                                                        </Dialog>
-                                                    )}
-                                                </div>
-                                            </DialogHeader>
+                                                            )}
+                                                            <Input id="image" name="image" type="file" accept="image/png, image/jpeg, image/gif, image/webp" required={!editingProduct} />
+                                                            <p className="text-xs text-gray-500">{t('addProduct.imagePlaceholder')}</p>
+                                                        </div>
 
-                                            <form key={editingProduct?.product_id || 'new'} onSubmit={handleCreateProduct} className="space-y-4 pt-4">
-                                                <div className="space-y-2">
-                                                    <Label htmlFor="name">{t('addProduct.name')}</Label>
-                                                    <Input id="name" name="name" defaultValue={editingProduct?.name} required />
-                                                </div>
-                                                <div className="space-y-2">
-                                                    <Label htmlFor="description">{t('addProduct.description')}</Label>
-                                                    <Input id="description" name="description" defaultValue={editingProduct?.description} required />
-                                                </div>
-                                                <div className="grid grid-cols-2 gap-4">
-                                                    <div className="space-y-2">
-                                                        <Label htmlFor="price">{t('addProduct.price')}</Label>
-                                                        <Input id="price" name="price" type="number" min="0" defaultValue={editingProduct?.price} required />
-                                                    </div>
-                                                    <div className="space-y-2">
-                                                        <Label htmlFor="valid_days">{t('addProduct.validDays')}</Label>
-                                                        <Input id="valid_days" name="valid_days" type="number" defaultValue={editingProduct?.valid_days || APP_CONFIG.DEFAULT_VALID_DAYS} min={1} required />
-                                                    </div>
-                                                </div>
-                                                <div className="space-y-2">
-                                                    <Label htmlFor="image">{t('addProduct.image') + (editingProduct ? ' (' + t('editProduct.ifChange') + ')' : '')}</Label>
-                                                    {editingProduct && <p className="text-xs text-gray-500">{t('editProduct.beforeImage')}</p>}
-                                                    {editingProduct && <img src={editingProduct?.image_url} className="w-full h-auto rounded-md border shadow-sm" />}
-                                                    <Input id="image" name="image" type="file" accept="image/png, image/jpeg, image/gif, image/webp" required={!editingProduct} />
-                                                    <p className="text-xs text-gray-500">{t('addProduct.imagePlaceholder')}</p>
-                                                </div>
-
-                                                {/* Card Design Selection */}
-                                                <div className="space-y-4 pt-4 border-t">
-                                                    <div className="flex items-center justify-between">
-                                                        <Label className="text-sm font-bold flex items-center gap-2">
-                                                            <div className="w-1 h-4 bg-primary rounded-full" />
-                                                            {t('addProduct.cardDesign')}
-                                                        </Label>
-                                                        {(!shop?.allowed_designs || shop.allowed_designs.length === 0) && (
-                                                            <span className="text-[10px] text-red-500 font-medium">
-                                                                {t('addProduct.noDesignsLinked')}
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                    <div className="flex flex-wrap items-start gap-3 max-h-[300px] overflow-y-auto p-1">
-                                                        {shop?.allowed_designs?.map((design: any) => (
-                                                                <div
-                                                                    key={`${design.design_id}`}
-                                                                    onClick={() => setSelectedDesignId(design.design_id)}
-                                                                    className={`group relative h-24 rounded-lg border-2 overflow-hidden cursor-pointer transition-all hover:shadow-md ${selectedDesignId === design.design_id
-                                                                        ? 'border-green-500 ring-2 ring-green-500/20 shadow-lg'
-                                                                        : 'border-gray-100 hover:border-primary/30'
-                                                                        }`}
-                                                                    style={{ aspectRatio: `${design.width || 84} / ${design.height || 52}` }}
-                                                                >
-                                                                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                                                                    <img
-                                                                        src={design.thumbf || design.bgimgf}
-                                                                        alt={design.name}
-                                                                        className="w-full h-full object-fill"
-                                                                        crossOrigin="anonymous"
-                                                                    />
-                                                                <div className={`absolute bottom-0 left-0 right-0 bg-black/60 p-1.5 transition-all duration-300 ${selectedDesignId === design.design_id ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
-                                                                    }`}>
-                                                                    <p className="text-[10px] text-white truncate text-center font-bold">
-                                                                        {design.name}
-                                                                    </p>
-                                                                    {design.description && (
-                                                                        <p className="text-[8px] text-gray-200 line-clamp-2 text-center mt-0.5 leading-tight opacity-0 group-hover:opacity-100 transition-opacity duration-500">
-                                                                            {design.description}
-                                                                        </p>
-                                                                    )}
-                                                                </div>
-                                                                {selectedDesignId === design.design_id && (
-                                                                    <div className="absolute top-0 right-0">
-                                                                        <div className="bg-green-500 text-white text-[9px] font-bold px-2 py-0.5 rounded-bl shadow-sm flex items-center gap-1">
-                                                                            <Check className="w-2.5 h-2.5" />
-                                                                        </div>
-                                                                    </div>
+                                                        {/* Card Design Selection */}
+                                                        <div className="space-y-4 pt-4 border-t">
+                                                            <div className="flex items-center justify-between">
+                                                                <Label className="text-sm font-bold flex items-center gap-2">
+                                                                    <div className="w-1 h-4 bg-primary rounded-full" />
+                                                                    {t('addProduct.cardDesign')}
+                                                                </Label>
+                                                                {(!shop?.allowed_designs || shop.allowed_designs.length === 0) && (
+                                                                    <span className="text-[10px] text-red-500 font-medium">
+                                                                        {t('addProduct.noDesignsLinked')}
+                                                                    </span>
                                                                 )}
                                                             </div>
-                                                        ))}
-                                                    </div>
-                                                </div>
+                                                            <div className="flex flex-wrap items-start gap-3 max-h-[300px] overflow-y-auto p-1">
+                                                                {shop?.allowed_designs?.map((design: any) => (
+                                                                    <div
+                                                                        key={`${design.design_id}`}
+                                                                        onClick={() => setSelectedDesignId(design.design_id)}
+                                                                        className={`group relative h-24 rounded-lg border-2 overflow-hidden cursor-pointer transition-all hover:shadow-md ${selectedDesignId === design.design_id
+                                                                            ? 'border-green-500 ring-2 ring-green-500/20 shadow-lg'
+                                                                            : 'border-gray-100 hover:border-primary/30'
+                                                                            }`}
+                                                                        style={{ aspectRatio: `${design.width || 84} / ${design.height || 52}` }}
+                                                                    >
+                                                                        <img
+                                                                            src={design.thumbf || design.bgimgf}
+                                                                            alt={design.name || ''}
+                                                                            className="w-full h-full object-fill"
+                                                                            crossOrigin="anonymous"
+                                                                        />
+                                                                        <div className={`absolute bottom-0 left-0 right-0 bg-black/60 p-1.5 transition-all duration-300 ${selectedDesignId === design.design_id ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+                                                                            }`}>
+                                                                            <p className="text-[10px] text-white truncate text-center font-bold">
+                                                                                {design.name || '-'}
+                                                                            </p>
+                                                                            {design.description && (
+                                                                                <p className="text-[8px] text-gray-200 line-clamp-2 text-center mt-0.5 leading-tight opacity-0 group-hover:opacity-100 transition-opacity duration-500">
+                                                                                    {design.description}
+                                                                                </p>
+                                                                            )}
+                                                                        </div>
+                                                                        {selectedDesignId === design.design_id && (
+                                                                            <div className="absolute top-0 right-0">
+                                                                                <div className="bg-green-500 text-white text-[9px] font-bold px-2 py-0.5 rounded-bl shadow-sm flex items-center gap-1">
+                                                                                    <Check className="w-2.5 h-2.5" />
+                                                                                </div>
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        </div>
 
-                                                <Button type="submit" className="w-full" disabled={isCreatingProduct || !selectedDesignId}>
-                                                    {isCreatingProduct ? t('linkQr.processing') : (editingProduct ? t('shopSettings.submit') : t('addProduct.submit'))}
-                                                </Button>
-                                            </form>
+                                                        <Button type="submit" className="w-full" disabled={isCreatingProduct || !selectedDesignId}>
+                                                            {isCreatingProduct ? <Loader2 className="w-4 h-4 animate-spin mr-2 inline-block" /> : null}
+                                                            {isCreatingProduct ? t('linkQr.processing') : (editingProduct ? t('shopSettings.submit') : t('addProduct.submit'))}
+                                                        </Button>
+                                                    </form>
+                                                </>
+                                            )}
                                         </DialogContent>
                                     </Dialog>
                                 </div>
                             </div>
                         </Card>
-
                     </div>
                 )}
-
-
-
 
 
                 {/* --- Wrapper for Card Ordering --- */}
