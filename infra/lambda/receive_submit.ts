@@ -63,7 +63,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         if (item.ts_expired_at && now > new Date(item.ts_expired_at)) {
             await ddb.send(new UpdateCommand({
                 TableName: TABLE_NAME, Key: { PK: `QR#${qr_id}`, SK: 'METADATA' },
-                UpdateExpression: 'SET #status = :expired, GSI1_PK = :gsi_pk, ts_updated_at = :now',
+                UpdateExpression: 'SET #status = :expired, GSI1_PK = :gsi_pk, GSI1_SK = :now, ts_updated_at = :now',
                 ExpressionAttributeNames: { '#status': 'status' },
                 ExpressionAttributeValues: { ':expired': 'EXPIRED', ':gsi_pk': 'QR#EXPIRED', ':now': nowIso }
             })).catch(e => console.error('Failed lazy expire update', e));
@@ -85,7 +85,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                     Update: {
                         TableName: TABLE_NAME,
                         Key: { PK: `QR#${qr_id}`, SK: 'METADATA' },
-                        UpdateExpression: 'SET #status = :used, GSI1_PK = :gsi_pk, ts_submitted_at = :now, ts_updated_at = :now' +
+                        UpdateExpression: 'SET #status = :used, GSI1_PK = :gsi_pk, GSI1_SK = :now, ts_submitted_at = :now, ts_updated_at = :now' +
                             (password_hash ? ', password_hash = :ph' : '') + ' REMOVE #fa, #lu',
                         ConditionExpression: '#status = :active',
                         ExpressionAttributeNames: { '#status': 'status', '#fa': 'failed_attempts', '#lu': 'locked_until' },

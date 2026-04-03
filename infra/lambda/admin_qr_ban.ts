@@ -65,7 +65,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             await ddb.send(new UpdateCommand({
                 TableName: TABLE_NAME,
                 Key: { PK: `QR#${qr_id}`, SK: 'METADATA' },
-                UpdateExpression: 'SET #status = :s, GSI1_PK = :gsi_pk, ts_updated_at = :now REMOVE ban_reason, ts_banned_at',
+                UpdateExpression: 'SET #status = :s, GSI1_PK = :gsi_pk, GSI1_SK = :now, ts_updated_at = :now REMOVE ban_reason, ts_banned_at',
                 ExpressionAttributeNames: { '#status': 'status' },
                 ExpressionAttributeValues: {
                     ':s': revertStatus, ':gsi_pk': `QR#${revertStatus}`, ':now': now
@@ -84,7 +84,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             await ddb.send(new UpdateCommand({
                 TableName: TABLE_NAME,
                 Key: { PK: `QR#${qr_id}`, SK: 'METADATA' },
-                UpdateExpression: 'SET #status = :banned, GSI1_PK = :gsi_pk, ts_updated_at = :now, ts_banned_at = :now, ban_reason = :reason',
+                UpdateExpression: 'SET #status = :banned, GSI1_PK = :gsi_pk, GSI1_SK = :now, ts_updated_at = :now, ts_banned_at = :now, ban_reason = :reason',
                 ExpressionAttributeNames: { '#status': 'status' },
                 ExpressionAttributeValues: {
                     ':banned': 'BANNED', ':gsi_pk': 'QR#BANNED', ':now': now, ':reason': reason

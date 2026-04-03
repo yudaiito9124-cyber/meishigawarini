@@ -110,6 +110,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                     qr_id: qrid,
                     status: status,
                     product_id: item.product_id,
+                    design_id: item.design_id || item.card_design || item.card_design_id,
                     ts_created_at: item.ts_created_at,
                     ts_activated_at: item.ts_activated_at,
                     ts_expired_at: item.ts_expired_at
@@ -159,7 +160,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 expiresAt = expDate.toISOString();
             }
 
-            let updateExpr = 'SET #status = :status, shop_id = :sid, product_id = :pid, GSI1_PK = :gsi_pk, GSI2_PK = :gsi2_pk, GSI2_SK = :now, ts_linked_at = :now, ts_updated_at = :now';
+            let updateExpr = 'SET #status = :status, shop_id = :sid, product_id = :pid, GSI1_PK = :gsi_pk, GSI1_SK = :now, GSI2_PK = :gsi2_pk, GSI2_SK = :now, ts_linked_at = :now, ts_updated_at = :now';
             const attrValues: any = {
                 ':status': status, ':sid': shopId, ':pid': product_id,
                 ':gsi_pk': `QR#${status}`, ':gsi2_pk': `SHOP#${shopId}`, ':now': now,
@@ -210,7 +211,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             // 【DB操作: UpdateItem】
             await ddb.send(new UpdateCommand({
                 TableName: TABLE_NAME, Key: { PK: `QR#${qr_id}`, SK: 'METADATA' },
-                UpdateExpression: 'SET #status = :active, ts_activated_at = :now, ts_expired_at = :exp, GSI1_PK = :gsi_pk, ts_updated_at = :now',
+                UpdateExpression: 'SET #status = :active, ts_activated_at = :now, ts_expired_at = :exp, GSI1_PK = :gsi_pk, GSI1_SK = :now, ts_updated_at = :now',
                 ConditionExpression: '#status = :linked AND shop_id = :sid',
                 ExpressionAttributeNames: { '#status': 'status' },
                 ExpressionAttributeValues: {

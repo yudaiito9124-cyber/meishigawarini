@@ -30,7 +30,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         const senderInfo = body.sender_info;
         let senderId = body.sender_id;
         const activateNow = body.activate_now === true;
-        const cardDesign = body.card_design;
+        const designId = body.design_id;
 
         // 生成件数の上限チェック (一旦100件まで)
         if (count > 100) {
@@ -88,7 +88,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 item.GSI2_SK = now;
             }
             if (productId) item.product_id = productId;
-            if (cardDesign) item.card_design = cardDesign;
+            if (designId) item.design_id = designId;
 
             // ステータスとGSI1の設定
             if (activateNow) {

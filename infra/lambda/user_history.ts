@@ -166,7 +166,15 @@ async function enrichLogs(logs: Array<{ qr_id: string, timestamp: string }>) {
 
         // デザイン情報、商品情報、ショップ情報の取得用
         const metaList = items.filter(it => it.SK === 'METADATA');
-        const designIds = [...new Set(metaList.map(it => it.card_design).filter(Boolean))];
+        
+        // 互換性処理: metaList の各要素に design_id を設定
+        metaList.forEach(m => {
+            if (!m.design_id && (m as any).card_design) {
+                m.design_id = (m as any).card_design;
+            }
+        });
+
+        const designIds = [...new Set(metaList.map(it => it.design_id).filter(Boolean))];
         const shopProductPairs = [...new Set(metaList.map(it => `${it.shop_id}#${it.product_id}`).filter(p => !p.startsWith('undefined')))];
         const shopIds = [...new Set(metaList.map(it => it.shop_id).filter(Boolean))];
 
@@ -208,7 +216,7 @@ async function enrichLogs(logs: Array<{ qr_id: string, timestamp: string }>) {
             // 期限切れチェック(遅延評価)
             const currentStatus = await checkAndExpire(ddb, TABLE_NAME, qr_id, meta);
 
-            const designId = meta.card_design;
+            const designId = meta.design_id;
             const design = designId ? (designMap.get(designId) || getSystemDesign(designId)) : null;
             const product = productMap.get(`SHOP#${meta.shop_id}#PRODUCT#${meta.product_id}`);
             const shop = shopMap.get(`SHOP#${meta.shop_id}`);
@@ -222,9 +230,9 @@ async function enrichLogs(logs: Array<{ qr_id: string, timestamp: string }>) {
                 product_image_url: product ? await signUrlIfS3(product.image_url, BUCKET_NAME) : null,
                 shop_id: meta.shop_id,
                 shop_name: shop?.name,
-                card_design: designId,
-                card_design_thumbf: design ? await signUrlIfS3(design.thumbf, BUCKET_NAME) : null,
-                card_design_thumbb: design ? await signUrlIfS3(design.thumbb, BUCKET_NAME) : null,
+                design_id: designId,
+                thumbf: design ? await signUrlIfS3(design.thumbf, BUCKET_NAME) : null,
+                thumbb: design ? await signUrlIfS3(design.thumbb, BUCKET_NAME) : null,
                 recipient_name: order.name,
                 sender_info: chat.sender_info,
                 ts_created_at: meta.ts_created_at,

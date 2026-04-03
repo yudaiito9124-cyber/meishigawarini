@@ -49,7 +49,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         await ddb.send(new UpdateCommand({
             TableName: TABLE_NAME,
             Key: { PK: `QR#${qr_id}`, SK: 'METADATA' },
-            UpdateExpression: 'SET #status = :completed, GSI1_PK = :gsi_pk, ts_completed_at = :now, ts_updated_at = :now',
+            UpdateExpression: 'SET #status = :completed, GSI1_PK = :gsi_pk, GSI1_SK = :now, ts_completed_at = :now, ts_updated_at = :now',
             ConditionExpression: '#status = :shipped', // 二重操作防止
             ExpressionAttributeNames: { '#status': 'status' },
             ExpressionAttributeValues: { ':completed': 'COMPLETED', ':shipped': 'SHIPPED', ':gsi_pk': 'QR#COMPLETED', ':now': now }

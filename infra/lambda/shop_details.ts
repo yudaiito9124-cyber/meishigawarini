@@ -55,8 +55,9 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             }
 
             // ショップに許可されているカードデザイン情報を一括取得(BatchGet)
-            if (result.card_designs && Array.isArray(result.card_designs) && result.card_designs.length > 0) {
-                const keys = result.card_designs.map((id: string) => ({ PK: 'CARD_DESIGN#METADATA', SK: id }));
+            const allowedDesignIds = result.card_designs;
+            if (allowedDesignIds && Array.isArray(allowedDesignIds) && allowedDesignIds.length > 0) {
+                const keys = allowedDesignIds.map((id: string) => ({ PK: 'CARD_DESIGN#METADATA', SK: id }));
                 const batchRes = await ddb.send(new BatchGetCommand({
                     RequestItems: { [TABLE_NAME]: { Keys: keys } }
                 }));
@@ -64,13 +65,14 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 const rawDesigns = batchRes.Responses?.[TABLE_NAME] || [];
                 const designList = await Promise.all(rawDesigns.map(async (d) => ({
                     design_id: d.SK, name: d.name, description: d.description,
+                    width: d.width, height: d.height,
                     thumbf: d.thumbf ? await signUrlIfS3(d.thumbf, BUCKET_NAME) : undefined,
                     thumbb: d.thumbb ? await signUrlIfS3(d.thumbb, BUCKET_NAME) : undefined,
                     bgimgf: d.bgimgf ? await signUrlIfS3(d.bgimgf, BUCKET_NAME) : undefined
                 })));
                 
                 // システムデザインの補完
-                for (const id of result.card_designs) {
+                for (const id of allowedDesignIds) {
                     const sys = getSystemDesign(id);
                     if (sys && !designList.find(d => d.design_id === id)) {
                         designList.push({ design_id: id, name: id, description: "System Design", ...sys } as any);
@@ -80,6 +82,10 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             } else {
                 result.allowed_designs = [];
             }
+            
+            // 不要な古いプロパティを削除してクリーンアップ
+            delete result.card_designs;
+            
             return successResponse(result);
         }
 

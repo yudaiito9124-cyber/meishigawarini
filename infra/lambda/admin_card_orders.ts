@@ -40,6 +40,13 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             }));
 
             const items = result.Items || [];
+            
+            // 互換性処理: design_id がない場合は card_design を使用
+            items.forEach((item: any) => {
+                if (!item.design_id && item.card_design) {
+                    item.design_id = item.card_design;
+                }
+            });
 
             if (items.length > 0) {
                 const shopIds = [...new Set(items.map((i: any) => i.shop_id).filter(Boolean))];
@@ -93,6 +100,42 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                         }
                     }
                 }
+
+                // --- 新規追加: デザイン情報のEnrichment (thumbnails) ---
+                const designIds = [...new Set(items.map((i: any) => i.design_id).filter(Boolean))];
+                if (designIds.length > 0) {
+                    const keys = designIds.map(id => ({ PK: 'CARD_DESIGN#METADATA', SK: id }));
+                    const batchRes = await ddb.send(new BatchGetCommand({
+                        RequestItems: { 
+                            [TABLE_NAME]: { 
+                                Keys: keys, 
+                                ProjectionExpression: 'SK, thumbf, thumbb, bgimgf, bgimgb' 
+                            } 
+                        }
+                    }));
+                    
+                    const metaMap = new Map<string, any>();
+                    for (const d of (batchRes.Responses?.[TABLE_NAME] || [])) {
+                        // 署名付きURLの生成 (S3パスの場合)
+                        const { BUCKET_NAME } = require('./share/db');
+                        const { signUrlIfS3 } = require('./utils/s3');
+                        if (d.thumbf) d.thumbf = await signUrlIfS3(d.thumbf, BUCKET_NAME);
+                        if (d.thumbb) d.thumbb = await signUrlIfS3(d.thumbb, BUCKET_NAME);
+                        metaMap.set(d.SK, d);
+                    }
+
+                    const { getSystemDesign } = require('./utils/designs');
+                    for (const item of items) {
+                        const designId = item.design_id;
+                        if (designId) {
+                            const meta = metaMap.get(designId) || getSystemDesign(designId);
+                            if (meta) {
+                                item.thumbf = meta.thumbf || meta.bgimgf;
+                                item.thumbb = meta.thumbb || meta.bgimgb;
+                            }
+                        }
+                    }
+                }
             }
 
             return successResponse({ items, count: items.length, hasMore: !!result.LastEvaluatedKey });
@@ -110,7 +153,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             await ddb.send(new UpdateCommand({
                 TableName: TABLE_NAME,
                 Key: { PK: `CARD_ORDER#SHOP${shop_id}`, SK: `ORDER#${order_id}` },
-                UpdateExpression: 'SET #status = :status, GSI1_PK = :gsi_pk, ts_updated_at = :now',
+                UpdateExpression: 'SET #status = :status, GSI1_PK = :gsi_pk, GSI1_SK = :now, ts_updated_at = :now',
                 ExpressionAttributeNames: { '#status': 'status' },
                 ExpressionAttributeValues: {
                     ':status': status,

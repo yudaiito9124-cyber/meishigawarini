@@ -139,7 +139,8 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 const newItem = {
                     ...product,
                     PK: `SHOP#${shopId}`,
-                    GSI2_SK: `SHOP#${shopId}`,
+                    GSI1_SK: now,
+                    GSI2_SK: now,
                     image_url: newImageUrl,
                     ts_created_at: now,
                     ts_updated_at: now

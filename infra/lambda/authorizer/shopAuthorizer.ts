@@ -3,6 +3,7 @@ import { CognitoJwtVerifier } from 'aws-jwt-verify';
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient } from '@aws-sdk/lib-dynamodb';
 import { checkShopOwnerOrGM } from '../share/shop-auth';
+import { getHeader } from '../utils/request';
 
 const USER_POOL_ID = process.env.USER_POOL_ID || '';
 const CLIENT_ID = process.env.CLIENT_ID || '';
@@ -20,7 +21,7 @@ const ddb = DynamoDBDocumentClient.from(client);
 
 export const handler = async (event: APIGatewayRequestAuthorizerEvent): Promise<APIGatewayAuthorizerResult> => {
   try {
-    const authorizationToken = event.headers?.['authorization'] || event.headers?.['Authorization'];
+    const authorizationToken = getHeader(event.headers, 'authorization');
     if (!authorizationToken) {
       console.log('No authorization token provided');
       return generatePolicy('unauthorized-user', 'Deny', event.methodArn);

@@ -7,7 +7,7 @@
  * エンドポイント: POST /shop/card_orders
  */
 import { APIGatewayProxyHandler } from 'aws-lambda';
-import { PutCommand, QueryCommand, GetCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
+import { PutCommand, QueryCommand, GetCommand, UpdateCommand, BatchGetCommand } from '@aws-sdk/lib-dynamodb';
 import { checkShopOwnerOrGM } from './share/shop-auth';
 import { generateId } from './utils/id';
 import { successResponse, errorResponse, apiResponse } from './utils/response';
@@ -70,7 +70,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                     GSI1_SK: now,
                     // ID逆引き用インデックス (GSI2)
                     GSI2_PK: `CARD_ORDER#${orderId}`,
-                    GSI2_SK: `SHOP#${orderId}`
+                    GSI2_SK: now
                 }
             }));
 
@@ -93,7 +93,51 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 ScanIndexForward: false
             }));
 
-            return successResponse({ items: result.Items || [] });
+            const items = result.Items || [];
+            // 互換性処理: design_id がない場合は card_design を使用
+            items.forEach((item: any) => {
+                if (!item.design_id && item.card_design) {
+                    item.design_id = item.card_design;
+                }
+            });
+
+            // --- 新規追加: デザイン情報のEnrichment (thumbnails) ---
+            const designIds = [...new Set(items.map((i: any) => i.design_id).filter(Boolean))];
+            if (designIds.length > 0) {
+                const keys = designIds.map(id => ({ PK: 'CARD_DESIGN#METADATA', SK: id }));
+                const batchRes = await ddb.send(new BatchGetCommand({
+                    RequestItems: { 
+                        [TABLE_NAME]: { 
+                            Keys: keys, 
+                            ProjectionExpression: 'SK, thumbf, thumbb, bgimgf, bgimgb' 
+                        } 
+                    }
+                }));
+                
+                const metaMap = new Map<string, any>();
+                const { BUCKET_NAME } = require('./share/db');
+                const { signUrlIfS3 } = require('./utils/s3');
+                const { getSystemDesign } = require('./utils/designs');
+
+                for (const d of (batchRes.Responses?.[TABLE_NAME] || [])) {
+                    if (d.thumbf) d.thumbf = await signUrlIfS3(d.thumbf, BUCKET_NAME);
+                    if (d.thumbb) d.thumbb = await signUrlIfS3(d.thumbb, BUCKET_NAME);
+                    metaMap.set(d.SK, d);
+                }
+
+                for (const item of items) {
+                    const designId = item.design_id;
+                    if (designId) {
+                        const meta = metaMap.get(designId) || getSystemDesign(designId);
+                        if (meta) {
+                            item.thumbf = meta.thumbf || meta.bgimgf;
+                            item.thumbb = meta.thumbb || meta.bgimgb;
+                        }
+                    }
+                }
+            }
+
+            return successResponse({ items });
         }
 
         // ====================================================================
@@ -118,7 +162,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             await ddb.send(new UpdateCommand({
                 TableName: TABLE_NAME,
                 Key: { PK: `CARD_ORDER#SHOP${shopId}`, SK: `ORDER#${order_id}` },
-                UpdateExpression: 'SET #status = :status, GSI1_PK = :gsi_pk, ts_updated_at = :now',
+                UpdateExpression: 'SET #status = :status, GSI1_PK = :gsi_pk, GSI1_SK = :now, ts_updated_at = :now',
                 ExpressionAttributeNames: { '#status': 'status' },
                 ExpressionAttributeValues: {
                     ':status': 'CANCELLED',
@@ -152,7 +196,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             await ddb.send(new UpdateCommand({
                 TableName: TABLE_NAME,
                 Key: { PK: `CARD_ORDER#SHOP${shopId}`, SK: `ORDER#${order_id}` },
-                UpdateExpression: 'SET #status = :status, GSI1_PK = :gsi_pk, ts_updated_at = :now',
+                UpdateExpression: 'SET #status = :status, GSI1_PK = :gsi_pk, GSI1_SK = :now, ts_updated_at = :now',
                 ExpressionAttributeNames: { '#status': 'status' },
                 ExpressionAttributeValues: {
                     ':status': 'COMPLETED',

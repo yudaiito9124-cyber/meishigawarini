@@ -18,17 +18,17 @@ import { cardformats } from '../../../frontend/lib/constants/designs';
  * System-provided card designs mapping.
  * Automatically extracted from the frontend constants to ensure a single source of truth.
  */
-export const SYSTEM_DESIGNS: Record<string, { thumbf: string; thumbb: string; bgimgf: string }> = Object.fromEntries(
+export const SYSTEM_DESIGNS: Record<string, { thumbf: string; thumbb: string; bgimgf: string; width?: number; height?: number; }> = Object.fromEntries(
     Object.entries(cardformats).map(([id, cfg]: [string, any]) => [
         id,
-        { thumbf: cfg.bgimgf, thumbb: cfg.bgimgb, bgimgf: cfg.bgimgf }
+        { thumbf: cfg.bgimgf, thumbb: cfg.bgimgb, bgimgf: cfg.bgimgf, width: cfg.width, height: cfg.height }
     ])
 );
 
 /**
  * Returns the system design if it exists, otherwise null.
  */
-export function getSystemDesign(designId: string | undefined): { thumbf: string; thumbb: string; bgimgf: string } | null {
+export function getSystemDesign(designId: string | undefined): { thumbf: string; thumbb: string; bgimgf: string; width?: number; height?: number; } | null {
     if (!designId) return null;
     return SYSTEM_DESIGNS[designId] || null;
 }

@@ -145,8 +145,8 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                     Update: {
                         TableName: TABLE_NAME,
                         Key: { PK: `SHOP#${cleanShopId}`, SK: 'METADATA' },
-                        UpdateExpression: 'SET owner_id = :new_id, GSI2_PK = :gsi_pk, email = :email, gm_ids = :new_gm_ids, ts_updated_at = :now',
-                        ExpressionAttributeValues: { ':new_id': cleanNewUserId, ':gsi_pk': `USER#${cleanNewUserId}`, ':email': newUserEmail, ':new_gm_ids': updatedGmIds, ':now': now }
+                        UpdateExpression: 'SET owner_id = :new_id, GSI2_PK = :gsi_pk, GSI2_SK = :now, email = :email, gm_ids = :new_gm_ids, ts_updated_at = :now',
+                        ExpressionAttributeValues: { ':new_id': cleanNewUserId, ':gsi_pk': `USER#${cleanNewUserId}`, ':now': now, ':email': newUserEmail, ':new_gm_ids': updatedGmIds }
                     }
                 }
             ];

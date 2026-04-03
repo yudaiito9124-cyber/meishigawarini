@@ -1,5 +1,6 @@
 import { APIGatewayAuthorizerResult, APIGatewayRequestAuthorizerEvent } from 'aws-lambda';
 import { CognitoJwtVerifier } from 'aws-jwt-verify';
+import { getHeader } from '../utils/request';
 
 const USER_POOL_ID = process.env.USER_POOL_ID || '';
 const CLIENT_ID = process.env.CLIENT_ID || '';
@@ -14,7 +15,7 @@ const verifier = CognitoJwtVerifier.create({
 export const handler = async (event: APIGatewayRequestAuthorizerEvent): Promise<APIGatewayAuthorizerResult> => {
   try {
     // 1. authorizationヘッダーからトークンを抽出
-    const authorizationToken = event.headers?.['authorization'] || event.headers?.['Authorization'];
+    const authorizationToken = getHeader(event.headers, 'authorization');
     if (!authorizationToken) {
       console.log('No authorization token provided');
       return generatePolicy('unauthorized-user', 'Deny', event.methodArn);

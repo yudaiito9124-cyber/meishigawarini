@@ -72,6 +72,14 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         }
 
         const items = result.Items || [];
+        
+        // 互換性処理: design_id がない場合は card_design を使用
+        items.forEach((item: any) => {
+            if (!item.design_id && item.card_design) {
+                item.design_id = item.card_design;
+            }
+        });
+
         const shopMap = new Map<string, any>();
         const orderMap = new Map<string, any>();
         const designMap = new Map<string, any>();
@@ -105,7 +113,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         }
 
         // 3. デザイン情報のEnrichment (BatchGet, PK=CARD_DESIGN#METADATA, SK=design_id)
-        const designIds = [...new Set(items.map((i: any) => i.card_design).filter(Boolean))];
+        const designIds = [...new Set(items.map((i: any) => i.design_id).filter(Boolean))];
         if (designIds.length > 0) {
             const keys = designIds.map(id => ({ PK: 'CARD_DESIGN#METADATA', SK: id }));
             const batchRes = await ddb.send(new BatchGetCommand({ RequestItems: { [TABLE_NAME]: { Keys: keys, ProjectionExpression: 'SK, thumbf, thumbb' } } }));
@@ -125,11 +133,13 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             
             const shop = item.shop_id ? shopMap.get(item.shop_id) : null;
             const order = orderMap.get(item.PK);
-            const design = item.card_design ? (designMap.get(item.card_design) || getSystemDesign(item.card_design)) : null;
+            const designId = item.design_id;
+            const design = designId ? (designMap.get(designId) || getSystemDesign(designId)) : null;
 
             return {
                 ...item,
                 qr_id, // Add unified qr_id
+                design_id: designId, // Ensure design_id is present
                 status: currentStatus, // 最新の判定結果を反映
                 shop_name: shop?.name, 
                 shop_email: shop?.email,

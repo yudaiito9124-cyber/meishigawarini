@@ -130,7 +130,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                     return sendLocalizedEmail({
                         type: 'MESSAGE_NOTIFICATION',
                         to: emailTo,
-                        params: { username: 'Recipient', message: message || '', qr_id, pin },
+                        params: { username: username || 'Receiver', message: message || '', qr_id, pin },
                         lang
                     });
                 });

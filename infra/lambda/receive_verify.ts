@@ -65,7 +65,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             status = 'EXPIRED';
             await ddb.send(new UpdateCommand({
                 TableName: TABLE_NAME, Key: { PK: `QR#${qr_id}`, SK: 'METADATA' },
-                UpdateExpression: 'SET #status = :expired, GSI1_PK = :gsi_pk, ts_updated_at = :now',
+                UpdateExpression: 'SET #status = :expired, GSI1_PK = :gsi_pk, GSI1_SK = :now, ts_updated_at = :now',
                 ExpressionAttributeNames: { '#status': 'status' },
                 ExpressionAttributeValues: { ':expired': 'EXPIRED', ':gsi_pk': 'QR#EXPIRED', ':now': now.toISOString() }
             })).catch(e => console.error('Failed lazy expire update', e));
@@ -80,7 +80,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         // ====================================================================
         const shopId = item.shop_id;
         const productId = item.product_id;
-        const designId = item.card_design;
+        const designId = item.design_id || (item as any).card_design;
 
         const keys = [];
         if (shopId) keys.push({ PK: `SHOP#${shopId}`, SK: 'METADATA' });
@@ -96,7 +96,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         const shop = responses.find(r => r.PK === `SHOP#${shopId}` && r.SK === 'METADATA');
         const product = responses.find(r => r.PK === `SHOP#${shopId}` && r.SK === `PRODUCT#${productId}`);
         const designMeta = responses.find(r => r.PK === 'CARD_DESIGN#METADATA' && r.SK === designId);
-        const design = designMeta || getSystemDesign(designId);
+        const design = designMeta || (designId ? getSystemDesign(designId) : null);
         const order = responses.find(r => r.PK === `QR#${qr_id}` && r.SK === 'ORDER');
 
         // ショップオーナーのEmailフォールバック (Cognito)

@@ -1,6 +1,16 @@
 import { APIGatewayProxyEvent } from 'aws-lambda';
 
 /**
+ * Perform a case-insensitive header lookup.
+ */
+export const getHeader = (headers: Record<string, string | undefined> | null | undefined, key: string): string | undefined => {
+    if (!headers) return undefined;
+    const lowerKey = key.toLowerCase();
+    const actualKey = Object.keys(headers).find(k => k.toLowerCase() === lowerKey);
+    return actualKey ? headers[actualKey] : undefined;
+};
+
+/**
  * リクエストから QR ID を安全に取得します。
  * リクエストから QR ID を安全に取得します。
  * 優先順位: 1. Authorizer, 2. PathParameters, 3. Headers, 4. Body
@@ -9,7 +19,7 @@ export const getQrId = (event: APIGatewayProxyEvent, body: any = {}): string | u
     return (
         event.requestContext?.authorizer?.qr_id ||
         event.pathParameters?.qr_id ||
-        event.headers?.['x-qr-id'] ||
+        getHeader(event.headers, 'x-qr-id') ||
         body?.qr_id
     );
 };
@@ -21,7 +31,7 @@ export const getQrId = (event: APIGatewayProxyEvent, body: any = {}): string | u
 export const getPIN = (event: APIGatewayProxyEvent, body: any = {}): string | undefined => {
     return (
         event.requestContext?.authorizer?.pin ||
-        event.headers?.['x-qr-pin'] ||
+        getHeader(event.headers, 'x-qr-pin') ||
         body?.pin
     );
 };
@@ -32,7 +42,7 @@ export const getPIN = (event: APIGatewayProxyEvent, body: any = {}): string | un
 export const getShopId = (event: APIGatewayProxyEvent, body: any = {}): string | undefined => {
     return (
         event.requestContext?.authorizer?.shop_id ||
-        event.headers?.['x-shop-id'] ||
+        getHeader(event.headers, 'x-shop-id') ||
         event.pathParameters?.shop_id ||
         body?.shop_id ||
         event.queryStringParameters?.shop_id
@@ -44,7 +54,7 @@ export const getShopId = (event: APIGatewayProxyEvent, body: any = {}): string |
  */
 export const getProductId = (event: APIGatewayProxyEvent, body: any = {}): string | undefined => {
     return (
-        event.headers?.['x-product-id'] ||
+        getHeader(event.headers, 'x-product-id') ||
         body?.product_id ||
         event.queryStringParameters?.product_id
     );

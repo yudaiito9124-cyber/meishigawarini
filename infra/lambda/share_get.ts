@@ -41,7 +41,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         // 【フェーズ 2: 関連情報の取得 (Enrichment)】
         const shopId = item.shop_id;
         const productId = item.product_id;
-        const designId = item.card_design;
+        const designId = item.design_id || (item as any).card_design;
 
         const keys = [];
         if (shopId) keys.push({ PK: `SHOP#${shopId}`, SK: 'METADATA' });
@@ -61,7 +61,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             shop = responses.find(r => r.PK === `SHOP#${shopId}` && r.SK === 'METADATA');
             product = responses.find(r => r.PK === `SHOP#${shopId}` && r.SK === `PRODUCT#${productId}`);
             const designMeta = responses.find(r => r.PK === 'CARD_DESIGN#METADATA' && r.SK === designId);
-            design = designMeta || getSystemDesign(designId);
+            design = designMeta || (designId ? getSystemDesign(designId) : null);
         }
 
         // 【フェーズ 3: レスポンスの構築】

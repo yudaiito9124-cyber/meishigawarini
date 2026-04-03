@@ -3,6 +3,7 @@ import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, GetCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
 import { CognitoJwtVerifier } from 'aws-jwt-verify';
 import { isLocked, getRateLimitUpdate, getResetRateLimitUpdate } from '../utils/rate-limit';
+import { getHeader } from '../utils/request';
 
 const USER_POOL_ID = process.env.USER_POOL_ID || '';
 const CLIENT_ID = process.env.CLIENT_ID || '';
@@ -28,8 +29,8 @@ const ddb = DynamoDBDocumentClient.from(client, {
 
 export const handler = async (event: APIGatewayRequestAuthorizerEvent): Promise<APIGatewayAuthorizerResult> => {
     try {
-        const qr_id = event.headers?.['x-qr-id'] || event.headers?.['X-QR-ID'];
-        const pin = event.headers?.['x-qr-pin'] || event.headers?.['X-QR-PIN'];
+        const qr_id = getHeader(event.headers, 'x-qr-id');
+        const pin = getHeader(event.headers, 'x-qr-pin');
 
         if (!qr_id || !pin) {
             console.log('Missing QR ID or PIN in headers');
@@ -38,7 +39,7 @@ export const handler = async (event: APIGatewayRequestAuthorizerEvent): Promise<
 
         // --- オプションのJWT検証 (履歴記録等のためのユーザー識別用) ---
         let user_id: string | undefined = undefined;
-        const authHeader = event.headers?.['authorization'] || event.headers?.['Authorization'];
+        const authHeader = getHeader(event.headers, 'authorization');
         if (authHeader && verifier) {
             try {
                 const token = authHeader.replace('Bearer ', '');
@@ -136,7 +137,7 @@ export const handler = async (event: APIGatewayRequestAuthorizerEvent): Promise<
             ];
         } else {
             // 通常は /receive/* 配下すべてを許可 (他の /admin/ などは含めない)
-            policyResource = `${stageArn}/*/receive/*`;
+            policyResource = `${stageArn}/*`;
         }
 
         return generatePolicy(`receiver-${qr_id}`, 'Allow', policyResource, {

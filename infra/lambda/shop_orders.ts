@@ -59,14 +59,17 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 
                 metaItems = [metadata];
                 const orderDetail = items.find(i => i.SK === 'ORDER') || {};
+                const designId = metadata.design_id || metadata.card_design;
                 const order = formatOrderDetails(metadata, orderDetail);
                 // 単体取得時はデザイン情報を即時アタッチ
-                if (order.card_design) {
-                    const designRes = await ddb.send(new GetCommand({ TableName: TABLE_NAME, Key: { PK: 'CARD_DESIGN#METADATA', SK: order.card_design } }));
-                    const design = designRes.Item || getSystemDesign(order.card_design);
+                if (designId) {
+                    const designRes = await ddb.send(new GetCommand({ TableName: TABLE_NAME, Key: { PK: 'CARD_DESIGN#METADATA', SK: designId } }));
+                    const design = designRes.Item || getSystemDesign(designId);
                     if (design) {
                         order.thumbf = design.thumbf?.startsWith('/') ? design.thumbf : await signUrlIfS3(design.thumbf, BUCKET_NAME);
                         order.thumbb = design.thumbb?.startsWith('/') ? design.thumbb : await signUrlIfS3(design.thumbb, BUCKET_NAME);
+                        order.width = design.width;
+                        order.height = design.height;
                     }
                 }
                 return successResponse({ orders: [order] });
@@ -89,13 +92,20 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 batchRes.Responses?.[TABLE_NAME]?.forEach(o => orderDetailsMap.set(o.PK, o));
             }
 
+            // design_id を正規化
+            rawItems.forEach((item: any) => {
+                if (!item.design_id && item.card_design) {
+                    item.design_id = item.card_design;
+                }
+            });
+
             // Enrichment 2: カードデザイン情報(PK=CARD_DESIGN#METADATA, SK=id)の一括取得
             const designMap = new Map<string, any>();
-            const designIds = [...new Set(rawItems.map(i => i.card_design).filter(Boolean))];
+            const designIds = [...new Set(rawItems.map(i => i.design_id).filter(Boolean))];
             if (designIds.length > 0) {
                 for (let i = 0; i < designIds.length; i += 100) {
                     const keys = designIds.slice(i, i + 100).map(id => ({ PK: 'CARD_DESIGN#METADATA', SK: id }));
-                    const batchRes = await ddb.send(new BatchGetCommand({ RequestItems: { [TABLE_NAME]: { Keys: keys, ProjectionExpression: 'SK, thumbf, thumbb' } } }));
+                    const batchRes = await ddb.send(new BatchGetCommand({ RequestItems: { [TABLE_NAME]: { Keys: keys, ProjectionExpression: 'SK, thumbf, thumbb, width, height' } } }));
                     for (const d of (batchRes.Responses?.[TABLE_NAME] || [])) {
                         if (d.thumbf) d.thumbf = await signUrlIfS3(d.thumbf, BUCKET_NAME);
                         if (d.thumbb) d.thumbb = await signUrlIfS3(d.thumbb, BUCKET_NAME);
@@ -106,11 +116,13 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 
             const orders = rawItems.map(meta => {
                 const orderDetail = orderDetailsMap.get(meta.PK) || {};
-                const design = meta.card_design ? (designMap.get(meta.card_design) || getSystemDesign(meta.card_design)) : null;
+                const design = meta.design_id ? (designMap.get(meta.design_id) || getSystemDesign(meta.design_id)) : null;
                 const order = formatOrderDetails(meta, orderDetail);
                 if (design) {
                     order.thumbf = design.thumbf;
                     order.thumbb = design.thumbb;
+                    order.width = design.width;
+                    order.height = design.height;
                 }
                 return order;
             });
@@ -139,7 +151,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             const metaUpdateExpr: string[] = ['ts_updated_at = :now'];
             const metaAttrValues: any = { ':now': now };
             if (isShippingTransition) {
-                metaUpdateExpr.push('#status = :s, ts_shipped_at = :now, GSI1_PK = :gsi_pk');
+                metaUpdateExpr.push('#status = :s, ts_shipped_at = :now, GSI1_PK = :gsi_pk, GSI1_SK = :now');
                 metaAttrValues[':s'] = 'SHIPPED'; metaAttrValues[':gsi_pk'] = 'QR#SHIPPED';
             }
             if (memo_for_users !== undefined && !['COMPLETED', 'EXPIRED', 'BANNED'].includes(currentStatus)) {
@@ -213,6 +225,6 @@ function formatOrderDetails(meta: any, order: any): any {
         ts_shipped_at: meta.ts_shipped_at, ts_activated_at: meta.ts_activated_at,
         ts_submitted_at: meta.ts_submitted_at, ts_completed_at: meta.ts_completed_at,
         ts_expired_at: meta.ts_expired_at, ts_banned_at: meta.ts_banned_at,
-        card_design: meta.card_design
+        design_id: meta.design_id || meta.card_design
     };
 }

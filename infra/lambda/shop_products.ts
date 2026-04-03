@@ -49,14 +49,14 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         // 目的: ショップに紐づく新しい商品を登録します。
         // ====================================================================
         if (action === 'create') {
-            const { name, description, image_url, price, valid_days, detail_html, card_design_id } = body as ShopApiSchema['shop_products_create'];
+            const { name, description, image_url, price, valid_days, detail_html, design_id } = body as ShopApiSchema['shop_products_create'];
             if (!name) return errorResponse(400, 'Missing product name');
-            if (!card_design_id) return errorResponse(400, 'Missing card_design_id');
+            if (!design_id) return errorResponse(400, 'Missing design_id');
 
             // カードデザインの利用権限チェック
-            const isSystemDesign = !!getSystemDesign(card_design_id);
-            const isAllowedDesign = shopMetadata.card_designs?.includes(card_design_id);
-            if (!isSystemDesign && !isAllowedDesign) return errorResponse(403, 'Disallowed card_design_id');
+            const isSystemDesign = !!getSystemDesign(design_id);
+            const isAllowedDesign = shopMetadata.card_designs?.includes(design_id);
+            if (!isSystemDesign && !isAllowedDesign) return errorResponse(403, 'Disallowed design_id');
 
             const productId = generateId();
             const now = new Date().toISOString();
@@ -69,10 +69,10 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                     detail_html: stripSignaturesInHtml(detail_html || '', BUCKET_NAME),
                     image_url: stripSignature(image_url),
                     price, valid_days: Math.min(valid_days || DEFAULT_VALID_DAYS, 180),
-                    card_design_id,
+                    design_id,
                     status: 'ACTIVE',
                     GSI1_PK: 'PRODUCT#ACTIVE', GSI1_SK: now,
-                    GSI2_PK: `PRODUCT#${productId}`, GSI2_SK: `SHOP#${shopId}`,
+                    GSI2_PK: `PRODUCT#${productId}`, GSI2_SK: now,
                     ts_created_at: now, ts_updated_at: now
                 }
             }));
@@ -93,25 +93,34 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 
             // DELETED 以外を抽出
             const items = (res.Items || []).filter(item => item.status !== 'DELETED');
-            const cardDesignIds = Array.from(new Set(items.map(item => item.card_design_id).filter(id => !!id)));
+            
+            // design_id を正規化
+            items.forEach(item => {
+                if (!item.design_id && (item as any).card_design_id) {
+                    item.design_id = (item as any).card_design_id;
+                }
+            });
+
+            const designIds = Array.from(new Set(items.map(item => item.design_id).filter(id => !!id)));
             const designMap: Record<string, any> = {};
 
-            if (cardDesignIds.length > 0) {
+            if (designIds.length > 0) {
                 // デザインメタデータの一括取得
                 const batchRes = await ddb.send(new BatchGetCommand({
-                    RequestItems: { [TABLE_NAME]: { Keys: cardDesignIds.map(id => ({ PK: 'CARD_DESIGN#METADATA', SK: id })) } }
+                    RequestItems: { [TABLE_NAME]: { Keys: designIds.map(id => ({ PK: 'CARD_DESIGN#METADATA', SK: id })) } }
                 }));
                 const rawDesigns = batchRes.Responses?.[TABLE_NAME] || [];
                 for (const d of rawDesigns) {
                     designMap[d.SK] = {
                         design_id: d.SK, name: d.name, description: d.description,
+                        width: d.width, height: d.height,
                         thumbf: await signUrlIfS3(d.thumbf, BUCKET_NAME),
                         thumbb: await signUrlIfS3(d.thumbb, BUCKET_NAME),
                         bgimgf: await signUrlIfS3(d.bgimgf, BUCKET_NAME)
                     };
                 }
                 // システムデザインの補完
-                for (const id of cardDesignIds) {
+                for (const id of designIds) {
                     if (!designMap[id]) {
                         const sys = getSystemDesign(id);
                         if (sys) designMap[id] = { design_id: id, name: id, ...sys };
@@ -123,7 +132,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             for (const item of items) {
                 if (item.image_url) item.image_url = await signUrlIfS3(item.image_url, BUCKET_NAME);
                 if (item.detail_html) item.detail_html = await signUrlsInHtml(item.detail_html, BUCKET_NAME);
-                if (item.card_design_id) item.design = designMap[item.card_design_id];
+                if (item.design_id) item.design = designMap[item.design_id];
             }
             return successResponse({ items });
         }
@@ -135,7 +144,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         // ====================================================================
         if (action === 'update') {
             const product_id = getProductId(event, body);
-            const { status, name, description, image_url, price, valid_days, detail_html, card_design_id } = body as ShopApiSchema['shop_products_update'];
+            const { status, name, description, image_url, price, valid_days, detail_html, design_id } = body as ShopApiSchema['shop_products_update'];
             
             if (!product_id) return errorResponse(400, 'Missing product ID');
 
@@ -155,7 +164,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 
             if (status) {
                 if (!['ACTIVE', 'STOPPED'].includes(status)) return errorResponse(400, 'Invalid status');
-                updateExpr.push('#status = :status, GSI1_PK = :gsi_pk');
+                updateExpr.push('#status = :status, GSI1_PK = :gsi_pk, GSI1_SK = :now');
                 attrValues[':status'] = status;
                 attrValues[':gsi_pk'] = `PRODUCT#${status}`;
             }
@@ -166,12 +175,12 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             if (valid_days !== undefined) { updateExpr.push('valid_days = :vd'); attrValues[':vd'] = Math.min(valid_days, 180); }
             if (detail_html !== undefined) { updateExpr.push('detail_html = :html'); attrValues[':html'] = stripSignaturesInHtml(detail_html, BUCKET_NAME); }
             
-            if (card_design_id) {
-                const isSystemDesign = !!getSystemDesign(card_design_id);
-                const isAllowedDesign = shopMetadata.card_designs?.includes(card_design_id);
-                if (!isSystemDesign && !isAllowedDesign) return errorResponse(403, 'Disallowed card_design_id');
-                updateExpr.push('card_design_id = :cdid');
-                attrValues[':cdid'] = card_design_id;
+            if (design_id) {
+                const isSystemDesign = !!getSystemDesign(design_id);
+                const isAllowedDesign = shopMetadata.card_designs?.includes(design_id);
+                if (!isSystemDesign && !isAllowedDesign) return errorResponse(403, 'Disallowed design_id');
+                updateExpr.push('design_id = :cdid');
+                attrValues[':cdid'] = design_id;
             }
 
             await ddb.send(new UpdateCommand({
@@ -207,7 +216,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             if (relatedQRs.length > 0) return errorResponse(409, 'Cannot delete product with active QRs');
 
             // 論理削除の実行
-            const deletedItem = { ...prodRes.Item, status: 'DELETED', GSI1_PK: 'PRODUCT#DELETED', ts_updated_at: new Date().toISOString() };
+            const deletedItem = { ...prodRes.Item, status: 'DELETED', GSI1_PK: 'PRODUCT#DELETED', GSI1_SK: new Date().toISOString(), ts_updated_at: new Date().toISOString() };
             await ddb.send(new PutCommand({ TableName: TABLE_NAME, Item: deletedItem }));
             
             return successResponse({ message: 'Product deleted' });
