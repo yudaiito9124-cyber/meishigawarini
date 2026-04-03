@@ -20,7 +20,7 @@ const ddb = DynamoDBDocumentClient.from(client);
 
 export const handler = async (event: APIGatewayRequestAuthorizerEvent): Promise<APIGatewayAuthorizerResult> => {
   try {
-    const authorizationToken = event.headers?.['Authorization'] || event.headers?.['authorization'];
+    const authorizationToken = event.headers?.['authorization'] || event.headers?.['Authorization'];
     if (!authorizationToken) {
       console.log('No authorization token provided');
       return generatePolicy('unauthorized-user', 'Deny', event.methodArn);
@@ -55,13 +55,14 @@ export const handler = async (event: APIGatewayRequestAuthorizerEvent): Promise<
     const shopMetadata = await checkShopOwnerOrGM(ddb, TABLE_NAME, shopId, userId, null, groups);
 
     if (shopMetadata) {
-      const isGlobalAdmin = groups.includes('GlobalAdmins');
+      const is_global_admin = groups.includes('GlobalAdmins');
       return generatePolicy(userId, 'Allow', event.methodArn, {
         username: payload['cognito:username'] as string,
         email: payload.email as string,
         groups: JSON.stringify(groups),
-        shopId: shopId,
-        isGlobalAdmin: isGlobalAdmin ? 'true' : 'false'
+        shop_id: shopId,
+        is_global_admin: is_global_admin ? 'true' : 'false',
+        user_id: userId
       });
     }
 

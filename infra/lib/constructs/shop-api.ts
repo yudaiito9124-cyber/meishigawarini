@@ -7,6 +7,7 @@ import * as nodejs from 'aws-cdk-lib/aws-lambda-nodejs';
 import * as apigateway from 'aws-cdk-lib/aws-apigateway';
 import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as path from 'path';
+import { SHOP_ALLOW_HEADERS } from '../../../shared/constants';
 
 export interface ShopApiProps {
   table: dynamodb.ITable;
@@ -42,7 +43,7 @@ export class ShopApi extends cdk.NestedStack {
 
     const authorizer = new apigateway.RequestAuthorizer(this, 'ShopAuthorizer', {
       handler: shopAuthFn,
-      identitySources: [apigateway.IdentitySource.header('Authorization')],
+      identitySources: [apigateway.IdentitySource.header('authorization')],
       resultsCacheTtl: cdk.Duration.minutes(5),
     });
 
@@ -89,7 +90,7 @@ export class ShopApi extends cdk.NestedStack {
       res.addCorsPreflight({
         allowOrigins: allowedOrigins,
         allowMethods: apigateway.Cors.ALL_METHODS,
-        allowHeaders: [...apigateway.Cors.DEFAULT_HEADERS, 'X-QR-ID', 'X-QR-UUID', 'X-QR-PIN'],
+        allowHeaders: SHOP_ALLOW_HEADERS,
       });
       return res;
     };
@@ -102,7 +103,7 @@ export class ShopApi extends cdk.NestedStack {
     this.shopResource.addCorsPreflight({
       allowOrigins: allowedOrigins,
       allowMethods: apigateway.Cors.ALL_METHODS,
-      allowHeaders: [...apigateway.Cors.DEFAULT_HEADERS, 'X-QR-ID', 'X-QR-UUID', 'X-QR-PIN'],
+      allowHeaders: SHOP_ALLOW_HEADERS,
     });
 
     const routeOptions = { authorizer, authorizationType: apigateway.AuthorizationType.CUSTOM };

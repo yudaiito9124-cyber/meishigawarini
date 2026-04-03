@@ -6,6 +6,7 @@ import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as apigateway from 'aws-cdk-lib/aws-apigateway';
 import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as iam from 'aws-cdk-lib/aws-iam';
+import { ALL_ALLOW_HEADERS, joinHeaders } from '../../shared/constants';
 
 import { AdminApi } from './constructs/admin-api';
 import { ShopApi } from './constructs/shop-api';
@@ -224,7 +225,7 @@ export class InfraStack extends cdk.Stack {
       responseParameters: {
         // ヘッダー名にはシングルクォート、値にはシングル＋ダブルクォートが必要
         'gatewayresponse.header.Access-Control-Allow-Origin': "'*'",
-        'gatewayresponse.header.Access-Control-Allow-Headers': "'*'",
+        'gatewayresponse.header.Access-Control-Allow-Headers': `'${joinHeaders(ALL_ALLOW_HEADERS)}'`,
         'gatewayresponse.header.Access-Control-Allow-Methods': "'GET,POST,PUT,DELETE,OPTIONS,PATCH'",
       },
       templates: {

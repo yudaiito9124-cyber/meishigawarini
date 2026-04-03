@@ -78,7 +78,7 @@ export async function checkShopOwnerOrGM(
         } catch (e) { }
     }
 
-    if (userGroups.includes('GlobalAdmins') || (event && event.requestContext?.authorizer?.isGlobalAdmin === 'true')) {
+    if (userGroups.includes('GlobalAdmins') || (event && event.requestContext?.authorizer?.is_global_admin === 'true')) {
         // GlobalAdminのみは全ショップにアクセス可能
         const shopRes = await ddb.send(new GetCommand({
             TableName: tableName,

@@ -13,8 +13,8 @@ const verifier = CognitoJwtVerifier.create({
 
 export const handler = async (event: APIGatewayRequestAuthorizerEvent): Promise<APIGatewayAuthorizerResult> => {
   try {
-    // 1. Authorizationヘッダーからトークンを抽出
-    const authorizationToken = event.headers?.['Authorization'] || event.headers?.['authorization'];
+    // 1. authorizationヘッダーからトークンを抽出
+    const authorizationToken = event.headers?.['authorization'] || event.headers?.['Authorization'];
     if (!authorizationToken) {
       console.log('No authorization token provided');
       return generatePolicy('unauthorized-user', 'Deny', event.methodArn);
@@ -40,7 +40,8 @@ export const handler = async (event: APIGatewayRequestAuthorizerEvent): Promise<
     return generatePolicy(userId, 'Allow', event.methodArn, {
       username: payload['cognito:username'] as string,
       email: payload.email as string,
-      groups: JSON.stringify(groups)
+      groups: JSON.stringify(groups),
+      user_id: userId
     });
 
   } catch (err) {

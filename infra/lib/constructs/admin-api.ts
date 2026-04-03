@@ -8,6 +8,7 @@ import * as apigateway from 'aws-cdk-lib/aws-apigateway';
 import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as path from 'path';
+import { ADMIN_ALLOW_HEADERS } from '../../../shared/constants';
 
 export interface AdminApiProps {
   bucket: s3.IBucket;
@@ -67,6 +68,7 @@ export class AdminApi extends cdk.NestedStack {
     });
     const authorizerOfAdmin = new apigateway.TokenAuthorizer(this, 'AdminAuthorizer', {
       handler: adminAuthorizer,
+      identitySource: 'method.request.header.authorization',
       resultsCacheTtl: cdk.Duration.minutes(5),
     });
     adminAuthorizer.addToRolePolicy(new iam.PolicyStatement({
@@ -182,7 +184,7 @@ export class AdminApi extends cdk.NestedStack {
       res.addCorsPreflight({
         allowOrigins: allowedOrigins,
         allowMethods: apigateway.Cors.ALL_METHODS,
-        allowHeaders: [...apigateway.Cors.DEFAULT_HEADERS, 'X-QR-ID', 'X-QR-UUID', 'X-QR-PIN'],
+        allowHeaders: ADMIN_ALLOW_HEADERS,
       });
       return res;
     };
@@ -195,7 +197,7 @@ export class AdminApi extends cdk.NestedStack {
     this.adminResource.addCorsPreflight({
       allowOrigins: allowedOrigins,
       allowMethods: apigateway.Cors.ALL_METHODS,
-      allowHeaders: [...apigateway.Cors.DEFAULT_HEADERS, 'X-QR-ID', 'X-QR-UUID', 'X-QR-PIN'],
+      allowHeaders: ADMIN_ALLOW_HEADERS,
     });
 
     this.adminResource.addMethod('GET', new apigateway.LambdaIntegration(admin_check), { authorizer: authorizerOfAdmin, });

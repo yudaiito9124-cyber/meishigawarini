@@ -107,7 +107,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 const qrid = item.PK.replace('QR#', '');
                 const status = await checkAndExpire(ddb, TABLE_NAME, qrid, item as any);
                 return {
-                    id: qrid,
+                    qr_id: qrid,
                     status: status,
                     product_id: item.product_id,
                     ts_created_at: item.ts_created_at,

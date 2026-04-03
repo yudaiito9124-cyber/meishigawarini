@@ -7,6 +7,7 @@ import * as nodejs from 'aws-cdk-lib/aws-lambda-nodejs';
 import * as apigateway from 'aws-cdk-lib/aws-apigateway';
 import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as path from 'path';
+import { USER_ALLOW_HEADERS } from '../../../shared/constants';
 
 export interface UserApiProps {
   table: dynamodb.ITable;
@@ -43,7 +44,7 @@ export class UserApi extends cdk.NestedStack {
 
     const authorizer = new apigateway.RequestAuthorizer(this, 'UserAuthorizer', {
       handler: userAuthFn,
-      identitySources: [apigateway.IdentitySource.header('Authorization')],
+      identitySources: [apigateway.IdentitySource.header('authorization')],
       resultsCacheTtl: cdk.Duration.minutes(5),
     });
 
@@ -79,7 +80,7 @@ export class UserApi extends cdk.NestedStack {
       res.addCorsPreflight({
         allowOrigins: allowedOrigins,
         allowMethods: apigateway.Cors.ALL_METHODS,
-        allowHeaders: [...apigateway.Cors.DEFAULT_HEADERS, 'X-QR-ID', 'X-QR-UUID', 'X-QR-PIN'],
+        allowHeaders: USER_ALLOW_HEADERS,
       });
       return res;
     };
@@ -92,7 +93,7 @@ export class UserApi extends cdk.NestedStack {
     this.userResource.addCorsPreflight({
       allowOrigins: allowedOrigins,
       allowMethods: apigateway.Cors.ALL_METHODS,
-      allowHeaders: [...apigateway.Cors.DEFAULT_HEADERS, 'X-QR-ID', 'X-QR-UUID', 'X-QR-PIN'],
+      allowHeaders: USER_ALLOW_HEADERS,
     });
 
     const routeOptions = { authorizer, authorizationType: apigateway.AuthorizationType.CUSTOM };

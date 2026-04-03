@@ -28,7 +28,7 @@ const ddb = DynamoDBDocumentClient.from(client, {
 
 export const handler = async (event: APIGatewayRequestAuthorizerEvent): Promise<APIGatewayAuthorizerResult> => {
     try {
-        const qr_id = event.headers?.['x-qr-id'] || event.headers?.['X-QR-ID'] || event.headers?.['x-qr-uuid'] || event.headers?.['X-QR-UUID'];
+        const qr_id = event.headers?.['x-qr-id'] || event.headers?.['X-QR-ID'];
         const pin = event.headers?.['x-qr-pin'] || event.headers?.['X-QR-PIN'];
 
         if (!qr_id || !pin) {
@@ -37,13 +37,13 @@ export const handler = async (event: APIGatewayRequestAuthorizerEvent): Promise<
         }
 
         // --- オプションのJWT検証 (履歴記録等のためのユーザー識別用) ---
-        let userId: string | undefined = undefined;
-        const authHeader = event.headers?.['Authorization'] || event.headers?.['authorization'];
+        let user_id: string | undefined = undefined;
+        const authHeader = event.headers?.['authorization'] || event.headers?.['Authorization'];
         if (authHeader && verifier) {
             try {
                 const token = authHeader.replace('Bearer ', '');
                 const payload = await verifier.verify(token);
-                userId = payload.sub;
+                user_id = payload.sub;
             } catch (err) {
                 console.log('Optional JWT verification failed, proceeding as guest', err);
             }
@@ -143,8 +143,8 @@ export const handler = async (event: APIGatewayRequestAuthorizerEvent): Promise<
             qr_id: String(qr_id),
             pin: String(pin),
             status: String(item.status),
-            shopId: item.shop_id ? String(item.shop_id) : '',
-            ...(userId ? { userId: String(userId) } : {})
+            shop_id: item.shop_id ? String(item.shop_id) : '',
+            ...(user_id ? { user_id: String(user_id) } : {})
         });
 
     } catch (err) {

@@ -8,6 +8,7 @@ import * as apigateway from 'aws-cdk-lib/aws-apigateway';
 import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as path from 'path';
+import { RECEIVE_ALLOW_HEADERS } from '../../../shared/constants';
 
 export interface ReceiveApiProps {
   table: dynamodb.ITable;
@@ -46,8 +47,8 @@ export class ReceiveApi extends cdk.NestedStack {
     const authorizer = new apigateway.RequestAuthorizer(this, 'receive_authorizer', {
       handler: receive_authorizer_fn,
       identitySources: [
-        apigateway.IdentitySource.header('X-QR-ID'),
-        apigateway.IdentitySource.header('X-QR-PIN'),
+        apigateway.IdentitySource.header('x-qr-id'),
+        apigateway.IdentitySource.header('x-qr-pin'),
       ],
       resultsCacheTtl: cdk.Duration.minutes(5),
     });
@@ -128,7 +129,7 @@ export class ReceiveApi extends cdk.NestedStack {
       res.addCorsPreflight({
         allowOrigins: allowedOrigins,
         allowMethods: apigateway.Cors.ALL_METHODS,
-        allowHeaders: [...apigateway.Cors.DEFAULT_HEADERS, 'X-QR-ID', 'X-QR-UUID', 'X-QR-PIN'],
+        allowHeaders: RECEIVE_ALLOW_HEADERS,
       });
       return res;
     };
@@ -140,7 +141,7 @@ export class ReceiveApi extends cdk.NestedStack {
     this.receiveResource.addCorsPreflight({
       allowOrigins: allowedOrigins,
       allowMethods: apigateway.Cors.ALL_METHODS,
-      allowHeaders: [...apigateway.Cors.DEFAULT_HEADERS, 'X-QR-ID', 'X-QR-UUID', 'X-QR-PIN'],
+      allowHeaders: RECEIVE_ALLOW_HEADERS,
     });
 
     const routeOptions = { authorizer, authorizationType: apigateway.AuthorizationType.CUSTOM };

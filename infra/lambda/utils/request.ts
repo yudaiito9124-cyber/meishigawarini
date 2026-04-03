@@ -2,23 +2,15 @@ import { APIGatewayProxyEvent } from 'aws-lambda';
 
 /**
  * リクエストから QR ID を安全に取得します。
+ * リクエストから QR ID を安全に取得します。
  * 優先順位: 1. Authorizer, 2. PathParameters, 3. Headers, 4. Body
  */
 export const getQrId = (event: APIGatewayProxyEvent, body: any = {}): string | undefined => {
     return (
         event.requestContext?.authorizer?.qr_id ||
-        event.requestContext?.authorizer?.qrId ||
-        event.requestContext?.authorizer?.uuid ||
         event.pathParameters?.qr_id ||
-        event.pathParameters?.qrId ||
-        event.pathParameters?.uuid ||
-        event.headers['X-QR-ID'] ||
-        event.headers['x-qr-id'] ||
-        event.headers['X-QR-UUID'] ||
-        event.headers['x-qr-uuid'] ||
-        body?.qr_id ||
-        body?.qrId ||
-        body?.uuid
+        event.headers?.['x-qr-id'] ||
+        body?.qr_id
     );
 };
 
@@ -29,10 +21,7 @@ export const getQrId = (event: APIGatewayProxyEvent, body: any = {}): string | u
 export const getPIN = (event: APIGatewayProxyEvent, body: any = {}): string | undefined => {
     return (
         event.requestContext?.authorizer?.pin ||
-        event.headers['X-QR-PIN'] ||
-        event.headers['x-qr-pin'] ||
-        body?.pin_code ||
-        body?.pinCode ||
+        event.headers?.['x-qr-pin'] ||
         body?.pin
     );
 };
@@ -42,11 +31,10 @@ export const getPIN = (event: APIGatewayProxyEvent, body: any = {}): string | un
  */
 export const getShopId = (event: APIGatewayProxyEvent, body: any = {}): string | undefined => {
     return (
-        event.headers['X-Shop-Id'] ||
-        event.headers['x-shop-id'] ||
+        event.requestContext?.authorizer?.shop_id ||
+        event.headers?.['x-shop-id'] ||
+        event.pathParameters?.shop_id ||
         body?.shop_id ||
-        body?.shopId ||
-        event.queryStringParameters?.shopId ||
         event.queryStringParameters?.shop_id
     );
 };
@@ -56,11 +44,8 @@ export const getShopId = (event: APIGatewayProxyEvent, body: any = {}): string |
  */
 export const getProductId = (event: APIGatewayProxyEvent, body: any = {}): string | undefined => {
     return (
-        event.headers['X-Product-Id'] ||
-        event.headers['x-product-id'] ||
+        event.headers?.['x-product-id'] ||
         body?.product_id ||
-        body?.productId ||
-        event.queryStringParameters?.productId ||
         event.queryStringParameters?.product_id
     );
 };
@@ -70,6 +55,7 @@ export const getProductId = (event: APIGatewayProxyEvent, body: any = {}): strin
  */
 export const getUserId = (event: APIGatewayProxyEvent): string | undefined => {
     return (
+        event.requestContext?.authorizer?.user_id ||
         event.requestContext?.authorizer?.principalId ||
         event.requestContext?.authorizer?.claims?.sub
     );

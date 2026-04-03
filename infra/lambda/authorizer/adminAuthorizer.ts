@@ -68,9 +68,10 @@ export const handler = async (event: APIGatewayTokenAuthorizerEvent): Promise<AP
     if (!usedMfa) {
       console.log('Admin user access denied: MFA evidence not found and not enabled in profile. AMR:', amr);
       return generatePolicy(payload.sub, 'Deny', event.methodArn, {
-        mfaRequired: 'true',
+        mfa_required: 'true',
         username: payload['cognito:username'] as string,
-        amr: JSON.stringify(amr)
+        amr: JSON.stringify(amr),
+        user_id: payload.sub
       });
     }
 
@@ -79,8 +80,9 @@ export const handler = async (event: APIGatewayTokenAuthorizerEvent): Promise<AP
       username: payload['cognito:username'] as string,
       email: payload.email as string,
       groups: JSON.stringify(groups),
-      isGlobalAdmin: groups.includes('GlobalAdmins') ? 'true' : 'false',
-      isAdmin: groups.includes('Administrators') ? 'true' : 'false',
+      is_global_admin: groups.includes('GlobalAdmins') ? 'true' : 'false',
+      is_admin: groups.includes('Administrators') ? 'true' : 'false',
+      user_id: payload.sub
     });
 
   } catch (err) {

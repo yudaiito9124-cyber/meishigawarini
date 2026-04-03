@@ -129,6 +129,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 
             return {
                 ...item,
+                qr_id, // Add unified qr_id
                 status: currentStatus, // 最新の判定結果を反映
                 shop_name: shop?.name, 
                 shop_email: shop?.email,
