@@ -8,18 +8,19 @@
 
 ## 1. データの種類（エンティティ一覧）
 
-| **User (ユーザー情報 ショップのオーナー・管理者)** | `USER#{userId}` | `SHOP` |
-| **User (ユーザー情報 送り主プロフィール)** | `USER#{userId}` | `SENDER` |
-| **User (ユーザー情報 配送先デフォルト)** | `USER#{userId}` | `RECEIVER` |
-| **User (ユーザー履歴ログ)** | `USER#{userId}` | `SENDLOG#{index}` / `RECEIVEDLOG#{index}` |
-| **User (ユーザー履歴メタデータ)** | `USER#{userId}` | `SENDLOG_META` / `RECEIVEDLOG_META` |
-| **Shop Metadata (ショップ情報)** | `SHOP#{shopId}` | `METADATA` |
-| **Shop Product (商品情報)** | `SHOP#{shopId}` | `PRODUCT#{productId}` |
+| **User (ユーザー情報 ショップのオーナー・管理者)** | `USER#{user_id}` | `SHOP` |
+| **User (ユーザー情報 送り主プロフィール)** | `USER#{user_id}` | `SENDER` |
+| **User (ユーザー情報 配送先デフォルト)** | `USER#{user_id}` | `RECEIVER` |
+| **User (ユーザー履歴ログ)** | `USER#{user_id}` | `SENDLOG#{index}` / `RECEIVEDLOG#{index}` |
+| **User (ユーザー履歴メタデータ)** | `USER#{user_id}` | `SENDLOG_META` / `RECEIVEDLOG_META` |
+| **Shop Metadata (ショップ情報)** | `SHOP#{shop_id}` | `METADATA` |
+| **Shop Product (商品情報)** | `SHOP#{shop_id}` | `PRODUCT#{product_id}` |
 | **QR Metadata (QRコード及び注文ステータス)** | `QR#{uuid}` | `METADATA` |
 | **QR Order (受取人入力の配送先情報)** | `QR#{uuid}` | `ORDER` |
 | **QR Chat (チャット履歴)** | `QR#{uuid}` | `CHAT` |
-| **Card Design (カードデザイン情報)** | `CARD_DESIGN#METADATA` | `designId` |
-| **Card Order (カード発注情報)** | `CARD_ORDER#{shopId}` | `ORDER#{orderId}` |
+| **Card Design (カードデザイン情報)** | `CARD_DESIGN#METADATA` | `design_id` |
+| **Card Order (カード発注情報)** | `CARD_ORDER#{shop_id}` | `ORDER#{order_id}` |
+| **QR Batch (一括生成バッチデータ)** | `QRBATCH#{batch_id}` | `METADATA` |
 
 
 ---
@@ -31,11 +32,11 @@
 
 | 属性名 | 型 | 説明 |
 | --- | --- | --- |
-| `PK` | String | `USER#{userId}` （`userId` はCognitoの `sub` 属性） |
+| `PK` | String | `USER#{user_id}` （`user_id` はCognitoの `sub` 属性） |
 | `SK` | String | 常に固定値 `SHOP` |
 | `email` | String | ユーザーのメールアドレス |
 | `roles` | Array | ユーザーに付与されたロールの配列 （例: `['SHOP_MANAGER', 'GENERAL_MANAGER']`） |
-| `owner_shop_ids` | Array | 自身がオーナーであるショップID（`shopId`）の配列 |
+| `owner_shop_ids` | Array | 自身がオーナーであるショップID（`shop_id`）の配列 |
 | `gm_shop_ids` | Array | 管理権限（General Manager）を持つショップIDの配列 |
 | `ts_created_at` | String | 作成日時 （ISO 8601形式のUTC日時文字列） |
 
@@ -44,7 +45,7 @@
 
 | 属性名 | 型 | 説明 |
 | --- | --- | --- |
-| `PK` | String | `USER#{userId}` （`userId` はUUID形式の識別子、またはCognitoの `sub`） |
+| `PK` | String | `USER#{user_id}` （`user_id` はUUID形式の識別子、またはCognitoの `sub`） |
 | `SK` | String | 常に固定値 `SENDER` |
 | `name` | String | 名前 |
 | `job_title` | String | 役職 |
@@ -82,7 +83,7 @@
 
 | 属性名 | 型 | 説明 |
 | --- | --- | --- |
-| `PK` | String | `USER#{userId}` （Cognitoの `sub`） |
+| `PK` | String | `USER#{user_id}` （Cognitoの `sub`） |
 | `SK` | String | 常に固定値 `RECEIVER` |
 | `name` | String | 受取人氏名 |
 | `zipCode` | String | 郵便番号 |
@@ -97,7 +98,7 @@
 
 | 属性名 | 型 | 説明 |
 | --- | --- | --- |
-| `PK` | String | `USER#{userId}` |
+| `PK` | String | `USER#{user_id}` |
 | `SK` | String | `SENDLOG#{index}` または `RECEIVEDLOG#{index}` (例: `001`) |
 | `logs` | Array | 履歴データの配列。形式: `[{ qr_id: "ID", timestamp: "ISO時間" }]` ※旧データは `uuid` キーを使用 |
 | `ts_updated_at` | String | レコードの最終更新日時 |
@@ -107,7 +108,7 @@
 
 | 属性名 | 型 | 説明 |
 | --- | --- | --- |
-| `PK` | String | `USER#{userId}` |
+| `PK` | String | `USER#{user_id}` |
 | `SK` | String | `SENDLOG_META` または `RECEIVEDLOG_META` |
 | `current_index` | Number | 現在書き込みを行っているログレコードのインデックス |
 | `current_count` | Number | 現在のログレコードに含まれるエントリー数 |
@@ -120,7 +121,7 @@
 
 | 属性名 | 型 | 説明 |
 | --- | --- | --- |
-| `PK` | String | `SHOP#{shopId}` （`shopId` はUUID形式、例: `SHOP#123e4567-...`） |
+| `PK` | String | `SHOP#{shop_id}` （`shop_id` はUUID形式、例: `SHOP#123e4567-...`） |
 | `SK` | String | 常に固定値 `METADATA` |
 | `name` | String | ショップ名 （任意の文字列、例: `山田青果店`） |
 | `detail_html` | String | ショップ説明 （任意のHTML文字列） |
@@ -141,8 +142,8 @@
 
 | 属性名 | 型 | 説明 |
 | --- | --- | --- |
-| `PK` | String | `SHOP#{shopId}` （`shopId` はUUID形式） |
-| `SK` | String | `PRODUCT#{productId}` （`productId` はUUID形式） |
+| `PK` | String | `SHOP#{shop_id}` （`shop_id` はUUID形式） |
+| `SK` | String | `PRODUCT#{product_id}` （`product_id` はUUID形式） |
 | `product_id` | String | 商品自身のUUID （逆引きや参照用） |
 | `name` | String | 商品名 （任意の文字列、例: `高級メロン`） |
 | `description` | String | 商品説明 （任意のシングルライン文字列） |
@@ -156,7 +157,7 @@
 | `ts_updated_at` | String | 更新日時 （ISO 8601形式のUTC日時文字列） |
 | `GSI1_PK` | String | `PRODUCT#{status}` （アクティブな商品一覧取得用、例: `PRODUCT#ACTIVE`） |
 | `GSI1_SK` | String | ソートキー。**商品ステータス (`GSI1_PK`) が変更された際のみ**、現在時刻 (ISO 8601) に更新されます。 |
-| `GSI2_PK` | String | `PRODUCT#{productId}` （UUIDからの逆引き用） |
+| `GSI2_PK` | String | `PRODUCT#{product_id}` （UUIDからの逆引き用） |
 | `GSI2_SK` | String | ソートキー。商品作成時のみ現在時刻がセットされます（PKが不変のため）。 |
 
 ### 2.8 QR Metadata (QRコード及び注文ステータス)
@@ -188,7 +189,7 @@ QRコードのライフサイクルや注文ステータス、商品との紐付
 | `ban_reason` | String | 無効化(BAN)理由 （任意の文字列） |
 | `GSI1_PK` | String | `QR#{status}` （ステータスごとの一覧取得用、例: `QR#ACTIVE`） |
 | `GSI1_SK` | String | ソートキー。**ステータス (`GSI1_PK`) が変更された際のみ**、現在時刻 (ISO 8601) に更新されます。 |
-| `GSI2_PK` | String | `SHOP#{shopId}` （担当ショップが持つQR一覧取得用） |
+| `GSI2_PK` | String | `SHOP#{shop_id}` （担当ショップが持つQR一覧取得用） |
 | `GSI2_SK` | String | ソートキー。**紐付け先ショップ (`GSI2_PK`) が変更された際のみ**、現在時刻 (ISO 8601) に更新されます。 |
 
 ### 2.9 Order (受取人による配送先・注文詳細)
@@ -259,10 +260,10 @@ QRコードのライフサイクルや注文ステータス、商品との紐付
 
 | 属性名 | 型 | 説明 |
 | --- | --- | --- |
-| `PK` | String | `CARD_ORDER#SHOP{shopId}` （`shopId` はUUID形式,いずれSHOP以外も？） |
-| `SK` | String | `ORDER#{orderId}` （`orderId` はUUID形式） |
+| `PK` | String | `CARD_ORDER#SHOP{shop_id}` または `CARD_ORDER#ADMIN{user_id}` |
+| `SK` | String | `ORDER#{order_id}` （`order_id` はUUID形式） |
 | `order_id` | String | 発注ID （UUID形式） |
-| `quantity` | Number | 発注枚数 |
+| `quantity` | Number | 発注枚数（上限100枚，QRBATCHレコードの保存方法の都合上，AWSの1レコードあたりの容量上限があるため，1000個くらいが限度と思われる） |
 | `status` | String | 発注状態 (`ORDERED`, `CANCELLED`, `PRINTING`, `SHIPPED`, `COMPLETED`, `REJECTED`) | ショップからはORDEREDの時点でのみCANCELLEDに移行可能，システム管理者が生成した時点でPRINTINGに移行 |
 | `design_id` | String | デザインID （UUID形式） |
 | `product_id` | String | (オプション・制限) 商品ID （UUID形式） |
@@ -273,13 +274,26 @@ QRコードのライフサイクルや注文ステータス、商品との紐付
 | `activate_now` | Boolean | (オプション・制限) 生成と同時に有効化するか |
 | `ts_created_at` | String | 作成日時 （ISO 8601形式のUTC日時文字列） |
 | `ts_updated_at` | String | 更新日時 （ISO 8601形式のUTC日時文字列） |
+| `user_id_order` | String | 発注を申請したユーザーのID (ショップ担当者または管理者) |
+| `user_id_create` | String | 実際にQR生成・印刷処理を行った管理者のID |
+| `batch_id` | String | 生成されたQRコード群のバッチID (印刷/ダウンロードの再利用に使用) |
 | `GSI1_PK` | String | `CARD_ORDER#{status}` （アクティブな商品一覧取得用、例: `CARD_ORDER#ORDERED`） |
 | `GSI1_SK` | String | ソートキー。**発注ステータス (`GSI1_PK`) が変更された際のみ**、現在時刻 (ISO 8601) に更新されます。 |
-| `GSI2_PK` | String | `CARD_ORDER#{orderId}` （UUIDからの逆引き用） |
+| `GSI2_PK` | String | `CARD_ORDER#{order_id}` （UUIDからの逆引き用） |
 | `GSI2_SK` | String | ソートキー。発注作成時のみ現在時刻がセットされます（PKが不変のため）。 |
- 欲しい？　印刷したユーザー名，手動で生成した場合もこのフォーマットでレコードを残す？
 
-### 2.13 レコードが保持可能な状態 (ステータス) 一覧
+### 2.14 QR Batch (一括生成バッチデータ)
+QRコードを一括生成した際のメタデータと、生成された全QRコードのペア（IDとPIN）を保持します。PDF/CSVの再生成や、一括管理に使用されます。
+
+| 属性名 | 型 | 説明 |
+| --- | --- | --- |
+| `PK` | String | `QRBATCH#{batch_id}` |
+| `SK` | String | 常に固定値 `METADATA` |
+| `data` | Array | 生成されたQRコードのリスト。形式: `[{ qr_id: "...", pin: "..." }]` |
+| `order_id` | String | このバッチ生成の契機となったカード発注ID |
+| `ts_created_at` | String | 作成日時 |
+
+### 2.15 レコードが保持可能な状態 (ステータス) 一覧
 
 
 データベース内の `status` 属性が取りうる状態とその意味を定義します。
@@ -329,8 +343,9 @@ QRコードのライフサイクルや注文の進捗状況を表します。
    - 商品のインポート: `GetCommand` (Source Product) + `PutCommand` (Target Product)
    - 画像アップロードURL発行: (S3 Presigned URL発行)
 
-3. **QR管理 (`shop_qr.ts`, `admin-generate.ts`)**
-   - QRコードの一括生成: `BatchWriteItemCommand` (QR Metadata)
+3. **QR管理 (`shop_qr.ts`, `admin_qr_generate.ts`, `admin_qr_batch.ts`)**
+   - QRコードの一括生成: `BatchWriteItemCommand` (QR Metadata) + `PutCommand` (QR Batch)
+   - バッチデータの取得: `GetCommand` (QR Batch)
    - QRコードの一覧・検索: `QueryCommand` (GSI2 使用)
    - QRコードの紐付け・有効化: `UpdateCommand` (QR Metadata)
    - QR状態チェック: `GetCommand` (QR Metadata)

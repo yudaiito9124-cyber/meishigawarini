@@ -11,9 +11,10 @@ import { PutCommand, QueryCommand, GetCommand, UpdateCommand, BatchGetCommand } 
 import { checkShopOwnerOrGM } from './share/shop-auth';
 import { generateId } from './utils/id';
 import { successResponse, errorResponse, apiResponse } from './utils/response';
-import { ddb, TABLE_NAME } from './share/db';
+import { ddb, TABLE_NAME, BUCKET_NAME } from './share/db';
 import { getShopId, getAction, getUserId } from './utils/request';
 import { ShopApiSchema } from '@shared/api-types';
+import { validateQRParams } from './utils/qr-validation';
 
 export const handler: APIGatewayProxyHandler = async (event) => {
     try {
@@ -45,6 +46,22 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 return errorResponse(400, 'Missing quantity or design_id');
             }
 
+            // 整合性チェックの実行
+            const validationResult: any = await validateQRParams(ddb, TABLE_NAME, BUCKET_NAME, {
+                shopId,
+                productId: product_id,
+                owner_id: shop_user_id,
+                activateNow: !!activate_now,
+                senderId: sender_user_id
+            }).catch((err: any) => {
+                if (err.statusCode) return err;
+                throw err;
+            });
+
+            if (validationResult.statusCode) {
+                return errorResponse(validationResult.statusCode, validationResult.message, validationResult.detail);
+            }
+
             const orderId = generateId();
             let finalExpirationDate = expiration_date || null;
 
@@ -65,6 +82,8 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                     activate_now: !!activate_now,
                     ts_created_at: now,
                     ts_updated_at: now,
+                    user_id_order: userId, // 作成したショップ担当者のID
+                    user_id_create: null,
                     // 管理者一覧用インデックス (GSI1)
                     GSI1_PK: `CARD_ORDER#ORDERED`,
                     GSI1_SK: now,

@@ -44,8 +44,10 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         // ACTION: update (カードデザインの紐付け更新)
         // ====================================================================
         if (action === 'update') {
-            const { design_ids } = body as AdminApiSchema['admin_shop_carddesign_link_update'];
-            if (!Array.isArray(design_ids)) return errorResponse(400, 'design_ids must be an array');
+            const { card_designs } = body as AdminApiSchema['admin_shop_carddesign_link_update'];
+            if (!Array.isArray(card_designs)) {
+                return errorResponse(400, 'card_designs must be an array');
+            }
 
             // 【DB操作: UpdateItem】
             // 理由: ショップメタデータの card_designs プロパティを上書き。
@@ -54,7 +56,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 TableName: TABLE_NAME,
                 Key: { PK: `SHOP#${shopId}`, SK: 'METADATA' },
                 UpdateExpression: 'SET card_designs = :cd, ts_updated_at = :now',
-                ExpressionAttributeValues: { ':cd': design_ids, ':now': new Date().toISOString() }
+                ExpressionAttributeValues: { ':cd': card_designs, ':now': new Date().toISOString() }
             }));
 
             return successResponse({ message: 'Shop card designs updated successfully' });

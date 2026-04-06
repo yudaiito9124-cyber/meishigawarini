@@ -4,7 +4,7 @@
  */
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useMemo } from 'react';
 import { notFound, useParams } from "next/navigation";
 import { getCurrentUser, fetchAuthSession } from 'aws-amplify/auth';
 import { Button } from "@/components/ui/button";
@@ -84,7 +84,7 @@ export default function AdminPage() {
     };
 
     useEffect(() => {
-        if (reloadDbCardDesigns && (activeTab === "qrcodes" || activeTab === "cardorders")) {
+        if (reloadDbCardDesigns && (activeTab === "qrcodes" || activeTab === "cardorders" || activeTab === "shops")) {
             fetchDbCardDesigns();
             setReloadDbCardDesigns(false);
         }
@@ -111,12 +111,13 @@ export default function AdminPage() {
         }
     };
 
-    const handleUpdateCardOrderStatus = async (shopId: string, orderId: string, status: string) => {
+    const handleUpdateCardOrderStatus = async (shopId: string, orderId: string, status: string, batchId?: string) => {
         try {
             await adminApi.admin_card_orders_update({
                 shop_id: shopId,
                 order_id: orderId,
-                status
+                status,
+                batch_id: batchId
             });
             fetchCardOrders();
         } catch (e) {
@@ -132,48 +133,100 @@ export default function AdminPage() {
 
 
 
-    const handleGenerate = async () => {
-        setIsGenerating(true);
+    const handleExport = async (order: any, type: 'pdf' | 'csv') => {
+        setIsExportingCsv(order.order_id); // Reusing existing state for progress
         try {
+            let codes: any[] = [];
+            let batchId = order.batch_id;
+
+            if (batchId) {
+                // 1. If batch_id already exists, use it regardless of status
+                const data = await adminApi.admin_qr_batch_get({ batch_id: batchId });
+                codes = data.data;
+                
+                // If the status was still ORDERED, we should update it to PRINTING (if not done already)
+                if (order.status === 'ORDERED') {
+                    await handleUpdateCardOrderStatus(order.shop_id, order.order_id, 'PRINTING', batchId);
+                }
+            } else if (order.status === 'ORDERED') {
+                // 2. Generate NEW QR codes only for ORDERED status with no batch_id
+                const data = await adminApi.admin_qr_generate({
+                    order_id: order.order_id
+                });
+                codes = data.data;
+                batchId = data.batch_id;
+
+                // After generation, the Lambda already updates the order, 
+                // but we refresh the UI to show the new status.
+                setTimeout(() => fetchCardOrders(), 500);
+            } else {
+                // 3. No batch_id for non-ORDERED status
+                alert("No QR codes found for this order. It may have been processed without saving a batch ID.");
+                return;
+            }
+
+            // 4. Trigger download
+            const batch = {
+                id: `batch-${batchId}`,
+                count: codes.length,
+                codes: codes,
+                date: new Date(order.ts_created_at || new Date()).toLocaleString()
+            };
+
             const resolveDesign = (designId?: string) => {
                 const targetId = designId || cardFormat;
                 const dbDesign = dbCardDesigns.find(d => d.design_id === targetId);
                 if (dbDesign) return dbDesign;
-                if (cardformats[targetId]) return cardformats[targetId];
-                // Fallback to currently selected global design
+                if (cardformats[targetId]) return targetId;
                 const globalDesign = dbCardDesigns.find(d => d.design_id === cardFormat);
                 return globalDesign || cardFormat;
             };
+            const design = resolveDesign(order.design_id);
 
-            const data = await adminApi.admin_qr_generate({
-                count,
-                ...(useMetadataOptions ? {
-                    shop_id: shopId || undefined,
-                    product_id: productId || undefined,
-                    owner_user_id: ownerUuid || undefined,
-                    sender_id: senderId || undefined,
-                    expiry_date: expiryDate ? new Date(expiryDate).toISOString() : undefined,
-                    activate_now: activateNow
-                } : {}),
-                design_id: cardFormat
+            if (type === 'pdf') {
+                await generatePDF(batch, paperFormat, design);
+            } else {
+                await generateCSVExport(batch, design);
+            }
+        } catch (e) {
+            console.error("Export failed", e);
+            alert("Export failed. Please check if the design and shop are correct.");
+        } finally {
+            setIsExportingCsv(null);
+        }
+    };
+
+    const handleGenerate = async () => {
+        setIsGenerating(true);
+        try {
+            // 1. Create a CARD_ORDER first (Unifying the flow)
+            const orderRes = await adminApi.admin_card_orders_create({
+                shop_id: shopId,
+                quantity: count,
+                design_id: cardFormat,
+                product_id: productId || undefined,
+                shop_user_id: ownerUuid || undefined,
+                sender_user_id: senderId || undefined,
+                expiration_date: expiryDate ? new Date(expiryDate).toISOString() : undefined,
+                activate_now: activateNow
             });
 
-            const batchid = `batch-${data.batch_id}`;
-            const now = new Date();
+            // 2. Refresh the list to show the new order
+            await fetchCardOrders();
 
-            const newBatch = {
-                id: batchid,
-                count: data.count,
-                date: now.toLocaleString(),
-                status: t('batches.status.ready'),
-                codes: data.data // Store the codes
+            // 3. Manually construct/trigger the export for the newly created order
+            const newOrder = {
+                order_id: orderRes.order_id,
+                shop_id: shopId,
+                quantity: count,
+                status: 'ORDERED',
+                design_id: cardFormat,
+                product_id: productId,
+                ts_created_at: new Date().toISOString()
             };
-            setGeneratedBatches([newBatch, ...generatedBatches]);
 
-            // Automatically download PDF and CSV
-            const design = resolveDesign(cardFormat);
-            await generatePDF(newBatch, paperFormat, design);
-            await generateCSVExport(newBatch, design);
+            await handleExport(newOrder, 'pdf');
+            
         } catch (e: any) {
             const errData = e;
             alert((tb(errData?.message?.replace(/\./g, '_')) || errData?.message) || t('batches.alerts.failed') + (errData?.detail?.toString() || ''));
@@ -332,6 +385,8 @@ export default function AdminPage() {
                             setShopIdFilter={setCardOrderFilterShopId}
                             onUpdateStatus={handleUpdateCardOrderStatus}
                             onRefresh={fetchCardOrders}
+                            onExport={handleExport}
+                            isExporting={isExportingCsv}
                             dbCardDesigns={dbCardDesigns}
                             paperFormat={paperFormat}
                             cardFormat={cardFormat}
@@ -1939,7 +1994,16 @@ function AdminShopCardDesignLinkSection({ apiUrl, dbCardDesigns }: { apiUrl: str
         try {
             const data = await adminApi.admin_shop_carddesign_link_get({ shop_id: shopId.trim() });
             setShopData(data);
-            setSelectedDesignIds(data.design_ids || []);
+
+            // Clean extraction strictly from card_designs field
+            const rawLinks = data.card_designs || [];
+            const ids = Array.isArray(rawLinks)
+                ? rawLinks.map((item: any) => typeof item === 'string' ? item : (item.design_id || item.id || item.SK))
+                : [];
+
+            const filteredIds = ids.filter(Boolean);
+            // console.log("AdminShopCardDesignLinkSection: extracted IDs", filteredIds);
+            setSelectedDesignIds(filteredIds);
         } catch (e: any) {
             alert(tLink('notFound') + ": " + (e.message || ""));
             setShopData(null);
@@ -1954,7 +2018,7 @@ function AdminShopCardDesignLinkSection({ apiUrl, dbCardDesigns }: { apiUrl: str
         try {
             await adminApi.admin_shop_carddesign_link_update({
                 shop_id: shopData.PK.replace(/^SHOP#/, ""),
-                design_ids: selectedDesignIds
+                card_designs: selectedDesignIds
             });
             alert(tLink('saveSuccess'));
         } catch (e: any) {
@@ -1971,6 +2035,25 @@ function AdminShopCardDesignLinkSection({ apiUrl, dbCardDesigns }: { apiUrl: str
                 : [...prev, designId]
         );
     };
+
+    // Combine system designs and database designs for full coverage
+    const allAvailableDesigns = useMemo(() => {
+        const systemDesigns = Object.entries(cardformats).map(([id, data]) => ({
+            ...(data as any),
+            design_id: id,
+            SK: id,
+            isSystem: true
+        }));
+
+        const combined = [...systemDesigns];
+        dbCardDesigns.forEach(dbd => {
+            const id = dbd.design_id || dbd.SK;
+            if (id && !combined.find(c => c.design_id === id || c.SK === id)) {
+                combined.push(dbd);
+            }
+        });
+        return combined;
+    }, [dbCardDesigns]);
 
     return (
         <Card>
@@ -2014,12 +2097,13 @@ function AdminShopCardDesignLinkSection({ apiUrl, dbCardDesigns }: { apiUrl: str
                             <p className="text-xs text-gray-400 mb-2 italic">{tLink('allowedDesignsDesc')}</p>
 
                             <div className="flex flex-wrap items-start gap-2">
-                                {dbCardDesigns.map((design) => {
-                                    const isSelected = selectedDesignIds.includes(design.design_id);
+                                {allAvailableDesigns.map((design) => {
+                                    const dId = design.design_id || design.SK || "";
+                                    const isSelected = selectedDesignIds.includes(dId);
                                     return (
                                         <div
-                                            key={design.design_id}
-                                            onClick={() => toggleDesign(design.design_id)}
+                                            key={dId}
+                                            onClick={() => toggleDesign(dId)}
                                             className={cn(
                                                 "relative cursor-pointer rounded-lg border-2 p-1 transition-all group overflow-hidden flex flex-col items-center",
                                                 isSelected
@@ -2030,6 +2114,11 @@ function AdminShopCardDesignLinkSection({ apiUrl, dbCardDesigns }: { apiUrl: str
                                             {isSelected && (
                                                 <div className="absolute top-0 right-0 bg-green-500 text-white px-1.5 py-0.5 text-[8px] font-bold rounded-bl shadow-sm z-10 animate-in fade-in zoom-in duration-200">
                                                     LINK
+                                                </div>
+                                            )}
+                                            {design.isSystem && (
+                                                <div className="absolute top-0 left-0 bg-blue-500 text-white px-1.5 py-0.5 text-[7px] font-bold rounded-br shadow-sm z-10">
+                                                    SYSTEM
                                                 </div>
                                             )}
                                             <div
@@ -2051,14 +2140,14 @@ function AdminShopCardDesignLinkSection({ apiUrl, dbCardDesigns }: { apiUrl: str
                                                 )}
                                             </div>
                                             <div className="mt-2 px-1 text-center w-full max-w-[120px]">
-                                                <p className="text-[10px] font-medium truncate text-black" title={design.name || "No Name"}>
-                                                    {design.name || <span className="opacity-30 italic">No Name</span>}
+                                                <p className="text-[10px] font-medium truncate text-black" title={design.name || dId}>
+                                                    {design.name || <span className="opacity-30 italic">{dId}</span>}
                                                 </p>
                                                 <p className="text-[8px] font-medium truncate text-black" title={design.description || "No Description"}>
                                                     {design.description || <span className="opacity-30 italic">No Description</span>}
                                                 </p>
                                                 <p className="text-[8px] text-gray-500 font-mono truncate">
-                                                    {design.design_id}
+                                                    {dId}
                                                 </p>
                                             </div>
                                         </div>
@@ -2087,6 +2176,8 @@ function CardOrderListSection({
     setShopIdFilter,
     onUpdateStatus,
     onRefresh,
+    onExport,
+    isExporting,
     dbCardDesigns,
     paperFormat,
     cardFormat
@@ -2097,8 +2188,10 @@ function CardOrderListSection({
     setStatusFilter: (s: string) => void,
     shopIdFilter: string,
     setShopIdFilter: (s: string) => void,
-    onUpdateStatus: (shopId: string, orderId: string, status: string) => Promise<void>,
+    onUpdateStatus: (shopId: string, orderId: string, status: string, batchId?: string) => Promise<void>,
     onRefresh: () => void,
+    onExport: (order: any, type: 'pdf' | 'csv') => Promise<void>,
+    isExporting: string | null,
     dbCardDesigns: any[],
     paperFormat: string,
     cardFormat: string
@@ -2112,56 +2205,6 @@ function CardOrderListSection({
     const filteredOrders = orders.filter(o =>
         !shopIdFilter || (o.shop_id && o.shop_id.toLowerCase().includes(shopIdFilter.toLowerCase())) || (o.shop_name && o.shop_name.toLowerCase().includes(shopIdFilter.toLowerCase()))
     );
-
-    const handleExport = async (order: any, type: 'pdf' | 'csv') => {
-        setIsProcessing(order.order_id);
-        try {
-            // 1. Generate QR codes for this order
-            // Note: In a real system, we might want to ensure these are unique and saved.
-            // For now, we generate a fresh batch.
-            const data = await adminApi.admin_qr_generate({
-                count: order.quantity,
-                shop_id: order.shop_id,
-                product_id: order.product_id,
-                design_id: order.design_id || cardFormat,
-                activate_now: false
-            });
-
-            // 2. Transition status to PRINTING if it was ORDERED
-            if (order.status === 'ORDERED') {
-                await onUpdateStatus(order.shop_id, order.order_id, 'PRINTING');
-            }
-
-            // 3. Trigger download
-            const batch = {
-                id: `batch-${data.batch_id}`,
-                count: data.count,
-                codes: data.data,
-                date: new Date().toLocaleString()
-            };
-
-            const resolveDesign = (designId?: string) => {
-                const targetId = designId || cardFormat;
-                const dbDesign = dbCardDesigns.find(d => d.design_id === targetId);
-                if (dbDesign) return dbDesign;
-                if (cardformats[targetId]) return targetId;
-                const globalDesign = dbCardDesigns.find(d => d.design_id === cardFormat);
-                return globalDesign || cardFormat;
-            };
-            const design = resolveDesign(order.design_id);
-
-            if (type === 'pdf') {
-                await generatePDF(batch, paperFormat, design);
-            } else {
-                await generateCSVExport(batch, design);
-            }
-        } catch (e) {
-            console.error("Export failed", e);
-            alert("Export failed. Please check if the design and shop are correct.");
-        } finally {
-            setIsProcessing(null);
-        }
-    };
 
     return (
         <Card>
@@ -2265,24 +2308,26 @@ function CardOrderListSection({
                                             </TableCell>
                                             <TableCell className="text-right">
                                                 <div className="flex justify-end gap-0.5 ">
-                                                    {(order.status === 'ORDERED' || order.status === 'PRINTING') && (
+                                                    {(order.status !== 'REJECTED' && order.status !== 'CANCELLED') && (
                                                         <div className="gap-1 rounded-sm p-1 bg-green-100">
                                                             <Button
                                                                 variant="ghost"
                                                                 size="sm"
                                                                 className="h-6 text-xs text-black hover:bg-green-300"
-                                                                onClick={() => handleExport(order, 'pdf')}
-                                                                disabled={!!isProcessing}
+                                                                onClick={() => onExport(order, 'pdf')}
+                                                                disabled={!!isExporting}
+                                                                title={order.status === 'ORDERED' ? "Generate & Print" : "Re-download"}
                                                             >
-                                                                {isProcessing === order.order_id ? <Loader2 className="w-3 h-3 animate-spin" /> : <FileText className="w-3 h-3 mr-1" />}
+                                                                {isExporting === order.order_id ? <Loader2 className="w-3 h-3 animate-spin" /> : <FileText className="w-3 h-3 mr-1" />}
                                                                 PDF
                                                             </Button>
                                                             <Button
                                                                 variant="ghost"
                                                                 size="sm"
                                                                 className="h-6 text-xs text-black hover:bg-green-300"
-                                                                onClick={() => handleExport(order, 'csv')}
-                                                                disabled={!!isProcessing}
+                                                                onClick={() => onExport(order, 'csv')}
+                                                                disabled={!!isExporting}
+                                                                title={order.status === 'ORDERED' ? "Generate & Print" : "Re-download"}
                                                             >
                                                                 {isProcessing === order.order_id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3 mr-1" />}
                                                                 CSV

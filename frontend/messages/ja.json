@@ -252,7 +252,8 @@
         "product": "商品",
         "quantity": "数量",
         "status": "ステータス",
-        "dateupdated": "更新日時"
+        "dateupdated": "更新日時",
+        "actions": "操作"
       }
     },
     "orders": {

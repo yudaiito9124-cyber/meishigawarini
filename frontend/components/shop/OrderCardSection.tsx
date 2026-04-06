@@ -40,17 +40,17 @@ export function OrderCardSection({ shopId }: { shopId: string }) {
     const tc = useTranslations('Common');
     const tb = useTranslations('Backend');
 
-    const { 
-        refreshCardOrders, 
+    const {
+        refreshCardOrders,
         refreshProducts,
         cardOrders,
         cardOrdersLoading,
         products
     } = useShop();
 
-    const { 
+    const {
         selectedOrderProduct, orderQuantity, isCreatingCardOrder, isConfirmOrderDialogOpen,
-        set: setOrderCard 
+        set: setOrderCard
     } = useOrderCardUI();
 
     const fetchCardOrders = async () => {
@@ -120,8 +120,8 @@ export function OrderCardSection({ shopId }: { shopId: string }) {
                                 <div className="w-1 h-4 bg-primary rounded-full" />
                                 {t('cardOrder.selectProduct')}
                             </Label>
-                            <ProductSelection 
-                                products={products} 
+                            <ProductSelection
+                                products={products}
                                 selectedOrderProduct={selectedOrderProduct}
                                 setOrderCard={setOrderCard}
                                 t={t}
@@ -150,17 +150,17 @@ export function OrderCardSection({ shopId }: { shopId: string }) {
                                             <Label className="text-xs font-black text-gray-400 uppercase tracking-widest block mb-1">{t('linkQr.cardDesign')}</Label>
                                             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                                                 <div className="space-y-2">
-                                                    <div className="relative rounded-2xl border-4 border-white shadow-2xl overflow-hidden group ring-1 ring-gray-200/50" 
+                                                    <div className="relative rounded-2xl border-4 border-white shadow-2xl overflow-hidden group ring-1 ring-gray-200/50"
                                                         style={{ aspectRatio: getDesignAspectRatio(selectedOrderProduct.design_id, [], selectedOrderProduct.design) }}>
-                                                        <img src={getDesignImages(selectedOrderProduct.design_id, [], selectedOrderProduct.design).front} 
+                                                        <img src={getDesignImages(selectedOrderProduct.design_id, [], selectedOrderProduct.design).front}
                                                             className="w-full h-full object-fill select-none transition-transform duration-700 group-hover:scale-105" draggable={false} crossOrigin="anonymous" />
                                                         <div className="absolute top-3 left-3 px-3 py-1 bg-black/60 backdrop-blur-md text-[10px] font-black text-white rounded-full uppercase tracking-widest shadow-lg">{t('frontView')}</div>
                                                     </div>
                                                 </div>
                                                 <div className="space-y-2">
-                                                    <div className="relative rounded-2xl border-4 border-white shadow-2xl overflow-hidden group ring-1 ring-gray-200/50" 
+                                                    <div className="relative rounded-2xl border-4 border-white shadow-2xl overflow-hidden group ring-1 ring-gray-200/50"
                                                         style={{ aspectRatio: getDesignAspectRatio(selectedOrderProduct.design_id, [], selectedOrderProduct.design) }}>
-                                                        <img src={getDesignImages(selectedOrderProduct.design_id, [], selectedOrderProduct.design).back} 
+                                                        <img src={getDesignImages(selectedOrderProduct.design_id, [], selectedOrderProduct.design).back}
                                                             className="w-full h-full object-fill select-none transition-transform duration-700 group-hover:scale-105" draggable={false} crossOrigin="anonymous" />
                                                         <div className="absolute top-3 left-3 px-3 py-1 bg-black/60 backdrop-blur-md text-[10px] font-black text-white rounded-full uppercase tracking-widest shadow-lg">{t('backView')}</div>
                                                     </div>
@@ -221,7 +221,7 @@ export function OrderCardSection({ shopId }: { shopId: string }) {
                         </Button>
                     </CardHeader>
                     <CardContent>
-                        <OrderHistoryTable 
+                        <OrderHistoryTable
                             cardOrders={cardOrders}
                             cardOrdersLoading={cardOrdersLoading}
                             products={products}
@@ -253,11 +253,10 @@ function ProductSelection({ products, selectedOrderProduct, setOrderCard, t }: P
                 <div
                     key={product.product_id}
                     onClick={() => setOrderCard({ selectedOrderProduct: product })}
-                    className={`group relative h-24 rounded-xl border-2 overflow-hidden cursor-pointer transition-all hover:shadow-lg ${
-                        selectedProductId === product.product_id
-                            ? 'border-primary ring-4 ring-primary/10 shadow-xl scale-[1.02]'
-                            : 'border-gray-100 hover:border-primary/30'
-                    }`}
+                    className={`group relative h-24 rounded-xl border-2 overflow-hidden cursor-pointer transition-all hover:shadow-lg ${selectedProductId === product.product_id
+                        ? 'border-primary ring-4 ring-primary/10 shadow-xl scale-[1.02]'
+                        : 'border-gray-100 hover:border-primary/30'
+                        }`}
                     style={{ aspectRatio: getDesignAspectRatio(product.design_id, [], product.design) }}
                 >
                     {(product.design || product.design_id) && (
@@ -295,7 +294,7 @@ function OrderHistoryTable({ cardOrders, cardOrdersLoading, products, onCancel, 
                         <TableHead className="font-bold">{t('cardOrder.table.product')}</TableHead>
                         <TableHead className="w-[80px] font-bold text-right">{t('cardOrder.table.quantity')}</TableHead>
                         <TableHead className="w-[120px] font-bold text-center">{t('cardOrder.table.status')}</TableHead>
-                        <TableHead className="w-[150px] font-bold text-right"></TableHead>
+                        <TableHead className="w-[150px] font-bold text-center">{t(`cardOrder.table.actions`)}</TableHead>
                     </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -309,19 +308,18 @@ function OrderHistoryTable({ cardOrders, cardOrdersLoading, products, onCancel, 
                             <TableCell className="font-semibold">{products.find((p: any) => p.product_id === order.product_id)?.name || order.product_id}</TableCell>
                             <TableCell className="text-right font-mono font-bold">{(order.quantity || 0).toLocaleString()}</TableCell>
                             <TableCell className="text-center">
-                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold ring-1 ring-inset ${
-                                    order.status === 'ORDERED' ? 'bg-blue-50 text-blue-700 ring-blue-700/10' :
+                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold ring-1 ring-inset ${order.status === 'ORDERED' ? 'bg-blue-50 text-blue-700 ring-blue-700/10' :
                                     order.status === 'PRINTING' ? 'bg-amber-50 text-amber-700 ring-amber-700/10' :
-                                    order.status === 'SHIPPED' ? 'bg-indigo-50 text-indigo-700 ring-indigo-700/10' :
-                                    order.status === 'COMPLETED' ? 'bg-emerald-50 text-emerald-700 ring-emerald-700/10' :
-                                    order.status === 'CANCELLED' ? 'bg-gray-50 text-gray-600 ring-gray-600/10' :
-                                    'bg-red-50 text-red-700 ring-red-700/10'
-                                }`}>
+                                        order.status === 'SHIPPED' ? 'bg-indigo-50 text-indigo-700 ring-indigo-700/10' :
+                                            order.status === 'COMPLETED' ? 'bg-emerald-50 text-emerald-700 ring-emerald-700/10' :
+                                                order.status === 'CANCELLED' ? 'bg-gray-50 text-gray-600 ring-gray-600/10' :
+                                                    'bg-red-50 text-red-700 ring-red-700/10'
+                                    }`}>
                                     {t(`cardOrder.status.${order.status.toLowerCase()}`)}
                                 </span>
                             </TableCell>
                             <TableCell className="text-right">
-                                <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <div className="flex justify-end gap-2 opacity-100 group-hover:opacity-100 transition-opacity">
                                     {order.status === 'ORDERED' && (
                                         <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-700 hover:bg-red-50 h-8 font-bold" onClick={() => onCancel(order.order_id)}>
                                             {t('cardOrder.cancel')}

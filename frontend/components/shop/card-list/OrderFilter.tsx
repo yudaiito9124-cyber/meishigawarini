@@ -25,10 +25,10 @@ export function OrderFilter() {
         getDesignImages,
     } = useCardListContext();
 
-    const { 
-        isDetailFiltering, orderStatusFilter, orderProductFilter, 
-        searchQrId, visibleOrderColumns, subRefreshing, 
-        set: setList 
+    const {
+        isDetailFiltering, orderStatusFilter, orderProductFilter,
+        searchQrId, visibleOrderColumns, subRefreshing,
+        set: setList
     } = useCardListUI();
 
     const allowedDesigns = shop?.allowed_designs || [];
@@ -189,7 +189,7 @@ export function OrderFilter() {
                     </Button>
 
                     {/* 更新ボタン */}
-                    <Button variant="outline" size="sm" onClick={() => fetchSectionData(true)} disabled={subRefreshing}>
+                    <Button variant="ghost" size="sm" onClick={() => fetchSectionData(true)} disabled={subRefreshing}>
                         <RefreshCw className={`mr-2 h-4 w-4 ${subRefreshing ? 'animate-spin' : ''}`} />
                         {t('refresh')}
                     </Button>

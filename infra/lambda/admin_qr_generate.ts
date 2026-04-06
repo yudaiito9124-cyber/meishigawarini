@@ -8,7 +8,7 @@
  * エンドポイント: POST /admin/qr/generate
  */
 import { APIGatewayProxyHandler } from 'aws-lambda';
-import { BatchWriteCommand } from '@aws-sdk/lib-dynamodb';
+import { BatchWriteCommand, UpdateCommand, QueryCommand } from '@aws-sdk/lib-dynamodb';
 import * as crypto from 'crypto';
 import { generateId } from './utils/id';
 import { validateQRParams } from './utils/qr-validation';
@@ -22,15 +22,62 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         if (event.httpMethod === 'OPTIONS') return successResponse();
 
         const body = JSON.parse(event.body || '{}') as AdminApiSchema['admin_qr_generate'];
-        const count = body.count || 1;
-        const shopId = getShopId(event, body);
-        const productId = getProductId(event, body);
-        const expiryDate = body.expiry_date;
-        const owner_id = body.owner_id || body.owner_user_id || (body as any).owner_uuid;
-        const senderInfo = body.sender_info;
-        let senderId = body.sender_id;
-        const activateNow = body.activate_now === true;
-        const designId = body.design_id;
+        const order_id = body.order_id;
+
+        if (!order_id) {
+            return errorResponse(400, 'order_id is required. Manual generation without order_id is no longer supported.');
+        }
+
+        let cardOrderPK = '';
+        let cardOrderSK = '';
+        let targetItem: any = null;
+
+        // QR生成済みの事前チェックとデータ取得
+        try {
+            const lookup = await ddb.send(new QueryCommand({
+                TableName: TABLE_NAME,
+                IndexName: 'GSI2',
+                KeyConditionExpression: 'GSI2_PK = :pk',
+                ExpressionAttributeValues: { ':pk': `CARD_ORDER#${order_id}` }
+            }));
+
+            targetItem = lookup.Items?.[0];
+            if (!targetItem) {
+                return errorResponse(404, 'Card order not found');
+            }
+            
+            // すでに batch_id があるか、ステータスが ORDERED でない場合はエラー
+            if (targetItem.batch_id || targetItem.status !== 'ORDERED') {
+                return errorResponse(400, 'QR codes already generated for this order', {
+                    order_id,
+                    status: targetItem.status,
+                    batch_id: targetItem.batch_id
+                });
+            }
+
+            cardOrderPK = targetItem.PK;
+            cardOrderSK = targetItem.SK;
+        } catch (err: any) {
+            console.error('Failed to pre-check card order:', err);
+            return errorResponse(500, 'Failed to verify card order status');
+        }
+
+        // DB（CardOrder）からパラメータを抽出
+        const count = targetItem.quantity || 1;
+        const shopId = targetItem.shop_id;
+        const productId = targetItem.product_id;
+        const expiryDate = targetItem.expiration_date;
+        const owner_id = targetItem.shop_user_id;
+        const senderId = targetItem.sender_user_id;
+        const designId = targetItem.design_id;
+        
+        // 【重要】動作の不変性維持: 
+        // 以前のフロントエンド実装(handleExport)では常に activate_now: false を送っていたため、
+        // DB上の値に関わらず一貫性を保つため false を固定値として使用します。
+        const activateNow = false; 
+
+        // senderInfo は DB に存在しないため null 固定 (senderId 経由で取得される)
+        const senderInfo = null;
 
         // 生成件数の上限チェック (一旦100件まで)
         if (count > 100) {
@@ -134,12 +181,53 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             ids.push({ qr_id, pin });
         }
 
+        // バッチ管理レコードの追加
+        writeRequests.push({
+            PutRequest: {
+                Item: {
+                    PK: `QRBATCH#${batch_id}`,
+                    SK: 'METADATA',
+                    data: ids,
+                    order_id: order_id,
+                    ts_created_at: new Date().toISOString()
+                }
+            }
+        });
+
         // 25件ずつのバッチ書き込みを実行 (BatchWriteCommand は DocumentClient 用)
         for (let i = 0; i < writeRequests.length; i += 25) {
             const chunk = writeRequests.slice(i, i + 25);
             await ddb.send(new BatchWriteCommand({
                 RequestItems: { [TABLE_NAME]: chunk }
             }));
+        }
+
+        // 発注レコードの更新 (order_id が指定されている場合)
+        if (order_id && shopId && cardOrderPK && cardOrderSK) {
+            const now = new Date().toISOString();
+            const adminUserId = getUserId(event);
+            try {
+                await ddb.send(new UpdateCommand({
+                    TableName: TABLE_NAME,
+                    Key: { PK: cardOrderPK, SK: cardOrderSK },
+                    UpdateExpression: 'SET batch_id = :bid, user_id_create = :uid, #status = :status, GSI1_PK = :gsi_pk, GSI1_SK = :now, ts_updated_at = :now',
+                    ConditionExpression: 'attribute_not_exists(batch_id)', // 二重生成防止
+                    ExpressionAttributeNames: { '#status': 'status' },
+                    ExpressionAttributeValues: {
+                        ':bid': batch_id,
+                        ':uid': adminUserId,
+                        ':status': 'PRINTING',
+                        ':gsi_pk': 'CARD_ORDER#PRINTING',
+                        ':now': now
+                    }
+                }));
+            } catch (err: any) {
+                console.error('Failed to update card order status:', err);
+                if (err.name === 'ConditionalCheckFailedException') {
+                    return errorResponse(400, 'QR codes were already generated concurrently');
+                }
+                // QR生成自体は成功しているので、ここではエラーを返さずログのみ（バッチIDは戻り値に含まれる）
+            }
         }
 
         return successResponse({

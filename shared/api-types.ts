@@ -14,22 +14,13 @@ export type AdminApiSchema = {
     admin_changeowner: { shop_id: string, new_user_id: string, action: "validate" | "execute" }; // ショップのオーナー変更
     admin_shop_create: { name: string; description?: string; owner_id?: string; gm_ids?: string[] }; // ショップの作成
     admin_shop_carddesign_link_get: { shop_id: string }; // ショップとカードデザインの紐付け取得
-    admin_shop_carddesign_link_update: { shop_id: string; design_ids: string[] }; // ショップとカードデザインの紐付け更新
+    admin_shop_carddesign_link_update: { shop_id: string; card_designs: string[] }; // ショップとカードデザインの紐付け更新
     // QRコード
     admin_qr_ban: { qr_id: string; reason?: string }; //QRコードをBAN / 解除
     admin_qr_deleteban: { target?: string }; //BANされたQRコードを削除 (指定がない場合は全件)
     admin_qr_generate: {
-        count: number;
-        shop_id?: string;
-        product_id?: string;
-        expiry_date?: string;
-        owner_id?: string;
-        owner_user_id?: string;
-        sender_info?: { [key: string]: any };
-        sender_id?: string;
-        activate_now?: boolean;
-        design_id: string
-    }; //QRコードを生成
+        order_id: string;
+    }; //QRコードを生成 (CardOrderに基づく)
     admin_qr_list: { status: string, keyword?: string, limit?: number }; //QRコードのリストを取得 (limit: 取得件数制限)
     // カードデザイン
     admin_carddesigns_list: {}; //カードデザインのリストを取得
@@ -37,8 +28,24 @@ export type AdminApiSchema = {
     admin_carddesigns_update: { design_id: string; design: { [key: string]: any } }; //カードデザインを更新
     admin_carddesigns_delete: { design_id: string }; //カードデザインを削除
     admin_carddesigns_uploadurl: { filename: string; content_type: string; design_id: string }; //カードデザインのアップロードURLを取得
-    admin_card_orders_list: { status?: string; limit?: number }; //カード発注のリストを取得
-    admin_card_orders_update: { shop_id: string; order_id: string; status: string }; //カード発注のステータスを更新
+    admin_card_orders_list: { status: string, limit?: number, last_key?: any }; //カード発注のリストを取得
+    admin_card_orders_create: {
+        shop_id: string;
+        quantity: number;
+        design_id: string;
+        product_id?: string;
+        shop_user_id?: string;
+        sender_user_id?: string;
+        expiration_date?: string;
+        activate_now?: boolean;
+    };
+    admin_card_orders_update: {
+        shop_id: string,
+        order_id: string,
+        status: string,
+        batch_id?: string
+    }; //カード発注のステータス更新
+    admin_qr_batch_get: { batch_id: string }; //バッチIDからQRコードリストを取得
 };
 
 // ==========================================

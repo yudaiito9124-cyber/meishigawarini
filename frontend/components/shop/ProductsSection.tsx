@@ -217,7 +217,7 @@ export function ProductsSection({
             setIsAddProductDialogOpen(false);
             fetchProducts();
         } catch (err) {
-            alert(editingProduct ? t('editProduct.error') : t('addProduct.error'));
+            alert(editingProduct && !isDuplicateMode ? t('editProduct.error') : t('addProduct.error'));
         } finally {
             setIsCreatingProduct(false);
         }
@@ -292,8 +292,12 @@ export function ProductsSection({
                                                 <DialogHeader>
                                                     <div className="flex items-center justify-between pr-8">
                                                         <div>
-                                                            <DialogTitle>{editingProduct ? t('editProduct.title') : t('addProduct.title')}</DialogTitle>
-                                                            <DialogDescription>{editingProduct ? t('editProduct.dialogDesc') : t('addProduct.dialogDesc')}</DialogDescription>
+                                                            <DialogTitle>
+                                                                {isDuplicateMode ? t('productDetails.duplicate') : (editingProduct ? t('editProduct.title') : t('addProduct.title'))}
+                                                            </DialogTitle>
+                                                            <DialogDescription>
+                                                                {isDuplicateMode ? t('addProduct.dialogDesc') : (editingProduct ? t('editProduct.dialogDesc') : t('addProduct.dialogDesc'))}
+                                                            </DialogDescription>
                                                         </div>
 
                                                         {!editingProduct && (
@@ -424,7 +428,7 @@ export function ProductsSection({
 
                                                     <Button type="submit" className="w-full" disabled={isCreatingProduct || !selectedDesignId}>
                                                         {isCreatingProduct ? <Loader2 className="w-4 h-4 animate-spin mr-2 inline-block" /> : null}
-                                                        {isCreatingProduct ? t('linkQr.processing') : (editingProduct ? t('shopSettings.submit') : t('addProduct.submit'))}
+                                                        {isCreatingProduct ? t('linkQr.processing') : (editingProduct && !isDuplicateMode ? t('shopSettings.submit') : t('addProduct.submit'))}
                                                     </Button>
                                                 </form>
                                             </>
