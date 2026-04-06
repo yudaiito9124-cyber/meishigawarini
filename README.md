@@ -43,6 +43,7 @@
 - **メール通知の仕様**： **[EMAIL_NOTIFICATIONS.md](./documents/EMAIL_NOTIFICATIONS.md)** には、送信されるメールの種類、送信タイミング、環境設定などをまとめています。
 - **S3 ストレージの運用・命名規則**： **[S3_STORAGE_GUIDE.md](./documents/S3_STORAGE_GUIDE.md)** には、画像のアップロード、一時フォルダ、自動標準化、および削除ロジックについて解説しています。
 - **ヘルプ・マニュアルの管理**： **[HELP_MANAGEMENT.md](./documents/HELP_MANAGEMENT.md)** には、Markdownを使用したヘルプページの追加・編集方法を解説しています。
+- **フロントエンド・データ管理設計**： **[FRONTEND_DATA_MANAGEMENT.md](./documents/FRONTEND_DATA_MANAGEMENT.md)** には、ShopContext を使用した効率的なデータ取得とコンポーネント間での状態共有について解説しています。
 
 
 

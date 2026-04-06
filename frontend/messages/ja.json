@@ -34,22 +34,7 @@
     "ordered": "発注済み",
     "printing": "印刷中",
     "rejected": "却下",
-    "cancelled": "キャンセル済み",
-    "short": {
-      "una": "unassigned",
-      "lin": "linked",
-      "act": "active",
-      "use": "used",
-      "shi": "shipped",
-      "com": "completed",
-      "exp": "expired",
-      "ban": "banned",
-      "pro": "promotion",
-      "ord": "ordered",
-      "pri": "printing",
-      "rej": "rejected",
-      "can": "cancelled"
-    }
+    "cancelled": "キャンセル済み"
   },
   "Time": {
     "timeMorning": "午前中",
@@ -225,6 +210,8 @@
     "refresh": "更新",
     "incomingOrders": "発送待ち",
     "ordersDesc": "注文と発送を管理します。",
+    "filter": "絞り込み",
+    "searchPlaceholder": "カードIDで絞り込み...",
     "tabs": {
       "activation": "アクティベーション",
       "shipping": "注文管理",
@@ -297,9 +284,12 @@
         "deliveryCompanyPlaceholder": "〇〇運輸",
         "submit": "発送済みにする",
         "Completed-state messages cannot be updated": "完了状態のメッセージは更新できません"
-      }
+      },
+      "filter": "詳細検索",
+      "searchPlaceholder": "カードID検索..."
     },
     "products": "商品一覧",
+    "productsDescription": "商品の登録・編集を行います。",
     "product": {
       "stop": "停止",
       "activate": "有効化",
