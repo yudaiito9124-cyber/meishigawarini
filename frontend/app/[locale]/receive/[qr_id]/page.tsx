@@ -13,7 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card";
 import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { MessageCircleQuestion, Paperclip, X, FileText, File as FileIcon, Loader2, Save, SendHorizontal, Pencil, UserPlus, Globe, Gift, User, MessagesSquare, Heart, Sparkles, Calendar, Clock, ShoppingBasket, Plus, Copy, Trash2, ChevronDown, ImageIcon, Import, Download, Package, Truck } from "lucide-react";
+import { MessageCircleQuestion, Paperclip, X, FileText, File as FileIcon, Loader2, Save, SendHorizontal, Pencil, UserPlus, Globe, Gift, User, MessagesSquare, Heart, Sparkles, Calendar, Clock, ShoppingBasket, Plus, Copy, Trash2, ChevronDown, ImageIcon, Import, Download, Package, Truck, Send } from "lucide-react";
 import { SiFacebook, SiInstagram, SiThreads, SiX, SiYoutube, SiLine, SiTiktok, SiLinktree, SiEight } from "@icons-pack/react-simple-icons";
 import SandboxedHtml from "@/components/SandboxedHtml";
 import { cn } from "@/lib/utils";
@@ -1247,24 +1247,9 @@ export default function ReceivePage() {
                             {t('titles.selectRole')}
                         </CardTitle>
                     </CardHeader>
-                    <CardContent className="p-4 space-y-6 animate-in fade-in slide-in-from-bottom-4">
+                    <CardContent className="pl-4 pr-4 space-y-6 animate-in fade-in slide-in-from-bottom-4">
                         <p className="text-center text-[10px] text-gray-500">{t('roleSelection.description')}</p>
                         <div className="grid grid-cols-2 gap-4">
-                            <Button
-                                variant="outline"
-                                className={cn(
-                                    "h-24 flex flex-col gap-1 border-2 transition-all",
-                                    userRole === 'sender' ? "border-black bg-gray-50" : "border-gray-100 hover:border-gray-300 bg-white"
-                                )}
-                                onClick={handleSenderRoleSelect}
-                                disabled={loading}
-                            >
-                                <Package className={cn("w-5 h-5", userRole === 'sender' ? "text-black" : "text-gray-400")} />
-                                <span className={cn("font-bold text-sm", userRole === 'sender' ? "text-black" : "text-gray-500")}>
-                                    {t('roleSelection.sender')}
-                                </span>
-                                <span className="text-[8px] text-gray-400 leading-tight">{t('roleSelection.senderDescription')}</span>
-                            </Button>
 
                             <Button
                                 variant="outline"
@@ -1275,18 +1260,34 @@ export default function ReceivePage() {
                                 onClick={handleReceiverRoleSelect}
                                 disabled={loading}
                             >
-                                <Truck className={cn("w-5 h-5", userRole === 'receiver' ? "text-black" : "text-gray-400")} />
+                                <Gift className={cn("w-5 h-5", userRole === 'receiver' ? "text-black" : "text-gray-400")} />
                                 <span className={cn("font-bold text-sm", userRole === 'receiver' ? "text-black" : "text-gray-500")}>
                                     {t('roleSelection.receiver')}
                                 </span>
                                 <span className="text-[8px] text-gray-400 leading-tight">{t('roleSelection.receiverDescription')}</span>
+                            </Button>
+
+                            <Button
+                                variant="outline"
+                                className={cn(
+                                    "h-24 flex flex-col gap-1 border-2 transition-all",
+                                    userRole === 'sender' ? "border-black bg-gray-50" : "border-gray-100 hover:border-gray-300 bg-white"
+                                )}
+                                onClick={handleSenderRoleSelect}
+                                disabled={loading}
+                            >
+                                <Send className={cn("w-5 h-5", userRole === 'sender' ? "text-black" : "text-gray-400")} />
+                                <span className={cn("font-bold text-sm", userRole === 'sender' ? "text-black" : "text-gray-500")}>
+                                    {t('roleSelection.sender')}
+                                </span>
+                                <span className="text-[8px] text-gray-400 leading-tight">{t('roleSelection.senderDescription')}</span>
                             </Button>
                         </div>
                     </CardContent>
                 </Card>
             )}
 
-            {/* --- Form / notification Section --- */}
+            {/* --- Form Section --- */}
             {(["FORM", "PROMOTION"].includes(step)) && (
                 <Card className="w-full max-w-xl mt-20">
                     <CardHeader>
@@ -1475,7 +1476,7 @@ export default function ReceivePage() {
             )
             }
 
-            {/* --- Form / notification Section --- */}
+            {/* --- Notification Section --- */}
             {(["SUCCESS", "SHIPPED", "EXPIRED", "RESTRICTED"].includes(step)) && (
                 <Card className="w-full max-w-xl mt-20">
                     <CardHeader>
