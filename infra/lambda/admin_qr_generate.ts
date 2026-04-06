@@ -210,7 +210,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 await ddb.send(new UpdateCommand({
                     TableName: TABLE_NAME,
                     Key: { PK: cardOrderPK, SK: cardOrderSK },
-                    UpdateExpression: 'SET batch_id = :bid, user_id_create = :uid, #status = :status, GSI1_PK = :gsi_pk, GSI1_SK = :now, ts_updated_at = :now',
+                    UpdateExpression: 'SET batch_id = :bid, user_id_create = :uid, #status = :status, GSI1_PK = :gsi_pk, GSI1_SK = :now, ts_qr_generated_at = :now, ts_updated_at = :now',
                     ConditionExpression: 'attribute_not_exists(batch_id)', // 二重生成防止
                     ExpressionAttributeNames: { '#status': 'status' },
                     ExpressionAttributeValues: {

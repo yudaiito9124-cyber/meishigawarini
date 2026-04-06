@@ -274,6 +274,7 @@ QRコードのライフサイクルや注文ステータス、商品との紐付
 | `activate_now` | Boolean | (オプション・制限) 生成と同時に有効化するか |
 | `ts_created_at` | String | 作成日時 （ISO 8601形式のUTC日時文字列） |
 | `ts_updated_at` | String | 更新日時 （ISO 8601形式のUTC日時文字列） |
+| `ts_qr_generated_at` | String | QRコード生成日時 （ISO 8601形式のUTC日時文字列） |
 | `user_id_order` | String | 発注を申請したユーザーのID (ショップ担当者または管理者) |
 | `user_id_create` | String | 実際にQR生成・印刷処理を行った管理者のID |
 | `batch_id` | String | 生成されたQRコード群のバッチID (印刷/ダウンロードの再利用に使用) |
