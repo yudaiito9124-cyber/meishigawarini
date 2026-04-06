@@ -72,10 +72,12 @@ const fireConfetti = () => {
 const ShakingGiftBox = ({ isShaking, isExpanding }: { isShaking?: boolean, isExpanding?: boolean }) => (
     <div className={cn(
         "flex flex-col items-center justify-center py-10 transition-all duration-700",
-        isShaking && "animate-shake animate-bounce",
         isExpanding && "animate-expand"
     )}>
-        <div className="relative w-24 h-24 mb-4 flex items-center justify-center">
+        <div className={cn(
+            "relative w-24 h-24 mb-4 flex items-center justify-center bg-white/40 backdrop-blur-sm rounded-full",
+            isShaking && "animate-shake animate-bounce"
+        )}>
             <Gift size={64} className={cn("text-black stroke-[1.2] stroke-black")} />
         </div>
     </div>
@@ -263,13 +265,19 @@ export default function ReceivePage() {
         setError(null);
 
         try {
-            const data = await receiveApi.verify(qr_id, pin);
+            // Start both API calls in parallel to maximize efficiency
+            // The box will continue to shake during this phase because loading=true and isExpanding=false
+            const [data] = await Promise.all([
+                receiveApi.verify(qr_id, pin),
+                loadMessages()
+            ]);
 
-            // Start expansion animation after successful verification
+            // Once ALL data is loaded, start the expansion animation
             setIsExpanding(true);
             setHasLoadedChat(true);
-            loadMessages(); // Start fetching in background during animation
-            await new Promise(resolve => setTimeout(resolve, 800)); // Wait for expansion
+
+            // Wait for the duration of the expansion animation (800ms)
+            await new Promise(resolve => setTimeout(resolve, 800));
 
             setGift(data);
             if (data.status === 'COMPLETED') {
@@ -307,6 +315,7 @@ export default function ReceivePage() {
         } catch (err: any) {
             // console.error(err);
             setPinError(t('errors.invalidPin'));
+            setIsExpanding(false); // Reset animation if verification fails
         } finally {
             setLoading(false);
             setIsExpanding(false);
@@ -317,14 +326,19 @@ export default function ReceivePage() {
         e.preventDefault();
         setLoading(true);
         try {
-            const data = await receiveApi.verify(qr_id, pin, unlockPassword);
+            // Start both API calls in parallel
+            const [data] = await Promise.all([
+                receiveApi.verify(qr_id, pin, unlockPassword),
+                loadMessages()
+            ]);
 
             if (data.is_authorized) {
-                // Start expansion animation after successful verification
+                // Once verified and data is ready, start expansion
                 setIsExpanding(true);
                 setHasLoadedChat(true);
-                loadMessages(); // Start fetching in background during animation
-                await new Promise(resolve => setTimeout(resolve, 800)); // Wait for expansion
+
+                // Wait for expansion animation
+                await new Promise(resolve => setTimeout(resolve, 800));
 
                 setGift(data);
                 if (data.status === 'COMPLETED') {
@@ -349,9 +363,11 @@ export default function ReceivePage() {
                     setStep("EXPIRED");
                 }
             } else {
+                setIsExpanding(false);
                 alert(t('errors.invalidPassword'));
             }
         } catch (e: any) {
+            setIsExpanding(false);
             alert(t('errors.unlockFailed'));
         } finally {
             setLoading(false);
