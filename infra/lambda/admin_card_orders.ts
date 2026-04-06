@@ -14,6 +14,8 @@ import { getAction, getUserId } from './utils/request';
 import { generateId } from './utils/id';
 import { AdminApiSchema } from '@shared/api-types';
 import { validateQRParams } from './utils/qr-validation';
+import { signUrlIfS3 } from './utils/s3';
+import { getSystemDesign } from './utils/designs';
 
 export const handler: APIGatewayProxyHandler = async (event) => {
     try {
@@ -42,7 +44,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             }));
 
             const items = result.Items || [];
-            
+
             // 互換性処理: design_id がない場合は card_design を使用
             items.forEach((item: any) => {
                 if (!item.design_id && item.card_design) {
@@ -64,7 +66,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                             }
                         }
                     }));
-                    
+
                     const shopMap: Record<string, { name: string, owner_id?: string }> = {};
                     const ownerIds = new Set<string>();
 
@@ -108,14 +110,14 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 if (designIds.length > 0) {
                     const keys = designIds.map(id => ({ PK: 'CARD_DESIGN#METADATA', SK: id }));
                     const batchRes = await ddb.send(new BatchGetCommand({
-                        RequestItems: { 
-                            [TABLE_NAME]: { 
-                                Keys: keys, 
-                                ProjectionExpression: 'SK, thumbf, thumbb, bgimgf, bgimgb' 
-                            } 
+                        RequestItems: {
+                            [TABLE_NAME]: {
+                                Keys: keys,
+                                ProjectionExpression: 'SK, thumbf, thumbb, bgimgf, bgimgb'
+                            }
                         }
                     }));
-                    
+
                     const metaMap = new Map<string, any>();
                     for (const d of (batchRes.Responses?.[TABLE_NAME] || [])) {
                         // 署名付きURLの生成 (S3パスの場合)
@@ -149,9 +151,9 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         // 目的: 管理者が特定のショップへの受託（発注）を手動で作成します。
         // ====================================================================
         if (action === 'create') {
-            const { 
-                shop_id, quantity, design_id, product_id, shop_user_id, 
-                sender_user_id, expiration_date, activate_now 
+            const {
+                shop_id, quantity, design_id, product_id, shop_user_id,
+                sender_user_id, expiration_date, activate_now
             } = body as AdminApiSchema['admin_card_orders_create'];
 
             if (!shop_id || !quantity || !design_id) {

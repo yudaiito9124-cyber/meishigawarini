@@ -116,6 +116,9 @@ export class AdminApi extends cdk.NestedStack {
     const admin_qr_deleteban = new nodejs.NodejsFunction(this, 'admin_qr_deleteban', { entry: lampath('admin_qr_deleteban'), ...commonProps });
     grantTablePermissions(admin_qr_deleteban, true);
 
+    const admin_qr_batch = new nodejs.NodejsFunction(this, 'admin_qr_batch', { entry: lampath('admin_qr_batch'), ...commonProps });
+    grantTablePermissions(admin_qr_batch);
+
 
 
 
@@ -212,6 +215,10 @@ export class AdminApi extends cdk.NestedStack {
     addResourceWithCors(qrResource, 'ban').addMethod('POST', new apigateway.LambdaIntegration(admin_qr_ban), { authorizer: authorizerOfAdmin, });
     addResourceWithCors(qrResource, 'deleteban').addMethod('POST', new apigateway.LambdaIntegration(admin_qr_deleteban), { authorizer: authorizerOfAdmin, });
 
+    // /admin/qr/batch/get
+    const batchResource = addResourceWithCors(qrResource, 'batch');
+    addResourceWithCors(batchResource, 'get').addMethod('POST', new apigateway.LambdaIntegration(admin_qr_batch), { authorizer: authorizerOfAdmin, });
+
     // /admin/carddesigns
     const cardDesignsResource = addResourceWithCors(this.adminResource, 'carddesigns');
     addResourceWithCors(cardDesignsResource, 'list').addMethod('POST', new apigateway.LambdaIntegration(admin_carddesigns), { authorizer: authorizerOfAdmin, });
@@ -235,6 +242,7 @@ export class AdminApi extends cdk.NestedStack {
     const adminCardOrdersResource = addResourceWithCors(cardOrderRoot, 'orders');
     addResourceWithCors(adminCardOrdersResource, 'list').addMethod('POST', new apigateway.LambdaIntegration(admin_card_orders), { authorizer: authorizerOfAdmin, });
     addResourceWithCors(adminCardOrdersResource, 'update').addMethod('POST', new apigateway.LambdaIntegration(admin_card_orders), { authorizer: authorizerOfAdmin, });
+    addResourceWithCors(adminCardOrdersResource, 'create').addMethod('POST', new apigateway.LambdaIntegration(admin_card_orders), { authorizer: authorizerOfAdmin, });
 
   }
 }

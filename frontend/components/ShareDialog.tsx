@@ -94,10 +94,10 @@ export function ShareDialog({ qr_id, product, card, shop }: ShareDialogProps) {
                     {t('buttonDesc')}
                 </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-md bg-white/95 backdrop-blur-xl border-none shadow-2xl rounded-[2.5rem] overflow-hidden">
+            <DialogContent className="sm:max-w-md bg-white/95 backdrop-blur-xl border-none shadow-2xl rounded-[2rem] overflow-y-auto">
                 <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-emerald-400 via-teal-500 to-emerald-400" />
 
-                <DialogHeader className="pt-6">
+                <DialogHeader className="pt-4">
                     <DialogTitle className="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2 justify-center flex-col">
                         <div className="flex items-center gap-2">
                             <Sparkles className="w-6 h-6 text-amber-500 animate-pulse" />
@@ -110,7 +110,7 @@ export function ShareDialog({ qr_id, product, card, shop }: ShareDialogProps) {
                     </DialogDescription>
                 </DialogHeader>
 
-                <div className="p-2 space-y-8">
+                <div className="p-2 space-y-4">
                     {/* Visual Preview Card (Witty/Premium) */}
                     <div className="relative aspect-video w-full bg-slate-50 rounded-3xl overflow-hidden border border-slate-100 shadow-inner group">
                         <div className="absolute inset-0 bg-gradient-to-br from-emerald-50/50 via-transparent to-teal-50/50" />
@@ -153,10 +153,10 @@ export function ShareDialog({ qr_id, product, card, shop }: ShareDialogProps) {
                     </div>
 
                     {/* Settings Toggles */}
-                    <div className="grid grid-cols-1 gap-4 px-2">
+                    <div className="grid grid-cols-1 gap-2 px-2">
                         <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">{t('options.title')}</p>
 
-                        <div className="flex items-center justify-between p-3 bg-slate-50/50 rounded-2xl hover:bg-slate-50 transition-colors border border-transparent hover:border-slate-100">
+                        <div className="flex items-center justify-between py-2 px-3 bg-slate-50/50 rounded-2xl hover:bg-slate-50 transition-colors border border-transparent hover:border-slate-100">
                             <div className="flex flex-col">
                                 <span className="text-sm font-bold text-slate-700">{t('options.product')}</span>
                                 <span className="text-[10px] text-slate-400 font-medium truncate max-w-[150px]">{product?.name || "---"}</span>
@@ -164,14 +164,14 @@ export function ShareDialog({ qr_id, product, card, shop }: ShareDialogProps) {
                             <Switch checked={includeProduct} onCheckedChange={setIncludeProduct} />
                         </div>
 
-                        <div className="flex items-center justify-between p-3 bg-slate-50/50 rounded-2xl hover:bg-slate-50 transition-colors border border-transparent hover:border-slate-100">
+                        <div className="flex items-center justify-between py-2 px-3 bg-slate-50/50 rounded-2xl hover:bg-slate-50 transition-colors border border-transparent hover:border-slate-100">
                             <div className="flex flex-col">
                                 <span className="text-sm font-bold text-slate-700">{t('options.card')}</span>
                             </div>
                             <Switch checked={includeCard} onCheckedChange={setIncludeCard} />
                         </div>
 
-                        <div className="flex items-center justify-between p-3 bg-slate-50/50 rounded-2xl hover:bg-slate-50 transition-colors border border-transparent hover:border-slate-100">
+                        <div className="flex items-center justify-between py-2 px-3 bg-slate-50/50 rounded-2xl hover:bg-slate-50 transition-colors border border-transparent hover:border-slate-100">
                             <div className="flex flex-col">
                                 <span className="text-sm font-bold text-slate-700">{t('options.shop')}</span>
                                 <span className="text-[10px] text-slate-400 font-medium truncate max-w-[150px]">{shop?.name || "---"}</span>
@@ -186,14 +186,14 @@ export function ShareDialog({ qr_id, product, card, shop }: ShareDialogProps) {
                         <div className="flex gap-3">
                             <Button
                                 onClick={handleShareX}
-                                className="flex-1 h-16 rounded-2xl bg-[#000000] hover:bg-slate-800 text-white font-black text-base gap-3 shadow-lg shadow-black/10"
+                                className="flex-1 h-14 rounded-2xl bg-[#000000] hover:bg-slate-800 text-white font-black text-base gap-3 shadow-lg shadow-black/10"
                             >
                                 <SiX className="w-5 h-5" />
                                 {t('x')}
                             </Button>
                             <Button
                                 onClick={handleShareLine}
-                                className="flex-1 h-16 rounded-2xl bg-[#06C755] hover:bg-[#05b14c] text-white font-black text-base gap-3 shadow-lg shadow-emerald-100"
+                                className="flex-1 h-14 rounded-2xl bg-[#06C755] hover:bg-[#05b14c] text-white font-black text-base gap-3 shadow-lg shadow-emerald-100"
                             >
                                 <SiLine className="w-6 h-6" />
                                 {t('line')}

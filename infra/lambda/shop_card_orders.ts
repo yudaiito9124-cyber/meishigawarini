@@ -15,6 +15,8 @@ import { ddb, TABLE_NAME, BUCKET_NAME } from './share/db';
 import { getShopId, getAction, getUserId } from './utils/request';
 import { ShopApiSchema } from '@shared/api-types';
 import { validateQRParams } from './utils/qr-validation';
+import { signUrlIfS3 } from './utils/s3';
+import { getSystemDesign } from './utils/designs';
 
 export const handler: APIGatewayProxyHandler = async (event) => {
     try {
@@ -125,14 +127,14 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             if (designIds.length > 0) {
                 const keys = designIds.map(id => ({ PK: 'CARD_DESIGN#METADATA', SK: id }));
                 const batchRes = await ddb.send(new BatchGetCommand({
-                    RequestItems: { 
-                        [TABLE_NAME]: { 
-                            Keys: keys, 
-                            ProjectionExpression: 'SK, thumbf, thumbb, bgimgf, bgimgb' 
-                        } 
+                    RequestItems: {
+                        [TABLE_NAME]: {
+                            Keys: keys,
+                            ProjectionExpression: 'SK, thumbf, thumbb, bgimgf, bgimgb'
+                        }
                     }
                 }));
-                
+
                 const metaMap = new Map<string, any>();
                 const { BUCKET_NAME } = require('./share/db');
                 const { signUrlIfS3 } = require('./utils/s3');

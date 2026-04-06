@@ -45,7 +45,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             if (!targetItem) {
                 return errorResponse(404, 'Card order not found');
             }
-            
+
             // すでに batch_id があるか、ステータスが ORDERED でない場合はエラー
             if (targetItem.batch_id || targetItem.status !== 'ORDERED') {
                 return errorResponse(400, 'QR codes already generated for this order', {
@@ -63,18 +63,15 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         }
 
         // DB（CardOrder）からパラメータを抽出
-        const count = targetItem.quantity || 1;
+        const count = targetItem.quantity;
         const shopId = targetItem.shop_id;
         const productId = targetItem.product_id;
         const expiryDate = targetItem.expiration_date;
         const owner_id = targetItem.shop_user_id;
         const senderId = targetItem.sender_user_id;
         const designId = targetItem.design_id;
-        
-        // 【重要】動作の不変性維持: 
-        // 以前のフロントエンド実装(handleExport)では常に activate_now: false を送っていたため、
-        // DB上の値に関わらず一貫性を保つため false を固定値として使用します。
-        const activateNow = false; 
+
+        const activateNow = !!targetItem.activate_now;
 
         // senderInfo は DB に存在しないため null 固定 (senderId 経由で取得される)
         const senderInfo = null;
