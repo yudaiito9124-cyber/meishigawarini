@@ -452,12 +452,24 @@ export default function ReceivePage() {
 
     const loadMessages = useCallback(async () => {
         try {
-            const [data, authUser, receiverData, profileData] = await Promise.all([
-                receiveApi.receive_chat_get(qr_id, pin, {}),
-                getCurrentUser().catch(() => null),
-                userApi.user_receiver_get({}).catch(() => null),
-                userApi.user_profile_get({}).catch(() => null)
-            ]);
+            // Unauthenticated users in Safari can hang on Cognito session checks (getCurrentUser/fetchAuthSession).
+            // We skip these calls if we already know the user is not logged in.
+            const promises: Promise<any>[] = [
+                receiveApi.receive_chat_get(qr_id, pin, {})
+            ];
+
+            if (isLoggedIn) {
+                promises.push(getCurrentUser().catch(() => null));
+                promises.push(userApi.user_receiver_get({}).catch(() => null));
+                promises.push(userApi.user_profile_get({}).catch(() => null));
+            } else {
+                // Return nulls for unauthenticated users to match the array destructuring
+                promises.push(Promise.resolve(null));
+                promises.push(Promise.resolve(null));
+                promises.push(Promise.resolve(null));
+            }
+
+            const [data, authUser, receiverData, profileData] = await Promise.all(promises);
 
             setMessages(data.messages || []);
             setTotalSizeInfo(data.total_size_bytes || 0);
@@ -517,7 +529,7 @@ export default function ReceivePage() {
             console.error("Failed to load messages or user data:", e);
             alert(t('errors.loadFailed') + (tb(e.message.replace(/\./g, '_')) || e.message));
         }
-    }, [qr_id, pin, handleImportFromId]);
+    }, [qr_id, pin, handleImportFromId, isLoggedIn, t, tb]);
 
     const handleSenderRoleSelect = async () => {
         if (!window.confirm(t('roleSelection.confirmSender'))) return;
