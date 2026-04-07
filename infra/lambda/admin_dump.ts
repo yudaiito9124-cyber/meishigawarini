@@ -18,18 +18,18 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         if (event.httpMethod !== 'POST') return errorResponse(405, 'Method Not Allowed');
 
         const body = JSON.parse(event.body || '{}') as AdminApiSchema['admin_dump'];
-        const pks = body.pks;
+        const pks = body.pks || [];
+        const keys = body.keys || [];
+        const gsi2_pks = body.gsi2_pks || [];
 
-        if (!Array.isArray(pks) || pks.length === 0) {
-            return errorResponse(400, 'Missing pks array');
+        if (pks.length === 0 && keys.length === 0 && gsi2_pks.length === 0) {
+            return errorResponse(400, 'Missing pks, keys, or gsi2_pks array');
         }
 
         let allItems: any[] = [];
 
-        // 指定された各PKに対し、SKを条件とせずにQueryを実行して全関連アイテムを取得
+        // 1. 指定された各PKに対し、SKを条件とせずにQueryを実行して全関連アイテムを取得
         for (const pk of pks) {
-            // 【DB操作: Query】
-            // 理由: 同一PKを持つ全アイテム(METADATA, ORDER, CHAT 等)を一括で取得。
             const res = await ddb.send(new QueryCommand({
                 TableName: TABLE_NAME,
                 KeyConditionExpression: 'PK = :pk',
@@ -37,8 +37,36 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             }));
             
             if (res.Items && res.Items.length > 0) {
-                // 調査対象の区切りとしてヘッダーを挿入
                 allItems.push({ __HEADER__: `--- Data for PK: ${pk} ---` });
+                allItems = allItems.concat(res.Items);
+            }
+        }
+
+        // 2. 指定されたPKとSKのペア(keys)に対し、特定のアイテムを取得
+        for (const key of keys) {
+            const res = await ddb.send(new QueryCommand({
+                TableName: TABLE_NAME,
+                KeyConditionExpression: 'PK = :pk AND SK = :sk',
+                ExpressionAttributeValues: { ':pk': key.pk, ':sk': key.sk }
+            }));
+            
+            if (res.Items && res.Items.length > 0) {
+                allItems.push({ __HEADER__: `--- Data for PK: ${key.pk} SK: ${key.sk} ---` });
+                allItems = allItems.concat(res.Items);
+            }
+        }
+
+        // 3. GSI2 インデックスを使用して、特定のインデックスキー(GSI2_PK)からアイテムを取得
+        for (const gsi2_pk of gsi2_pks) {
+            const res = await ddb.send(new QueryCommand({
+                TableName: TABLE_NAME,
+                IndexName: 'GSI2',
+                KeyConditionExpression: 'GSI2_PK = :pk',
+                ExpressionAttributeValues: { ':pk': gsi2_pk }
+            }));
+            
+            if (res.Items && res.Items.length > 0) {
+                allItems.push({ __HEADER__: `--- Data for GSI2_PK: ${gsi2_pk} ---` });
                 allItems = allItems.concat(res.Items);
             }
         }

@@ -236,7 +236,29 @@
         "shipped": "Shipped",
         "completed": "Completed",
         "cancelled": "Cancelled",
-        "rejected": "Rejected"
+        "rejected": "Rejected",
+        "details": "Details"
+      },
+      "details": {
+        "title": "Order Details",
+        "orderInfo": "Order Information",
+        "orderMetadata": "Order Metadata",
+        "quantity": "Quantity",
+        "createdAt": "Created At",
+        "updatedAt": "Updated At",
+        "productId": "Product ID",
+        "shopUserId": "Order Staff ID",
+        "senderId": "Default Sender ID",
+        "expiration": "Card (QR) Expiration",
+        "activateNow": "Activate on Issue",
+        "systemDefault": "System Default",
+        "yes": "Yes",
+        "no": "No",
+        "designPreview": "Design Preview",
+        "front": "Front",
+        "back": "Back",
+        "designId": "Design ID",
+        "close": "Close"
       }
     },
     "orders": {
@@ -793,9 +815,10 @@
       "title": "Global Card Order Management",
       "shopIdFilter": "Filter by Shop ID",
       "preparePrinting": "Prepare Printing (PDF/CSV)",
+      "acceptAndGenerate": "Accept and Generate Cards",
       "markAsShipped": "Mark as Shipped",
       "markAsCompleted": "Mark as Completed",
-      "rejectOrder": "Reject order",
+      "rejectOrder": "Reject",
       "rejectConfirm": "Are you sure you want to reject this order? This action cannot be undone.",
       "table": {
         "shop": "Shop",
@@ -803,6 +826,43 @@
         "quantity": "Qty",
         "status": "Status",
         "date": "Order Date"
+      },
+      "search": {
+        "title": "ID Search (Order ID / Batch ID)",
+        "placeholder": "Enter ID here...",
+        "button": "Search",
+        "searching": "Searching...",
+        "notFound": "Order or Batch not found."
+      },
+      "details": {
+        "orderInfo": "Order Information",
+        "orderMetadata": "Order Metadata",
+        "shopName": "Shop Name",
+        "shopId": "Shop ID",
+        "ownerEmail": "Owner Email",
+        "quantity": "Quantity",
+        "createdAt": "Created At",
+        "updatedAt": "Updated At",
+        "productId": "Product ID",
+        "shopUserId": "Shop User ID",
+        "senderId": "Sender ID",
+        "expiration": "Expiration",
+        "activateNow": "Activate Now",
+        "systemDefault": "System Default",
+        "yes": "Yes",
+        "no": "No",
+        "designPreview": "Design Preview",
+        "front": "Front",
+        "back": "Back",
+        "designId": "Design ID",
+        "availableActions": "Available Actions",
+        "exportPdf": "Export PDF",
+        "exportCsv": "Export CSV",
+        "adminDetails": "Administrative Details",
+        "orderedByAdmin": "Ordered By (Admin)",
+        "createdByAdmin": "Created By (Admin)",
+        "batchId": "Batch ID",
+        "qrGeneratedAt": "QR Generated At"
       }
     }
   },

@@ -66,9 +66,8 @@ export const handler = async (event: APIGatewayRequestAuthorizerEvent): Promise<
 
         const item = getRes.Item;
 
-
         if (item.status !== 'PROMOTION') {
-            // 1. 状態チェック (Banned / Closed etc)
+
 
             // 2. Lockチェック
             if (isLocked(item)) {
@@ -76,7 +75,9 @@ export const handler = async (event: APIGatewayRequestAuthorizerEvent): Promise<
                 return generatePolicy(`receiver-${qr_id}`, 'Deny', event.methodArn, { locked: 'true' });
             }
 
-            // 2. PIN検証
+
+
+            // 1. PIN検証
             if (String(item.pin) !== String(pin)) {
                 console.log(`Invalid PIN for QR: ${qr_id}`);
 
@@ -93,6 +94,8 @@ export const handler = async (event: APIGatewayRequestAuthorizerEvent): Promise<
                 return generatePolicy(`receiver-${qr_id}`, 'Deny', event.methodArn);
             }
 
+
+
             // 3. 成功時：失敗回数のリセット (もしあれば)
             if (item.failed_attempts || item.locked_until) {
                 const { UpdateExpression, ExpressionAttributeNames } = getResetRateLimitUpdate();
@@ -107,7 +110,6 @@ export const handler = async (event: APIGatewayRequestAuthorizerEvent): Promise<
                     console.error("Failed to reset rate limit:", e);
                 }
             }
-
         } else {
             // 4. PROMOTIONステータス時の制限 (情報取得系のみ許可)
             const methodArnParts = event.methodArn.split('/');
@@ -124,8 +126,7 @@ export const handler = async (event: APIGatewayRequestAuthorizerEvent): Promise<
             }
         }
 
-
-        // 5. ポリシーの生成 (Allow)
+        // 4. ステータスに応じたアクセス制御
         const stageArn = event.methodArn.split('/').slice(0, 2).join('/');
         let policyResource: string | string[];
 
@@ -133,10 +134,11 @@ export const handler = async (event: APIGatewayRequestAuthorizerEvent): Promise<
             // PROMOTION(プロモーション用のQRコード)の場合は特定の取得系エンドポイントのみを許可
             policyResource = [
                 `${stageArn}/POST/receive/chat/get`,
-                `${stageArn}/POST/receive/sender/load`
+                `${stageArn}/POST/receive/sender/load`,
+                `${stageArn}/POST/receive/verify` // verify自体も許可に含める
             ];
         } else {
-            // 通常は /receive/* 配下すべてを許可 (他の /admin/ などは含めない)
+            // 通常は /receive/* 配下すべてを許可
             policyResource = `${stageArn}/*`;
         }
 
@@ -153,6 +155,7 @@ export const handler = async (event: APIGatewayRequestAuthorizerEvent): Promise<
         return generatePolicy('authorization-failed', 'Deny', event.methodArn);
     }
 };
+
 
 /**
  * API Gateway に返すための認可ポリシーを生成する

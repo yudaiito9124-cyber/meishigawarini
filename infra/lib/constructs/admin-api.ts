@@ -99,7 +99,7 @@ export class AdminApi extends cdk.NestedStack {
         BUCKET_NAME: bucket.bucketName,
       }
     });
-    grantTablePermissions(admin_qr_list);
+    grantTablePermissions(admin_qr_list, true);
     admin_qr_list.addToRolePolicy(new iam.PolicyStatement({
       actions: ['cognito-idp:AdminGetUser'],
       resources: [userPool.userPoolArn]
@@ -107,17 +107,49 @@ export class AdminApi extends cdk.NestedStack {
     bucket.grantRead(admin_qr_list);
 
 
-    const admin_qr_generate = new nodejs.NodejsFunction(this, 'admin_qr_generate', { entry: lampath('admin_qr_generate'), ...commonProps });
+    const admin_qr_generate = new nodejs.NodejsFunction(this, 'admin_qr_generate', {
+      entry: lampath('admin_qr_generate'),
+      ...commonProps,
+      environment: {
+        ...commonProps.environment,
+        BUCKET_NAME: bucket.bucketName,
+      }
+    });
     grantTablePermissions(admin_qr_generate, true);
+    bucket.grantRead(admin_qr_generate);
 
-    const admin_qr_ban = new nodejs.NodejsFunction(this, 'admin_qr_ban', { entry: lampath('admin_qr_ban'), ...commonProps });
+    const admin_qr_ban = new nodejs.NodejsFunction(this, 'admin_qr_ban', {
+      entry: lampath('admin_qr_ban'),
+      ...commonProps,
+      environment: {
+        ...commonProps.environment,
+        BUCKET_NAME: bucket.bucketName,
+      }
+    });
     grantTablePermissions(admin_qr_ban, true);
+    bucket.grantRead(admin_qr_ban);
 
-    const admin_qr_deleteban = new nodejs.NodejsFunction(this, 'admin_qr_deleteban', { entry: lampath('admin_qr_deleteban'), ...commonProps });
+    const admin_qr_deleteban = new nodejs.NodejsFunction(this, 'admin_qr_deleteban', {
+      entry: lampath('admin_qr_deleteban'),
+      ...commonProps,
+      environment: {
+        ...commonProps.environment,
+        BUCKET_NAME: bucket.bucketName,
+      }
+    });
     grantTablePermissions(admin_qr_deleteban, true);
+    bucket.grantRead(admin_qr_deleteban);
 
-    const admin_qr_batch = new nodejs.NodejsFunction(this, 'admin_qr_batch', { entry: lampath('admin_qr_batch'), ...commonProps });
+    const admin_qr_batch = new nodejs.NodejsFunction(this, 'admin_qr_batch', {
+      entry: lampath('admin_qr_batch'),
+      ...commonProps,
+      environment: {
+        ...commonProps.environment,
+        BUCKET_NAME: bucket.bucketName,
+      }
+    });
     grantTablePermissions(admin_qr_batch);
+    bucket.grantRead(admin_qr_batch);
 
 
 
@@ -128,9 +160,11 @@ export class AdminApi extends cdk.NestedStack {
       environment: {
         ...commonProps.environment,
         USER_POOL_ID: userPool.userPoolId,
+        BUCKET_NAME: bucket.bucketName,
       }
     });
     grantTablePermissions(admin_changeowner, true);
+    bucket.grantRead(admin_changeowner);
     admin_changeowner.addToRolePolicy(new iam.PolicyStatement({
       actions: ['cognito-idp:AdminGetUser'],
       resources: [userPool.userPoolArn]
@@ -156,9 +190,11 @@ export class AdminApi extends cdk.NestedStack {
       environment: {
         ...commonProps.environment,
         USER_POOL_ID: userPool.userPoolId,
+        BUCKET_NAME: bucket.bucketName,
       }
     });
     grantTablePermissions(admin_shop_create, true);
+    bucket.grantRead(admin_shop_create);
     admin_shop_create.addToRolePolicy(new iam.PolicyStatement({
       actions: ['cognito-idp:AdminGetUser'],
       resources: [userPool.userPoolArn]
@@ -167,14 +203,24 @@ export class AdminApi extends cdk.NestedStack {
     const admin_shop_carddesign_link = new nodejs.NodejsFunction(this, 'admin_shop_carddesign_link', {
       entry: lampath('admin_shop_carddesign_link'),
       ...commonProps,
+      environment: {
+        ...commonProps.environment,
+        BUCKET_NAME: bucket.bucketName,
+      }
     });
     grantTablePermissions(admin_shop_carddesign_link, true);
+    bucket.grantRead(admin_shop_carddesign_link);
 
     const admin_card_orders = new nodejs.NodejsFunction(this, 'admin_card_orders', {
       entry: lampath('admin_card_orders'),
       ...commonProps,
+      environment: {
+        ...commonProps.environment,
+        BUCKET_NAME: bucket.bucketName,
+      }
     });
     grantTablePermissions(admin_card_orders, true);
+    bucket.grantRead(admin_card_orders);
 
 
 
@@ -243,6 +289,8 @@ export class AdminApi extends cdk.NestedStack {
     addResourceWithCors(adminCardOrdersResource, 'list').addMethod('POST', new apigateway.LambdaIntegration(admin_card_orders), { authorizer: authorizerOfAdmin, });
     addResourceWithCors(adminCardOrdersResource, 'update').addMethod('POST', new apigateway.LambdaIntegration(admin_card_orders), { authorizer: authorizerOfAdmin, });
     addResourceWithCors(adminCardOrdersResource, 'create').addMethod('POST', new apigateway.LambdaIntegration(admin_card_orders), { authorizer: authorizerOfAdmin, });
+    addResourceWithCors(adminCardOrdersResource, 'get').addMethod('POST', new apigateway.LambdaIntegration(admin_card_orders), { authorizer: authorizerOfAdmin, });
+
 
   }
 }

@@ -13,7 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card";
 import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { MessageCircleQuestion, Paperclip, X, FileText, File as FileIcon, Loader2, Save, SendHorizontal, Pencil, UserPlus, Globe, Gift, User, MessagesSquare, Heart, Sparkles, Calendar, Clock, ShoppingBasket, Plus, Copy, Trash2, ChevronDown, ImageIcon, Import, Download, Package, Truck, Send } from "lucide-react";
+import { MessageCircleQuestion, Paperclip, X, FileText, File as FileIcon, Loader2, Save, SendHorizontal, Pencil, UserPlus, Globe, Gift, User, MessagesSquare, Heart, Sparkles, Calendar, Clock, ShoppingBasket, Plus, Copy, Trash2, ChevronDown, ImageIcon, Import, Download, Package, Truck, Send, Check } from "lucide-react";
 import { SiFacebook, SiInstagram, SiThreads, SiX, SiYoutube, SiLine, SiTiktok, SiLinktree, SiEight } from "@icons-pack/react-simple-icons";
 import SandboxedHtml from "@/components/SandboxedHtml";
 import { cn } from "@/lib/utils";
@@ -75,7 +75,7 @@ const ShakingGiftBox = ({ isShaking, isExpanding }: { isShaking?: boolean, isExp
         isExpanding && "animate-expand"
     )}>
         <div className={cn(
-            "relative w-24 h-24 mb-4 flex items-center justify-center bg-white/40 backdrop-blur-sm rounded-full",
+            "relative w-24 h-24 mb-4 flex items-center justify-center bg-white rounded-full",
             isShaking && "animate-shake animate-bounce"
         )}>
             <Gift size={64} className={cn("text-black stroke-[1.2] stroke-black")} />
@@ -452,10 +452,11 @@ export default function ReceivePage() {
 
     const loadMessages = useCallback(async () => {
         try {
-            const [data, authUser, receiverData] = await Promise.all([
+            const [data, authUser, receiverData, profileData] = await Promise.all([
                 receiveApi.receive_chat_get(qr_id, pin, {}),
                 getCurrentUser().catch(() => null),
-                userApi.user_receiver_get({}).catch(() => null)
+                userApi.user_receiver_get({}).catch(() => null),
+                userApi.user_profile_get({}).catch(() => null)
             ]);
 
             setMessages(data.messages || []);
@@ -469,6 +470,12 @@ export default function ReceivePage() {
                 setPhone(prev => prev || receiverData.receiver_info.phone || '');
                 setEmail(prev => prev || receiverData.receiver_info.email || '');
                 setEmail2(prev => prev || receiverData.receiver_info.email || '');
+            }
+
+            // Pre-fill chat sender name based on registered personal info
+            const myRegisteredName = receiverData?.receiver_info?.name || profileData?.profile?.name || '';
+            if (myRegisteredName) {
+                setChatName(prev => prev || myRegisteredName);
             }
 
             if (data.sender_id) {
@@ -528,6 +535,9 @@ export default function ReceivePage() {
                 await handleImportFromId(fullImportId, true);
                 setUserRole('sender');
                 setShowRoleSelection(false);
+                if (profileData.profile?.name) {
+                    setChatName(prev => prev || profileData.profile.name || '');
+                }
                 // Scroll to sender section
                 setTimeout(() => {
                     const el = document.getElementById('sender-info-section');
@@ -546,6 +556,7 @@ export default function ReceivePage() {
 
         setLoading(true);
         try {
+            setShowRoleSelection(false);
             const data = await userApi.user_receiver_get({});
             if (data.receiver_info) {
                 setName(data.receiver_info.name || '');
@@ -554,6 +565,7 @@ export default function ReceivePage() {
                 setPhone(data.receiver_info.phone || '');
                 setEmail(data.receiver_info.email || '');
                 setEmail2(data.receiver_info.email || '');
+                setChatName(prev => prev || data.receiver_info.name || '');
             }
             setUserRole('receiver');
         } catch (e: any) {
@@ -1184,18 +1196,10 @@ export default function ReceivePage() {
 
                             </div>
 
-                            {/* SNS Share Button - Witty Place */}
-                            <div className="mt-8 animate-reveal reveal-delay-500">
-                                <ShareDialog
-                                    qr_id={qr_id}
-                                    product={{ name: gift.product.name, image_url: gift.product.image_url }}
-                                    card={{ image_url: gift.design?.thumbf || gift.thumbf || gift.card_image_url }}
-                                    shop={{ name: gift.shop_name }}
-                                />
-                            </div>
-
                         </div>
                     )}
+
+
 
                     {step === "PIN" && !gift?.product && (
                         <form onSubmit={handleVerifyPin} className={cn("transition-opacity", loading && "opacity-50 pointer-events-none")}>
@@ -1238,57 +1242,122 @@ export default function ReceivePage() {
                 </CardContent>
             </Card>
 
+
+
+
+
+
+
             {/* Role Selection Card */}
             {showRoleSelection && step === "FORM" && (
-                <Card className="w-full max-w-xl mt-20 border-2 border-dashed border-gray-200">
-                    <CardHeader className="pb-2">
-                        <CardTitle className="text-lg text-center flex items-center justify-center gap-2">
-                            <Sparkles className="w-4 h-4 text-amber-500" />
+                <Card className="w-full max-w-xl mt-12 border-1 shadow-xl bg-white/90 backdrop-blur-md overflow-hidden animate-in fade-in slide-in-from-bottom-8 duration-700">
+                    <CardHeader className="pb-4 pt-8 text-center">
+                        <div className="mx-auto w-12 h-12 bg-gray-50 rounded-full flex items-center justify-center mb-4">
+                            <Sparkles className="w-6 h-6 text-amber-500 animate-pulse" />
+                        </div>
+                        <CardTitle className="text-2xl font-bold tracking-tight text-gray-900">
                             {t('titles.selectRole')}
                         </CardTitle>
+                        <p className="text-sm text-gray-500 mt-2 max-w-[80%] mx-auto leading-relaxed">
+                            {t('roleSelection.description')}
+                        </p>
                     </CardHeader>
-                    <CardContent className="pl-4 pr-4 space-y-6 animate-in fade-in slide-in-from-bottom-4">
-                        <p className="text-center text-[10px] text-gray-500">{t('roleSelection.description')}</p>
-                        <div className="grid grid-cols-2 gap-4">
-
-                            <Button
-                                variant="outline"
-                                className={cn(
-                                    "h-24 flex flex-col gap-1 border-2 transition-all font-bold",
-                                    userRole === 'receiver' ? "border-black bg-gray-50" : "border-gray-100 hover:border-gray-300 bg-white"
-                                )}
+                    <CardContent className="px-6 pb-10 space-y-6">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            {/* Receiver Role Button */}
+                            <button
+                                type="button"
                                 onClick={handleReceiverRoleSelect}
                                 disabled={loading}
-                            >
-                                <Gift className={cn("w-5 h-5", userRole === 'receiver' ? "text-black" : "text-gray-400")} />
-                                <span className={cn("font-bold text-sm", userRole === 'receiver' ? "text-black" : "text-gray-500")}>
-                                    {t('roleSelection.receiver')}
-                                </span>
-                                <span className="text-[8px] text-gray-400 leading-tight">{t('roleSelection.receiverDescription')}</span>
-                            </Button>
-
-                            <Button
-                                variant="outline"
                                 className={cn(
-                                    "h-24 flex flex-col gap-1 border-2 transition-all",
-                                    userRole === 'sender' ? "border-black bg-gray-50" : "border-gray-100 hover:border-gray-300 bg-white"
+                                    "relative h-44 flex flex-col items-center justify-center gap-3 p-6 rounded-2xl border-2 transition-all duration-300 group",
+                                    userRole === 'receiver'
+                                        ? "border-black bg-gray-50 ring-4 ring-gray-100"
+                                        : "border-gray-100 hover:border-black hover:bg-white hover:shadow-lg hover:scale-[1.02] bg-gray-50/30"
                                 )}
+                            >
+                                {userRole === 'receiver' && (
+                                    <div className="absolute top-3 right-3 bg-black rounded-full p-1 shadow-sm">
+                                        <Check className="w-3 h-3 text-white" />
+                                    </div>
+                                )}
+                                <div className={cn(
+                                    "p-4 rounded-xl transition-colors duration-300",
+                                    userRole === 'receiver' ? "bg-black text-white" : "bg-white text-gray-400 group-hover:text-black group-hover:bg-gray-50 shadow-sm"
+                                )}>
+                                    <Gift className="w-8 h-8" />
+                                </div>
+                                <div className="text-center">
+                                    <span className={cn(
+                                        "block font-bold text-lg mb-1",
+                                        userRole === 'receiver' ? "text-black" : "text-gray-700"
+                                    )}>
+                                        {t('roleSelection.receiver')}
+                                    </span>
+                                    <span className="text-[10px] text-gray-400 font-medium leading-tight block">
+                                        {t('roleSelection.receiverDescription')}
+                                    </span>
+                                </div>
+                            </button>
+
+                            {/* Sender Role Button */}
+                            <button
+                                type="button"
                                 onClick={handleSenderRoleSelect}
                                 disabled={loading}
+                                className={cn(
+                                    "relative h-44 flex flex-col items-center justify-center gap-3 p-6 rounded-2xl border-2 transition-all duration-300 group",
+                                    userRole === 'sender'
+                                        ? "border-black bg-gray-50 ring-4 ring-gray-100"
+                                        : "border-gray-100 hover:border-black hover:bg-white hover:shadow-lg hover:scale-[1.02] bg-gray-50/30"
+                                )}
                             >
-                                <Send className={cn("w-5 h-5", userRole === 'sender' ? "text-black" : "text-gray-400")} />
-                                <span className={cn("font-bold text-sm", userRole === 'sender' ? "text-black" : "text-gray-500")}>
-                                    {t('roleSelection.sender')}
-                                </span>
-                                <span className="text-[8px] text-gray-400 leading-tight">{t('roleSelection.senderDescription')}</span>
-                            </Button>
+                                {userRole === 'sender' && (
+                                    <div className="absolute top-3 right-3 bg-black rounded-full p-1 shadow-sm">
+                                        <Check className="w-3 h-3 text-white" />
+                                    </div>
+                                )}
+                                <div className={cn(
+                                    "p-4 rounded-xl transition-colors duration-300",
+                                    userRole === 'sender' ? "bg-black text-white" : "bg-white text-gray-400 group-hover:text-black group-hover:bg-gray-50 shadow-sm"
+                                )}>
+                                    <Send className="w-8 h-8" />
+                                </div>
+                                <div className="text-center">
+                                    <span className={cn(
+                                        "block font-bold text-lg mb-1",
+                                        userRole === 'sender' ? "text-black" : "text-gray-700"
+                                    )}>
+                                        {t('roleSelection.sender')}
+                                    </span>
+                                    <span className="text-[10px] text-gray-400 font-medium leading-tight block">
+                                        {t('roleSelection.senderDescription')}
+                                    </span>
+                                </div>
+                            </button>
                         </div>
+
+                        {/* Global Loading Overlay for Role Selection */}
+                        {loading && (
+                            <div className="absolute inset-0 bg-white/80 backdrop-blur-sm z-30 flex flex-col items-center justify-center animate-in fade-in duration-300">
+                                <div className="p-10 flex flex-col items-center gap-4 text-center">
+                                    <div className="relative">
+                                        <Loader2 className="w-12 h-12 text-black animate-spin" />
+                                        <div className="absolute inset-0 border-4 border-gray-100 rounded-full opacity-25" />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <p className="font-bold text-gray-800 text-lg">{t('roleSelection.processing')}</p>
+                                        <p className="text-xs text-gray-500 font-medium">{t('roleSelection.processingDescription')}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                     </CardContent>
                 </Card>
             )}
 
             {/* --- Form Section --- */}
-            {(["FORM", "PROMOTION"].includes(step)) && (
+            {(!showRoleSelection && ["FORM", "PROMOTION"].includes(step)) && (
                 <Card className="w-full max-w-xl mt-20">
                     <CardHeader>
                         <CardTitle className="text-xl text-center">
@@ -1526,7 +1595,7 @@ export default function ReceivePage() {
                         {step === "SUCCESS" && (
                             <div className="text-center py-6 space-y-4">
                                 {/* <p className="text-green-600 font-medium">{t('successStep.message')}</p> */}
-                                <p className="text-sm text-gray-500">{t('successStep.subMessage')}</p>
+                                <p className="text-sm text-gray-500">{t('successStep.subMessage')}<br />{t('successStep.subMessage2')}</p>
                             </div>
                         )}
 
@@ -1600,6 +1669,21 @@ export default function ReceivePage() {
                                         </div>
                                     </DialogContent>
                                 </Dialog>
+                            </div>
+                        )}
+
+
+
+                        {/* SNS Share Button - Witty Place */}
+                        {!["PIN", "EXPIRED"].includes(step) && (
+
+                            <div className="w-full max-w-xl mt-12 pr-6 pl-6 animate-reveal reveal-delay-500">
+                                <ShareDialog
+                                    qr_id={qr_id}
+                                    product={{ name: gift.product.name, image_url: gift.product.image_url }}
+                                    card={{ image_url: gift.design?.thumbf || gift.thumbf || gift.card_image_url }}
+                                    shop={{ name: gift.shop_name }}
+                                />
                             </div>
                         )}
                     </CardContent>

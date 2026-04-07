@@ -20,7 +20,7 @@
 | **QR Chat (チャット履歴)** | `QR#{uuid}` | `CHAT` |
 | **Card Design (カードデザイン情報)** | `CARD_DESIGN#METADATA` | `design_id` |
 | **Card Order (カード発注情報)** | `CARD_ORDER#{shop_id}` | `ORDER#{order_id}` |
-| **QR Batch (一括生成バッチデータ)** | `QRBATCH#{batch_id}` | `METADATA` |
+| **QR Batch (一括生成バッチデータ)** | `QR_BATCH#{batch_id}` | `METADATA#{ts_created_at}` |
 
 
 ---
@@ -263,7 +263,7 @@ QRコードのライフサイクルや注文ステータス、商品との紐付
 | `PK` | String | `CARD_ORDER#SHOP{shop_id}` または `CARD_ORDER#ADMIN{user_id}` |
 | `SK` | String | `ORDER#{order_id}` （`order_id` はUUID形式） |
 | `order_id` | String | 発注ID （UUID形式） |
-| `quantity` | Number | 発注枚数（上限100枚，QRBATCHレコードの保存方法の都合上，AWSの1レコードあたりの容量上限があるため，1000個くらいが限度と思われる） |
+| `quantity` | Number | 発注枚数（上限100枚，QR_BATCHレコードの保存方法の都合上，AWSの1レコードあたりの容量上限があるため，1000個くらいが限度と思われる） |
 | `status` | String | 発注状態 (`ORDERED`, `CANCELLED`, `PRINTING`, `SHIPPED`, `COMPLETED`, `REJECTED`) | ショップからはORDEREDの時点でのみCANCELLEDに移行可能，システム管理者が生成した時点でPRINTINGに移行 |
 | `design_id` | String | デザインID （UUID形式） |
 | `product_id` | String | (オプション・制限) 商品ID （UUID形式） |
@@ -288,8 +288,8 @@ QRコードを一括生成した際のメタデータと、生成された全QR�
 
 | 属性名 | 型 | 説明 |
 | --- | --- | --- |
-| `PK` | String | `QRBATCH#{batch_id}` |
-| `SK` | String | 常に固定値 `METADATA` |
+| `PK` | String | `QR_BATCH#{batch_id}` |
+| `SK` | String | `METADATA#{ts_created_at}` |
 | `data` | Array | 生成されたQRコードのリスト。形式: `[{ qr_id: "...", pin: "..." }]` |
 | `order_id` | String | このバッチ生成の契機となったカード発注ID |
 | `ts_created_at` | String | 作成日時 |

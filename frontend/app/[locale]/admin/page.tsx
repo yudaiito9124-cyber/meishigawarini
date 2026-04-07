@@ -39,6 +39,8 @@ import { Link, useRouter } from '@/i18n/routing';
 import { Textarea } from "@/components/ui/textarea";
 
 import { adminApi } from "@/lib/api/admin";
+import OrderDetailsDialog from "@/components/admin/OrderDetailsDialog";
+
 
 export default function AdminPage() {
     const t = useTranslations('AdminPage');
@@ -66,6 +68,12 @@ export default function AdminPage() {
     const [cardOrderFilterShopId, setCardOrderFilterShopId] = useState("");
     const router = useRouter();
     const [copiedId, setCopiedId] = useState<string | null>(null);
+
+    // ID Search states
+    const [searchId, setSearchId] = useState("");
+    const [isSearching, setIsSearching] = useState(false);
+    const [searchedOrder, setSearchedOrder] = useState<any>(null);
+
 
     const handleCopy = (id: string) => {
         navigator.clipboard.writeText(id).then(() => {
@@ -113,15 +121,22 @@ export default function AdminPage() {
 
     const handleUpdateCardOrderStatus = async (shopId: string, orderId: string, status: string, batchId?: string) => {
         try {
+            // UIに即座に反映させるためローカルステートを更新
+            setCardOrders(prev => prev.map(o => o.order_id === orderId ? { ...o, status, batch_id: batchId || o.batch_id, ts_updated_at: new Date().toISOString() } : o));
+
             await adminApi.admin_card_orders_update({
                 shop_id: shopId,
                 order_id: orderId,
                 status,
                 batch_id: batchId
             });
-            fetchCardOrders();
+
+            // GSIの反映待ち時間を考慮して1秒後に再取得
+            setTimeout(() => fetchCardOrders(), 1000);
         } catch (e) {
+            console.error("Failed to update status:", e);
             alert(tb('Internal Server Error'));
+            fetchCardOrders(); // エラー時は元の状態に戻すため再取得
         }
     };
 
@@ -143,7 +158,7 @@ export default function AdminPage() {
                 // 1. If batch_id already exists, use it regardless of status
                 const data = await adminApi.admin_qr_batch_get({ batch_id: batchId });
                 codes = data.data;
-                
+
                 // If the status was still ORDERED, we should update it to PRINTING (if not done already)
                 if (order.status === 'ORDERED') {
                     await handleUpdateCardOrderStatus(order.shop_id, order.order_id, 'PRINTING', batchId);
@@ -158,7 +173,8 @@ export default function AdminPage() {
 
                 // After generation, the Lambda already updates the order, 
                 // but we refresh the UI to show the new status.
-                setTimeout(() => fetchCardOrders(), 500);
+                // GSIの反映待ち時間を考慮して1秒後に再取得
+                setTimeout(() => fetchCardOrders(), 1000);
             } else {
                 // 3. No batch_id for non-ORDERED status
                 alert("No QR codes found for this order. It may have been processed without saving a batch ID.");
@@ -167,11 +183,20 @@ export default function AdminPage() {
 
             // 4. Trigger download
             const batch = {
-                id: `batch-${batchId}`,
+                id: batchId,
                 count: codes.length,
                 codes: codes,
-                date: new Date(order.ts_created_at || new Date()).toLocaleString()
+                date: new Date(order.ts_created_at || new Date()).toLocaleString(),
+                status: 'ready',
+                design_id: order.design_id
             };
+
+            // Update local history
+            setGeneratedBatches(prev => {
+                const exists = prev.find(b => b.id === batchId);
+                if (exists) return prev;
+                return [batch, ...prev];
+            });
 
             const resolveDesign = (designId?: string) => {
                 const targetId = designId || cardFormat;
@@ -226,7 +251,7 @@ export default function AdminPage() {
             };
 
             await handleExport(newOrder, 'pdf');
-            
+
         } catch (e: any) {
             const errData = e;
             alert((tb(errData?.message?.replace(/\./g, '_')) || errData?.message) || t('batches.alerts.failed') + (errData?.detail?.toString() || ''));
@@ -234,6 +259,43 @@ export default function AdminPage() {
             setIsGenerating(false);
         }
     };
+
+    const handleIdSearch = async () => {
+        if (!searchId.trim()) return;
+        setIsSearching(true);
+        try {
+            // 入力の正規化: 先頭のプレフィックス (ORDER#, QR_BATCH#, QR#) を除去
+            let orderId = searchId.trim().replace(/^(ORDER#|QR_BATCH#|QR#)/, '');
+
+            console.log(`[AdminSearch] Starting search workflow for normalized ID: ${orderId}`);
+
+            // 1. Try Batch lookup
+            try {
+                // まずはバッチIDとして検索（同じID形式の場合に備えて）
+                const batchRes = await adminApi.admin_qr_batch_get({ batch_id: orderId });
+                if (batchRes && batchRes.order_id) {
+                    console.log(`[AdminSearch] Found matching Batch. Resolving to OrderID: ${batchRes.order_id}`);
+                    orderId = batchRes.order_id;
+                }
+            } catch (e) {
+                // Not a batch ID, continue to Order lookup
+            }
+
+            // 2. Order lookup
+            const orderRes = await adminApi.admin_card_orders_get({ order_id: orderId });
+            setSearchedOrder(orderRes);
+        } catch (e: any) {
+            console.error('[AdminSearch] Search failed:', e);
+            if (e.status === 404) {
+                alert(t('cardOrders.search.notFound'));
+            } else {
+                alert(t('cardOrders.search.error') || 'Search failed. Please try again.');
+            }
+        } finally {
+            setIsSearching(false);
+        }
+    };
+
 
     const currentSelectedDesign = dbCardDesigns.find(d => d.design_id === cardFormat) || cardformats[cardFormat] || cardformats['gakuchousenbeiv1'];
     const previewAspectRatio = `${currentSelectedDesign.width || 84} / ${currentSelectedDesign.height || 52}`;
@@ -391,8 +453,51 @@ export default function AdminPage() {
                             paperFormat={paperFormat}
                             cardFormat={cardFormat}
                         />
+
+                        {/* ID Search Section (Standalone) */}
+                        {/* <Card>
+                            <CardHeader>
+                                <CardTitle className="flex items-center gap-2">
+                                    <Search className="w-5 h-5" />
+                                    {t('cardOrders.search.title')}
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="flex gap-2">
+                                    <div className="relative flex-1">
+                                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                                        <Input
+                                            placeholder={t('cardOrders.search.placeholder')}
+                                            value={searchId}
+                                            onChange={(e) => setSearchId(e.target.value)}
+                                            onKeyDown={(e) => e.key === 'Enter' && handleIdSearch()}
+                                            className="pl-10 h-11 text-black bg-white border-gray-200"
+                                        />
+                                    </div>
+                                    <Button
+                                        onClick={handleIdSearch}
+                                        disabled={isSearching || !searchId.trim()}
+                                        className="h-11 px-6 bg-mist-800 hover:bg-mist-700 text-white font-bold transition-all"
+                                    >
+                                        {isSearching ? (
+                                            <>
+                                                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                                                {t('cardOrders.search.searching')}
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Search className="w-4 h-4 mr-2" />
+                                                {t('cardOrders.search.button')}
+                                            </>
+                                        )}
+                                    </Button>
+                                </div>
+                            </CardContent>
+                        </Card> */}
+
                         {/* QRコード生成 */}
                         <Card>
+
                             <CardHeader>
                                 <CardTitle>{t('generate.title')}</CardTitle>
                             </CardHeader>
@@ -609,7 +714,7 @@ export default function AdminPage() {
                                                             </div>
                                                             <p className="text-sm text-gray-500">{t('batches.info', { count: batch.count, date: batch.date })}</p>
                                                         </div>
-                                                        <p className="flex justify-center items-center text-sm bg-green-100 text-green-800 px-3 py-1 rounded-xl">{batch.status}</p>
+                                                        <p className="flex justify-center items-center text-sm bg-green-100 text-green-800 px-3 py-1 rounded-xl">{t(`batches.status.${batch.status}`)}</p>
                                                     </div>
                                                     <Button className="ml-auto" variant="outline" size="sm" onClick={() => {
                                                         setIsExportingCsv(batch.id);
@@ -728,6 +833,20 @@ export default function AdminPage() {
                             </CardFooter>
                         </Card>
 
+                        {searchedOrder && (
+                            <OrderDetailsDialog
+                                order={searchedOrder}
+                                isOpen={!!searchedOrder}
+                                onClose={() => setSearchedOrder(null)}
+                                onUpdateStatus={handleUpdateCardOrderStatus}
+                                onExport={handleExport}
+                                isExporting={isExportingCsv}
+                                dbCardDesigns={dbCardDesigns}
+                                paperFormat={paperFormat}
+                            />
+                        )}
+
+
                     </div>
                 )}
 
@@ -736,7 +855,7 @@ export default function AdminPage() {
 
 
                 {activeTab === "shops" && (
-                    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 animate-in fade-in slide-in-from-bottom-2 duration-300 items-start">
                         {/* ショップのメタデータ管理 (NEW) */}
                         <AdminShopCardDesignLinkSection apiUrl={NEXT_PUBLIC_API_URL} dbCardDesigns={dbCardDesigns} />
 
@@ -756,7 +875,7 @@ export default function AdminPage() {
 
 
                 {activeTab === "tools" && (
-                    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 animate-in fade-in slide-in-from-bottom-2 duration-300 items-start">
                         {/* データダンプ */}
                         <DataDumpSection apiUrl={NEXT_PUBLIC_API_URL} />
                     </div>
@@ -1560,21 +1679,65 @@ function BanButton({ qr_id, apiUrl, onSuccess, size = "sm", className, isBanned 
 
 function DataDumpSection({ apiUrl }: { apiUrl: string }) {
     const t = useTranslations('AdminPage');
-    const [userId, setUserId] = useState("");
-    const [shopId, setShopId] = useState("");
+
+    return (
+        <>
+            <DumpCard title={t('list.dump.userId')} prefix="USER#" />
+            <DumpCard title={t('list.dump.shopId')} prefix="SHOP#" />
+            <DumpCard title="QR" prefix="QR#" />
+            <DumpCard
+                title="Card Order"
+                prefix="CARD_ORDER#"
+                skPrefix="GSI 2;CARD_ORDER#"
+                isGsi2
+            />
+            <DumpCard title="QR Batch" prefix="QR_BATCH#" />
+            <DumpCard
+                title="Card Design"
+                prefix="CARD_DESIGN#METADATA"
+                skPrefix="PK: CARD_DESIGN#METADATA, SK: "
+                useSk
+            />
+        </>
+    );
+}
+
+function DumpCard({
+    title,
+    prefix,
+    skPrefix,
+    defaultValue = "",
+    useSk = false,
+    isGsi2 = false
+}: {
+    title: string,
+    prefix: string,
+    skPrefix?: string,
+    defaultValue?: string,
+    useSk?: boolean,
+    isGsi2?: boolean
+}) {
+    const t = useTranslations('AdminPage');
+    const [id, setId] = useState(defaultValue);
     const [data, setData] = useState<any>(null);
     const [loading, setLoading] = useState(false);
 
     const handleDump = async () => {
-        if (!userId && !shopId) return;
+        if (!id.trim()) return;
         setLoading(true);
         try {
-            const pks: string[] = [];
-            if (userId) pks.push(`USER#${userId}`);
-            if (shopId) pks.push(`SHOP#${shopId}`);
-            const result = await adminApi.admin_dump({
-                pks
-            });
+            const val = id.trim();
+            const pk = `${prefix}${(!useSk && !isGsi2) ? val : ""}`;
+            const sk = useSk ? val : undefined;
+            const gsi2_pk = isGsi2 ? `${prefix}${val}` : undefined;
+
+            const result = await adminApi.admin_dump(
+                gsi2_pk
+                    ? { gsi2_pks: [gsi2_pk] }
+                    : sk
+                        ? { keys: [{ pk, sk }] }
+                        : { pks: [pk] }
+            );
             setData(result.items);
         } catch (e) {
             alert(t('list.dump.error'));
@@ -1583,45 +1746,73 @@ function DataDumpSection({ apiUrl }: { apiUrl: string }) {
         }
     };
 
+    const handleClear = () => {
+        setId(defaultValue);
+        setData(null);
+    };
 
     return (
-        <Card className="flex flex-col w-full">
-            <CardHeader className="flex-none">
-                <CardTitle>{t('list.dump.title')}</CardTitle>
+        <Card className={cn(
+            "flex flex-col w-full transition-all duration-300",
+            data ? "xl:col-span-2 ring-2 ring-mist-500/30" : "h-full"
+        )}>
+            <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                    <Search className="w-4 h-4 text-mist-400" />
+                    {title}
+                </CardTitle>
             </CardHeader>
-            <CardContent className="">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                        <Label htmlFor="dumpUserId">{t('list.dump.userId')}</Label>
+            <CardContent className="space-y-4 flex-1 flex flex-col">
+                <div className="space-y-2">
+                    <div className="flex border border-mist-700/30 rounded-md overflow-hidden bg-white text-black shadow-sm focus-within:ring-2 focus-within:ring-mist-500/20 focus-within:border-mist-500 transition-all">
+                        <div className="bg-mist-50 px-3 py-2 text-[10px] font-bold font-mono border-r border-mist-700/30 select-none flex items-center text-mist-600 uppercase tracking-tight whitespace-nowrap">
+                            {skPrefix || prefix}
+                        </div>
                         <Input
-                            id="dumpUserId"
-                            placeholder=""
-                            value={userId}
-                            onChange={(e) => setUserId(e.target.value)}
-                        />
-                    </div>
-                    <div className="space-y-2">
-                        <Label htmlFor="dumpShopId">{t('list.dump.shopId')}</Label>
-                        <Input
-                            id="dumpShopId"
-                            placeholder=""
-                            value={shopId}
-                            onChange={(e) => setShopId(e.target.value)}
+                            className="border-0 shadow-none focus-visible:ring-0 rounded-none h-10 px-3 py-2 text-sm flex-1 bg-transparent"
+                            placeholder="..."
+                            value={id}
+                            onChange={(e) => setId(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && handleDump()}
                         />
                     </div>
                 </div>
-                <Button onClick={handleDump} disabled={loading || (!userId && !shopId)} className="w-full sticky top-0 z-10 mt-3">
-                    {loading ? t('list.dump.loading') : t('list.dump.button')}
-                </Button>
+
+                <div className="flex gap-2">
+                    <Button
+                        onClick={handleDump}
+                        disabled={loading || !id.trim()}
+                        className="flex-1 bg-mist-800 hover:bg-mist-700 text-white font-bold h-9 text-xs"
+                    >
+                        {loading ? <Loader2 className="w-3 h-3 animate-spin mr-2" /> : <Search className="w-3 h-3 mr-2" />}
+                        {t('list.dump.button')}
+                    </Button>
+                    <Button
+                        variant="secondary"
+                        onClick={handleClear}
+                        disabled={loading || (!id && !data)}
+                        className="bg-white border text-mist-800 hover:bg-mist-50 h-9 text-xs px-3"
+                    >
+                        <Trash2 className="w-3 h-3" />
+                    </Button>
+                </div>
+
                 {data && (
-                    <div className="mt-4 ">
-                        {data.length === 0 ? (
-                            <p className="text-gray-500 text-sm">{t('list.dump.noItems')}</p>
-                        ) : (
-                            <pre className="bg-gray-100 p-4 rounded-xl text-xs font-mono overflow-auto max-h-96 text-black h-[70vh] max-h-[70vh]">
-                                {JSON.stringify(data, null, 2)}
-                            </pre>
-                        )}
+                    <div className="mt-2 flex-1 flex flex-col min-h-0 animate-in fade-in slide-in-from-top-2 duration-300">
+                        <div className="flex items-center justify-between mb-1.5 px-1">
+                            <p className="text-[10px] font-bold text-mist-500 uppercase">{data.length} records found</p>
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-5 px-1.5 text-[9px] text-mist-400 hover:text-mist-800"
+                                onClick={() => setData(null)}
+                            >
+                                Hide
+                            </Button>
+                        </div>
+                        <pre className="bg-slate-900 p-4 rounded-lg text-[12px] font-mono overflow-auto max-h-[500px] text-emerald-400 border border-slate-800 shadow-inner custom-scrollbar">
+                            {JSON.stringify(data, null, 2)}
+                        </pre>
                     </div>
                 )}
             </CardContent>
@@ -2056,14 +2247,17 @@ function AdminShopCardDesignLinkSection({ apiUrl, dbCardDesigns }: { apiUrl: str
     }, [dbCardDesigns]);
 
     return (
-        <Card>
+        <Card className={cn(
+            "flex flex-col w-full transition-all duration-300",
+            shopData ? "xl:col-span-2 ring-2 ring-mist-500/30" : "h-full"
+        )}>
             <CardHeader>
                 <CardTitle>{tLink('title')}</CardTitle>
-                <CardDescription>{tLink('description')}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-                <div className="flex gap-2">
-                    <div className="flex-1">
+                <p className="text-sm text-gray-500">{tLink('description')}</p>
+                <div className="flex flex-col gap-4">
+                    <div className="flex-1 space-y-2">
                         <Label htmlFor="manageShopId">{tLink('shopIdLabel')}</Label>
                         <Input
                             id="manageShopId"
@@ -2167,6 +2361,8 @@ function AdminShopCardDesignLinkSection({ apiUrl, dbCardDesigns }: { apiUrl: str
     );
 }
 
+
+
 function CardOrderListSection({
     orders,
     loading,
@@ -2201,6 +2397,7 @@ function CardOrderListSection({
     const st = useTranslations('Status');
     const ts = useTranslations('Timestamp');
     const [isProcessing, setIsProcessing] = useState<string | null>(null);
+    const [selectedOrder, setSelectedOrder] = useState<any>(null);
 
     const filteredOrders = orders.filter(o =>
         !shopIdFilter || (o.shop_id && o.shop_id.toLowerCase().includes(shopIdFilter.toLowerCase())) || (o.shop_name && o.shop_name.toLowerCase().includes(shopIdFilter.toLowerCase()))
@@ -2258,26 +2455,29 @@ function CardOrderListSection({
                                     <TableHead>{tc('table.shop')}</TableHead>
                                     <TableHead className="text-right">{tc('table.quantity')}</TableHead>
                                     <TableHead className="text-center">{tc('table.status')}</TableHead>
-                                    <TableHead className="text-center">{tc('table.actions')}</TableHead>
                                     <TableHead className="w-[150px]">{tc('table.dateupdated')}</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
                                 {loading ? (
                                     <TableRow>
-                                        <TableCell colSpan={6} className="h-24 text-center">
+                                        <TableCell colSpan={5} className="h-24 text-center">
                                             <Loader2 className="h-6 w-6 animate-spin mx-auto text-gray-400" />
                                         </TableCell>
                                     </TableRow>
                                 ) : filteredOrders.length === 0 ? (
                                     <TableRow>
-                                        <TableCell colSpan={6} className="h-24 text-center text-gray-500">
+                                        <TableCell colSpan={5} className="h-24 text-center text-gray-500">
                                             No orders found.
                                         </TableCell>
                                     </TableRow>
                                 ) : (
                                     filteredOrders.map((order) => (
-                                        <TableRow key={order.order_id} className="text-black hover:bg-gray-50 transition-colors">
+                                        <TableRow
+                                            key={order.order_id}
+                                            className="text-black hover:bg-gray-100 transition-colors cursor-pointer group"
+                                            onClick={() => setSelectedOrder(order)}
+                                        >
                                             <TableCell className="text-xs text-gray-500">
                                                 {new Date(order.ts_created_at).toLocaleString()}
                                             </TableCell>
@@ -2306,63 +2506,6 @@ function CardOrderListSection({
                                                     {st(order.status.toLowerCase())}
                                                 </span>
                                             </TableCell>
-                                            <TableCell className="text-right">
-                                                <div className="flex justify-end gap-0.5 ">
-                                                    {(order.status !== 'REJECTED' && order.status !== 'CANCELLED') && (
-                                                        <div className="gap-1 rounded-sm p-1 bg-green-100">
-                                                            <Button
-                                                                variant="ghost"
-                                                                size="sm"
-                                                                className="h-6 text-xs text-black hover:bg-green-300"
-                                                                onClick={() => onExport(order, 'pdf')}
-                                                                disabled={!!isExporting}
-                                                                title={order.status === 'ORDERED' ? "Generate & Print" : "Re-download"}
-                                                            >
-                                                                {isExporting === order.order_id ? <Loader2 className="w-3 h-3 animate-spin" /> : <FileText className="w-3 h-3 mr-1" />}
-                                                                PDF
-                                                            </Button>
-                                                            <Button
-                                                                variant="ghost"
-                                                                size="sm"
-                                                                className="h-6 text-xs text-black hover:bg-green-300"
-                                                                onClick={() => onExport(order, 'csv')}
-                                                                disabled={!!isExporting}
-                                                                title={order.status === 'ORDERED' ? "Generate & Print" : "Re-download"}
-                                                            >
-                                                                {isProcessing === order.order_id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3 mr-1" />}
-                                                                CSV
-                                                            </Button>
-                                                        </div>
-                                                    )}
-                                                    {order.status === 'PRINTING' && (
-                                                        <Button
-                                                            variant="default"
-                                                            size="sm"
-                                                            className="flex h-8 rounded-sm text-xs bg-indigo-300 hover:bg-indigo-500 text-indigo-800 font-bold hover:text-indigo-100"
-                                                            onClick={() => onUpdateStatus(order.shop_id, order.order_id, 'SHIPPED')}
-                                                        >
-                                                            {tc('markAsShipped')}
-                                                        </Button>
-                                                    )}
-                                                    {(order.status === 'ORDERED' || order.status === 'PRINTING') && (
-
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="sm"
-                                                            className="h-8 w-8 p-0 h-8 rounded-sm items-center justify-center text-red-500 bg-red-100 hover:bg-red-500 hover:text-white"
-                                                            onClick={() => {
-                                                                if (window.confirm(tc('rejectConfirm'))) {
-                                                                    onUpdateStatus(order.shop_id, order.order_id, 'REJECTED');
-                                                                }
-                                                            }}
-                                                            title={tc('rejectOrder')}
-                                                        >
-                                                            <X className="w-4 h-4" />
-                                                        </Button>
-                                                    )}
-
-                                                </div>
-                                            </TableCell>
                                             <TableCell className="text-xs text-gray-500">
                                                 {new Date(order.ts_updated_at).toLocaleString()}
                                             </TableCell>
@@ -2373,6 +2516,18 @@ function CardOrderListSection({
                         </Table>
                     </div>
                 </div>
+                {selectedOrder && (
+                    <OrderDetailsDialog
+                        order={selectedOrder}
+                        isOpen={!!selectedOrder}
+                        onClose={() => setSelectedOrder(null)}
+                        onUpdateStatus={onUpdateStatus}
+                        onExport={onExport}
+                        isExporting={isExporting}
+                        dbCardDesigns={dbCardDesigns}
+                        paperFormat={paperFormat}
+                    />
+                )}
             </CardContent>
         </Card>
     );

@@ -27,6 +27,8 @@ export function OrderFilter() {
 
     const {
         isDetailFiltering, orderStatusFilter, orderProductFilter,
+        orderUpdatedFilter, orderExpirationFilter,
+        orderSubmissionFilter, orderPreferredDateFilter,
         searchQrId, visibleOrderColumns, subRefreshing,
         set: setList
     } = useCardListUI();
@@ -44,7 +46,15 @@ export function OrderFilter() {
                         size="sm"
                         onClick={() => {
                             if (isDetailFiltering) {
-                                setList({ orderProductFilter: null, orderStatusFilter: 'ALL', searchQrId: '' });
+                                setList({
+                                    orderProductFilter: null,
+                                    orderStatusFilter: 'ALL',
+                                    orderUpdatedFilter: 'ALL',
+                                    orderExpirationFilter: 'ALL',
+                                    orderSubmissionFilter: 'ALL',
+                                    orderPreferredDateFilter: 'ALL',
+                                    searchQrId: ''
+                                });
                             }
                             setList({ isDetailFiltering: !isDetailFiltering });
                         }}
@@ -54,7 +64,7 @@ export function OrderFilter() {
                             <Plus className={`w-3.5 h-3.5 mr-2 rotate-45`} />
                         ) : (
                             <>
-                                <Filter className={`w-3.5 h-3.5 mr-2`} />絞り込み
+                                <Filter className={`w-3.5 h-3.5 mr-2`} />{t('filter')}
                             </>
                         )}
                     </Button>
@@ -63,7 +73,7 @@ export function OrderFilter() {
                         <div className="mt-7">
                             {/* 商品/カードフィルター */}
                             <div className="relative left-3 text-[15px] text-gray-800 flex flex-row gap-2 items-center mt-0">
-                                Design
+                                {t('orders.design')}
                             </div>
                             <div className="flex flex-wrap items-start gap-3 border-gray-200 p-2 bg-gray-300 rounded-xl max-h-100 overflow-y-auto w-full">
                                 <Card
@@ -122,7 +132,7 @@ export function OrderFilter() {
 
                             {/* ステータスフィルター */}
                             <div className="relative left-3 text-[15px] text-gray-800 flex flex-row gap-2 items-center mt-4">
-                                Status
+                                {t('orders.status')}
                             </div>
                             <div className="border-gray-200 flex flex-wrap gap-2 rounded-md p-2 bg-gray-300 justify-center">
                                 {['ALL'].concat(cardStatusList).map((s) => (
@@ -138,9 +148,81 @@ export function OrderFilter() {
                                 ))}
                             </div>
 
+                            {/* 更新日時フィルター */}
+                            <div className="relative left-3 text-[15px] text-gray-800 flex flex-row gap-2 items-center mt-4">
+                                {t('orders.filterUpdated')}
+                            </div>
+                            <div className="border-gray-200 flex flex-wrap gap-2 rounded-md p-2 bg-gray-300 justify-center">
+                                {['ALL', 'TODAY', 'YESTERDAY', 'THIS_WEEK', 'THIS_MONTH', 'LAST_30_DAYS'].map((f) => (
+                                    <Button
+                                        key={f}
+                                        variant={orderUpdatedFilter === f ? "default" : "secondary"}
+                                        size="sm"
+                                        onClick={() => setList({ orderUpdatedFilter: f === orderUpdatedFilter ? "ALL" : f })}
+                                        className={cn("text-[10px] border min-w-20 flex-1", orderUpdatedFilter === f ? "border-black font-bold" : "hover:font-bold")}
+                                    >
+                                        {f === 'ALL' ? tc('all') : t(`orders.filterItems.${f.toLowerCase().replace(/_([a-z0-9])/g, (g) => g[1].toUpperCase())}`)}
+                                    </Button>
+                                ))}
+                            </div>
+
+                            {/* 有効期限フィルター */}
+                            {/* <div className="relative left-3 text-[15px] text-gray-800 flex flex-row gap-2 items-center mt-4">
+                                {t('orders.filterExpiration')}
+                            </div>
+                            <div className="border-gray-200 flex flex-wrap gap-2 rounded-md p-2 bg-gray-300 justify-center">
+                                {['ALL', 'VALID', 'EXPIRING_SOON', 'EXPIRED'].map((f) => (
+                                    <Button
+                                        key={f}
+                                        variant={orderExpirationFilter === f ? "default" : "secondary"}
+                                        size="sm"
+                                        onClick={() => setList({ orderExpirationFilter: f === orderExpirationFilter ? "ALL" : f })}
+                                        className={cn("text-[10px] border min-w-20 flex-1", orderExpirationFilter === f ? "border-black font-bold" : "hover:font-bold")}
+                                    >
+                                        {f === 'ALL' ? tc('all') : t(`orders.filterItems.${f.toLowerCase().replace(/_([a-z0-9])/g, (g) => g[1].toUpperCase())}`)}
+                                    </Button>
+                                ))}
+                            </div> */}
+
+                            {/* 受注日フィルター */}
+                            {/* <div className="relative left-3 text-[15px] text-gray-800 flex flex-row gap-2 items-center mt-4">
+                                {t('orders.filterSubmission')}
+                            </div>
+                            <div className="border-gray-200 flex flex-wrap gap-2 rounded-md p-2 bg-gray-300 justify-center">
+                                {['ALL', 'TODAY', 'YESTERDAY', 'THIS_WEEK'].map((f) => (
+                                    <Button
+                                        key={f}
+                                        variant={orderSubmissionFilter === f ? "default" : "secondary"}
+                                        size="sm"
+                                        onClick={() => setList({ orderSubmissionFilter: f === orderSubmissionFilter ? "ALL" : f })}
+                                        className={cn("text-[10px] border min-w-20 flex-1", orderSubmissionFilter === f ? "border-black font-bold" : "hover:font-bold")}
+                                    >
+                                        {f === 'ALL' ? tc('all') : t(`orders.filterItems.${f.toLowerCase().replace(/_([a-z0-9])/g, (g) => g[1].toUpperCase())}`)}
+                                    </Button>
+                                ))}
+                            </div> */}
+
+                            {/* お届け希望日フィルター */}
+                            {/* <div className="relative left-3 text-[15px] text-gray-800 flex flex-row gap-2 items-center mt-4">
+                                {t('orders.filterPreferred')}
+                            </div>
+                            <div className="border-gray-200 flex flex-wrap gap-2 rounded-md p-2 bg-gray-300 justify-center">
+                                {['ALL', 'TODAY', 'TOMORROW', 'UPCOMING'].map((f) => (
+                                    <Button
+                                        key={f}
+                                        variant={orderPreferredDateFilter === f ? "default" : "secondary"}
+                                        size="sm"
+                                        onClick={() => setList({ orderPreferredDateFilter: f === orderPreferredDateFilter ? "ALL" : f })}
+                                        className={cn("text-[10px] border min-w-20 flex-1", orderPreferredDateFilter === f ? "border-black font-bold" : "hover:font-bold")}
+                                    >
+                                        {f === 'ALL' ? tc('all') : t(`orders.filterItems.${f.toLowerCase().replace(/_([a-z0-9])/g, (g) => g[1].toUpperCase())}`)}
+                                    </Button>
+                                ))}
+                            </div> */}
+
                             {/* Search and Column Settings Row */}
                             <div className="relative left-3 text-[15px] text-gray-800 flex flex-row gap-2 items-center mt-4">
-                                ID
+                                {t('orders.qrId')}
                             </div>
                             <div className="flex flex-col sm:flex-row gap-2 border-gray-300 flex flex-wrap gap-2 rounded-md p-2 mb-4 bg-gray-300">
                                 <div className="relative flex-1 group">

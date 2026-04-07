@@ -51,7 +51,11 @@ export const receiveApiBase = {
     async verify(qr_id: string, pin: string, password?: string) {
         const res = await fetch(`${NEXT_PUBLIC_API_URL}/receive/verify`, {
             method: 'POST',
-            headers: { 'content-type': 'application/json' },
+            headers: { 
+                'content-type': 'application/json',
+                'x-qr-id': qr_id,
+                'x-qr-pin': pin
+            },
             body: JSON.stringify({ qr_id, pin, password })
         });
         if (!res.ok) throw await res.json().catch(() => ({ message: res.statusText }));

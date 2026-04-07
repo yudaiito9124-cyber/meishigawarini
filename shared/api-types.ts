@@ -9,7 +9,7 @@
 export type AdminApiSchema = {
     // 管理
     admin_check: {};
-    admin_dump: { pks: string[] }; //PKでレコードを取得
+    admin_dump: { pks?: string[], keys?: { pk: string, sk: string }[], gsi2_pks?: string[] }; //PKのみ、またはPK+SKでレコードを取得
     admin_links: { shop_ids: string[]; user_ids: string[]; action: "validate" | "execute" }; //ショップと別の管理者をリンク
     admin_changeowner: { shop_id: string, new_user_id: string, action: "validate" | "execute" }; // ショップのオーナー変更
     admin_shop_create: { name: string; description?: string; owner_id?: string; gm_ids?: string[] }; // ショップの作成
@@ -45,6 +45,7 @@ export type AdminApiSchema = {
         status: string,
         batch_id?: string
     }; //カード発注のステータス更新
+    admin_card_orders_get: { order_id: string }; //特定のカード発注を取得
     admin_qr_batch_get: { batch_id: string }; //バッチIDからQRコードリストを取得
 };
 

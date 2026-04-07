@@ -13,6 +13,7 @@ import { TransactWriteCommand, GetCommand, UpdateCommand } from '@aws-sdk/lib-dy
 import { CognitoIdentityProviderClient, AdminGetUserCommand } from '@aws-sdk/client-cognito-identity-provider';
 import * as bcrypt from 'bcryptjs';
 import { sendLocalizedEmail } from './templates/email';
+import { checkAndExpire } from './utils/expiration';
 import { successResponse, errorResponse } from './utils/response';
 import { ddb, TABLE_NAME } from './share/db';
 import { getQrId, getPIN } from './utils/request';
@@ -60,13 +61,8 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         const nowIso = now.toISOString();
 
         // 期限切れチェック (遅延評価)
-        if (item.ts_expired_at && now > new Date(item.ts_expired_at)) {
-            await ddb.send(new UpdateCommand({
-                TableName: TABLE_NAME, Key: { PK: `QR#${qr_id}`, SK: 'METADATA' },
-                UpdateExpression: 'SET #status = :expired, GSI1_PK = :gsi_pk, GSI1_SK = :now, ts_updated_at = :now',
-                ExpressionAttributeNames: { '#status': 'status' },
-                ExpressionAttributeValues: { ':expired': 'EXPIRED', ':gsi_pk': 'QR#EXPIRED', ':now': nowIso }
-            })).catch(e => console.error('Failed lazy expire update', e));
+        const currentStatus = await checkAndExpire(ddb, TABLE_NAME, qr_id, item as any);
+        if (currentStatus === 'EXPIRED') {
             return errorResponse(400, 'QR Code has expired');
         }
 

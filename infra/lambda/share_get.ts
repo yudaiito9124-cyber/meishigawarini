@@ -11,6 +11,7 @@ import { APIGatewayProxyHandler } from 'aws-lambda';
 import { GetCommand, BatchGetCommand } from '@aws-sdk/lib-dynamodb';
 import { signUrlIfS3, signUrlsInHtml } from './utils/s3';
 import { getSystemDesign } from './utils/designs';
+import { checkAndExpire } from './utils/expiration';
 import { successResponse, errorResponse } from './utils/response';
 import { ddb, TABLE_NAME, BUCKET_NAME } from './share/db';
 import { getQrId } from './utils/request';
@@ -32,6 +33,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         if (!qrRes.Item) return errorResponse(404, 'Gift Not Found');
 
         const item = qrRes.Item;
+        const currentStatus = await checkAndExpire(ddb, TABLE_NAME, qr_id, item as any);
 
         // BANNED（停止中）の場合は情報を返さない
         if (item.status === 'BANNED') {
@@ -68,7 +70,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         // セキュリティのため、公開して良い項目のみを厳選して返却
         const result = {
             qr_id,
-            status: item.status,
+            status: currentStatus,
             shop: shop ? {
                 name: shop.name || 'Unknown Shop',
                 // detail_html は必要に応じて含める（署名が必要な画像が含まれている可能性があるため signUrlsInHtml を通す）

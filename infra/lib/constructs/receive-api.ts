@@ -146,7 +146,7 @@ export class ReceiveApi extends cdk.NestedStack {
 
     const routeOptions = { authorizer, authorizationType: apigateway.AuthorizationType.CUSTOM };
 
-    addResourceWithCors(this.receiveResource, 'verify').addMethod('POST', new apigateway.LambdaIntegration(receive_verify));
+    addResourceWithCors(this.receiveResource, 'verify').addMethod('POST', new apigateway.LambdaIntegration(receive_verify), routeOptions);
     addResourceWithCors(this.receiveResource, 'submit').addMethod('POST', new apigateway.LambdaIntegration(receive_submit), routeOptions);
     addResourceWithCors(this.receiveResource, 'completed').addMethod('POST', new apigateway.LambdaIntegration(receive_completed), routeOptions);
 

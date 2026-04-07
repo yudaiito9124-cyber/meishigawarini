@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext } from 'react';
+import React, { createContext, useContext, useState } from 'react';
 import { ShoppingBasket, RefreshCw, Check } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -16,6 +16,7 @@ import { useOrderCardUI } from '@/store/useShopStore';
 
 // Sub-components
 import { ConfirmOrderDialog } from './order-card/ConfirmOrderDialog';
+import OrderDetailsDialog from './order-card/OrderDetailsDialog';
 
 // --- Context ---
 
@@ -53,6 +54,17 @@ export function OrderCardSection({ shopId }: { shopId: string }) {
         set: setOrderCard
     } = useOrderCardUI();
 
+    const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false);
+    const [selectedOrder, setSelectedOrder] = useState<any>(null);
+    const [selectedProduct, setSelectedProduct] = useState<any>(null);
+
+    const handleOpenDetails = (order: any) => {
+        const product = products.find((p: any) => p.product_id === order.product_id);
+        setSelectedProduct(product);
+        setSelectedOrder(order);
+        setIsDetailsDialogOpen(true);
+    };
+
     const fetchCardOrders = async () => {
         await Promise.all([refreshCardOrders(), refreshProducts()]);
     };
@@ -70,7 +82,7 @@ export function OrderCardSection({ shopId }: { shopId: string }) {
                 quantity: orderQuantity,
                 design_id: selectedOrderProduct.design_id || selectedOrderProduct.design?.design_id,
                 product_id: selectedOrderProduct.product_id,
-                activate_now: true
+                activate_now: false
             });
             setOrderCard({ isConfirmOrderDialogOpen: false, selectedOrderProduct: null });
             fetchCardOrders();
@@ -227,10 +239,18 @@ export function OrderCardSection({ shopId }: { shopId: string }) {
                             products={products}
                             onCancel={handleCancelCardOrder}
                             onComplete={handleCompleteCardOrder}
+                            onDetails={handleOpenDetails}
                             t={t}
                         />
                     </CardContent>
                 </Card>
+
+                <OrderDetailsDialog
+                    order={selectedOrder}
+                    product={selectedProduct}
+                    isOpen={isDetailsDialogOpen}
+                    onClose={() => setIsDetailsDialogOpen(false)}
+                />
             </div>
         </OrderCardContext.Provider>
     );
@@ -284,7 +304,7 @@ function ProductSelection({ products, selectedOrderProduct, setOrderCard, t }: P
     );
 }
 
-function OrderHistoryTable({ cardOrders, cardOrdersLoading, products, onCancel, onComplete, t }: any) {
+function OrderHistoryTable({ cardOrders, cardOrdersLoading, products, onCancel, onComplete, onDetails, t }: any) {
     return (
         <div className="border rounded-xl bg-white overflow-hidden shadow-sm">
             <Table>
@@ -303,7 +323,11 @@ function OrderHistoryTable({ cardOrders, cardOrdersLoading, products, onCancel, 
                     ) : cardOrders.length === 0 ? (
                         <TableRow><TableCell colSpan={5} className="h-32 text-center text-gray-400 font-medium">{t('cardOrder.noOrders')}</TableCell></TableRow>
                     ) : cardOrders.map((order: any) => (
-                        <TableRow key={order.order_id} className="group hover:bg-gray-50/50 transition-colors">
+                        <TableRow
+                            key={order.order_id}
+                            className="group hover:bg-gray-50/50 transition-colors cursor-pointer"
+                            onClick={() => onDetails(order)}
+                        >
                             <TableCell className="text-xs font-medium text-gray-500">{new Date(order.ts_created_at).toLocaleDateString()}</TableCell>
                             <TableCell className="font-semibold">{products.find((p: any) => p.product_id === order.product_id)?.name || order.product_id}</TableCell>
                             <TableCell className="text-right font-mono font-bold">{(order.quantity || 0).toLocaleString()}</TableCell>
@@ -321,12 +345,28 @@ function OrderHistoryTable({ cardOrders, cardOrdersLoading, products, onCancel, 
                             <TableCell className="text-right">
                                 <div className="flex justify-end gap-2 opacity-100 group-hover:opacity-100 transition-opacity">
                                     {order.status === 'ORDERED' && (
-                                        <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-700 hover:bg-red-50 h-8 font-bold" onClick={() => onCancel(order.order_id)}>
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            className="text-red-600 hover:text-red-700 hover:bg-red-50 h-8 font-bold"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                onCancel(order.order_id);
+                                            }}
+                                        >
                                             {t('cardOrder.cancel')}
                                         </Button>
                                     )}
                                     {order.status === 'SHIPPED' && (
-                                        <Button variant="outline" size="sm" className="border-emerald-200 text-emerald-700 hover:bg-emerald-50 h-8 font-bold" onClick={() => onComplete(order.order_id)}>
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            className="border-emerald-200 text-emerald-700 hover:bg-emerald-50 h-8 font-bold"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                onComplete(order.order_id);
+                                            }}
+                                        >
                                             <Check className="w-3 h-3 mr-1" />{t('cardOrder.received')}
                                         </Button>
                                     )}

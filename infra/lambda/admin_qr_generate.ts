@@ -110,7 +110,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             do {
                 // 8桁のPIN生成 (ゾロ目を避ける)
                 pin = crypto.randomInt(10000000, 100000000).toString();
-            } while (/^(\d)\1+$/.test(pin));
+            } while (/^(\d)\1+$/.test(pin) || pin === "12345678");
 
             const now = new Date().toISOString();
 
@@ -178,15 +178,15 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             ids.push({ qr_id, pin });
         }
 
-        // バッチ管理レコードの追加
+        const batchTimestamp = new Date().toISOString();
         writeRequests.push({
             PutRequest: {
                 Item: {
-                    PK: `QRBATCH#${batch_id}`,
-                    SK: 'METADATA',
+                    PK: `QR_BATCH#${batch_id}`,
+                    SK: `METADATA#${batchTimestamp}`,
                     data: ids,
                     order_id: order_id,
-                    ts_created_at: new Date().toISOString()
+                    ts_created_at: batchTimestamp
                 }
             }
         });
@@ -200,7 +200,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         }
 
         // 発注レコードの更新 (order_id が指定されている場合)
-        if (order_id && shopId && cardOrderPK && cardOrderSK) {
+        if (order_id && cardOrderPK && cardOrderSK) {
             const now = new Date().toISOString();
             const adminUserId = getUserId(event);
             try {

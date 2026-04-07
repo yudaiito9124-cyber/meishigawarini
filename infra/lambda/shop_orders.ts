@@ -12,6 +12,7 @@ import { QueryCommand, BatchGetCommand, UpdateCommand, GetCommand } from '@aws-s
 import { sendLocalizedEmail } from './templates/email';
 import { checkShopOwnerOrGM } from './share/shop-auth';
 import { signUrlIfS3 } from './utils/s3';
+import { checkAndExpire } from './utils/expiration';
 import { getSystemDesign } from './utils/designs';
 import { successResponse, errorResponse } from './utils/response';
 import { ddb, TABLE_NAME, BUCKET_NAME } from './share/db';
@@ -114,10 +115,13 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 }
             }
 
-            const orders = rawItems.map(meta => {
+            const orders = await Promise.all(rawItems.map(async (meta) => {
+                const qrid = meta.PK.replace('QR#', '');
+                const updatedStatus = await checkAndExpire(ddb, TABLE_NAME, qrid, meta as any);
                 const orderDetail = orderDetailsMap.get(meta.PK) || {};
                 const design = meta.design_id ? (designMap.get(meta.design_id) || getSystemDesign(meta.design_id)) : null;
                 const order = formatOrderDetails(meta, orderDetail);
+                order.status = updatedStatus; // Ensure newest status
                 if (design) {
                     order.thumbf = design.thumbf;
                     order.thumbb = design.thumbb;
@@ -125,7 +129,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                     order.height = design.height;
                 }
                 return order;
-            });
+            }));
 
             return successResponse({ orders });
         }

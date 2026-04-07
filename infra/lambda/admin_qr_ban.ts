@@ -8,6 +8,7 @@
  */
 import { APIGatewayProxyHandler } from 'aws-lambda';
 import { UpdateCommand, GetCommand } from '@aws-sdk/lib-dynamodb';
+import { isExpired } from './utils/expiration';
 import { successResponse, errorResponse } from './utils/response';
 import { ddb, TABLE_NAME } from './share/db';
 import { getQrId, getAction } from './utils/request';
@@ -21,9 +22,7 @@ const getRevertStatus = (item: any): string => {
     if (item.ts_shipped_at) return "SHIPPED";
     if (item.ts_submitted_at) return "USED";
 
-    const now = new Date();
-    const expiresAt = item.ts_expired_at ? new Date(item.ts_expired_at) : null;
-    if (expiresAt && now > expiresAt) return "EXPIRED";
+    if (isExpired(item)) return "EXPIRED";
 
     if (item.ts_activated_at) return "ACTIVE";
     if (item.ts_linked_at) return "LINKED";

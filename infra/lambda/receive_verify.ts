@@ -15,6 +15,7 @@ import * as bcrypt from 'bcryptjs';
 import { signUrlIfS3, signUrlsInHtml } from './utils/s3';
 
 import { getSystemDesign } from './utils/designs';
+import { checkAndExpire } from './utils/expiration';
 import { successResponse, errorResponse } from './utils/response';
 import { ddb, TABLE_NAME, BUCKET_NAME } from './share/db';
 import { getQrId, getPIN } from './utils/request';
@@ -40,7 +41,10 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         const qrRes = await ddb.send(new GetCommand({
             TableName: TABLE_NAME, Key: { PK: `QR#${qr_id}`, SK: 'METADATA' }
         }));
-        if (!qrRes.Item) return errorResponse(404, 'Invalid Gift or PIN');
+
+        if (!qrRes.Item || String(qrRes.Item.pin) !== String(pin) && qrRes.Item.status !== 'PROMOTION') {
+            return errorResponse(404, 'Invalid Gift or PIN');
+        }
 
         const item = qrRes.Item;
 
@@ -61,15 +65,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         const now = new Date();
 
         // 【確認フェーズ 4: 期限切れチェック (遅延評価)】
-        if (status === 'ACTIVE' && item.ts_expired_at && now > new Date(item.ts_expired_at)) {
-            status = 'EXPIRED';
-            await ddb.send(new UpdateCommand({
-                TableName: TABLE_NAME, Key: { PK: `QR#${qr_id}`, SK: 'METADATA' },
-                UpdateExpression: 'SET #status = :expired, GSI1_PK = :gsi_pk, GSI1_SK = :now, ts_updated_at = :now',
-                ExpressionAttributeNames: { '#status': 'status' },
-                ExpressionAttributeValues: { ':expired': 'EXPIRED', ':gsi_pk': 'QR#EXPIRED', ':now': now.toISOString() }
-            })).catch(e => console.error('Failed lazy expire update', e));
-        }
+        status = await checkAndExpire(ddb, TABLE_NAME, qr_id, item as any);
 
 
         // 基本的な受取可能チェック (無効なステータスだがBANNEDでない場合は enriched data を返す)

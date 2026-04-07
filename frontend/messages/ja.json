@@ -208,13 +208,13 @@
     "ownerId": "ユーザーID(ショップオーナー)",
     "shopId": "ショップID",
     "refresh": "更新",
-    "incomingOrders": "発送待ち",
-    "ordersDesc": "注文と発送を管理します。",
+    "incomingOrders": "カード・注文一覧",
+    "ordersDesc": "注文・発送に加えて、現在持っているカードの一覧を表示します。",
     "filter": "絞り込み",
     "searchPlaceholder": "カードIDで絞り込み...",
     "tabs": {
       "activation": "アクティベーション",
-      "shipping": "注文管理",
+      "shipping": "カード・受注管理",
       "products": "商品登録",
       "orderCard": "カード発注"
     },
@@ -253,7 +253,29 @@
         "quantity": "数量",
         "status": "ステータス",
         "dateupdated": "更新日時",
-        "actions": "操作"
+        "actions": "操作",
+        "details": "詳細"
+      },
+      "details": {
+        "title": "注文詳細",
+        "orderInfo": "注文情報",
+        "orderMetadata": "注文メタデータ",
+        "quantity": "発注枚数",
+        "createdAt": "作成日時",
+        "updatedAt": "更新日時",
+        "productId": "商品ID",
+        "shopUserId": "発注担当者ID",
+        "senderId": "ギフト送り主(固定ID)",
+        "expiration": "カード(QR)の有効期限",
+        "activateNow": "発行時に有効化",
+        "systemDefault": "システム規定値",
+        "yes": "はい",
+        "no": "いいえ",
+        "designPreview": "デザインプレビュー",
+        "front": "表面",
+        "back": "裏面",
+        "designId": "デザインID",
+        "close": "閉じる"
       }
     },
     "orders": {
@@ -264,8 +286,16 @@
       "preferredDateTime": "希望日時",
       "status": "ステータス",
       "action": "発送処理",
+      "design": "デザイン",
       "qrId": "ID",
       "productName": "商品名",
+      "postalCode": "郵便番号",
+      "phone": "電話番号",
+      "email": "メールアドレス",
+      "preferredDate": "希望日",
+      "preferredTime": "希望時間",
+      "trackingNumber": "追跡番号",
+      "deliveryCompany": "配送会社",
       "noOrders": "注文はまだありません",
       "ship": "発送する",
       "details": "詳細",
@@ -287,7 +317,30 @@
         "Completed-state messages cannot be updated": "完了状態のメッセージは更新できません"
       },
       "filter": "詳細検索",
-      "searchPlaceholder": "カードID検索..."
+      "searchPlaceholder": "カードID検索...",
+      "filterUpdated": "更新日時",
+      "filterExpiration": "有効期限",
+      "filterSubmission": "受注日",
+      "filterPreferred": "お届け希望日",
+      "filterItems": {
+        "today": "今日",
+        "yesterday": "昨日",
+        "thisWeek": "直近7日間",
+        "thisMonth": "今月",
+        "last30Days": "直近30日間",
+        "tomorrow": "明日",
+        "upcoming": "今後",
+        "valid": "有効",
+        "expiringSoon": "もうすぐ期限切れ",
+        "expired": "期限切れ"
+      },
+      "columnGroups": {
+        "basic": "基本情報",
+        "shipping": "お届け先情報",
+        "history": "発送・履歴",
+        "messages": "メモ・メッセージ",
+        "timestamps": "タイムスタンプ"
+      }
     },
     "products": "商品一覧",
     "productsDescription": "商品の登録・編集を行います。",
@@ -502,7 +555,8 @@
     },
     "successStep": {
       "message": "配送先情報が送信されました！",
-      "subMessage": "ショップの担当者が発送いたします。"
+      "subMessage": "ショップの担当者が発送いたします。",
+      "subMessage2": "発送されると、追跡番号などをここで確認できるようになります。"
     },
     "shippedStep": {
       "message": "ギフトは発送済みです！",
@@ -565,7 +619,9 @@
       "senderError": "送り主情報の登録に失敗しました。",
       "receiver": "このギフトを受け取る",
       "receiverDescription": "ギフトを受け取るための住所を入力します。",
-      "confirmReceiver": "受け取り主として進みますか？登録されている配送先情報を自動入力します。"
+      "confirmReceiver": "受け取り主として進みますか？登録されている配送先情報を自動入力します。",
+      "processing": "処理中",
+      "processingDescription": "画面を準備しています..."
     },
     "shopMessage": "ショップからのメッセージ",
     "contactInfo": {
@@ -863,9 +919,12 @@
       "title": "全ショップからのカード発注管理",
       "shopIdFilter": "ショップIDで絞り込み",
       "preparePrinting": "印刷準備 (PDF/CSV)",
+      "acceptAndGenerate": "受託してカードを生成する",
+      "markAsOrdered": "発注済みにする",
+      "markAsPrinting": "印刷中にする",
       "markAsShipped": "発送済みにする",
       "markAsCompleted": "完了にする",
-      "rejectOrder": "発注を却下する",
+      "rejectOrder": "却下",
       "rejectConfirm": "本当にこの発注を却下しますか？この操作は元に戻せません。",
       "table": {
         "shop": "ショップ",
@@ -875,6 +934,44 @@
         "status": "状態",
         "date": "注文日時",
         "dateupdated": "更新日時"
+      },
+      "search": {
+        "title": "ID検索 (Order ID / Batch ID)",
+        "placeholder": "ここにIDを入力してください...",
+        "button": "検索",
+        "searching": "検索中...",
+        "notFound": "注文またはバッチが見つかりません。"
+      },
+      "details": {
+        "title": "注文詳細",
+        "orderInfo": "注文情報",
+        "orderMetadata": "注文メタデータ",
+        "shopName": "ショップ名",
+        "shopId": "ショップID",
+        "ownerEmail": "オーナーメール",
+        "quantity": "発注枚数",
+        "createdAt": "作成日時",
+        "updatedAt": "更新日時",
+        "productId": "商品ID",
+        "shopUserId": "ショップユーザーID",
+        "senderId": "送り主ID",
+        "expiration": "有効期限",
+        "activateNow": "自動アクティベート",
+        "systemDefault": "システム規定値",
+        "yes": "はい",
+        "no": "いいえ",
+        "designPreview": "デザインプレビュー",
+        "front": "表面",
+        "back": "裏面",
+        "designId": "デザインID",
+        "availableActions": "可能な操作",
+        "exportPdf": "PDF出力",
+        "exportCsv": "CSV出力",
+        "adminDetails": "管理者用詳細",
+        "orderedByAdmin": "注文者(ユーザーID)",
+        "createdByAdmin": "生成者(管理者のユーザーID)",
+        "batchId": "バッチID",
+        "qrGeneratedAt": "QR生成日時"
       }
     }
   },
@@ -907,7 +1004,7 @@
   },
   "Backend": {
     "Unauthorized": "認証されていません。",
-    "Failed to fetch": "通信エラーが発生しました。インターネット接続を確認してください（CORS等）。",
+    "Failed to fetch": "通信エラーが発生しました。PINコードが誤っているなど、許可されていない通信か、インターネットに接続されていません。",
     "No changes provided": "変更内容がありません。",
     "Shop updated": "ショップ情報を更新しました。",
     "Missing name": "ショップ名を入力してください。",

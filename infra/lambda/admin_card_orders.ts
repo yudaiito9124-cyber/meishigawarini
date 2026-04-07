@@ -7,7 +7,7 @@
  * エンドポイント: POST /admin/card_orders
  */
 import { APIGatewayProxyHandler } from 'aws-lambda';
-import { QueryCommand, UpdateCommand, BatchGetCommand, PutCommand } from '@aws-sdk/lib-dynamodb';
+import { QueryCommand, UpdateCommand, BatchGetCommand, PutCommand, GetCommand } from '@aws-sdk/lib-dynamodb';
 import { successResponse, errorResponse } from './utils/response';
 import { ddb, TABLE_NAME, BUCKET_NAME } from './share/db';
 import { getAction, getUserId } from './utils/request';
@@ -34,6 +34,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             const { status = 'ORDERED', limit = 50 } = body as AdminApiSchema['admin_card_orders_list'];
 
             // ステータスに応じたGSI1検索 (最新順)
+            // GSI1_PK: CARD_ORDER#<STATUS> をパーティションキーとして、最新順(ScanIndexForward: false)に取得
             const result = await ddb.send(new QueryCommand({
                 TableName: TABLE_NAME,
                 IndexName: 'GSI1',
@@ -42,6 +43,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 ScanIndexForward: false,
                 Limit: limit
             }));
+
 
             const items = result.Items || [];
 
@@ -56,6 +58,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 const shopIds = [...new Set(items.map((i: any) => i.shop_id).filter(Boolean))];
                 if (shopIds.length > 0) {
                     // ショップメタデータの一括取得
+                    // SHOP#<shop_id> をPK、METADATAをSKとするレコードを、BatchGetCommandで一括取得してマージします
                     const shopKeys = shopIds.map(id => ({ PK: `SHOP#${id}`, SK: 'METADATA' }));
                     const batchRes = await ddb.send(new BatchGetCommand({
                         RequestItems: {
@@ -66,6 +69,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                             }
                         }
                     }));
+
 
                     const shopMap: Record<string, { name: string, owner_id?: string }> = {};
                     const ownerIds = new Set<string>();
@@ -121,14 +125,11 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                     const metaMap = new Map<string, any>();
                     for (const d of (batchRes.Responses?.[TABLE_NAME] || [])) {
                         // 署名付きURLの生成 (S3パスの場合)
-                        const { BUCKET_NAME } = require('./share/db');
-                        const { signUrlIfS3 } = require('./utils/s3');
                         if (d.thumbf) d.thumbf = await signUrlIfS3(d.thumbf, BUCKET_NAME);
                         if (d.thumbb) d.thumbb = await signUrlIfS3(d.thumbb, BUCKET_NAME);
                         metaMap.set(d.SK, d);
                     }
 
-                    const { getSystemDesign } = require('./utils/designs');
                     for (const item of items) {
                         const designId = item.design_id;
                         if (designId) {
@@ -156,9 +157,9 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 sender_user_id, expiration_date, activate_now
             } = body as AdminApiSchema['admin_card_orders_create'];
 
-            if (!shop_id || !quantity || !design_id) {
-                return errorResponse(400, 'Missing shop_id, quantity, or design_id');
-            }
+            // if (!shop_id || !quantity || !design_id) {
+            //     return errorResponse(400, 'Missing shop_id, quantity, or design_id');
+            // }
 
             // 整合性チェックの実行
             const validationResult: any = await validateQRParams(ddb, TABLE_NAME, BUCKET_NAME, {
@@ -179,6 +180,9 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             const order_id = generateId();
             const userId = getUserId(event);
 
+            // CARD_ORDERの新規作成
+            // PK: CARD_ORDER#ADMIN<admin_id>, SK: ORDER#<order_id> 
+            // 管理対象として検索しやすくするため、GSI1(ステータス別)とGSI2(Order ID検索用)のインデックス情報も付与します。
             await ddb.send(new PutCommand({
                 TableName: TABLE_NAME,
                 Item: {
@@ -198,13 +202,16 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                     ts_updated_at: now,
                     user_id_order: userId, // 作成した管理者のID
                     user_id_create: null,
-                    // 管理用インデックス
+                    // 管理用インデックス情報:
+                    // GSI1: ステータス別の全件リスト表示用
                     GSI1_PK: `CARD_ORDER#ORDERED`,
                     GSI1_SK: now,
+                    // GSI2: Order ID (UUID) からの直接検索用
                     GSI2_PK: `CARD_ORDER#${order_id}`,
                     GSI2_SK: now
                 }
             }));
+
 
             return successResponse({ message: 'Card order created', order_id });
         }
@@ -219,12 +226,15 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             if (!order_id || !status) return errorResponse(400, 'Missing order_id or status');
 
             // 1. GSI2 を使用して正確な PK, SK を取得する (SHOP# か ADMIN# かを特定)
+            // Order ID (UUID) は SK に含まれているため、直接アトミックに更新するには PK/SK のペアを知る必要があります。
+            // そのため、まず GSI2 (GSI2_PK = CARD_ORDER#<order_id>) で対象レコードを特定します。
             const lookup = await ddb.send(new QueryCommand({
                 TableName: TABLE_NAME,
                 IndexName: 'GSI2',
                 KeyConditionExpression: 'GSI2_PK = :pk',
                 ExpressionAttributeValues: { ':pk': `CARD_ORDER#${order_id}` }
             }));
+
 
             const targetItem = lookup.Items?.[0];
             if (!targetItem) return errorResponse(404, 'Order not found');
@@ -254,6 +264,99 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             }));
 
             return successResponse({ message: 'Order status updated' });
+        }
+
+        // ====================================================================
+        // ACTION: get (特定の発注情報の取得)
+        // --------------------------------------------------------------------
+        // 目的: order_id から特定の発注情報を取得し、デザイン情報やショップ情報をマージします。
+        // ====================================================================
+        if (action === 'get') {
+            const { order_id } = body as AdminApiSchema['admin_card_orders_get'];
+            if (!order_id) return errorResponse(400, 'Missing order_id');
+
+            // GSI2 を使用して検索
+            // Order ID (UUID) から直接レコードを特定するために、インデックス GSI2 を利用します。
+            // ログに検索対象のIDを出力して CloudWatch でデバッグ可能にします。
+            console.log(`[AdminSearch] Searching for order_id: ${order_id}`);
+
+            let result = await ddb.send(new QueryCommand({
+                TableName: TABLE_NAME,
+                IndexName: 'GSI2',
+                KeyConditionExpression: 'GSI2_PK = :pk',
+                ExpressionAttributeValues: { ':pk': `CARD_ORDER#${order_id}` }
+            }));
+
+            // フォールバック: CARD_ORDER# なしのプレフィックス（古いデータ、または別の格納形式）を念のため試行
+            if (!result.Items || result.Items.length === 0) {
+                console.log(`[AdminSearch] No match found with prefix CARD_ORDER#. Trying fallback ORDER#...`);
+                result = await ddb.send(new QueryCommand({
+                    TableName: TABLE_NAME,
+                    IndexName: 'GSI2',
+                    KeyConditionExpression: 'GSI2_PK = :pk',
+                    ExpressionAttributeValues: { ':pk': `ORDER#${order_id}` }
+                }));
+            }
+
+            // フォールバック2: プレフィックスなし
+            if (!result.Items || result.Items.length === 0) {
+                console.log(`[AdminSearch] No match found with prefix ORDER#. Trying direct UUID lookup...`);
+                result = await ddb.send(new QueryCommand({
+                    TableName: TABLE_NAME,
+                    IndexName: 'GSI2',
+                    KeyConditionExpression: 'GSI2_PK = :pk',
+                    ExpressionAttributeValues: { ':pk': order_id }
+                }));
+            }
+
+            const item = result.Items?.[0] as any;
+            if (!item) {
+                console.warn(`[AdminSearch] Order not found in GSI2 index for ID: ${order_id}`);
+                return errorResponse(404, 'Order not found');
+            }
+
+            console.log(`[AdminSearch] Order found! PK: ${item.PK}, SK: ${item.SK}, Status: ${item.status}`);
+
+
+            // Enrichment: 互換性処理
+            if (!item.design_id && item.card_design) {
+                item.design_id = item.card_design;
+            }
+
+            // Enrichment: ショップ情報
+            if (item.shop_id) {
+                const shopRes = await ddb.send(new GetCommand({
+                    TableName: TABLE_NAME,
+                    Key: { PK: `SHOP#${item.shop_id}`, SK: 'METADATA' }
+                }));
+                if (shopRes.Item) {
+                    item.shop_name = shopRes.Item.name;
+                    if (shopRes.Item.owner_id) {
+                        const ownerRes = await ddb.send(new GetCommand({
+                            TableName: TABLE_NAME,
+                            Key: { PK: `USER#${shopRes.Item.owner_id}`, SK: 'SHOP' }
+                        }));
+                        if (ownerRes.Item) {
+                            item.shop_owner_email = ownerRes.Item.email;
+                        }
+                    }
+                }
+            }
+
+            // Enrichment: デザイン情報
+            if (item.design_id) {
+                const designRes = await ddb.send(new GetCommand({
+                    TableName: TABLE_NAME,
+                    Key: { PK: 'CARD_DESIGN#METADATA', SK: item.design_id }
+                }));
+                const meta = designRes.Item || getSystemDesign(item.design_id);
+                if (meta) {
+                    item.thumbf = meta.thumbf ? await signUrlIfS3(meta.thumbf, BUCKET_NAME) : (meta.bgimgf ? await signUrlIfS3(meta.bgimgf, BUCKET_NAME) : null);
+                    item.thumbb = meta.thumbb ? await signUrlIfS3(meta.thumbb, BUCKET_NAME) : (meta.bgimgb ? await signUrlIfS3(meta.bgimgb, BUCKET_NAME) : null);
+                }
+            }
+
+            return successResponse(item);
         }
 
         return errorResponse(404, 'Unknown action');

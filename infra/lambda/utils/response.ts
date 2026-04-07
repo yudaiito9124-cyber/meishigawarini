@@ -30,5 +30,5 @@ export const successResponse = (body: any = null, methods: string = 'GET,POST,OP
 /**
  * エラー時 のレスポンス。
  */
-export const errorResponse = (statusCode: number, message: string, error?: any, methods: string = 'GET,POST,OPTIONS') => 
+export const errorResponse = (statusCode: number, message: string, error?: any, methods: string = 'GET,POST,OPTIONS') =>
     apiResponse(statusCode, { message, ...(error ? { error: String(error) } : {}) }, methods);
