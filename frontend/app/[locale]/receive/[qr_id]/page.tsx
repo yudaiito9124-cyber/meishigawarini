@@ -934,6 +934,8 @@ export default function ReceivePage() {
 
     return (
         <div className={cn("min-h-screen w-full bg-gray-50 flex flex-col items-center justify-center py-8 px-4 transition-all duration-1000", step === "COMPLETED" && "bg-olive-300 sepia-[.2] shadow-[inset_0_0_500px_rgba(0,0,0,0.8)]")}>
+
+
             {/* COMPLETEしているカードを読み込む際のフェード処理 */}
             {showWhiteFade && (
                 <div
@@ -941,6 +943,8 @@ export default function ReceivePage() {
                     onAnimationEnd={() => setShowWhiteFade(false)}
                 />
             )}
+
+
 
             {/* Login Encouragement Banner */}
             {!isLoggedIn && (step === "PIN" || step === "FORM") && (
@@ -1248,14 +1252,13 @@ export default function ReceivePage() {
 
 
 
-            {/* Role Selection Card */}
             {showRoleSelection && step === "FORM" && (
-                <Card className="w-full max-w-xl mt-12 border-1 shadow-xl bg-white/90 backdrop-blur-md overflow-hidden animate-in fade-in slide-in-from-bottom-8 duration-700">
+                <Card className="w-full max-w-xl mt-12 border shadow-2xl shadow-emerald-500/40 bg-white/95 backdrop-blur-2xl overflow-hidden animate-in fade-in slide-in-from-bottom-8 duration-700 ring-1 ring-emerald-500/10">
                     <CardHeader className="pb-4 pt-8 text-center">
-                        <div className="mx-auto w-12 h-12 bg-gray-50 rounded-full flex items-center justify-center mb-4">
-                            <Sparkles className="w-6 h-6 text-amber-500 animate-pulse" />
-                        </div>
-                        <CardTitle className="text-2xl font-bold tracking-tight text-gray-900">
+                        {/* <div className="mx-auto w-12 h-12 bg-emerald-50 rounded-full flex items-center justify-center mb-6 ring-4 ring-emerald-50/50">
+                            <Sparkles className="w-6 h-6 text-emerald-500 animate-pulse" />
+                        </div> */}
+                        <CardTitle className="text-2xl font-bold tracking-tight text-emerald-600">
                             {t('titles.selectRole')}
                         </CardTitle>
                         <p className="text-sm text-gray-500 mt-2 max-w-[80%] mx-auto leading-relaxed">
@@ -1358,17 +1361,20 @@ export default function ReceivePage() {
 
             {/* --- Form Section --- */}
             {(!showRoleSelection && ["FORM", "PROMOTION"].includes(step)) && (
-                <Card className="w-full max-w-xl mt-20">
-                    <CardHeader>
-                        <CardTitle className="text-xl text-center">
-                            {/* <Label className="text-xl text-center flex flex-col text-gray-500"> */}
+                <Card className="w-full max-w-xl mt-12 border shadow-2xl shadow-emerald-500/40 bg-white/95 backdrop-blur-2xl overflow-hidden animate-in fade-in slide-in-from-bottom-8 duration-700 ring-1 ring-emerald-500/10">
+                    <CardHeader className="pb-4 pt-8 text-center">
+                        {/* <div className="mx-auto w-12 h-12 bg-emerald-50 rounded-full flex items-center justify-center mb-6 ring-4 ring-emerald-50/50">
+                            <Sparkles className="w-6 h-6 text-emerald-500 animate-pulse" />
+                        </div> */}
+                        <CardTitle className="text-2xl font-bold tracking-tight text-emerald-600">
                             {
                                 step === "FORM" || step === "PROMOTION" ? t('titles.form') + (step === "PROMOTION" ? " (sample)" : "") : ""}
-                            {/* </Label>
-                            {step === "PIN" ? t('titles.pin') :
-                                step === "RESTRICTED" ? tst(gift.status.toLowerCase()) : ""} */}
                         </CardTitle>
+                        <p className="text-sm text-gray-500 mt-2 max-w-[80%] mx-auto leading-relaxed">
+                            {t('roleSelection.description')}
+                        </p>
                     </CardHeader>
+
                     <CardContent>
 
 
@@ -1546,149 +1552,150 @@ export default function ReceivePage() {
             }
 
             {/* --- Notification Section --- */}
-            {(["SUCCESS", "SHIPPED", "EXPIRED", "RESTRICTED"].includes(step)) && (
-                <Card className="w-full max-w-xl mt-20">
-                    <CardHeader>
-                        <CardTitle className="text-xl text-center">
-                            {/* <Label className="text-xl text-center flex flex-col text-gray-500"> */}
-                            {
-                                step === "SUCCESS" ? t('titles.success') :
-                                    step === "SHIPPED" ? t('titles.shipped') :
-                                        step === "EXPIRED" ? t('titles.expired') :
-                                            step === "COMPLETED" ? t('titles.completed') :
-                                                ""}
-                            {/* </Label>
+            {
+                (["SUCCESS", "SHIPPED", "EXPIRED", "RESTRICTED"].includes(step)) && (
+                    <Card className="w-full max-w-xl mt-20">
+                        <CardHeader>
+                            <CardTitle className="text-xl text-center">
+                                {/* <Label className="text-xl text-center flex flex-col text-gray-500"> */}
+                                {
+                                    step === "SUCCESS" ? t('titles.success') :
+                                        step === "SHIPPED" ? t('titles.shipped') :
+                                            step === "EXPIRED" ? t('titles.expired') :
+                                                step === "COMPLETED" ? t('titles.completed') :
+                                                    ""}
+                                {/* </Label>
                             {step === "PIN" ? t('titles.pin') :
                                 step === "RESTRICTED" ? tst(gift.status.toLowerCase()) : ""} */}
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent>
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent>
 
 
 
-                        {/* パスワード設定時のパスワード入力フォーム */}
-                        {step === "RESTRICTED" && !gift?.product && (
-                            <div className={cn("space-y-6 border-t mt-4 transition-opacity", loading && "opacity-50 pointer-events-none")}>
-                                <div className="text-center space-y-2 mt-4">
-                                    <p className="text-yellow-600 font-medium">{t('restrictedStep.title')}</p>
-                                    <p className="text-sm text-gray-500">{t('restrictedStep.message')}</p>
-                                </div>
-                                <form onSubmit={handleUnlock} className="space-y-4">
-                                    <div className="space-y-2">
-                                        <Label htmlFor="unlockPassword">{t('restrictedStep.passwordLabel')}</Label>
-                                        <Input
-                                            id="unlockPassword"
-                                            type="password"
-                                            value={unlockPassword}
-                                            disabled={loading}
-                                            onChange={(e) => setUnlockPassword(e.target.value)}
-                                            required
-                                        />
+                            {/* パスワード設定時のパスワード入力フォーム */}
+                            {step === "RESTRICTED" && !gift?.product && (
+                                <div className={cn("space-y-6 border-t mt-4 transition-opacity", loading && "opacity-50 pointer-events-none")}>
+                                    <div className="text-center space-y-2 mt-4">
+                                        <p className="text-yellow-600 font-medium">{t('restrictedStep.title')}</p>
+                                        <p className="text-sm text-gray-500">{t('restrictedStep.message')}</p>
                                     </div>
-                                    <Button type="submit" className="w-full" disabled={loading}>
-                                        {loading ? t('restrictedStep.verifying') : t('restrictedStep.unlock')}
-                                    </Button>
-                                </form>
-                            </div>
-                        )}
-
-                        {step === "SUCCESS" && (
-                            <div className="text-center py-6 space-y-4">
-                                {/* <p className="text-green-600 font-medium">{t('successStep.message')}</p> */}
-                                <p className="text-sm text-gray-500">{t('successStep.subMessage')}<br />{t('successStep.subMessage2')}</p>
-                            </div>
-                        )}
-
-                        {step === "SHIPPED" && gift && (
-                            <div className="text-center py-6 space-y-4">
-                                {/* <p className="text-green-600 font-medium">{t('shippedStep.message')}</p> */}
-
-                                {gift.delivery_company && (
-                                    <p className="text-sm text-gray-500">{t('shippedStep.deliveryCompany', { company: gift.delivery_company })}</p>
-                                )}
-                                {gift.tracking_number && (
-                                    <p className="text-sm text-gray-500">{t('shippedStep.tracking', { number: gift.tracking_number })}</p>
-                                )}
-                                <hr className="my-10 border-gray-200" />
-
-                                <p className="text-gray-600 text-sm">{t('shippedStep.receivedMessage')}</p>
-                                <Button type="submit" className="w-full h-12" variant="default" onClick={handleReceive} disabled={loading}>
-                                    {loading ? t('formStep.submitting') : t('shippedStep.receivedButton')}
-                                </Button>
-
-                            </div>
-                        )}
-
-                        {step === "COMPLETED" && gift && (
-                            <div />
-                            // <div className="text-center py-6 space-y-4">
-                            //     <p className="text-green-600 font-medium">{t('shippedStep.compleatedMessage')}</p>
-                            // </div>
-                        )}
-                        {(step === "SUCCESS" || step === "SHIPPED") && (
-                            <div className=" text-right">
-                                <Dialog>
-                                    <DialogTrigger asChild>
-                                        <Button variant="ghost" size="sm" className="text-gray-500 hover:text-gray-800 text-xs">
-                                            <MessageCircleQuestion className="w-4 h-4" />
-                                            {t('contactInfo.title')}
-                                        </Button>
-                                    </DialogTrigger>
-                                    <DialogContent className="sm:max-w-md">
-                                        <DialogHeader>
-                                            <DialogTitle>{t('contactInfo.title')}</DialogTitle>
-                                            <DialogDescription className="text-xs text-gray-500">
-                                                {t('contactInfo.note')}
-                                            </DialogDescription>
-                                        </DialogHeader>
-                                        <div className="space-y-4 py-4">
-                                            <div className="space-y-2">
-                                                <Label className="text-xs text-gray-500">{t('contactInfo.orderId')}</Label>
-                                                <div className="p-3 bg-gray-50 rounded-md border border-gray-200 font-mono text-sm select-all text-center">
-                                                    {qr_id}
-                                                </div>
-                                            </div>
-                                            {gift?.shop_name && (
-                                                <div className="space-y-2">
-                                                    <Label className="text-xs text-gray-500">{t('contactInfo.shopName')}</Label>
-                                                    <div className="p-3 bg-gray-50 rounded-md border border-gray-200 text-sm break-all text-center font-medium">
-                                                        {gift.shop_name}
-                                                    </div>
-                                                </div>
-                                            )}
-                                            {gift?.shop_email && (
-                                                <div className="space-y-2">
-                                                    <Label className="text-xs text-gray-500">{t('contactInfo.shopEmail')}</Label>
-                                                    <div className="p-3 bg-blue-50 rounded-md border border-blue-100 text-center">
-                                                        <a href={`mailto:${gift.shop_email}`} className="text-blue-600 font-medium hover:underline text-sm break-all">
-                                                            {gift.shop_email}
-                                                        </a>
-                                                    </div>
-                                                </div>
-                                            )}
+                                    <form onSubmit={handleUnlock} className="space-y-4">
+                                        <div className="space-y-2">
+                                            <Label htmlFor="unlockPassword">{t('restrictedStep.passwordLabel')}</Label>
+                                            <Input
+                                                id="unlockPassword"
+                                                type="password"
+                                                value={unlockPassword}
+                                                disabled={loading}
+                                                onChange={(e) => setUnlockPassword(e.target.value)}
+                                                required
+                                            />
                                         </div>
-                                    </DialogContent>
-                                </Dialog>
-                            </div>
-                        )}
+                                        <Button type="submit" className="w-full" disabled={loading}>
+                                            {loading ? t('restrictedStep.verifying') : t('restrictedStep.unlock')}
+                                        </Button>
+                                    </form>
+                                </div>
+                            )}
+
+                            {step === "SUCCESS" && (
+                                <div className="text-center py-6 space-y-4">
+                                    {/* <p className="text-green-600 font-medium">{t('successStep.message')}</p> */}
+                                    <p className="text-sm text-gray-500">{t('successStep.subMessage')}<br />{t('successStep.subMessage2')}</p>
+                                </div>
+                            )}
+
+                            {step === "SHIPPED" && gift && (
+                                <div className="text-center py-6 space-y-4">
+                                    {/* <p className="text-green-600 font-medium">{t('shippedStep.message')}</p> */}
+
+                                    {gift.delivery_company && (
+                                        <p className="text-sm text-gray-500">{t('shippedStep.deliveryCompany', { company: gift.delivery_company })}</p>
+                                    )}
+                                    {gift.tracking_number && (
+                                        <p className="text-sm text-gray-500">{t('shippedStep.tracking', { number: gift.tracking_number })}</p>
+                                    )}
+                                    <hr className="my-10 border-gray-200" />
+
+                                    <p className="text-gray-600 text-sm">{t('shippedStep.receivedMessage')}</p>
+                                    <Button type="submit" className="w-full h-12" variant="default" onClick={handleReceive} disabled={loading}>
+                                        {loading ? t('formStep.submitting') : t('shippedStep.receivedButton')}
+                                    </Button>
+
+                                </div>
+                            )}
+
+                            {step === "COMPLETED" && gift && (
+                                <div />
+                                // <div className="text-center py-6 space-y-4">
+                                //     <p className="text-green-600 font-medium">{t('shippedStep.compleatedMessage')}</p>
+                                // </div>
+                            )}
+                            {(step === "SUCCESS" || step === "SHIPPED") && (
+                                <div className=" text-right">
+                                    <Dialog>
+                                        <DialogTrigger asChild>
+                                            <Button variant="ghost" size="sm" className="text-gray-500 hover:text-gray-800 text-xs">
+                                                <MessageCircleQuestion className="w-4 h-4" />
+                                                {t('contactInfo.title')}
+                                            </Button>
+                                        </DialogTrigger>
+                                        <DialogContent className="sm:max-w-md">
+                                            <DialogHeader>
+                                                <DialogTitle>{t('contactInfo.title')}</DialogTitle>
+                                                <DialogDescription className="text-xs text-gray-500">
+                                                    {t('contactInfo.note')}
+                                                </DialogDescription>
+                                            </DialogHeader>
+                                            <div className="space-y-4 py-4">
+                                                <div className="space-y-2">
+                                                    <Label className="text-xs text-gray-500">{t('contactInfo.orderId')}</Label>
+                                                    <div className="p-3 bg-gray-50 rounded-md border border-gray-200 font-mono text-sm select-all text-center">
+                                                        {qr_id}
+                                                    </div>
+                                                </div>
+                                                {gift?.shop_name && (
+                                                    <div className="space-y-2">
+                                                        <Label className="text-xs text-gray-500">{t('contactInfo.shopName')}</Label>
+                                                        <div className="p-3 bg-gray-50 rounded-md border border-gray-200 text-sm break-all text-center font-medium">
+                                                            {gift.shop_name}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                                {gift?.shop_email && (
+                                                    <div className="space-y-2">
+                                                        <Label className="text-xs text-gray-500">{t('contactInfo.shopEmail')}</Label>
+                                                        <div className="p-3 bg-blue-50 rounded-md border border-blue-100 text-center">
+                                                            <a href={`mailto:${gift.shop_email}`} className="text-blue-600 font-medium hover:underline text-sm break-all">
+                                                                {gift.shop_email}
+                                                            </a>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </DialogContent>
+                                    </Dialog>
+                                </div>
+                            )}
 
 
 
-                        {/* SNS Share Button - Witty Place */}
-                        {!["PIN", "EXPIRED"].includes(step) && (
+                            {/* SNS Share Button - Witty Place */}
+                            {!["PIN", "EXPIRED"].includes(step) && (
 
-                            <div className="w-full max-w-xl mt-12 pr-6 pl-6 animate-reveal reveal-delay-500">
-                                <ShareDialog
-                                    qr_id={qr_id}
-                                    product={{ name: gift.product.name, image_url: gift.product.image_url }}
-                                    card={{ image_url: gift.design?.thumbf || gift.thumbf || gift.card_image_url }}
-                                    shop={{ name: gift.shop_name }}
-                                />
-                            </div>
-                        )}
-                    </CardContent>
-                </Card>
-            )
+                                <div className="w-full max-w-xl mt-12 pr-6 pl-6 animate-reveal reveal-delay-500">
+                                    <ShareDialog
+                                        qr_id={qr_id}
+                                        product={{ name: gift.product.name, image_url: gift.product.image_url }}
+                                        card={{ image_url: gift.design?.thumbf || gift.thumbf || gift.card_image_url }}
+                                        shop={{ name: gift.shop_name }}
+                                    />
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+                )
             }
 
 

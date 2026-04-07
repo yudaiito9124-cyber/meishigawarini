@@ -12,8 +12,8 @@
 | プロダクト作成 | 新規商品の作成 | `/shop/products/create` | `shopId`, `productData` | [shop_products.ts](../infra/lambda/shop_products.ts) |
 | プロダクト更新 | 商品情報の更新 | `/shop/products/update` | `shopId`, `productId`, `productData` | [shop_products.ts](../infra/lambda/shop_products.ts) |
 | プロダクト削除 | 商品の削除 | `/shop/products/delete` | `shopId`, `productId` | [shop_products.ts](../infra/lambda/shop_products.ts) |
-| インポート候補 | 他ショップの商品一覧取得 | `/shop/products/import/list` | `shopId` | [shop_products_import.ts](../infra/lambda/shop_products_import.ts) |
-| インポート実行 | 選んだ商品のコピー実行 | `/shop/products/import/execute` | `shopId`, `copyItems` | [shop_products_import.ts](../infra/lambda/shop_products_import.ts) |
+| インポート候補 | 他ショップの商品一覧 [試験段階] | `/shop/products/import/list` | `shopId` | [shop_products_import.ts](../infra/lambda/shop_products_import.ts) |
+| インポート実行 | 選んだ商品のコピー [試験段階] | `/shop/products/import/execute` | `shopId`, `copyItems` | [shop_products_import.ts](../infra/lambda/shop_products_import.ts) |
 | 画像アップロードURL | S3 Presigned URL発行 | `/shop/products/uploadurl` | `shopId`, `fileName` | [shop_products_uploadurl.ts](../infra/lambda/shop_products_uploadurl.ts) |
 | S3画像削除 | 画像ファイルの削除 | `/shop/delete/images` | `shopId`, `urls` | [shop_delete_images.ts](../infra/lambda/shop_delete_images.ts) |
 | QR一覧取得 | ショップに紐づくQRコード一覧 | `/shop/qr/list` | `shopId` | [shop_qr.ts](../infra/lambda/shop_qr.ts) |
