@@ -3,7 +3,8 @@ import fs from 'fs/promises';
 import path from 'path';
 
 // --- 設定 ---
-const TARGET_DIR = 'C:\\git\\meishigawarini\\frontend\\public\\images\\manual'; // PNGが入っているフォルダ
+// const TARGET_DIR = 'C:\\git\\meishigawarini\\frontend\\public\\images\\manual'; // PNGが入っているフォルダ
+const TARGET_DIR = '../documents/data'; // PNGが入っているフォルダ
 const BACKUP_DIR_NAME = 'original_pngs'; // 移動先のフォルダ名
 const QUALITY = 80; // WebPの画質 (0-100)
 

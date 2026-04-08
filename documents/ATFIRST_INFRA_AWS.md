@@ -10,6 +10,34 @@
 
 フロントエンド（画面）からのリクエストを受け取り、データを処理して返すまでの間に、以下のサービスが連携して動いています。
 
+```mermaid
+graph LR
+    User([ユーザー]) --> Browser([ブラウザ])
+    Browser --> |HTTPS / Next.js| Amplify[Amplify]
+    Browser -.-> |Login/MFA| Cognito[Cognito]
+    Browser --> |POST API| APIGW[API Gateway]
+
+    subgraph "Frontend (AWS)"
+        Amplify[Amplify]
+    end
+
+    subgraph "Backend (AWS)"
+        APIGW --> |Authorization| Cognito
+        APIGW --> |Trigger| Lambda[Lambda functions]
+        
+        Lambda <--> |Query/Update| DynamoDB[(DynamoDB)]
+        Lambda <--> |Upload/Download| S3[S3 Bucket]
+    end
+
+    style Amplify fill:#f9f,stroke:#333,stroke-width:2px
+    style Cognito fill:#ff9,stroke:#333,stroke-width:2px
+    style APIGW fill:#dfd,stroke:#333,stroke-width:2px
+    style Lambda fill:#ffd,stroke:#333,stroke-width:2px
+    style DynamoDB fill:#ddf,stroke:#333,stroke-width:2px
+    style S3 fill:#fdd,stroke:#333,stroke-width:2px
+```
+
+
 ### 🚪 **API Gateway** (窓口・ルーティング)
 *   **役割**: フロントエンドからの通信（HTTPリクエスト）を一番初めに受け取る「窓口」です。
     URLのパス（例: `/shops` や `/admin/qrcodes`）を見て、「これはどのLambda関数に処理を任せるべきか」を振り分ける（ルーティングする）役割を持ちます。
@@ -48,29 +76,48 @@
 ## 2. データの流れ（処理の全体像）
 
 システムがどのように動いているか、具体的な操作を例にデータの流れを追ってみます。
-![alt text](/documents/data/image-awsbackgroundservices.webp)
+
+```mermaid
+sequenceDiagram
+    actor User as ユーザー (ブラウザ)
+    participant Amplify as Amplify (Next.js/Frontend)
+    participant Cognito as Cognito (Auth/User Management)
+    participant APIGW as API Gateway (Routing)
+    participant Lambda as Lambda (Compute)
+    participant Dynamo as DynamoDB (Database)
+    participant S3 as S3 (Storage)
+
+    Note over User, Amplify: 1. フロントエンドの取得
+    User->>Amplify: ページアクセス (HTTPS)
+    Amplify-->>User: HTML/JS/CSS を返却
+
+    Note over User, Cognito: 2. 認証・ログイン
+    User->>Cognito: ログイン・MFA
+    Cognito-->>User: IDトークン/アクセストークン発行
+
+    Note over User, Lambda: 3. APIリクエスト実行
+    User->>APIGW: リクエスト (Token付き)
+    
+    rect rgb(240, 240, 240)
+        Note right of APIGW: 認証(Authorizer) & ルーティング
+        APIGW->>Cognito: トークン検証
+        APIGW->>Lambda: 各機能の関数を起動
+    end
+
+    Note over Lambda, S3: 4. データ処理
+    Lambda->>Dynamo: データの読み書き (Single Table)
+    Lambda->>S3: 画像の保存/署名付きURL生成
+    
+    Lambda-->>APIGW: 処理結果をレスポンス
+    APIGW-->>User: 最終的なデータを返却
+```
+
 
 ### 例：「管理者がQRコードを新規生成する」ときの裏側の動き
 
-1.  **Frontend (ブラウザ)**: 管理者画面で「生成」ボタンを押す。
-2.  **API Gateway**: `POST /admin/qrcodes/generate` というリクエストを受け取る。
-    *   *この時、API Gatewayは **Cognito** と連携して「この人はログイン済みの管理者か？」を瞬時にチェックします。*
-3.  **Lambda**: 認証がOKなら、設定されたLambda関数 (`infra/lambda/admin-generate.ts`) を起動する。
-4.  **Lambda の中身**: ランダムなUUID（固有ID）と専用のURLを含んだテキストを作成する。
-5.  **DynamoDB**: 作成したQRコードの情報をデータベースに書き込む（保存する）。
-6.  **Lambda -> API Gateway -> Frontend**: 「保存成功しました」という結果を画面に返す。
----
-
-## 3. 開発時のメンタルモデル（どこをどう触ればいいか）
-
-AWSの構成が分からなくても、基本的には以下のルールを覚えておけば開発を進められます。
-
-*   **① 既存のAPIのロジック（中身）を変えたい・バグを直したい時**
-    *   触る場所: `infra/lambda/*.ts` （各機能のTypeScriptファイル）
-    *   *AWSの設定を変える必要はありません。手元のコードを直して `npx cdk deploy` するだけで新しいプログラムに差し替わります。*
-*   **② 新しいAPI（新しいURL）を増やしたい時**
-    *   触る場所1: `infra/lambda/` に新しいプログラムファイルを作る。
-    *   触る場所2: `infra/lib/infra-stack.ts` を開き、「新しいLambda関数を登録する記述」と「API Gatewayの新しいURLをLambdaに繋ぐ記述」を追記する。
-*   **③ データベースに何が保存されているか確認したい時**
-    *   AWSのマネジメントコンソールにログインし、**DynamoDB** の画面から `MeishiGawariniTableV2` を開いて中身を検索・閲覧します。
-
+1.  **Browser (JavaScript)**: 管理者が画面で「生成」ボタンをクリック。ブラウザが Cognito から取得済みの **IDトークン** をヘッダーに付与し、API Gateway へ `POST` リクエストを送信します。
+2.  **API Gateway (Authorization)**: リクエストを受け取り、**Lambda Authorizer** (`infra/lambda/adminAuthorizer.ts`) を実行。Cognito と連携して「トークンは有効か？」「MFA（多要素認証）は完了しているか？」を厳格にチェックします。
+3.  **Lambda (Trigger)**: 認証が成功すると、ビジネスロジックを担当する Lambda 関数 (`infra/lambda/admin-generate.ts`) が起動されます。
+4.  **Lambda (Logic)**: プログラム内でランダムな UUID（固有ID）を生成し、QRコードに紐付けるデータ構造を組み立てます。
+5.  **DynamoDB (Persistence)**: 組み立てたデータをデータベース（`MeishiGawariniTableV2`）へ保存します。
+6.  **Response**: 処理結果が API Gateway を経由してブラウザに返り、画面上に「生成完了」のメッセージが表示されます。
