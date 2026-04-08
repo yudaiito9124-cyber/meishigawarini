@@ -300,6 +300,7 @@
     },
     "search": {
       "placeholder": "Search by ID...",
+      "productPlaceholder": "Search by name, ID, or Design ID...",
       "go": "Search",
       "clear": "Clear"
     },
@@ -492,7 +493,8 @@
       "receivedMessage": "Have you received the package?",
       "receivedButton": "Mark as Received",
       "compleatedMessage": "Package completely received!",
-      "deliveryCompany": "Delivery Company: {company}"
+      "deliveryCompany": "Delivery Company: {company}",
+      "submitting": "Submitting report..."
     },
     "expiredStep": {
       "message": "This gift has expired.",

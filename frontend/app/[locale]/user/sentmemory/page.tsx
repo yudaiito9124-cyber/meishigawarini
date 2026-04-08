@@ -87,7 +87,7 @@ export default function SendHistoryPage() {
             body.style.backgroundColor = "";
             html.style.backgroundColor = "";
         };
-    }, []);
+    }, [loading]);
 
     return (
         <div ref={containerRef} className="min-h-screen bg-slate-50 flex flex-col items-center py-12 px-4 text-gray-900 font-sans">

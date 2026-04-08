@@ -68,7 +68,7 @@ export default function DeliverySettingsPage() {
             body.style.backgroundColor = "";
             html.style.backgroundColor = "";
         };
-    }, []);
+    }, [loading]);
 
     const handleSave = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -139,7 +139,7 @@ export default function DeliverySettingsPage() {
 
     if (loading) {
         return (
-            <div className="flex items-center justify-center min-h-screen">
+            <div ref={containerRef} className="flex items-center justify-center min-h-screen">
                 <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
             </div>
         );

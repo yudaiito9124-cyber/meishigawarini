@@ -80,7 +80,7 @@ export default function UserProfilePage() {
             body.style.backgroundColor = "";
             html.style.backgroundColor = "";
         };
-    }, []);
+    }, [loading]);
 
     const updateSenderForm = (field: string, value: string) => {
         setSenderForm((prev: any) => ({ ...prev, [field]: value }));
@@ -257,7 +257,7 @@ export default function UserProfilePage() {
 
     if (loading) {
         return (
-            <div className="min-h-screen flex items-center justify-center bg-slate-50">
+            <div ref={containerRef} className="min-h-screen flex items-center justify-center bg-slate-50">
                 <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
             </div>
         );

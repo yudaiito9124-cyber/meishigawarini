@@ -166,11 +166,15 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             }
 
             // 【DB操作: UpdateItem (METADATA)】
-            await ddb.send(new UpdateCommand({
+            const metaUpdateParams: any = {
                 TableName: TABLE_NAME, Key: { PK: `QR#${qr_id}`, SK: 'METADATA' },
                 UpdateExpression: 'SET ' + metaUpdateExpr.join(', '),
-                ExpressionAttributeValues: metaAttrValues, ExpressionAttributeNames: { '#status': 'status' }
-            }));
+                ExpressionAttributeValues: metaAttrValues
+            };
+            if (isShippingTransition) {
+                metaUpdateParams.ExpressionAttributeNames = { '#status': 'status' };
+            }
+            await ddb.send(new UpdateCommand(metaUpdateParams));
 
             // 2. オーダー詳細の更新(発送業者、追跡番号) - ORDERレコードが存在する場合のみ (元の動作と一致)
             if ((delivery_company || tracking_number) && currentStatus === 'USED') {

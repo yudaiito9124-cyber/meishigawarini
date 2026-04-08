@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { RefreshCw, Plus, Check, Loader2 } from 'lucide-react';
+import { RefreshCw, Plus, Check, Loader2, Search, X } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -16,6 +16,7 @@ import { resizeImage } from "@/lib/image-utils";
 import SandboxedHtml from '@/components/SandboxedHtml';
 import { ProductCard } from '@/components/shop/ProductCard';
 import { useBackendError } from '@/hooks/useBackendError';
+import { cn } from '@/lib/utils';
 
 interface ProductsSectionProps {
     shopId: string;
@@ -53,6 +54,16 @@ export function ProductsSection({
     const [deletingProductId, setDeletingProductId] = useState<string | null>(null);
     const [copiedId, setCopiedId] = useState<string | null>(null);
     const [debouncedPreviewHtml, setDebouncedPreviewHtml] = useState<string>('');
+
+    const [searchProductId, setSearchProductId] = useState('');
+
+    const filteredProducts = products.filter(p => {
+        const sid = searchProductId.toLowerCase();
+        return (p.product_id || '').toLowerCase().includes(sid) ||
+            (p.design_id || '').toLowerCase().includes(sid) ||
+            (p.design?.design_id || '').toLowerCase().includes(sid) ||
+            (p.name || '').toLowerCase().includes(sid);
+    });
 
     const fetchProducts = refreshProducts;
     const setProductsLoading = (loading: boolean) => {};
@@ -227,9 +238,34 @@ export function ProductsSection({
     return (
         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
             <Card style={{ maxHeight: 'calc(100vh - 100px)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-                <CardHeader>
-                    <CardTitle>{t('products')}</CardTitle>
-                    <CardDescription>{t('productsDescription')}</CardDescription>
+                <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between space-y-2 sm:space-y-0 pb-4">
+                    <div>
+                        <CardTitle>{t('products')}</CardTitle>
+                        <CardDescription>{t('productsDescription')}</CardDescription>
+                    </div>
+                    <div className="relative w-full sm:max-w-xs group">
+                        <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
+                            <Search className="w-3.5 h-3.5 text-gray-400 group-focus-within:text-primary transition-colors" />
+                        </div>
+                        <Input
+                            placeholder={t('search.productPlaceholder')}
+                            value={searchProductId}
+                            onChange={(e) => setSearchProductId(e.target.value)}
+                            className={cn(
+                                "pl-9 h-9 border-gray-200 bg-white hover:border-gray-300 focus:border-primary/50 focus:ring-primary/10 transition-all rounded-lg text-sm",
+                                searchProductId ? "border-primary ring-1 ring-primary/20" : ""
+                            )}
+                        />
+                        {searchProductId && (
+                            <button
+                                onClick={() => setSearchProductId('')}
+                                className="absolute inset-y-0 right-3 flex items-center text-gray-400 hover:text-gray-600 transition-colors"
+                                title={t('search.clear')}
+                            >
+                                <X className="w-3.5 h-3.5" />
+                            </button>
+                        )}
+                    </div>
                 </CardHeader>
                 <div style={{ flex: '1 1 auto', overflowY: 'auto', minHeight: 0 }} className="p-4 w-full">
                     <div className="flex flex-wrap items-start gap-4">
@@ -239,7 +275,7 @@ export function ProductsSection({
                             </div>
                         ) : (
                             <>
-                                {products.map((product) => (
+                                {filteredProducts.map((product) => (
                                     <ProductCard
                                         key={product.product_id}
                                         product={product}

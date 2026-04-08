@@ -352,6 +352,7 @@
     },
     "search": {
       "placeholder": "カードIDで絞り込み...",
+      "productPlaceholder": "商品名・商品ID・デザインIDで検索...",
       "go": "検索",
       "clear": "クリア"
     },
@@ -567,7 +568,8 @@
       "receivedMessage": "荷物の受け取りが完了しましたか？",
       "receivedButton": "受け取り完了",
       "compleatedMessage": "荷物の受け取りが完了しました！",
-      "deliveryCompany": "配送会社: {company}"
+      "deliveryCompany": "配送会社: {company}",
+      "submitting": "報告を送信中..."
     },
     "expiredStep": {
       "message": "このギフトの使用期限は切れています。",

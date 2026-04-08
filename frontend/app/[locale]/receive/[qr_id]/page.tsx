@@ -427,15 +427,15 @@ export default function ReceivePage() {
             return;
         }
 
+        setLoading(true);
         try {
-            const isSubscribed = !!notificationEmail; // Check if notificationEmail is set
             await receiveApi.receive_submit(qr_id, pin, {
                 shipping_info: {
                     name,
                     address,
                     zip_code: zip_code,
                     phone,
-                    email: isSubscribed ? email : undefined,
+                    email: email || undefined,
                     preferred_date: preferred_date,
                     preferred_time: preferred_time,
                     client_timestamp: new Date().toISOString(),
@@ -457,6 +457,11 @@ export default function ReceivePage() {
         try {
             await receiveApi.receive_completed(qr_id, pin, {});
             setStep("COMPLETED");
+            setGift((prev: any) => ({
+                ...prev,
+                status: 'COMPLETED',
+                ts_completed_at: prev?.ts_completed_at || new Date().toISOString()
+            }));
         } catch (error: any) {
             // console.error("Receive error:", error);
             alert(translateError(error.message, error.detail) || error.message || t('errors.receiveFailed'));
@@ -962,10 +967,10 @@ export default function ReceivePage() {
         // ページの状態に応じてbodyの背景を同期させ、オーバースクロール時の白見えを防ぐ
         const body = document.body;
         const html = document.documentElement;
-        
+
         const updateStyles = () => {
             if (!containerRef.current) return;
-            
+
             // レンダリングされた実際のスタイルを取得することで、Tailwindのクラスやフィルターと完全に一致させる
             const style = window.getComputedStyle(containerRef.current);
             body.style.backgroundColor = style.backgroundColor;
@@ -975,7 +980,7 @@ export default function ReceivePage() {
 
         // 初回と、step変更による再レンダリング後に実行
         updateStyles();
-        
+
         // 念のため少し遅延させて再実行（トランジション対応）
         const timer = setTimeout(updateStyles, 100);
 
@@ -1069,7 +1074,7 @@ export default function ReceivePage() {
                                     </div>
                                     <div className="pt-2 text-[10px] text-gray-400 flex items-center gap-1.5 font-medium">
                                         <div className="w-1 h-1 bg-gray-300 rounded-full" />
-                                        {t('memorySection.submittedAt', { date: new Date(gift.ts_submitted_at).toLocaleDateString() })}
+                                        {t('memorySection.submittedAt', { date: gift.ts_submitted_at ? new Date(gift.ts_submitted_at).toLocaleDateString() : "-" })}
                                     </div>
                                 </div>
 
@@ -1087,7 +1092,7 @@ export default function ReceivePage() {
                                     </div>
                                     <div className="pt-2 text-[10px] text-gray-400 flex items-center gap-1.5 font-medium">
                                         <div className="w-1 h-1 bg-gray-300 rounded-full" />
-                                        {t('memorySection.receivedAt', { date: new Date(gift.ts_completed_at).toLocaleDateString() })}
+                                        {t('memorySection.receivedAt', { date: gift.ts_completed_at ? new Date(gift.ts_completed_at).toLocaleDateString() : "-" })}
                                     </div>
                                 </div>
                             </div>
@@ -1110,12 +1115,14 @@ export default function ReceivePage() {
 
             {/* ========== Animated Product Card Section ========== */}
             <Card className="w-full max-w-xl">
-                <CardHeader>
-                    <CardTitle className="text-xl text-center">
-                        {step === "PIN" ? t('titles.pin') :
-                            step === "RESTRICTED" ? tst(gift?.status?.toLowerCase() || 'active') : ""}
-                    </CardTitle>
-                </CardHeader>
+                {!(step === "PIN" && (loading || isExpanding)) && (
+                    <CardHeader>
+                        <CardTitle className="text-xl text-center">
+                            {step === "PIN" ? t('titles.pin') :
+                                step === "RESTRICTED" ? tst(gift?.status?.toLowerCase() || 'active') : ""}
+                        </CardTitle>
+                    </CardHeader>
+                )}
                 <CardContent className={cn("relative min-h-[300px] flex flex-col justify-center transition-colors duration-1000", step !== "PIN" && "bg-gradient-to-b from-white to-amber-50/20")}>
                     <style dangerouslySetInnerHTML={{
                         __html: `
@@ -1177,7 +1184,7 @@ export default function ReceivePage() {
                         }
                     `}} />
 
-                    {(loading || isExpanding || step === "PIN" || step === "RESTRICTED") && !gift?.product && (
+                    {(isExpanding || ((loading || step === "PIN" || step === "RESTRICTED") && !gift?.product)) && (
                         <ShakingGiftBox isShaking={loading && !isExpanding} isExpanding={isExpanding} />
                     )}
 
@@ -1249,7 +1256,7 @@ export default function ReceivePage() {
                                 {step === "EXPIRED" && (
                                     <div className="mt-6 p-4 bg-red-50 border border-red-200 rounded-xl text-center">
                                         <p className="text-red-600 font-bold">{t('expiredStep.message')}</p>
-                                        <p className="text-red-500 text-sm mt-1">{t('expiredStep.subMessage', { date: new Date(gift.ts_expired_at).toLocaleDateString() })}</p>
+                                        <p className="text-red-500 text-sm mt-1">{t('expiredStep.subMessage', { date: gift.ts_expired_at ? new Date(gift.ts_expired_at).toLocaleDateString() : "-" })}</p>
                                     </div>
                                 )}
 
@@ -1260,7 +1267,7 @@ export default function ReceivePage() {
 
 
 
-                    {step === "PIN" && !gift?.product && (
+                    {!(loading || isExpanding) && step === "PIN" && !gift?.product && (
                         <form onSubmit={handleVerifyPin} className={cn("transition-opacity", loading && "opacity-50 pointer-events-none")}>
                             <div className="space-y-2 p-4 rounded-lg">
                                 <Label htmlFor="pin" className="font-semibold justify-center">{t('pinStep.label')}</Label>
@@ -1593,8 +1600,12 @@ export default function ReceivePage() {
                                 {/* Password Setting Section (Commented out) */}
 
 
-                                <Button type="submit" className="w-full flex flex-col flex-row items-center h-12 mt-14" disabled={loading}>
-                                    <SendHorizontal className="mr-2 h-4 w-4" />
+                                <Button type="submit" className="w-full flex flex-row items-center justify-center h-12 mt-14" disabled={loading}>
+                                    {loading ? (
+                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    ) : (
+                                        <SendHorizontal className="mr-2 h-4 w-4" />
+                                    )}
                                     {loading ? t('formStep.submitting') : t('formStep.submit')}
                                 </Button>
                                 <p className="text-xs text-gray-500 text-center">{t('formStep.privacyPolicy')}</p>
@@ -1675,7 +1686,7 @@ export default function ReceivePage() {
 
                                     <p className="text-gray-600 text-sm">{t('shippedStep.receivedMessage')}</p>
                                     <Button type="submit" className="w-full h-12" variant="default" onClick={handleReceive} disabled={loading}>
-                                        {loading ? t('formStep.submitting') : t('shippedStep.receivedButton')}
+                                        {loading ? t('shippedStep.submitting') : t('shippedStep.receivedButton')}
                                     </Button>
 
                                 </div>
