@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card";
@@ -24,6 +24,7 @@ export default function DeliverySettingsPage() {
     const [phone, setPhone] = useState('');
     const [email, setEmail] = useState('');
     const [email2, setEmail2] = useState('');
+    const containerRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         const loadData = async () => {
@@ -45,6 +46,28 @@ export default function DeliverySettingsPage() {
             }
         };
         loadData();
+    }, []);
+
+    useEffect(() => {
+        // ページの状態に応じてbodyの背景を同期させ、オーバースクロール時の白見えを防ぐ
+        const body = document.body;
+        const html = document.documentElement;
+
+        const updateStyles = () => {
+            if (!containerRef.current) return;
+            const style = window.getComputedStyle(containerRef.current);
+            body.style.backgroundColor = style.backgroundColor;
+            html.style.backgroundColor = style.backgroundColor;
+        };
+
+        updateStyles();
+        const timer = setTimeout(updateStyles, 100);
+
+        return () => {
+            clearTimeout(timer);
+            body.style.backgroundColor = "";
+            html.style.backgroundColor = "";
+        };
     }, []);
 
     const handleSave = async (e: React.FormEvent) => {
@@ -123,7 +146,7 @@ export default function DeliverySettingsPage() {
     }
 
     return (
-        <div className="min-h-screen bg-slate-50 flex flex-col items-center py-12 px-4 text-gray-900 font-sans">
+        <div ref={containerRef} className="min-h-screen bg-slate-50 flex flex-col items-center py-12 px-4 text-gray-900 font-sans">
             <div className="w-full max-w-3xl flex justify-start mb-6">
                 <Button
                     variant="outline"

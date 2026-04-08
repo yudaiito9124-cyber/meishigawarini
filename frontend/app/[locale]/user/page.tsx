@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useTranslations } from 'next-intl';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent } from "@/components/ui/card";
@@ -14,6 +14,7 @@ export default function UserDashboardPage() {
     const [userEmail, setUserEmail] = useState<string>('');
     const [userId, setUserId] = useState<string>('');
     const [copiedId, setCopiedId] = useState<string | null>(null);
+    const containerRef = useRef<HTMLDivElement>(null);
 
     const handleCopy = (id: string) => {
         navigator.clipboard.writeText(id).then(() => {
@@ -41,6 +42,28 @@ export default function UserDashboardPage() {
             }
         };
         fetchUserData();
+    }, []);
+
+    useEffect(() => {
+        // ページの状態に応じてbodyの背景を同期させ、オーバースクロール時の白見えを防ぐ
+        const body = document.body;
+        const html = document.documentElement;
+
+        const updateStyles = () => {
+            if (!containerRef.current) return;
+            const style = window.getComputedStyle(containerRef.current);
+            body.style.backgroundColor = style.backgroundColor;
+            html.style.backgroundColor = style.backgroundColor;
+        };
+
+        updateStyles();
+        const timer = setTimeout(updateStyles, 100);
+
+        return () => {
+            clearTimeout(timer);
+            body.style.backgroundColor = "";
+            html.style.backgroundColor = "";
+        };
     }, []);
 
     const handleLogout = async () => {
@@ -112,7 +135,7 @@ export default function UserDashboardPage() {
     ];
 
     return (
-        <div className="flex flex-col min-h-screen bg-slate-50 font-sans">
+        <div ref={containerRef} className="flex flex-col min-h-screen bg-slate-50 font-sans">
             <main className="flex-1 max-w-4xl w-full mx-auto p-6 sm:p-8 lg:p-12 space-y-12 pb-16 pt-16">
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 mb-12">
                     <div>

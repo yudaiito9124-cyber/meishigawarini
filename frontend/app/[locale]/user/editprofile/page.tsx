@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useTranslations } from "next-intl";
 import { useParams, useRouter } from "next/navigation";
 import { Card, CardContent, CardTitle, CardHeader } from "@/components/ui/card";
@@ -37,6 +37,7 @@ export default function UserProfilePage() {
     const [showDetailHtmlSection, setShowDetailHtmlSection] = useState(false);
     const [htmlImageUrls, setHtmlImageUrls] = useState<string[]>([]);
     const [deletedHtmlUrls, setDeletedHtmlUrls] = useState<string[]>([]);
+    const containerRef = useRef<HTMLDivElement>(null);
 
     const fetchSenderInfo = useCallback(async () => {
         setLoading(true);
@@ -58,6 +59,28 @@ export default function UserProfilePage() {
     useEffect(() => {
         fetchSenderInfo();
     }, [fetchSenderInfo]);
+
+    useEffect(() => {
+        // ページの状態に応じてbodyの背景を同期させ、オーバースクロール時の白見えを防ぐ
+        const body = document.body;
+        const html = document.documentElement;
+
+        const updateStyles = () => {
+            if (!containerRef.current) return;
+            const style = window.getComputedStyle(containerRef.current);
+            body.style.backgroundColor = style.backgroundColor;
+            html.style.backgroundColor = style.backgroundColor;
+        };
+
+        updateStyles();
+        const timer = setTimeout(updateStyles, 100);
+
+        return () => {
+            clearTimeout(timer);
+            body.style.backgroundColor = "";
+            html.style.backgroundColor = "";
+        };
+    }, []);
 
     const updateSenderForm = (field: string, value: string) => {
         setSenderForm((prev: any) => ({ ...prev, [field]: value }));
@@ -241,7 +264,7 @@ export default function UserProfilePage() {
     }
 
     return (
-        <div className="min-h-screen bg-slate-50 flex flex-col items-center py-12 px-4 font-sans">
+        <div ref={containerRef} className="min-h-screen bg-slate-50 flex flex-col items-center py-12 px-4 font-sans">
             <div className="w-full max-w-xl flex justify-start mb-6">
                  <Button 
                     variant="outline" 

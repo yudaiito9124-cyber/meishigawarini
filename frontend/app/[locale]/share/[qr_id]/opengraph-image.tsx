@@ -151,6 +151,18 @@ export default async function Image({ params }: { params: Promise<{ qr_id: strin
   const productUrlRaw = toAbsoluteUrl(data?.product?.image_url);
   const productResult = await getImageData(productUrlRaw, appBase);
 
+  // 5. 最終的なサイズ計算 (見切れ防止とアスペクト比維持)
+  const cardBaseH = 280;
+  const cardBaseW = cardBaseH * cardRatio;
+  const cardFinalW = Math.min(580, cardBaseW);
+  const cardFinalH = cardFinalW / cardRatio;
+
+  const productRatio = productResult?.ratio || 1;
+  const productBaseH = 320;
+  const productBaseW = productBaseH * productRatio;
+  const productFinalW = Math.min(550, productBaseW);
+  const productFinalH = productFinalW / productRatio;
+
   return new ImageResponse(
     (
       <div
@@ -212,9 +224,8 @@ export default async function Image({ params }: { params: Promise<{ qr_id: strin
                 position: 'absolute',
                 bottom: '80px',
                 left: '25px',
-                height: '280px',
-                width: `${280 * cardRatio}px`,
-                maxWidth: '580px',
+                height: `${cardFinalH}px`,
+                width: `${cardFinalW}px`,
                 borderRadius: '24px',
                 display: 'flex',
                 boxShadow: '0 30px 80px rgba(0,0,0,0.6)',
@@ -245,9 +256,8 @@ export default async function Image({ params }: { params: Promise<{ qr_id: strin
                 position: 'absolute',
                 top: '40px',
                 right: '40px',
-                height: '320px',
-                width: productResult ? (320 * productResult.ratio) : '320px',
-                maxWidth: '550px',
+                height: `${productFinalH}px`,
+                width: `${productFinalW}px`,
                 borderRadius: '30px',
                 display: 'flex',
                 boxShadow: '0 40px 100px rgba(0,0,0,0.7)',

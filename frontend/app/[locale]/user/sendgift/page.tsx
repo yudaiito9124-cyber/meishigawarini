@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useTranslations } from "next-intl";
 import { useBackendError } from "@/hooks/useBackendError";
 import { useParams, useRouter } from "next/navigation";
@@ -26,6 +26,7 @@ export default function SendGiftPage() {
     const [bulkResults, setBulkResults] = useState<Array<{ qrId: string, status: 'success' | 'error', message?: string }>>([]);
     const [isConfirming, setIsConfirming] = useState(false);
     const [completedCount, setCompletedCount] = useState(0);
+    const containerRef = useRef<HTMLDivElement>(null);
 
     const handleUrl = (urlToProcess: string) => {
         setErrorMsg("");
@@ -109,8 +110,30 @@ export default function SendGiftPage() {
         handleUrl(scannedUrl);
     };
 
+    useEffect(() => {
+        // ページの状態に応じてbodyの背景を同期させ、オーバースクロール時の白見えを防ぐ
+        const body = document.body;
+        const html = document.documentElement;
+
+        const updateStyles = () => {
+            if (!containerRef.current) return;
+            const style = window.getComputedStyle(containerRef.current);
+            body.style.backgroundColor = style.backgroundColor;
+            html.style.backgroundColor = style.backgroundColor;
+        };
+
+        updateStyles();
+        const timer = setTimeout(updateStyles, 100);
+
+        return () => {
+            clearTimeout(timer);
+            body.style.backgroundColor = "";
+            html.style.backgroundColor = "";
+        };
+    }, []);
+
     return (
-        <div className="min-h-screen bg-slate-50 flex flex-col items-center py-12 px-4 font-sans">
+        <div ref={containerRef} className="min-h-screen bg-slate-50 flex flex-col items-center py-12 px-4 font-sans">
             <div className="w-full max-w-lg flex justify-start mb-6">
                 <Button
                     variant="outline"

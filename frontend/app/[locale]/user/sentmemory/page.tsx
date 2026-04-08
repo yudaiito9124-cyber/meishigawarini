@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardTitle } from "@/components/ui/card";
@@ -17,6 +17,7 @@ export default function SendHistoryPage() {
     const [activeStage, setActiveStage] = useState<'peek' | 'flipped' | 'none'>('none');
     const [viewMode, setViewMode] = useState<'grid' | 'stack'>('stack');
     const [hoveredId, setHoveredId] = useState<string | null>(null);
+    const containerRef = useRef<HTMLDivElement>(null);
 
     const handleItemClick = (id: string) => {
         if (activeId === id) {
@@ -66,8 +67,30 @@ export default function SendHistoryPage() {
         fetchHistory();
     }, [fetchHistory]);
 
+    useEffect(() => {
+        // ページの状態に応じてbodyの背景を同期させ、オーバースクロール時の白見えを防ぐ
+        const body = document.body;
+        const html = document.documentElement;
+
+        const updateStyles = () => {
+            if (!containerRef.current) return;
+            const style = window.getComputedStyle(containerRef.current);
+            body.style.backgroundColor = style.backgroundColor;
+            html.style.backgroundColor = style.backgroundColor;
+        };
+
+        updateStyles();
+        const timer = setTimeout(updateStyles, 100);
+
+        return () => {
+            clearTimeout(timer);
+            body.style.backgroundColor = "";
+            html.style.backgroundColor = "";
+        };
+    }, []);
+
     return (
-        <div className="min-h-screen bg-slate-50 flex flex-col items-center py-12 px-4 text-gray-900 font-sans">
+        <div ref={containerRef} className="min-h-screen bg-slate-50 flex flex-col items-center py-12 px-4 text-gray-900 font-sans">
             <div className="w-full max-w-4xl flex justify-start mb-6">
                 <Button
                     variant="outline"

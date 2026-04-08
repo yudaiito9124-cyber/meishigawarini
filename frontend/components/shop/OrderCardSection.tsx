@@ -154,9 +154,11 @@ export function OrderCardSection({ shopId }: { shopId: string }) {
                                             </div>
                                             {selectedOrderProduct.image_url && (
                                                 <div className="flex justify-center h-48 sm:h-64 animate-in zoom-in fade-in duration-700">
-                                                    <div className="h-full rounded-2xl overflow-hidden border-2 border-white shadow-lg bg-white">
-                                                        <img src={selectedOrderProduct.image_url} alt={selectedOrderProduct.name} className="h-full w-auto object-contain" />
-                                                    </div>
+                                                    <img 
+                                                        src={selectedOrderProduct.image_url} 
+                                                        alt={selectedOrderProduct.name} 
+                                                        className="h-full w-auto object-contain rounded-2xl border-2 border-white shadow-lg bg-white" 
+                                                    />
                                                 </div>
                                             )}
                                         </div>
