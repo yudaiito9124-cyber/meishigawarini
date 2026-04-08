@@ -244,7 +244,7 @@ export default function OrderDetailsDialog({
                                 {td('orderInfo')}
                             </h3>
                             <div className="bg-white rounded-xl border border-gray-100 px-4 shadow-sm">
-                                <InfoRow label={td('shopName')} value={order.shop_name} icon={Store} />
+                                <InfoRow label={td('shopName')} value={order.shop_name} icon={Store} copyValue={order.shop_name} />
                                 <InfoRow label={td('shopId')} value={order.shop_id} icon={Hash} copyValue={order.shop_id} shopIdToLink={order.shop_id} />
                                 <InfoRow label={td('ownerEmail')} value={order.shop_owner_email} icon={Mail} copyValue={order.shop_owner_email} />
                                 <InfoRow label={td('quantity')} value={`${order.quantity} 枚`} icon={CheckCircle2} />
@@ -260,7 +260,7 @@ export default function OrderDetailsDialog({
                                 <InfoRow label={td('productId')} value={order.product_id} icon={Package} copyValue={order.product_id} />
                                 <InfoRow label={td('shopUserId')} value={order.shop_user_id} icon={User} copyValue={order.shop_user_id} />
                                 <InfoRow label={td('senderId')} value={order.sender_user_id} copyValue={order.sender_user_id} />
-                                <InfoRow label={td('expiration')} value={order.expiration_date ? new Date(order.expiration_date).toLocaleString() : td('systemDefault')} icon={Clock} />
+                                <InfoRow label={td('expiration')} value={order.expiration_date ? new Date(order.expiration_date).toLocaleString() : td('systemDefault')} icon={Clock} copyValue={order.expiration_date} />
                                 <InfoRow label={td('activateNow')} value={order.activate_now ? td('yes') : td('no')} />
                             </div>
 

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
+import { useBackendError } from "@/hooks/useBackendError";
 import { useParams, useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -12,7 +13,7 @@ import { userApi } from "@/lib/api/user";
 
 export default function SendGiftPage() {
     const t = useTranslations('UserProfilePage');
-    const tb = useTranslations('Backend');
+    const { translateError } = useBackendError();
     const router = useRouter();
 
     const [isScanning, setIsScanning] = useState(false);
@@ -149,7 +150,7 @@ export default function SendGiftPage() {
                                         <div key={idx} className={`p-3 rounded-xl border flex justify-between items-center ${res.status === 'success' ? 'bg-green-50 border-green-100' : 'bg-red-50 border-red-100'}`}>
                                             <div className="flex flex-col overflow-hidden">
                                                 <span className="text-[10px] font-mono text-gray-400 truncate">{res.qrId}</span>
-                                                {res.message && <span className="text-xs text-red-600 font-medium mt-1">{tb(res.message) || res.message}</span>}
+                                                {res.message && <span className="text-xs text-red-600 font-medium mt-1">{translateError(res.message) || res.message}</span>}
                                             </div>
                                             {res.status === 'success' ? <CheckCircle2 className="w-4 h-4 text-green-600 shrink-0" /> : <X className="w-4 h-4 text-red-600 shrink-0" />}
                                         </div>
@@ -342,7 +343,7 @@ export default function SendGiftPage() {
 
                     {errorMsg && (
                         <div className="p-4 bg-red-50 text-red-600 rounded-xl text-xs font-medium border border-red-100 animate-in fade-in slide-in-from-top-1">
-                            {tb(errorMsg) || errorMsg}
+                            {translateError(errorMsg) || errorMsg}
                         </div>
                     )}
                 </CardContent>

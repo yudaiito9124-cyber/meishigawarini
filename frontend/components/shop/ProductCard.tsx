@@ -79,7 +79,7 @@ export function ProductCard({
                                 <img
                                     src={product.image_url}
                                     alt={product.name}
-                                    className="w-full h-full object-cover"
+                                    className="w-full h-full object-contain p-1"
                                 />
                             </div>
                         )}
@@ -110,9 +110,9 @@ export function ProductCard({
                         </DialogHeader>
                         <div className="space-y-6 py-4">
                             {product.image_url && (
-                                <div className="w-full relative rounded-lg overflow-hidden border">
+                                <div className="w-full h-64 sm:h-80 flex items-center justify-center relative rounded-lg overflow-hidden border bg-gray-50/50 p-2">
                                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                                    <img src={product.image_url} alt={product.name} className="w-full h-full object-cover" />
+                                    <img src={product.image_url} alt={product.name} className="h-full w-auto object-contain" />
                                 </div>
                             )}
 

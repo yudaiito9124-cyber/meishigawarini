@@ -25,6 +25,7 @@ import { receiveApi } from "@/lib/api/receive";
 import { fetchAuthSession, getCurrentUser } from "aws-amplify/auth";
 import { userApi } from "@/lib/api/user";
 import { ShareDialog } from "@/components/ShareDialog";
+import { useBackendError } from "@/hooks/useBackendError";
 
 
 const NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || "";
@@ -106,7 +107,7 @@ export default function ReceivePage() {
     const t = useTranslations('ReceivePage');
     const tt = useTranslations('Time');
     const tst = useTranslations('Status');
-    const tb = useTranslations('Backend');
+    const { translateError } = useBackendError();
     const params = useParams();
     const router = useRouter();
     const qr_id = params?.qr_id as string;
@@ -231,7 +232,7 @@ export default function ReceivePage() {
             }
         } catch (e: any) {
             // console.error("Import failed:", e);
-            if (!silent) alert(t('senderInfo.importFailed') + ": " + (tb(e.message.replace(/\./g, '_')) || e.message));
+            if (!silent) alert(t('senderInfo.importFailed') + ": " + (translateError(e.message, e.detail) || e.message));
         } finally {
             if (!silent) setSenderInfoLoading(false);
         }
@@ -247,6 +248,15 @@ export default function ReceivePage() {
     // Check auth status
     useEffect(() => {
         const checkAuth = async () => {
+            // Safari workaround: Skip hang if no obvious session hint exists
+            const hasSessionHint = typeof window !== 'undefined' &&
+                Object.keys(localStorage).some(key => key.startsWith('CognitoIdentityServiceProvider'));
+
+            if (!hasSessionHint) {
+                setIsLoggedIn(false);
+                return;
+            }
+
             try {
                 const session = await fetchAuthSession();
                 setIsLoggedIn(!!session.tokens?.idToken);
@@ -265,21 +275,22 @@ export default function ReceivePage() {
         setError(null);
 
         try {
-            // Re-parallelize: Fetch both verification and messages/chat data together
-            // to ensure a single complete UI transition after all data is ready.
-            // loadMessages() already contains the logic to skip slow Cognito checks when not logged in.
-            const [data] = await Promise.all([
-                receiveApi.verify(qr_id, pin),
-                loadMessages()
-            ]);
+            // Step 1: Verify PIN (Critical Path)
+            const data = await receiveApi.verify(qr_id, pin);
 
-            // Once ALL data is loaded, start the expansion animation
+            // Step 2: Start loading secondary data (Background/Parallel)
+            // This is non-blocking to ensure UI transition happens immediately after verification
+            loadMessages().catch(err => {
+                console.error("Delayed message load error:", err);
+            });
+
+            // Once verification is successful, start the expansion animation
             setIsExpanding(true);
             setGift(data);
             setHasLoadedChat(true);
 
             // Wait for the duration of the expansion animation (800ms)
-            await new Promise(resolve => setTimeout(resolve, 800));
+            await new Promise(resolve => setTimeout(resolve, 1000));
 
             if (data.status === 'COMPLETED') {
                 setShowWhiteFade(true);
@@ -327,20 +338,22 @@ export default function ReceivePage() {
         e.preventDefault();
         setLoading(true);
         try {
-            // Re-parallelize: Fetch both verification and messages/chat data together
-            const [data] = await Promise.all([
-                receiveApi.verify(qr_id, pin, unlockPassword),
-                loadMessages()
-            ]);
+            // Step 1: Verify with password (Critical Path)
+            const data = await receiveApi.verify(qr_id, pin, unlockPassword);
+
+            // Step 2: Start loading secondary data (Background/Parallel)
+            loadMessages().catch(err => {
+                console.error("Delayed message load error:", err);
+            });
 
             if (data.is_authorized) {
-                // Once verified and all data is ready, start expansion
+                // Once verified and data is ready, start expansion
                 setIsExpanding(true);
                 setGift(data);
                 setHasLoadedChat(true);
 
                 // Wait for expansion animation duration
-                await new Promise(resolve => setTimeout(resolve, 800));
+                await new Promise(resolve => setTimeout(resolve, 1000));
 
                 if (data.status === 'COMPLETED') {
                     setShowWhiteFade(true);
@@ -431,7 +444,7 @@ export default function ReceivePage() {
             setStep("SUCCESS");
         } catch (error: any) {
             // console.error("Submission error:", error);
-            alert(tb(error.message.replace(/\./g, '_')) || error.message || t('errors.submitFailed'));
+            alert(translateError(error.message, error.detail) || error.message || t('errors.submitFailed'));
         } finally {
             setLoading(false);
         }
@@ -445,7 +458,7 @@ export default function ReceivePage() {
             setStep("COMPLETED");
         } catch (error: any) {
             // console.error("Receive error:", error);
-            alert(tb(error.message.replace(/\./g, '_')) || error.message || t('errors.receiveFailed'));
+            alert(translateError(error.message, error.detail) || error.message || t('errors.receiveFailed'));
         } finally {
             setLoading(false);
         }
@@ -528,9 +541,9 @@ export default function ReceivePage() {
             }
         } catch (e: any) {
             console.error("Failed to load messages or user data:", e);
-            alert(t('errors.loadFailed') + (tb(e.message.replace(/\./g, '_')) || e.message));
+            alert(t('errors.loadFailed') + (translateError(e.message, e.detail) || e.message));
         }
-    }, [qr_id, pin, handleImportFromId, isLoggedIn, t, tb]);
+    }, [qr_id, pin, handleImportFromId, isLoggedIn, t]);
 
     const handleSenderRoleSelect = async () => {
         if (!window.confirm(t('roleSelection.confirmSender'))) return;
@@ -660,7 +673,7 @@ export default function ReceivePage() {
             setSelectedFile(null);
             await loadMessages();
         } catch (e: any) {
-            alert(t('chat.sendFailed') + (tb(e.message.replace(/\./g, '_')) || e.message));
+            alert(t('chat.sendFailed') + (translateError(e.message, e.detail) || e.message));
         } finally {
             setChatLoading(false);
             setUploading(false);
@@ -690,7 +703,7 @@ export default function ReceivePage() {
             await loadMessages();
             setIsEditingSender(false);
         } catch (e: any) {
-            alert(t('senderInfo.updateFailed') + (tb(e.message.replace(/\./g, '_')) || e.message));
+            alert(t('senderInfo.updateFailed') + (translateError(e.message, e.detail) || e.message));
         } finally {
             setSenderInfoLoading(false);
         }
@@ -711,7 +724,7 @@ export default function ReceivePage() {
 
             alert(t('senderInfo.exportedId', { id: data.userid }));
         } catch (e: any) {
-            alert(t('senderInfo.updateFailed') + (tb(e.message.replace(/\./g, '_')) || e.message));
+            alert(t('senderInfo.updateFailed') + (translateError(e.message, e.detail) || e.message));
         } finally {
             setSenderInfoLoading(false);
         }
@@ -780,7 +793,7 @@ export default function ReceivePage() {
 
             await loadMessages();
         } catch (e: any) {
-            alert(t('senderInfo.removeImageFailed') + ': ' + (tb(e.message.replace(/\./g, '_')) || e.message));
+            alert(t('senderInfo.removeImageFailed') + ': ' + (translateError(e.message, e.detail) || e.message));
         } finally {
             setSenderInfoLoading(false);
         }
@@ -827,7 +840,7 @@ export default function ReceivePage() {
 
             await loadMessages();
         } catch (e: any) {
-            alert(t('senderInfo.uploadCardFailed') + ': ' + (tb(e.message.replace(/\./g, '_')) || e.message));
+            alert(t('senderInfo.uploadCardFailed') + ': ' + (translateError(e.message, e.detail) || e.message));
         } finally {
             setSenderInfoLoading(false);
         }
@@ -879,7 +892,7 @@ export default function ReceivePage() {
             alert(t('chat.subscribeSuccess'));
             setNotificationEmail("");
         } catch (e: any) {
-            alert(t('chat.subscribeFailed') + (tb(e.message.replace(/\./g, '_')) || e.message));
+            alert(t('chat.subscribeFailed') + (translateError(e.message, e.detail) || e.message));
         } finally {
             setSubscribing(false);
         }

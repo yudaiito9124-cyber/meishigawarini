@@ -120,10 +120,31 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             }));
 
             // 【事後処理: 通知送信】
-            // 理由: チャット参加者（notification_emails）に新着メッセージを通知。
+            // 理由: チャット参加者（notification_emails）および送り主（sender_id）に新着メッセージを通知。
+            const recipientsSet = new Set<string>();
             if (chatRes.Item?.notification_emails) {
-                const recipients = Array.from(new Set(chatRes.Item.notification_emails as string[]));
-                const preferences = chatRes.Item.email_preferences || {};
+                (chatRes.Item.notification_emails as string[]).forEach(e => recipientsSet.add(e));
+            }
+
+            // 送り主IDが設定されている場合、プロフィールから最新のメールアドレスを取得
+            const senderId = chatRes.Item?.sender_id;
+            if (senderId) {
+                try {
+                    const profileRes = await ddb.send(new GetCommand({
+                        TableName: TABLE_NAME,
+                        Key: { PK: `USER#${senderId}`, SK: 'SENDER' }
+                    }));
+                    if (profileRes.Item?.email) {
+                        recipientsSet.add(profileRes.Item.email);
+                    }
+                } catch (e) {
+                    console.warn(`Failed to fetch sender profile for notification (sender_id: ${senderId}):`, e);
+                }
+            }
+
+            if (recipientsSet.size > 0) {
+                const recipients = Array.from(recipientsSet);
+                const preferences = chatRes.Item?.email_preferences || {};
 
                 const sendPromises = recipients.map(emailTo => {
                     const lang = preferences[emailTo] === 'en' ? 'en' : 'ja';

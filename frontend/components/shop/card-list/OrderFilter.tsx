@@ -108,7 +108,7 @@ export function OrderFilter() {
                                                 <img
                                                     src={product.image_url}
                                                     alt={product.name}
-                                                    className="w-full h-full object-cover"
+                                                    className="w-full h-full object-contain p-0.5"
                                                 />
                                             </div>
                                         )}

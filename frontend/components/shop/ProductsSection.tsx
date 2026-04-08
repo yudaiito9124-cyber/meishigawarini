@@ -15,6 +15,7 @@ import { generateId } from '@/lib/id';
 import { resizeImage } from "@/lib/image-utils";
 import SandboxedHtml from '@/components/SandboxedHtml';
 import { ProductCard } from '@/components/shop/ProductCard';
+import { useBackendError } from '@/hooks/useBackendError';
 
 interface ProductsSectionProps {
     shopId: string;
@@ -27,7 +28,7 @@ export function ProductsSection({
     const tr = useTranslations('ReceivePage');
     const tc = useTranslations('Common');
     const st = useTranslations('Status');
-    const tb = useTranslations('Backend');
+    const { translateError } = useBackendError();
 
     const { 
         shop, 
@@ -123,7 +124,7 @@ export function ProductsSection({
             });
             fetchProducts();
         } catch (err: any) {
-            alert((tb(err.message.replace(/\./g, '_')) || err.message) + (err.relatedQRs ? "\n" + err.relatedQRs.join(", ") : ""));
+            alert((translateError(err.message, err.detail) || err.message) + (err.relatedQRs ? "\n" + err.relatedQRs.join(", ") : ""));
         } finally {
             setDeletingProductId(null);
         }
@@ -142,12 +143,12 @@ export function ProductsSection({
                 source_shop_id: selectedImportShopId.replace('SHOP#', '')
             });
 
-            alert(`${tb(data.message.replace(/\./g, '_')) || data.message} (${data.imported} items)`);
+            alert(`${translateError(data.message) || data.message} (${data.imported} items)`);
             setIsImportDialogOpen(false);
             setSelectedImportShopId('');
             fetchProducts();
         } catch (error: any) {
-            alert(t('importProduct.failed') + ': ' + (tb(error.message.replace(/\./g, '_')) || error.message));
+            alert(t('importProduct.failed') + ': ' + (translateError(error.message, error.detail) || error.message));
         } finally {
             setIsImporting(false);
         }

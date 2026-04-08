@@ -7,6 +7,7 @@ export interface ScannedId {
         status: string;
         product_linked: boolean;
         product_name?: string;
+        product_id?: string;
     };
     error?: string;
 }
@@ -60,6 +61,7 @@ const initialSettingsState = {
     isUploadingHtmlImage: false,
     sessionUploadedUrls: [] as string[],
     adminEmails: null as { owner_email: string, manager_emails: string[] } | null,
+    copiedId: null as string | null,
 };
 
 // --- Derived Types ---

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef } from 'react';
-import { Settings, ShoppingBasket, Eye, Plus, Trash2, Copy, ImageIcon, Save, Loader2, ChevronDown, Download } from 'lucide-react';
+import { Settings, ShoppingBasket, Eye, Plus, Trash2, Copy, Check, ImageIcon, Save, Loader2, ChevronDown, Download } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { shopApi } from '@/lib/api/shop';
 import { Button } from '@/components/ui/button';
@@ -14,18 +14,19 @@ import { generateId } from '@/lib/id';
 import { resizeImage } from "@/lib/image-utils";
 import { useShop } from '@/context/ShopContext';
 import { useSettingsUI } from '@/store/useShopStore';
+import { useBackendError } from '@/hooks/useBackendError';
 
 export function ShopSettingsSection({ shopId }: { shopId: string }) {
     const t = useTranslations('ShopPage');
     const tr = useTranslations('ReceivePage');
-    const tb = useTranslations('Backend');
+    const { translateError } = useBackendError();
 
     const { shop, userId, refreshShopDetails } = useShop();
-    const { 
+    const {
         isSettingsOpen, isSettingShowHTML, isSettingUploading,
         debouncedPreviewHtml, htmlImageUrls, htmlImageUrlsToDelete,
         isHtmlImageSectionOpen, isUploadingHtmlImage,
-        sessionUploadedUrls, adminEmails,
+        sessionUploadedUrls, adminEmails, copiedId,
         set: setSettings
     } = useSettingsUI();
 
@@ -48,14 +49,14 @@ export function ShopSettingsSection({ shopId }: { shopId: string }) {
         try {
             const data = await shopApi.shop_admins({ shop_id: shopId });
             setSettings({ adminEmails: data });
-        } catch (e) {}
+        } catch (e) { }
     };
 
     const handleSettingsOpenChange = async (open: boolean) => {
         if (!open && sessionUploadedUrls.length > 0) {
             try {
                 await shopApi.shop_delete_images({ shop_id: shopId, urls: sessionUploadedUrls });
-            } catch (e) {}
+            } catch (e) { }
             setSettings({ sessionUploadedUrls: [] });
         }
         if (open) fetchAdminEmails();
@@ -70,7 +71,7 @@ export function ShopSettingsSection({ shopId }: { shopId: string }) {
         try {
             let uploadFile: File | Blob = file;
             if (file.type.startsWith("image/")) {
-                try { uploadFile = await resizeImage(file); } catch (err) {}
+                try { uploadFile = await resizeImage(file); } catch (err) { }
             }
 
             const resData = await shopApi.shop_products_uploadurl({
@@ -92,12 +93,12 @@ export function ShopSettingsSection({ shopId }: { shopId: string }) {
 
             if (!res.ok) throw new Error('Failed to upload image (' + res.status + ')');
 
-            setSettings(prev => ({ 
+            setSettings(prev => ({
                 htmlImageUrls: [...prev.htmlImageUrls, viewUrl],
                 sessionUploadedUrls: [...prev.sessionUploadedUrls, publicUrl]
             }));
         } catch (err: any) {
-            alert(t('addProduct.imageUploadFailed') + ': ' + (tb(err.message.replace(/\./g, '_')) || err.message));
+            alert(t('addProduct.imageUploadFailed') + ': ' + (translateError(err.message, err.detail) || err.message));
         } finally {
             setSettings({ isUploadingHtmlImage: false });
         }
@@ -122,7 +123,7 @@ export function ShopSettingsSection({ shopId }: { shopId: string }) {
             setSettings({ sessionUploadedUrls: [], isSettingsOpen: false });
             await refreshShopDetails();
         } catch (err: any) {
-            alert(t('shopSettings.error') + ': ' + (tb(err.message?.replace(/\./g, '_')) || err.message || String(err)));
+            alert(t('shopSettings.error') + ': ' + (translateError(err.message, err.detail) || err.message || String(err)));
         } finally {
             setSettings({ isSettingUploading: false });
         }
@@ -134,6 +135,14 @@ export function ShopSettingsSection({ shopId }: { shopId: string }) {
         }
     };
 
+    const handleCopy = (id: string | undefined) => {
+        if (!id) return;
+        navigator.clipboard.writeText(id).then(() => {
+            setSettings({ copiedId: id });
+            setTimeout(() => setSettings({ copiedId: null }), 2000);
+        });
+    };
+
     return (
         <Dialog open={isSettingsOpen} onOpenChange={handleSettingsOpenChange}>
             <DialogTrigger asChild>
@@ -141,7 +150,7 @@ export function ShopSettingsSection({ shopId }: { shopId: string }) {
                     <Settings className="h-5 w-5" />
                 </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-[95vw] w-full max-h-[95vh] overflow-y-auto">
+            <DialogContent className="max-w-[98vw] w-full sm:max-w-[98vw] max-h-[98vh] overflow-y-auto">
                 <DialogHeader>
                     <DialogTitle>{t('shopSettings.title')}</DialogTitle>
                     <DialogDescription>{t('shopSettings.description')}</DialogDescription>
@@ -156,16 +165,16 @@ export function ShopSettingsSection({ shopId }: { shopId: string }) {
 
                     {isSettingShowHTML ? (
                         <div className="space-y-2">
-                            <HtmlEditor 
-                                shopDetailRef={shopDetailRef} 
-                                defaultHtml={shop?.detail_html} 
-                                debouncedPreviewHtml={debouncedPreviewHtml} 
-                                onUpdatePreview={handleUpdatePreview} 
-                                t={t} tr={tr} 
+                            <HtmlEditor
+                                shopDetailRef={shopDetailRef}
+                                defaultHtml={shop?.detail_html}
+                                debouncedPreviewHtml={debouncedPreviewHtml}
+                                onUpdatePreview={handleUpdatePreview}
+                                t={t} tr={tr}
                             />
-                            <ImageUploadGrid 
-                                htmlImageUrls={htmlImageUrls} 
-                                isOpen={isHtmlImageSectionOpen} 
+                            <ImageUploadGrid
+                                htmlImageUrls={htmlImageUrls}
+                                isOpen={isHtmlImageSectionOpen}
                                 setIsOpen={(val) => setSettings({ isHtmlImageSectionOpen: val })}
                                 isUploading={isUploadingHtmlImage}
                                 onUpload={handleHtmlImageUpload}
@@ -191,13 +200,23 @@ export function ShopSettingsSection({ shopId }: { shopId: string }) {
                         </Button>
                     </DialogFooter>
                 </form>
-                <div className="border-t pt-4 space-y-1">
-                    <div className="text-xs text-gray-500">{t('userId')} : {userId}</div>
-                    <div className="text-xs text-gray-500">{t('ownerId')} : {shop?.owner_id}</div>
+                <div className="border-t pt-4 space-y-2">
+                    <div className="flex items-center gap-1 text-xs text-gray-500">
+                        {t('userId')} : {userId}
+                        <Button variant="ghost" size="icon" className="h-4 w-4" onClick={() => handleCopy(userId)}>
+                            {copiedId === userId ? <Check className="h-3 w-3 text-green-500" /> : <Copy className="h-3 w-3" />}
+                        </Button>
+                    </div>
+                    <div className="flex items-center gap-1 text-xs text-gray-500">
+                        {t('ownerId')} : {shop?.owner_id}
+                        <Button variant="ghost" size="icon" className="h-4 w-4" onClick={() => handleCopy(shop?.owner_id)}>
+                            {copiedId === shop?.owner_id ? <Check className="h-3 w-3 text-green-500" /> : <Copy className="h-3 w-3" />}
+                        </Button>
+                    </div>
                     <div className="flex items-center gap-1 text-xs text-gray-500">
                         {t('shopId')} : {shopId}
-                        <Button variant="ghost" size="icon" className="h-4 w-4" onClick={() => { navigator.clipboard.writeText(shopId); alert(t('shopSettings.copySuccess')); }}>
-                            <Copy className="h-3 w-3" />
+                        <Button variant="ghost" size="icon" className="h-4 w-4" onClick={() => handleCopy(shopId)}>
+                            {copiedId === shopId ? <Check className="h-3 w-3 text-green-500" /> : <Copy className="h-3 w-3" />}
                         </Button>
                     </div>
                 </div>
@@ -243,9 +262,9 @@ interface HtmlEditorProps {
 
 function HtmlEditor({ shopDetailRef, defaultHtml, debouncedPreviewHtml, onUpdatePreview, t, tr }: HtmlEditorProps) {
     const handleDownloadPrompt = () => {
-        const link = document.createElement('a'); 
-        link.href = '/prompts/landing-page-prompt.md'; 
-        link.download = 'landing-page-prompt.md'; 
+        const link = document.createElement('a');
+        link.href = '/prompts/landing-page-prompt.md';
+        link.download = 'landing-page-prompt.md';
         link.click();
     };
 
@@ -272,7 +291,7 @@ function HtmlEditor({ shopDetailRef, defaultHtml, debouncedPreviewHtml, onUpdate
                         <span className="text-xs font-bold text-gray-600 uppercase tracking-wider">{t('shopSettings.preview')}</span>
                     </div>
                     <div className="flex-1 overflow-y-auto p-4 flex flex-col items-center">
-                        <Card className="w-full mt-10 max-w-xl bg-white p-4">
+                        <Card className="w-full mt-10 max-w-full bg-white p-4">
                             <div className="flex flex-col items-center gap-2 mb-4">
                                 <div className="flex items-center gap-2 text-lg font-bold"><ShoppingBasket className="w-5 h-5" />{tr('shopinfo')}</div>
                                 <div className="text-xs text-gray-500">{tr('shopinfo_description')}</div>

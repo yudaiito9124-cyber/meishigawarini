@@ -15,6 +15,7 @@ import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, Tabl
 import { APP_CONFIG } from "@/lib/config";
 import { generateId } from '@/lib/id';
 import { useTranslations } from 'next-intl';
+import { useBackendError } from '@/hooks/useBackendError';
 import { generatePDF } from '@/lib/generatePDF';
 import { cardformats, paperformats } from '@/lib/constants/designs';
 import { generateCSVExport } from '@/lib/generateCSVExport';
@@ -44,7 +45,7 @@ import OrderDetailsDialog from "@/components/admin/OrderDetailsDialog";
 
 export default function AdminPage() {
     const t = useTranslations('AdminPage');
-    const tb = useTranslations('Backend');
+    const { translateError } = useBackendError();
     const [count, setCount] = useState(10);
     const [keyword, setKeyword] = useState("");
     const [shopId, setShopId] = useState("");
@@ -135,7 +136,7 @@ export default function AdminPage() {
             setTimeout(() => fetchCardOrders(), 1000);
         } catch (e) {
             console.error("Failed to update status:", e);
-            alert(tb('Internal Server Error'));
+            alert(translateError('Internal Server Error'));
             fetchCardOrders(); // エラー時は元の状態に戻すため再取得
         }
     };
@@ -254,7 +255,7 @@ export default function AdminPage() {
 
         } catch (e: any) {
             const errData = e;
-            alert((tb(errData?.message?.replace(/\./g, '_')) || errData?.message) || t('batches.alerts.failed') + (errData?.detail?.toString() || ''));
+            alert((translateError(errData?.message, errData?.detail) || errData?.message) || t('batches.alerts.failed') + (errData?.detail?.toString() || ''));
         } finally {
             setIsGenerating(false);
         }
@@ -1296,7 +1297,14 @@ function QRCodeRow({ item, apiUrl, onGeneratePDF, onRefresh, paperFormat, cardFo
                                 <span className="text-gray-400 text-xs">{t('shopInfo.contact')}</span>
                                 <span className="text-gray-600 break-all">{item.shop_email || '-'}</span>
                                 <span className="text-gray-400 text-xs">{tShop('orders.productName')}</span>
-                                <span className="text-gray-600 break-all">{item.product_name || item.product_id || '-'}</span>
+                                <div className="flex items-center gap-1">
+                                    <span className="text-gray-600 break-all">{item.product_name || item.product_id || '-'}</span>
+                                    {item.product_id && (
+                                        <Button variant="ghost" size="icon" className="h-4 w-4" onClick={(e) => { e.stopPropagation(); handleCopy(item.product_id); }}>
+                                            {copiedId === item.product_id ? <Check className="h-3 w-3 text-green-500" /> : <Copy className="h-3 w-3 text-gray-400" />}
+                                        </Button>
+                                    )}
+                                </div>
                             </div>
                         </div>
 
@@ -1313,7 +1321,17 @@ function QRCodeRow({ item, apiUrl, onGeneratePDF, onRefresh, paperFormat, cardFo
                             <div className="space-y-2">
                                 <div>
                                     <h4 className="text-sm font-semibold text-gray-500">{t('generate.cardFormat')}</h4>
-                                    <p className="text-sm font-medium">{item.design_id}</p>
+                                    <div className="flex items-center gap-2">
+                                        <p className="text-sm font-medium font-mono">{item.design_id}</p>
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-4 w-4"
+                                            onClick={(e) => { e.stopPropagation(); handleCopy(item.design_id); }}
+                                        >
+                                            {copiedId === item.design_id ? <Check className="h-3 w-3 text-green-500" /> : <Copy className="h-3 w-3 text-gray-400" />}
+                                        </Button>
+                                    </div>
                                 </div>
                                 {(item.thumbf || item.thumbb || cardformats[item.design_id]) && (
                                     <div className="flex flex-wrap gap-4">
@@ -1360,15 +1378,43 @@ function QRCodeRow({ item, apiUrl, onGeneratePDF, onRefresh, paperFormat, cardFo
                             </div>
                             <div>
                                 <h4 className="text-sm font-semibold text-gray-500">{tShop('orders.contact')}</h4>
-                                <p className="break-all">{item.shipping_info?.email || '-'}</p>
-                                <p className="text-sm mt-1">{item.shipping_info?.phone || '-'}</p>
+                                <div className="flex items-center gap-1">
+                                    <p className="break-all">{item.shipping_info?.email || '-'}</p>
+                                    {item.shipping_info?.email && (
+                                        <Button variant="ghost" size="icon" className="h-4 w-4" onClick={(e) => { e.stopPropagation(); handleCopy(item.shipping_info.email); }}>
+                                            {copiedId === item.shipping_info.email ? <Check className="h-3 w-3 text-green-500" /> : <Copy className="h-3 w-3 text-gray-400" />}
+                                        </Button>
+                                    )}
+                                </div>
+                                <div className="flex items-center gap-1">
+                                    <p className="text-sm mt-1">{item.shipping_info?.phone || '-'}</p>
+                                    {item.shipping_info?.phone && (
+                                        <Button variant="ghost" size="icon" className="h-4 w-4" onClick={(e) => { e.stopPropagation(); handleCopy(item.shipping_info.phone); }}>
+                                            {copiedId === item.shipping_info.phone ? <Check className="h-3 w-3 text-green-500" /> : <Copy className="h-3 w-3 text-gray-400" />}
+                                        </Button>
+                                    )}
+                                </div>
                             </div>
                         </div>
 
                         <div>
                             <h4 className="text-sm font-semibold text-gray-500">{tShop('orders.address')}</h4>
-                            {item.postal_code && <p className="text-sm">〒{item.postal_code}</p>}
-                            <p className="whitespace-pre-wrap text-sm">{item.address || '-'}</p>
+                            {item.postal_code && (
+                                <div className="flex items-center gap-1">
+                                    <p className="text-sm">〒{item.postal_code}</p>
+                                    <Button variant="ghost" size="icon" className="h-4 w-4" onClick={(e) => { e.stopPropagation(); handleCopy(item.postal_code); }}>
+                                        {copiedId === item.postal_code ? <Check className="h-3 w-3 text-green-500" /> : <Copy className="h-3 w-3 text-gray-400" />}
+                                    </Button>
+                                </div>
+                            )}
+                            <div className="flex items-center gap-1">
+                                <p className="whitespace-pre-wrap text-sm">{item.address || '-'}</p>
+                                {item.address && (
+                                    <Button variant="ghost" size="icon" className="h-4 w-4" onClick={(e) => { e.stopPropagation(); handleCopy(item.address); }}>
+                                        {copiedId === item.address ? <Check className="h-3 w-3 text-green-500" /> : <Copy className="h-3 w-3 text-gray-400" />}
+                                    </Button>
+                                )}
+                            </div>
                         </div>
 
                         <div>
@@ -1417,67 +1463,38 @@ function QRCodeRow({ item, apiUrl, onGeneratePDF, onRefresh, paperFormat, cardFo
                         {/* 生データ */}
                         <div className="mt-4">
                             <h4 className="text-sm font-semibold text-gray-500 border-b mb-2">{t('list.raw')}</h4>
-                            {Object.entries(item).map(([key, value]) => {
-                                if (key === 'shipping_info' || key.startsWith('ts_')) return null;
-                                if (key.startsWith('GSI') || key === "SK" || key === "PK") return null;
-                                return (
-                                    <div key={key} className="grid grid-cols-2 gap-1">
-                                        <h4 className="text-sm font-semibold text-gray-500">{key}</h4>
-                                        <p className="text-sm">
-                                            {value == null
-                                                ? '-'
-                                                : typeof value === 'object'
-                                                    ? JSON.stringify(value)
-                                                    : String(value)}
-                                        </p>
+                            {(Object.entries(item).filter(([k]) => !k.startsWith('ts_') && k !== 'shipping_info' && !k.startsWith('GSI') && k !== 'PK' && k !== 'SK')
+                                .concat(Object.entries(item.shipping_info || {}).map(([k, v]) => [`shipping_${k}`, v]))
+                                .concat(Object.entries(item).filter(([k]) => k.startsWith('ts_')))
+                                .concat(Object.entries(item).filter(([k]) => k.startsWith('GSI') || k === 'PK' || k === 'SK')) as [string, any][]).map(([key, value]) => (
+                                <div key={key} className="flex flex-col py-1 border-b border-gray-50 last:border-0 group/raw">
+                                    <div className="flex items-center justify-between gap-2">
+                                        <h4 className="text-[10px] font-bold text-gray-400 font-mono uppercase truncate w-24 shrink-0">{key}</h4>
+                                        <div className="flex-1 flex items-center justify-end gap-1 min-w-0">
+                                            <p className="text-[11px] font-mono text-gray-600 truncate text-right">
+                                                {value == null ? '-' : typeof value === 'object' ? JSON.stringify(value) : String(value)}
+                                            </p>
+                                            {value != null && (
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="h-5 w-5 opacity-0 group-hover/raw:opacity-100 transition-opacity shrink-0"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleCopy(typeof value === 'object' ? JSON.stringify(value) : String(value));
+                                                    }}
+                                                >
+                                                    {copiedId === (typeof value === 'object' ? JSON.stringify(value) : String(value)) ? (
+                                                        <Check className="h-3 w-3 text-green-500" />
+                                                    ) : (
+                                                        <Copy className="h-3 w-3 text-gray-400" />
+                                                    )}
+                                                </Button>
+                                            )}
+                                        </div>
                                     </div>
-                                );
-                            })}
-                            <div className="mt-0 border-t" />
-                            {item.shipping_info && Object.entries(item.shipping_info).map(([key, value]) => (
-                                <div key={`shipping_${key}`} className="grid grid-cols-2 gap-1">
-                                    <h4 className="text-sm font-semibold text-gray-500">{key}</h4>
-                                    <p className="text-sm">
-                                        {value == null
-                                            ? '-'
-                                            : typeof value === 'object'
-                                                ? JSON.stringify(value)
-                                                : String(value)}
-                                    </p>
                                 </div>
                             ))}
-                            <div className="mt-0 border-t" />
-                            {Object.entries(item).map(([key, value]) => {
-                                if (!key.startsWith('ts_')) return null;
-                                return (
-                                    <div key={key} className="grid grid-cols-2 gap-1">
-                                        <h4 className="text-sm font-semibold text-gray-500">{key}</h4>
-                                        <p className="text-sm">
-                                            {value == null
-                                                ? '-'
-                                                : typeof value === 'object'
-                                                    ? JSON.stringify(value)
-                                                    : String(value)}
-                                        </p>
-                                    </div>
-                                );
-                            })}
-                            <div className="mt-0 border-t" />
-                            {Object.entries(item).map(([key, value]) => {
-                                if (!key.startsWith('GSI') && key !== "SK" && key !== "PK") return null;
-                                return (
-                                    <div key={key} className="grid grid-cols-2 gap-1">
-                                        <h4 className="text-sm font-semibold text-gray-500">{key}</h4>
-                                        <p className="text-sm">
-                                            {value == null
-                                                ? '-'
-                                                : typeof value === 'object'
-                                                    ? JSON.stringify(value)
-                                                    : String(value)}
-                                        </p>
-                                    </div>
-                                );
-                            })}
                         </div>
                     </div>
                 )}
@@ -1684,6 +1701,12 @@ function DataDumpSection({ apiUrl }: { apiUrl: string }) {
         <>
             <DumpCard title={t('list.dump.userId')} prefix="USER#" />
             <DumpCard title={t('list.dump.shopId')} prefix="SHOP#" />
+            <DumpCard
+                title={t('list.dump.productId')}
+                prefix="PRODUCT#"
+                skPrefix="GSI 2;PRODUCT#"
+                isGsi2
+            />
             <DumpCard title="QR" prefix="QR#" />
             <DumpCard
                 title="Card Order"

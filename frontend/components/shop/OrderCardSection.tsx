@@ -13,6 +13,7 @@ import { shopApi } from '@/lib/api/shop';
 import { getDesignAspectRatio, getDesignImages } from '@/lib/utils/design';
 import { useShop } from '@/context/ShopContext';
 import { useOrderCardUI } from '@/store/useShopStore';
+import { useBackendError } from '@/hooks/useBackendError';
 
 // Sub-components
 import { ConfirmOrderDialog } from './order-card/ConfirmOrderDialog';
@@ -39,7 +40,7 @@ export const useOrderCardContext = () => {
 export function OrderCardSection({ shopId }: { shopId: string }) {
     const t = useTranslations('ShopPage');
     const tc = useTranslations('Common');
-    const tb = useTranslations('Backend');
+    const { translateError } = useBackendError();
 
     const {
         refreshCardOrders,
@@ -87,7 +88,7 @@ export function OrderCardSection({ shopId }: { shopId: string }) {
             setOrderCard({ isConfirmOrderDialogOpen: false, selectedOrderProduct: null });
             fetchCardOrders();
         } catch (e: any) {
-            alert(tb(e.message?.replace(/\./g, '_')) || e.message);
+            alert(translateError(e.message, e.detail) || e.message);
         } finally {
             setOrderCard({ isCreatingCardOrder: false });
         }
@@ -99,7 +100,7 @@ export function OrderCardSection({ shopId }: { shopId: string }) {
             await shopApi.shop_card_orders_cancel({ shop_id: shopId, order_id: orderId });
             fetchCardOrders();
         } catch (e: any) {
-            alert(tb(e.message?.replace(/\./g, '_')) || e.message);
+            alert(translateError(e.message, e.detail) || e.message);
         }
     };
 
@@ -108,7 +109,7 @@ export function OrderCardSection({ shopId }: { shopId: string }) {
             await shopApi.shop_card_orders_complete({ shop_id: shopId, order_id: orderId });
             fetchCardOrders();
         } catch (e: any) {
-            alert(tb(e.message?.replace(/\./g, '_')) || e.message);
+            alert(translateError(e.message, e.detail) || e.message);
         }
     };
 
@@ -152,8 +153,10 @@ export function OrderCardSection({ shopId }: { shopId: string }) {
                                                 </p>
                                             </div>
                                             {selectedOrderProduct.image_url && (
-                                                <div className="rounded-2xl overflow-hidden border-2 border-white shadow-lg bg-white max-w-[200px] animate-in zoom-in fade-in duration-700">
-                                                    <img src={selectedOrderProduct.image_url} alt={selectedOrderProduct.name} className="w-full h-auto object-contain" />
+                                                <div className="flex justify-center h-48 sm:h-64 animate-in zoom-in fade-in duration-700">
+                                                    <div className="h-full rounded-2xl overflow-hidden border-2 border-white shadow-lg bg-white">
+                                                        <img src={selectedOrderProduct.image_url} alt={selectedOrderProduct.name} className="h-full w-auto object-contain" />
+                                                    </div>
                                                 </div>
                                             )}
                                         </div>
@@ -290,8 +293,8 @@ function ProductSelection({ products, selectedOrderProduct, setOrderCard, t }: P
                     <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-80" />
 
                     {product.image_url && (
-                        <div className="absolute bottom-2 right-2 w-8 h-8 rounded-md overflow-hidden border border-white/50 shadow-md bg-white">
-                            <img src={product.image_url} alt={product.name} className="w-full h-full object-cover" />
+                        <div className="absolute bottom-2 right-2 w-8 h-8 rounded-md overflow-hidden border border-white/50 shadow-md bg-white p-0.5">
+                            <img src={product.image_url} alt={product.name} className="w-full h-full object-contain" />
                         </div>
                     )}
 

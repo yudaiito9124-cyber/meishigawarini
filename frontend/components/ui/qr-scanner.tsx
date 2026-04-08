@@ -67,7 +67,7 @@ const QRScanner = (props: QRScannerProps) => {
         const config = {
             fps: props.fps || 10,
             qrbox: (props.qrbox || ((viewfinderWidth: number, viewfinderHeight: number) => {
-                const size = Math.floor(Math.min(viewfinderWidth, viewfinderHeight) * 0.7);
+                const size = Math.max(50, Math.floor(Math.min(viewfinderWidth, viewfinderHeight) * 0.7));
                 return { width: size, height: size };
             })) as any,
             aspectRatio: props.aspectRatio || 1.0,

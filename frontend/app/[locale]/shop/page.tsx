@@ -7,6 +7,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useRouter } from '@/i18n/routing';
 import { useTranslations } from 'next-intl';
+import { useBackendError } from '@/hooks/useBackendError';
 import { fetchAuthSession, getCurrentUser, signOut } from 'aws-amplify/auth';
 import { RefreshCw, ArrowRight, HelpCircle, Camera, Settings, ShoppingBasket, Eye, Plus, Trash2, Copy, ImageIcon, Save, Loader2, Pencil, ChevronDown, Download, Check, QrCode, Package, Truck, CreditCard, Gift, LogOut } from 'lucide-react';
 import { Badge } from "lucide-react";
@@ -22,7 +23,7 @@ import { cn } from "@/lib/utils";
 
 export default function ShopListPage() {
     const t = useTranslations('ShopListPage');
-    const tb = useTranslations('Backend');
+    const { translateError } = useBackendError();
     const router = useRouter();
     const [shops, setShops] = useState<any[]>([]);
     const [roles, setRoles] = useState<string[]>([]);
@@ -110,7 +111,7 @@ export default function ShopListPage() {
             router.push(`/shop/${data.shop_id}`);
         } catch (e: any) {
             console.error(e);
-            const errorMessage = (e.message && tb(e.message)) || e.message || 'Error creating shop';
+            const errorMessage = (e.message && translateError(e.message, e.detail)) || e.message || 'Error creating shop';
             alert(errorMessage);
         } finally {
             setCreating(false);

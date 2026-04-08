@@ -3,6 +3,8 @@ import { headers } from 'next/headers';
 import sharp from 'sharp';
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { cardformats } from '@/lib/constants/designs';
+import { getDesignAspectRatio } from '@/lib/utils/design';
 
 export const runtime = 'nodejs';
 
@@ -141,6 +143,11 @@ export default async function Image({ params }: { params: Promise<{ qr_id: strin
   const cardResult = await getImageData(cardUrlRaw, appBase);
   console.log("OGP cardData exists:", !!cardResult);
 
+  // 4. カードの比率を計算 (既存のユーティリティ関数を使用)
+  const ratioStr = getDesignAspectRatio(data?.design_id, [], data?.design);
+  const [w, h] = ratioStr.split('/').map(s => Number(s.trim()));
+  const cardRatio = w / h || 84 / 52;
+
   const productUrlRaw = toAbsoluteUrl(data?.product?.image_url);
   const productResult = await getImageData(productUrlRaw, appBase);
 
@@ -206,7 +213,7 @@ export default async function Image({ params }: { params: Promise<{ qr_id: strin
                 bottom: '80px',
                 left: '25px',
                 height: '280px',
-                width: cardResult ? (280 * cardResult.ratio) : '480px',
+                width: `${280 * cardRatio}px`,
                 borderRadius: '24px',
                 display: 'flex',
                 boxShadow: '0 30px 80px rgba(0,0,0,0.6)',
@@ -220,7 +227,7 @@ export default async function Image({ params }: { params: Promise<{ qr_id: strin
                   style={{
                     width: '100%',
                     height: '100%',
-                    objectFit: 'contain',
+                    objectFit: 'fill',
                     borderRadius: '24px'
                   }}
                 />

@@ -12,9 +12,15 @@ export const receiveApiBase = {
      * 基本となる fetch ラッパー
      */
     async fetch(path: string, qr_id: string, pin: string, options: RequestInit = {}) {
-        const idToken = await fetchAuthSession()
-            .then(session => session.tokens?.idToken?.toString())
-            .catch(() => undefined);
+        // Safari workaround: Unauthenticated users can hang on fetchAuthSession()
+        const hasSessionHint = typeof window !== 'undefined' && 
+            Object.keys(localStorage).some(key => key.startsWith('CognitoIdentityServiceProvider'));
+
+        const idToken = hasSessionHint 
+            ? await fetchAuthSession()
+                .then(session => session.tokens?.idToken?.toString())
+                .catch(() => undefined)
+            : undefined;
 
         const headers = {
             ...options.headers,

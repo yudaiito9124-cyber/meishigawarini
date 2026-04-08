@@ -37,14 +37,15 @@ export function OrderRow({
         getDesignImages,
     } = useCardListContext();
 
-    const { 
-        visibleOrderColumns, shippingOrderId, copiedId, 
-        set: setList 
+    const {
+        visibleOrderColumns, shippingOrderId, copiedId,
+        set: setList
     } = useCardListUI();
 
     const allowedDesigns = shop?.allowed_designs || [];
 
-    const handleCopy = (id: string) => {
+    const handleCopy = (id: string | undefined) => {
+        if (!id) return;
         navigator.clipboard.writeText(id).then(() => {
             setList({ copiedId: id });
             setTimeout(() => setList({ copiedId: null }), 2000);
@@ -158,6 +159,22 @@ export function OrderRow({
                                         })()}
                                     </div>
                                 )}
+                                <div className="flex items-center gap-1 group/pid">
+                                    <p className="text-[10px] text-gray-400 font-mono">Product ID: {order.product_id}</p>
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-4 w-4 hover:bg-gray-100 rounded-md transition-opacity"
+                                        onClick={(e) => { e.stopPropagation(); handleCopy(order.product_id); }}
+                                    >
+                                        {copiedId === order.product_id ? (
+                                            <Check className="h-3 w-3 text-green-500" />
+                                        ) : (
+                                            <Copy className="h-3 w-3 text-gray-400" />
+                                        )}
+                                    </Button>
+                                </div>
                             </div>
 
                             {/* Delivery Information */}
@@ -168,16 +185,68 @@ export function OrderRow({
                                         {t('orders.recipient')}
                                     </h4>
                                     <p className="text-sm font-bold text-gray-900">{order.recipient_name || '-'}</p>
-                                    <p className="text-[11px] text-gray-500 font-medium font-mono">{order.shipping_info?.phone || '-'}</p>
-                                    <p className="text-[11px] text-gray-500 font-medium">{order.shipping_info?.email || '-'}</p>
+                                    <div className="flex items-center gap-2">
+                                        <p className="text-[11px] text-gray-500 font-medium font-mono">{order.shipping_info?.phone || '-'}</p>
+                                        {order.shipping_info?.phone && (
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="icon"
+                                                className="h-4 w-4 text-gray-400 hover:text-gray-600"
+                                                onClick={(e) => { e.stopPropagation(); handleCopy(order.shipping_info?.phone); }}
+                                            >
+                                                {copiedId === order.shipping_info.phone ? <Check className="h-3 w-3 text-green-500" /> : <Copy className="h-3 w-3" />}
+                                            </Button>
+                                        )}
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <p className="text-[11px] text-gray-500 font-medium">{order.shipping_info?.email || '-'}</p>
+                                        {order.shipping_info?.email && (
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="icon"
+                                                className="h-4 w-4 text-gray-400 hover:text-gray-600"
+                                                onClick={(e) => { e.stopPropagation(); handleCopy(order.shipping_info?.email); }}
+                                            >
+                                                {copiedId === order.shipping_info.email ? <Check className="h-3 w-3 text-green-500" /> : <Copy className="h-3 w-3" />}
+                                            </Button>
+                                        )}
+                                    </div>
                                 </div>
                                 <div className="col-span-2 space-y-1 pt-2 border-t border-gray-200/50">
                                     <h4 className="text-[10px] font-bold uppercase tracking-wider text-gray-400 flex items-center gap-1.5">
                                         <Truck className="w-3 h-3" />
                                         {t('orders.address')}
                                     </h4>
-                                    {order.postal_code && <p className="text-[11px] font-mono text-gray-500">〒{order.postal_code}</p>}
-                                    <p className="text-sm text-gray-900 leading-relaxed">{order.address || '-'}</p>
+                                    {order.postal_code && (
+                                        <div className="flex items-center gap-2">
+                                            <p className="text-[11px] font-mono text-gray-500">〒{order.postal_code}</p>
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="icon"
+                                                className="h-4 w-4 text-gray-400 hover:text-gray-600"
+                                                onClick={(e) => { e.stopPropagation(); handleCopy(order.postal_code); }}
+                                            >
+                                                {copiedId === order.postal_code ? <Check className="h-3 w-3 text-green-500" /> : <Copy className="h-3 w-3" />}
+                                            </Button>
+                                        </div>
+                                    )}
+                                    <div className="flex items-center gap-2">
+                                        <p className="text-sm text-gray-900 leading-relaxed">{order.address || '-'}</p>
+                                        {order.address && (
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="icon"
+                                                className="h-4 w-4 text-gray-400 hover:text-gray-600"
+                                                onClick={(e) => { e.stopPropagation(); handleCopy(order.address); }}
+                                            >
+                                                {copiedId === order.address ? <Check className="h-3 w-3 text-green-500" /> : <Copy className="h-3 w-3" />}
+                                            </Button>
+                                        )}
+                                    </div>
                                 </div>
                                 <div className="space-y-1">
                                     <h4 className="text-[10px] font-bold uppercase tracking-wider text-gray-400 flex items-center gap-1.5">

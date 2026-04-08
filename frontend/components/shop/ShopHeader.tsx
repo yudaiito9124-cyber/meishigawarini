@@ -1,7 +1,7 @@
 'use client';
 
-import React from 'react';
-import { RefreshCw, Copy, ChevronDown, LogOut } from 'lucide-react';
+import React, { useState } from 'react';
+import { RefreshCw, Copy, Check, ChevronDown, LogOut } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useRouter } from '@/i18n/routing';
 import { signOut } from 'aws-amplify/auth';
@@ -45,9 +45,13 @@ export function ShopHeader({
         }
     };
 
+    const [isCopied, setIsCopied] = useState(false);
+
     const handleCopyId = () => {
-        navigator.clipboard.writeText(shopId);
-        // We could add a toast here if available
+        navigator.clipboard.writeText(shopId).then(() => {
+            setIsCopied(true);
+            setTimeout(() => setIsCopied(false), 2000);
+        });
     };
 
     return (
@@ -70,7 +74,11 @@ export function ShopHeader({
                             className="h-4 w-4 text-gray-400 hover:text-gray-600"
                             onClick={handleCopyId}
                         >
-                            <Copy className="h-3 w-3" />
+                            {isCopied ? (
+                                <Check className="h-3 w-3 text-green-500" />
+                            ) : (
+                                <Copy className="h-3 w-3" />
+                            )}
                         </Button>
                     </div>
                 </div>

@@ -11,6 +11,7 @@ import { getDesignAspectRatio, getDesignImages } from '@/lib/utils/design';
 import { useShop } from '@/context/ShopContext';
 import { useCardListUI } from '@/store/useShopStore';
 import { cn } from '@/lib/utils';
+import { useBackendError } from '@/hooks/useBackendError';
 
 // Sub-components
 import { OrderFilter } from './card-list/OrderFilter';
@@ -109,7 +110,7 @@ export function CardListSection({ shopId }: { shopId: string }) {
     const t = useTranslations('ShopPage');
     const ts = useTranslations('Timestamp');
     const st = useTranslations('Status');
-    const tb = useTranslations('Backend');
+    const { translateError } = useBackendError();
 
     const { products, orders, ordersLoading, refreshOrders, refreshProducts, refreshShopDetails } = useShop();
     const {
@@ -140,7 +141,7 @@ export function CardListSection({ shopId }: { shopId: string }) {
             });
             await fetchSectionData(true);
         } catch (e: any) {
-            alert(t('orders.updateError') + ': ' + (tb(e.message?.replace(/\./g, '_')) || e.message || String(e)));
+            alert(t('orders.updateError') + ': ' + (translateError(e.message, e.detail) || e.message || String(e)));
         } finally {
             setList({ shippingOrderId: null });
         }

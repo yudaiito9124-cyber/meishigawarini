@@ -48,7 +48,7 @@ export function ConfirmOrderDialog() {
                             <img
                                 src={selectedOrderProduct.image_url}
                                 alt={selectedOrderProduct.name}
-                                className="w-full h-full object-cover"
+                                className="w-full h-full object-contain p-1"
                             />
                         </div>
                         <div className="relative top-[5] text-[10px] font-bold text-gray-400 uppercase tracking-tight">{t('cardOrder.link')}</div>
