@@ -300,8 +300,10 @@ export default function OrderDetailsDialog({
                                 <Button
                                     className="h-12 bg-emerald-600 hover:bg-emerald-700 text-white font-bold transition-all active:scale-95"
                                     onClick={async () => {
-                                        await onExport(order, 'pdf');
-                                        onClose();
+                                        if (window.confirm(tc('acceptConfirm'))) {
+                                            await onExport(order, 'pdf');
+                                            onClose();
+                                        }
                                     }}
                                     disabled={!!isExporting}
                                 >

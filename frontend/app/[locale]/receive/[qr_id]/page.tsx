@@ -4,7 +4,7 @@
  */
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
@@ -238,6 +238,7 @@ export default function ReceivePage() {
         }
     }, [qr_id, pin, t]);
     const [chatcontent, setChatcontent] = useState("");
+    const containerRef = useRef<HTMLDivElement>(null);
 
     // Steps: PIN -> FORM (or SHIPPED/SUCCESS) -> RESTRICTED (if blocked)
     const [step, setStep] = useState<"PIN" | "FORM" | "SUCCESS" | "SHIPPED" | "EXPIRED" | "COMPLETED" | "RESTRICTED" | "PROMOTION">("PIN");
@@ -957,9 +958,37 @@ export default function ReceivePage() {
 
         setZipCode(filtered);
     };
+    useEffect(() => {
+        // ページの状態に応じてbodyの背景を同期させ、オーバースクロール時の白見えを防ぐ
+        const body = document.body;
+        const html = document.documentElement;
+        
+        const updateStyles = () => {
+            if (!containerRef.current) return;
+            
+            // レンダリングされた実際のスタイルを取得することで、Tailwindのクラスやフィルターと完全に一致させる
+            const style = window.getComputedStyle(containerRef.current);
+            body.style.backgroundColor = style.backgroundColor;
+            html.style.backgroundColor = style.backgroundColor;
+            body.style.filter = style.filter;
+        };
+
+        // 初回と、step変更による再レンダリング後に実行
+        updateStyles();
+        
+        // 念のため少し遅延させて再実行（トランジション対応）
+        const timer = setTimeout(updateStyles, 100);
+
+        return () => {
+            clearTimeout(timer);
+            body.style.backgroundColor = "";
+            html.style.backgroundColor = "";
+            body.style.filter = "";
+        };
+    }, [step]);
 
     return (
-        <div className={cn("min-h-screen w-full bg-gray-50 flex flex-col items-center justify-center py-8 px-4 transition-all duration-1000", step === "COMPLETED" && "bg-olive-300 sepia-[.2] shadow-[inset_0_0_500px_rgba(0,0,0,0.8)]")}>
+        <div ref={containerRef} className={cn("min-h-screen w-full bg-gray-50 flex flex-col items-center justify-center py-8 px-4 transition-all duration-1000", step === "COMPLETED" && "bg-olive-300 sepia-[.2] shadow-[inset_0_0_500px_rgba(0,0,0,0.8)]")}>
 
 
             {/* COMPLETEしているカードを読み込む際のフェード処理 */}

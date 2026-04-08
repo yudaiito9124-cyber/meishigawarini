@@ -203,8 +203,8 @@ export default async function Image({ params }: { params: Promise<{ qr_id: strin
             </div>
           </div>
 
-          {/* Visual Content (Contained within 630x630, floating) */}
-          <div style={{ position: 'relative', width: '100%', height: '100%', display: 'flex', overflow: 'hidden' }}>
+          {/* Visual Content (Floating elements) */}
+          <div style={{ position: 'relative', width: '100%', height: '100%', display: 'flex' }}>
 
             {/* 1. Gift Card (Background Layer) */}
             <div
@@ -214,6 +214,7 @@ export default async function Image({ params }: { params: Promise<{ qr_id: strin
                 left: '25px',
                 height: '280px',
                 width: `${280 * cardRatio}px`,
+                maxWidth: '580px',
                 borderRadius: '24px',
                 display: 'flex',
                 boxShadow: '0 30px 80px rgba(0,0,0,0.6)',
@@ -246,6 +247,7 @@ export default async function Image({ params }: { params: Promise<{ qr_id: strin
                 right: '40px',
                 height: '320px',
                 width: productResult ? (320 * productResult.ratio) : '320px',
+                maxWidth: '550px',
                 borderRadius: '30px',
                 display: 'flex',
                 boxShadow: '0 40px 100px rgba(0,0,0,0.7)',
@@ -258,7 +260,7 @@ export default async function Image({ params }: { params: Promise<{ qr_id: strin
                   style={{
                     width: '100%',
                     height: '100%',
-                    objectFit: 'cover',
+                    objectFit: 'contain',
                     borderRadius: '30px'
                   }}
                 />

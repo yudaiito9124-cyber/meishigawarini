@@ -44,11 +44,11 @@ export function ConfirmOrderDialog() {
                 {selectedOrderProduct.image_url && (
                     <div className="w-full flex flex-col items-center justify-center mb-4 relative">
                         <div className="text-xs text-gray-500">{t('cardOrder.product')}:{selectedOrderProduct.name}</div>
-                        <div className="h-20 rounded-lg items-center justify-center overflow-hidden border-2 border-white shadow-xl bg-white animate-in zoom-in fade-in duration-500 delay-200 ">
+                        <div className="h-20 w-auto rounded-lg flex items-center justify-center overflow-hidden border-2 border-white shadow-xl bg-white animate-in zoom-in fade-in duration-500 delay-200 ">
                             <img
                                 src={selectedOrderProduct.image_url}
                                 alt={selectedOrderProduct.name}
-                                className="w-full h-full object-contain p-1"
+                                className="h-full w-auto object-contain p-1"
                             />
                         </div>
                         <div className="relative top-[5] text-[10px] font-bold text-gray-400 uppercase tracking-tight">{t('cardOrder.link')}</div>

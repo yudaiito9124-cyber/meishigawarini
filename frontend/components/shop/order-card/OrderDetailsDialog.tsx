@@ -162,8 +162,8 @@ export default function OrderDetailsDialog({
                                     </h3>
                                     <div className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm flex gap-4 items-start">
                                         {product.image_url && (
-                                            <div className="w-20 h-20 rounded-lg overflow-hidden border border-gray-100 bg-white shrink-0 p-1">
-                                                <img src={product.image_url} alt={product.name} className="w-full h-full object-contain" />
+                                            <div className="h-20 w-auto rounded-lg overflow-hidden border border-gray-100 bg-white shrink-0 p-1 flex items-center justify-center">
+                                                <img src={product.image_url} alt={product.name} className="h-full w-auto object-contain" />
                                             </div>
                                         )}
                                         <div className="flex-1 min-w-0">

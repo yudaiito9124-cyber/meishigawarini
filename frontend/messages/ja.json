@@ -930,6 +930,7 @@
       "markAsCompleted": "完了にする",
       "rejectOrder": "却下",
       "rejectConfirm": "本当にこの発注を却下しますか？この操作は元に戻せません。",
+      "acceptConfirm": "この発注を受託してカードを生成しますか？",
       "table": {
         "shop": "ショップ",
         "product": "商品",

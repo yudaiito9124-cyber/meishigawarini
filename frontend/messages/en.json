@@ -821,6 +821,7 @@
       "markAsCompleted": "Mark as Completed",
       "rejectOrder": "Reject",
       "rejectConfirm": "Are you sure you want to reject this order? This action cannot be undone.",
+      "acceptConfirm": "Are you sure you want to accept this order and generate cards?",
       "table": {
         "shop": "Shop",
         "product": "Product",
