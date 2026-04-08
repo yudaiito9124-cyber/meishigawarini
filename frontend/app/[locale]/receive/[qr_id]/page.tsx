@@ -265,8 +265,9 @@ export default function ReceivePage() {
         setError(null);
 
         try {
-            // Start both API calls in parallel to maximize efficiency
-            // The box will continue to shake during this phase because loading=true and isExpanding=false
+            // Re-parallelize: Fetch both verification and messages/chat data together
+            // to ensure a single complete UI transition after all data is ready.
+            // loadMessages() already contains the logic to skip slow Cognito checks when not logged in.
             const [data] = await Promise.all([
                 receiveApi.verify(qr_id, pin),
                 loadMessages()
@@ -274,12 +275,12 @@ export default function ReceivePage() {
 
             // Once ALL data is loaded, start the expansion animation
             setIsExpanding(true);
+            setGift(data);
             setHasLoadedChat(true);
 
             // Wait for the duration of the expansion animation (800ms)
             await new Promise(resolve => setTimeout(resolve, 800));
 
-            setGift(data);
             if (data.status === 'COMPLETED') {
                 setShowWhiteFade(true);
             } else if (['ACTIVE', 'USED', 'SHIPPED', `RESTRICTED`, `PROMOTION`].includes(data.status) && !error) {
@@ -326,21 +327,21 @@ export default function ReceivePage() {
         e.preventDefault();
         setLoading(true);
         try {
-            // Start both API calls in parallel
+            // Re-parallelize: Fetch both verification and messages/chat data together
             const [data] = await Promise.all([
                 receiveApi.verify(qr_id, pin, unlockPassword),
                 loadMessages()
             ]);
 
             if (data.is_authorized) {
-                // Once verified and data is ready, start expansion
+                // Once verified and all data is ready, start expansion
                 setIsExpanding(true);
+                setGift(data);
                 setHasLoadedChat(true);
 
-                // Wait for expansion animation
+                // Wait for expansion animation duration
                 await new Promise(resolve => setTimeout(resolve, 800));
 
-                setGift(data);
                 if (data.status === 'COMPLETED') {
                     setShowWhiteFade(true);
                 } else if (['ACTIVE', 'USED', 'SHIPPED'].includes(data.status) && !error) {
