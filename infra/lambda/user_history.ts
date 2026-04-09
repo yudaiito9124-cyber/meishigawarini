@@ -233,6 +233,8 @@ async function enrichLogs(logs: Array<{ qr_id: string, timestamp: string }>) {
                 design_id: designId,
                 thumbf: design ? await signUrlIfS3(design.thumbf, BUCKET_NAME) : null,
                 thumbb: design ? await signUrlIfS3(design.thumbb, BUCKET_NAME) : null,
+                bgimgf: design ? await signUrlIfS3(design.bgimgf, BUCKET_NAME) : null,
+                bgimgb: design ? await signUrlIfS3(design.bgimgb, BUCKET_NAME) : null,
                 recipient_name: order.name,
                 sender_info: chat.sender_info,
                 ts_created_at: meta.ts_created_at,

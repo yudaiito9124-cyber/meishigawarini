@@ -34,8 +34,8 @@
 ### 「どのブランチのコード」を「どこの環境に」「どのようにデプロイ」するか
 | 環境 | 対象ブランチ |  フロントエンドデプロイ方法(AWS Amplify) | フロントエンドのみローカルで実行する方法  | バックエンドデプロイ方法(AWS CDK) |
 | :--- | :--- | :--- | :--- | :--- |
-| **本番 (Prod)** | `master` | masterブランチの更新(push)で自動デプロイ | `npm run dev:prod` (本番用バックエンド) | `cdk deploy -c stage=prod` (手動デプロイ) |
-| **検証 (Stg)** | `stg` | stgブランチの更新(push)で自動デプロイ | `npm run dev:stg` (検証用バックエンド) | `cdk deploy -c stage=stg` (手動デプロイ) |
+| **本番 (Prod)** | `master` | masterブランチの更新(push)で自動デプロイ | `npm run dev:prod` (本番用バックエンド) | `npx cdk deploy -c stage=prod` (手動デプロイ) |
+| **検証 (Stg)** | `stg` | stgブランチの更新(push)で自動デプロイ | `npm run dev:stg` (検証用バックエンド) | `npx cdk deploy -c stage=stg` (手動デプロイ) |
 
 > [!IMPORTANT]
 > **バックエンドは常にAWS上で動作します。**

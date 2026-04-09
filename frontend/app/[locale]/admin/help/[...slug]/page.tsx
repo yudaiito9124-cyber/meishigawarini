@@ -68,7 +68,7 @@ export default async function AdminHelpPage({ params }: Props) {
         {/* Content Section */}
         <div className="bg-mist-200/10 border border-white/5 rounded-3xl p-8 sm:p-12 backdrop-blur-xl shadow-2xl overflow-hidden">
           <div className="prose prose-invert max-w-none">
-            <MarkdownRenderer content={content} categoryIcon={Crown} />
+            <MarkdownRenderer content={content} categoryIcon={Crown} mermaidVariant="dark" />
           </div>
         </div>
 

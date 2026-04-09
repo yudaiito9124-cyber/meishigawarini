@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { getTranslations } from 'next-intl/server';
-import { ArrowLeft, BookOpen, Settings, ChevronRight, PlaneTakeoff, CircleUserRound, CreditCard, Zap, Filter, MousePointerClick, Waypoints, Store } from 'lucide-react';
+import { ArrowLeft, ChevronRight, Gift, QrCode, Truck, CreditCard, CircleUserRound, Filter, Waypoints, Store } from 'lucide-react';
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }) {
     const { locale } = await params;
@@ -79,7 +79,7 @@ export default function ShopHelpGatewayPage() {
 
                     <Link href="/help/shop/manage" className="group relative rounded-xl border bg-card p-8 shadow-sm transition-all hover:border-primary/50 hover:shadow-md block">
                         <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary">
-                            <Settings className="h-6 w-6" />
+                            <Gift className="h-6 w-6" />
                         </div>
                         <h2 className="text-2xl font-bold tracking-tight text-foreground group-hover:text-primary transition-colors">
                             商品登録・ショップ設定
@@ -95,12 +95,7 @@ export default function ShopHelpGatewayPage() {
 
                     <Link href="/help/shop/activate" className="group relative rounded-xl border bg-card p-8 shadow-sm transition-all hover:border-primary/50 hover:shadow-md block">
                         <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary">
-                            <div className="relative flex items-center justify-center">
-                                <CreditCard className="h-7 w-7" />
-                                <div className="absolute -top-1 -right-1 rounded-full bg-background p-0.5">
-                                    <Zap className="h-3.5 w-3.5 fill-primary text-primary" />
-                                </div>
-                            </div>
+                            <QrCode className="h-6 w-6" />
                         </div>
                         <h2 className="text-2xl font-bold tracking-tight text-foreground group-hover:text-primary transition-colors">
                             アクティベーション
@@ -116,7 +111,7 @@ export default function ShopHelpGatewayPage() {
 
                     <Link href="/help/shop/shipping" className="group relative rounded-xl border bg-card p-8 shadow-sm transition-all hover:border-primary/50 hover:shadow-md block">
                         <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary">
-                            <PlaneTakeoff className="h-6 w-6" />
+                            <Truck className="h-6 w-6" />
                         </div>
                         <h2 className="text-2xl font-bold tracking-tight text-foreground group-hover:text-primary transition-colors">
                             カード・受注管理
@@ -133,7 +128,7 @@ export default function ShopHelpGatewayPage() {
                     {/* New: Card Application */}
                     <Link href="/help/shop/apply" className="group relative rounded-xl border bg-card p-8 shadow-sm transition-all hover:border-primary/50 hover:shadow-md block">
                         <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary">
-                            <MousePointerClick className="h-6 w-6" />
+                            <CreditCard className="h-6 w-6" />
                         </div>
                         <h2 className="text-2xl font-bold tracking-tight text-foreground group-hover:text-primary transition-colors">
                             カード発注

@@ -151,9 +151,9 @@ export default function SharePage() {
                                         transform: 'translateZ(1px)'
                                     }}
                                 >
-                                    {data.design.thumbf ? (
+                                    {data.design.bgimgf || data.design.thumbf ? (
                                         <img
-                                            src={data.design.thumbf}
+                                            src={data.design.bgimgf || data.design.thumbf}
                                             alt="Card Design Front"
                                             className="w-full h-full object-cover"
                                             crossOrigin="anonymous"
@@ -174,9 +174,9 @@ export default function SharePage() {
                                         transform: 'rotateY(180deg) translateZ(1px)'
                                     }}
                                 >
-                                    {data.design.thumbb ? (
+                                    {data.design.bgimgb || data.design.thumbb ? (
                                         <img
-                                            src={data.design.thumbb}
+                                            src={data.design.bgimgb || data.design.thumbb}
                                             alt="Card Design Back"
                                             className="w-full h-full object-cover"
                                             crossOrigin="anonymous"

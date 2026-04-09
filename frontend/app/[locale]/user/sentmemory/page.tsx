@@ -59,6 +59,8 @@ export default function SendHistoryPage() {
         product_name?: string,
         product_image_url?: string,
         thumbf?: string,
+        bgimgf?: string,
+        bgimgb?: string,
         shop_name?: string
     }>>([]);
     const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -269,9 +271,9 @@ export default function SendHistoryPage() {
                                                     <CardContent className="p-0 h-full relative rounded-2xl overflow-hidden">
                                                         {/* Card Design Image */}
                                                         <div className="absolute inset-0 w-full h-full pointer-events-none rounded-2xl overflow-hidden">
-                                                            {item.thumbf ? (
+                                                            {item.bgimgf || item.thumbf ? (
                                                                 <img
-                                                                    src={item.thumbf}
+                                                                    src={item.bgimgf || item.thumbf}
                                                                     alt="Card Design"
                                                                     className="w-full h-full object-cover"
                                                                     crossOrigin="anonymous"

@@ -90,7 +90,12 @@ export default async function DynamicHelpPage({ params }: Props) {
         </div>
 
         <div className="flex-grow font-sans">
-          <MarkdownRenderer content={content} categoryIcon={Icon} categoryTitle={categoryTitle} />
+          <MarkdownRenderer 
+            content={content} 
+            categoryIcon={Icon} 
+            categoryTitle={categoryTitle} 
+            mermaidVariant="light"
+          />
         </div>
 
         {/* Footer Section */}

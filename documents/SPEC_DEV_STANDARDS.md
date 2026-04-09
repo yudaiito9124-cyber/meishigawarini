@@ -107,6 +107,13 @@
     - **管理権限（`Administrators`, `GlobalAdmins`）を持つユーザーは、必ずメールアドレスとパスワードによるネイティブアカウントで運用する必要があります。**
     - これは、管理APIアクセス時に Lambda Authorizer が MFA（多要素認証）の完了をチェックするためです。現在の AWS 仕様上、外部 IdP 経由のユーザーには Cognito ネイティブの TOTP MFA を設定できないため、外部アカウントでは管理機能をフルに利用できません。詳細は **[セキュリティガイド (SPEC_SECURITY.md)](./SPEC_SECURITY.md#8-管理者専用のmfa強制-lambda-authorizer)** を参照してください。
 
+### 3.7 マニュアル用画像の自動撮影 (Screenshot Automation)
+製品マニュアルやヘルプページで使用するスクリーンショットの撮影を、AI Agent（Playwright + browser-use）を用いて自動化しています。これにより、UIの変更に追従したマニュアルの更新コストを最小化しています。
+
+- **詳細および操作手順**: `SPEC_HELP_CMS.md` の **[5. スクリーンショットの自動撮影 (Automation)](./SPEC_HELP_CMS.md#5-スクリーンショットの自動撮影-automation)** を参照してください。
+- **実行スクリプト**: `scripts/screenshot_auto_capture.py`
+- **指示書 (Blueprint)**: `documents/REF_SCREENSHOT_INSTRUCTIONS.md`
+
 ---
 
 ## 4. UI/UX デザイン指針 (Design Principles)

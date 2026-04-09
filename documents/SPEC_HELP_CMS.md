@@ -67,3 +67,58 @@ URLのスラッグ（配列）を解析し、末尾の要素を除去するこ�
   - 新しい HTML タグのスタイルを定義したり、既存のコンポーネントを差し替えたりできます。
 - **ページ全体の共通レイアウト**: `frontend/app/[locale]/help/[...slug]/page.tsx`
   - 余白、背景色、戻るボタンのスタイルなどを変更できます。
+
+---
+
+## 5. スクリーンショットの自動撮影 (Automation)
+
+「名刺代わりに」のヘルプページで使用される画像は、AI Agent を利用したオートメーションツールによって自動的に撮影・更新することが可能です。これにより、UI の変更や多言語対応に伴うマニュアルの鮮度維持を効率的に行えます。
+
+### 5.1 仕組みの概要
+AI Agent (`browser-use` ＋ `Playwright` ＋ `Gemini 2.0 Flash`) が、指示書となる Markdown ファイル（`REF_SCREENSHOT_INSTRUCTIONS.md`）を読み取り、ブラウザ操作を行ってスクリーンショットを取得します。
+
+### 5.2 技術的なセットアップ
+スクリプトの実行には Python 環境が必要です。
+
+1.  **仮想環境の作成とライブラリのインストール**:
+    ```bash
+    cd scripts
+    python3 -m venv .venv
+    source .venv/bin/activate
+    pip install -r requirements.txt
+    playwright install chromium
+    ```
+
+2.  **環境変数の設定**:
+    `scripts/.env` ファイルを作成（または編集）し、以下の項目を設定します。
+    - `GOOGLE_API_KEY`: Google AI Studio 等から取得した Gemini API キー
+    - `LOGIN_EMAIL`: テストユーザーのメールアドレス（通常は不要、Google認証を利用）
+    - `LOGIN_PASSWORD`: テストユーザーのパスワード（通常は不要、Google認証を利用）
+
+### 5.3 運用ワークフロー
+
+1.  **指示書の更新**:
+    `documents/REF_SCREENSHOT_INSTRUCTIONS.md` を編集し、撮影したい画像のパス、対象 URL、操作手順（自然言語で記述可能）をテーブルに追加します。
+
+2.  **スクリプトの実行**:
+    ```bash
+    cd scripts
+    source .venv/bin/activate
+    python screenshot_auto_capture.py
+    ```
+    実行するとブラウザが自動的に立ち上がり、指示書に従って各画面を撮影していきます。Google 認証などで手動介入が必要な場合は、ブラウザ画面上で操作を完了させてください。
+
+3.  **結果の確認**:
+    生成された画像は自動的に以下のディレクトリに上書き保存されます。
+    - `public/images/manuals/auto_screenshots/`
+
+### 5.4 指示書の記載ルール (REF_SCREENSHOT_INSTRUCTIONS.md)
+指示書は Markdown のテーブル形式で記述します。
+
+| 画像パス | 対象URL | 撮影状態 / 操作手順 |
+| :--- | :--- | :--- |
+| `example.webp` | `/path/to/page` | 「保存ボタン」をクリックして、ダイアログが表示されている状態を撮影 |
+
+- **画像パス**: `auto_screenshots/` 配下に保存されるファイル名。
+- **対象URL**: ベースURL（localhost:3000等）を除いた相対パス。
+- **操作手順**: AI Agent への命令です。「〇〇をクリックして」「〇〇を待って」など具体的に記載すると精度が向上します。

@@ -139,8 +139,8 @@ export default function CardDesignEditor({ apiUrl }: { apiUrl: string }) {
                 design_id: editingDesign.design_id
             });
 
-            // 2. Generate and Prepare Thumbnail (400px WebP)
-            const thumbBlob = await resizeImage(file, 400);
+            // 2. Generate and Prepare Thumbnail (1280px WebP)
+            const thumbBlob = await resizeImage(file);
             const thumbFile = new File([thumbBlob], `thumb_${file.name.split('.')[0]}.webp`, { type: "image/webp" });
 
             const { uploadUrl: thumbUploadUrl, publicUrl: thumbPublicUrl } = await adminApi.admin_carddesigns_uploadurl({

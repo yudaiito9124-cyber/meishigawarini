@@ -5,28 +5,36 @@ import mermaid from 'mermaid';
 
 interface MermaidProps {
   chart: string;
+  variant?: 'light' | 'dark';
 }
 
-// Initialize mermaid
-mermaid.initialize({
-  startOnLoad: false,
-  theme: 'base',
-  securityLevel: 'loose',
-  fontFamily: 'inherit',
-  themeVariables: {
-    primaryColor: '#e0f2f1',
-    primaryTextColor: '#004d40',
-    primaryBorderColor: '#80cbc4',
-    lineColor: '#00796b',
-    secondaryColor: '#f1f8e9',
-    tertiaryColor: '#ffffff',
-  },
-  sequence: {
-    showSequenceNumbers: false,
-  }
-});
+// Default variables for the "light" (brand) theme
+const lightThemeVariables = {
+  primaryColor: '#e0f2f1',
+  primaryTextColor: '#004d40',
+  primaryBorderColor: '#80cbc4',
+  lineColor: '#00796b',
+  secondaryColor: '#f1f8e9',
+  tertiaryColor: '#ffffff',
+};
 
-export const Mermaid: React.FC<MermaidProps> = ({ chart }) => {
+// Variables for the "dark" (admin) theme
+const darkThemeVariables = {
+  darkMode: true,
+  background: 'transparent',
+  primaryColor: '#1e293b',
+  primaryTextColor: '#f8fafc',
+  primaryBorderColor: '#475569',
+  lineColor: '#ffffff',
+  secondaryColor: '#334155',
+  tertiaryColor: '#0f172a',
+  nodeBorder: '#ffffff',
+  arrowheadColor: '#ffffff',
+  mainBkg: '#1e293b',
+  textColor: '#f8fafc',
+};
+
+export const Mermaid: React.FC<MermaidProps> = ({ chart, variant = 'light' }) => {
   const [svg, setSvg] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -37,7 +45,23 @@ export const Mermaid: React.FC<MermaidProps> = ({ chart }) => {
       if (!chart) return;
       
       try {
-        const { svg } = await mermaid.render(idRef.current, chart);
+        // Initialize mermaid with base settings
+        mermaid.initialize({
+          startOnLoad: false,
+          theme: 'base',
+          securityLevel: 'loose',
+          fontFamily: 'inherit',
+          sequence: {
+            showSequenceNumbers: false,
+          }
+        });
+
+        // Use inline configuration (directives) to avoid global state conflicts
+        const themeVars = variant === 'dark' ? darkThemeVariables : lightThemeVariables;
+        const configDirective = `%%{init: { 'theme': 'base', 'themeVariables': ${JSON.stringify(themeVars)} } }%%\n`;
+        const fullChart = configDirective + chart;
+
+        const { svg } = await mermaid.render(idRef.current, fullChart);
         setSvg(svg);
         setError(null);
       } catch (err) {
@@ -47,7 +71,7 @@ export const Mermaid: React.FC<MermaidProps> = ({ chart }) => {
     };
 
     renderChart();
-  }, [chart]);
+  }, [chart, variant]);
 
   if (error) {
     return (

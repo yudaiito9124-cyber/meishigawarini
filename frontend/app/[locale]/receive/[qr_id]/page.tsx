@@ -992,8 +992,18 @@ export default function ReceivePage() {
     }
 
     return (
-        <div ref={containerRef} className={cn("min-h-screen w-full bg-gray-50 flex flex-col items-center justify-center py-8 px-4 transition-all duration-1000", step === "COMPLETED" && "bg-olive-300 sepia-[.2] shadow-[inset_0_0_500px_rgba(0,0,0,0.8)]")}>
+        <div ref={containerRef} className={cn("min-h-screen w-full bg-gray-50 flex flex-col items-center justify-center py-8 px-4 transition-all duration-1000", step === "COMPLETED" && "relative")}>
 
+            {/* 完了状態の装飾レイヤー */}
+            {step === "COMPLETED" && (
+                <>
+                    {/* 1. 全体の背景色と内側シャドウ (最背面) */}
+                    <div className="fixed inset-0 z-[-1] bg-olive-300 shadow-[inset_0_0_500px_rgba(0,0,0,0.8)] animate-in fade-in duration-1000" />
+                    
+                    {/* 2. セピアフィルターレイヤー (中央) - デザイン上の演出のため操作は制限しない */}
+                    <div className="fixed inset-0 z-40 backdrop-sepia-[.2] pointer-events-none animate-in fade-in duration-1000" />
+                </>
+            )}
 
             {/* COMPLETEしているカードを読み込む際のフェード処理 */}
             {showWhiteFade && (
@@ -1266,6 +1276,19 @@ export default function ReceivePage() {
 
 
 
+                    {/* SNS Share Button - Witty Place */}
+                    {!["PIN", "EXPIRED"].includes(step) && (
+
+                        <div className={cn("w-full max-w-xl mt-12 pr-6 pl-6 animate-reveal reveal-delay-500", step === "COMPLETED" && "relative z-50 pointer-events-auto")}>
+                            <ShareDialog
+                                qr_id={qr_id}
+                                product={{ name: gift.product.name, image_url: gift.product.image_url }}
+                                card={{ image_url: gift.design?.thumbf || gift.thumbf || gift.card_image_url }}
+                                shop={{ name: gift.shop_name }}
+                            />
+                        </div>
+                    )}
+
                     {!(loading || isExpanding) && step === "PIN" && !gift?.product && (
                         <form onSubmit={handleVerifyPin} className={cn("transition-opacity", loading && "opacity-50 pointer-events-none")}>
                             <div className="space-y-2 p-4 rounded-lg">
@@ -1416,6 +1439,7 @@ export default function ReceivePage() {
                                 </div>
                             </div>
                         )}
+
                     </CardContent>
                 </Card>
             )}
@@ -1743,18 +1767,6 @@ export default function ReceivePage() {
 
 
 
-                            {/* SNS Share Button - Witty Place */}
-                            {!["PIN", "EXPIRED"].includes(step) && (
-
-                                <div className="w-full max-w-xl mt-12 pr-6 pl-6 animate-reveal reveal-delay-500">
-                                    <ShareDialog
-                                        qr_id={qr_id}
-                                        product={{ name: gift.product.name, image_url: gift.product.image_url }}
-                                        card={{ image_url: gift.design?.thumbf || gift.thumbf || gift.card_image_url }}
-                                        shop={{ name: gift.shop_name }}
-                                    />
-                                </div>
-                            )}
                         </CardContent>
                     </Card>
                 )

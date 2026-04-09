@@ -23,7 +23,8 @@ import {
   CircleUserRound,
   Crown,
   Gift,
-  QrCode
+  QrCode,
+  Truck
 } from 'lucide-react';
 
 import { HelpImage } from './HelpImage';
@@ -41,6 +42,7 @@ const IconMap: Record<string, React.ElementType> = {
   crown: Crown,
   gift: Gift,
   qrcode: QrCode,
+  truck: Truck,
 };
 
 const production = {
@@ -49,7 +51,19 @@ const production = {
   jsxs: prod.jsxs,
 };
 
-export async function MarkdownRenderer({ content, className, categoryIcon: Icon, categoryTitle }: { content: string; className?: string; categoryIcon?: React.ElementType; categoryTitle?: string }) {
+export async function MarkdownRenderer({ 
+  content, 
+  className, 
+  categoryIcon: Icon, 
+  categoryTitle,
+  mermaidVariant = 'light'
+}: { 
+  content: string; 
+  className?: string; 
+  categoryIcon?: React.ElementType; 
+  categoryTitle?: string;
+  mermaidVariant?: 'light' | 'dark';
+}) {
   const components = {
     h1: ({ children }: any) => (
       <div className="flex flex-col items-center mb-8">
@@ -150,6 +164,15 @@ export async function MarkdownRenderer({ content, className, categoryIcon: Icon,
         );
       }
 
+      // Use custom className if provided (e.g. for premium buttons in markdown)
+      if (className && className !== 'card-help') {
+        return (
+          <Link href={href} className={className}>
+            {children}
+          </Link>
+        );
+      }
+
       if (isInternal) {
         // Distinguish between manual-to-manual links and manual-to-app action links
         const isManualLink = href.startsWith('/help') || href.startsWith('/admin/help');
@@ -191,14 +214,14 @@ export async function MarkdownRenderer({ content, className, categoryIcon: Icon,
       }
       if (className === 'benefit') {
         return (
-          <section className="rounded-2xl bg-gradient-to-br from-card/100 via-card/50 to-background/30 p-8 border-2 border-primary/20 my-0 shadow-lg text-center">
+          <section className="rounded-2xl bg-gradient-to-br from-card/100 via-card/50 to-background/30 p-8 border-none border-primary/20 my-0  text-center">
             {children}
           </section>
         );
       }
       if (className === 'hero') {
         return (
-          <section className="p-6 bg-primary text-primary-foreground rounded-2xl shadow-xl text-center items-center mb-0">
+          <section className="p-10 text-3xl bg-primary text-primary-foreground rounded-2xl shadow-xl text-center items-center mb-2">
             {children}
           </section>
         );
@@ -251,7 +274,7 @@ export async function MarkdownRenderer({ content, className, categoryIcon: Icon,
       const isMermaid = match && match[1] === 'mermaid';
 
       if (isMermaid) {
-        return <Mermaid chart={String(children).replace(/\n$/, '')} />;
+        return <Mermaid chart={String(children).replace(/\n$/, '')} variant={mermaidVariant} />;
       }
 
       return (
