@@ -49,7 +49,7 @@ export default async function AdminHelpPage({ params }: Props) {
 
   // Parent link logic
   const parentSlug = slug.slice(0, -1);
-  const parentPath = parentSlug.length > 0 ? `/admin/help/${parentSlug.join('/')}` : '/admin';
+  const parentPath = parentSlug.length > 0 ? `/admin/help/${parentSlug.join('/')}` : '/admin/help';
 
   return (
     <div className="min-h-screen bg-mist-900 text-white pb-20 pt-10 px-4 sm:px-6 lg:px-10">
@@ -59,10 +59,10 @@ export default async function AdminHelpPage({ params }: Props) {
           <Link href={parentPath}>
             <Button variant="ghost" className="text-white/60 hover:text-white hover:bg-white/5">
               <ArrowLeft className="mr-2 h-4 w-4" />
-              {parentSlug.length > 0 ? 'Back' : 'Back to Dashboard'}
+              戻る
             </Button>
           </Link>
-          <h1 className="text-xl font-bold opacity-40">Admin Documentation</h1>
+          <h1 className="text-xl font-bold opacity-40">管理者用ドキュメント</h1>
         </div>
 
         {/* Content Section */}
@@ -83,7 +83,7 @@ export default async function AdminHelpPage({ params }: Props) {
           <Link href="/admin">
             <Button variant="outline" className="bg-white/5 border-white/10 text-white/70 hover:bg-white/10 hover:text-white rounded-full px-8">
               <Home className="mr-2 h-4 w-4" />
-              Admin Dashboard
+              管理者ダッシュボードに戻る
             </Button>
           </Link>
         </div>

@@ -73,6 +73,22 @@ export const paperformats: { [format: string]: any } = {
         scale: .93,
         dots: false,
         dotsedge: true
+    },
+    "meishitanai-katamen": {
+        description: "名刺サイズ（単体・片面）",
+        pageWidth: 91, // mm
+        pageHeight: 55, // mm
+        cols: 1,
+        rows: 1,
+        cols_gap: 0, // mm
+        rows_gap: 0, // mm
+        offset_x: 0, // mm
+        offset_y: 0, // mm
+        uraomote: false,
+        comment: "",
+        scale: 1,
+        dots: false,
+        dotsedge: false
     }
 }
 

@@ -1,7 +1,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { getTranslations } from 'next-intl/server';
-import { Store, Package, ChevronRight, Bug, PlaneTakeoff, Gift } from 'lucide-react';
+import { Store, Package, ChevronRight, Bug, PlaneTakeoff, Gift, QrCode, LayoutDashboard } from 'lucide-react';
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }) {
     const { locale } = await params;
@@ -30,6 +30,28 @@ export default function HelpPage() {
 
                 <div className="min-h-screen">
                     <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                        {/* Universal Flow Card */}
+                        <Link href="/help/overview"
+                            className="group relative rounded-xl border border-primary/20 bg-primary/5 p-8 shadow-sm transition-all hover:border-primary/50 hover:shadow-md block md:col-span-2">
+                            <div className="flex items-center gap-6">
+                                <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg">
+                                    <LayoutDashboard className="h-8 w-8" />
+                                </div>
+                                <div className="flex-grow">
+                                    <h2 className="text-2xl font-bold tracking-tight text-foreground group-hover:text-primary transition-colors">
+                                        新しいギフト体験を贈る
+                                    </h2>
+                                    <p className="mt-2 text-muted-foreground">
+                                        カードの受け取りからギフトの到着まで、ユーザーの体験をステップ形式で解説します。
+                                    </p>
+                                </div>
+                                <div className="flex items-center text-sm font-medium text-primary whitespace-nowrap">
+                                    全体の流れを見る
+                                    <ChevronRight className="ml-1 h-4 w-4 transition-transform group-hover:translate-x-1" />
+                                </div>
+                            </div>
+                        </Link>
+
                         {/* Recipient Card */}
                         <Link href="/help/receive"
                             className="group relative rounded-xl border bg-card p-8 shadow-sm transition-all hover:border-primary/50 hover:shadow-md block ">
@@ -66,9 +88,27 @@ export default function HelpPage() {
                             </div>
                         </Link>
 
+                        {/* User Profile Card */}
+                        <Link href="/help/user"
+                            className="group relative rounded-xl border bg-card p-8 shadow-sm transition-all hover:border-primary/50 hover:shadow-md block">
+                            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary">
+                                <QrCode className="h-6 w-6" />
+                            </div>
+                            <h2 className="text-2xl font-bold tracking-tight text-foreground group-hover:text-primary transition-colors">
+                                マイページの使い方
+                            </h2>
+                            <p className="mt-2 text-muted-foreground">
+                                アカウントをお持ちの方（贈り主・受取人）向けの、プロフィール設定や履歴確認に関するマニュアルです。
+                            </p>
+                            <div className="mt-6 flex items-center text-sm font-medium text-primary">
+                                マニュアルを見る
+                                <ChevronRight className="ml-1 h-4 w-4 transition-transform group-hover:translate-x-1" />
+                            </div>
+                        </Link>
+
                         {/* Shop Owner Card */}
                         <Link href="/help/shop"
-                            className="group relative rounded-xl border bg-card p-8 shadow-sm transition-all hover:border-primary/50 hover:shadow-md block md:col-span-2">
+                            className="group relative rounded-xl border bg-card p-8 shadow-sm transition-all hover:border-primary/50 hover:shadow-md block">
                             <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary">
                                 <Store className="h-6 w-6" />
                             </div>
@@ -76,13 +116,14 @@ export default function HelpPage() {
                                 ショップオーナーの方
                             </h2>
                             <p className="mt-2 text-muted-foreground">
-                                アカウントの登録方法、ログイン、ショップの作成や商品の管理、QRコードの紐付けなど、運用に関するマニュアルです。
+                                ショップの作成や商品の管理、QRコードの有効化など、運用に関するマニュアルです。
                             </p>
                             <div className="mt-6 flex items-center text-sm font-medium text-primary">
                                 マニュアルを見る
                                 <ChevronRight className="ml-1 h-4 w-4 transition-transform group-hover:translate-x-1" />
                             </div>
                         </Link>
+
 
                     </div>
                 </div>

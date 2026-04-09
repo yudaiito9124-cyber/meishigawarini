@@ -309,7 +309,7 @@ export default function AdminPage() {
                 <div className="flex justify-between items-center flex-wrap gap-4">
                     <h1 className="text-2xl font-bold text-white w-full sm:w-auto text-center sm:text-left">{t('title')}</h1>
                     <div className="flex items-center gap-2 flex-wrap justify-center sm:justify-end w-full sm:w-auto">
-                        <Link href="/admin/help/overview">
+                        <Link href="/admin/help">
                             <Button variant="outline" className="bg-mist-800 border-mist-700 text-mist-300 hover:bg-mist-700 hover:text-white transition-all duration-300">
                                 <HelpCircle className="w-4 h-4 mr-2" />
                                 {t('helpButton') || "Help"}

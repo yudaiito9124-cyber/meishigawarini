@@ -6,6 +6,7 @@ import path from 'path';
 import matter from 'gray-matter';
 import { MarkdownRenderer } from '@/components/help/MarkdownRenderer';
 import { notFound } from 'next/navigation';
+import { Button } from '@/components/ui/button';
 
 interface Props {
   params: Promise<{
@@ -48,7 +49,14 @@ export default async function DynamicHelpPage({ params }: Props) {
 
   // Determine parent link
   const parentSlug = slug.slice(0, -1);
-  const parentPath = parentSlug.length > 0 ? `/help/${parentSlug.join('/')}` : '/help';
+  let parentPath = parentSlug.length > 0 ? `/help/${parentSlug.join('/')}` : '/help';
+
+  // Special case for 'overview' (Flow) page requested by user to return to /help/shop
+  if (slug[0] === 'overview') {
+    parentPath = '/help/shop';
+  }
+
+  const backLabel = parentSlug.length > 0 ? '戻る' : (slug[0] === 'overview' ? '戻る' : 'ヘルプのトップに戻る');
 
   return (
     <div className="min-h-screen bg-background pb-20 pt-10">
@@ -60,7 +68,7 @@ export default async function DynamicHelpPage({ params }: Props) {
             className="inline-flex items-center text-sm font-medium text-muted-foreground hover:text-foreground mb-4 transition-colors"
           >
             <ArrowLeft className="mr-2 h-4 w-4" />
-            {parentSlug.length > 0 ? '戻る' : 'ヘルプのトップに戻る'}
+            {backLabel}
           </Link>
         </div>
 
@@ -69,14 +77,22 @@ export default async function DynamicHelpPage({ params }: Props) {
         </div>
 
         {/* Footer Section */}
-        <div className="mt-12 pt-8 border-t">
+        <div className="mt-12 pt-8 border-t flex flex-col items-center gap-4">
           <Link
             href={parentPath}
             className="inline-flex items-center text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
           >
             <ArrowLeft className="mr-2 h-4 w-4" />
-            {parentSlug.length > 0 ? '戻る' : 'ヘルプのトップに戻る'}
+            {backLabel}
           </Link>
+
+          {slug[0] === 'shop' && (
+            <Link href="/shop" className="mt-4">
+              <Button variant="outline" className="rounded-full px-8">
+                ショップ管理画面に戻る
+              </Button>
+            </Link>
+          )}
         </div>
       </div>
     </div>
