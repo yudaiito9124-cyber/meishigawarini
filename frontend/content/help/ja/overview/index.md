@@ -1,34 +1,16 @@
 ---
-title: ご利用の流れ（シーケンス図）
+title: ご利用の流れ
 ---
 
 <section class="manual-container">
 
-# ご利用の流れ（全体フロー）
+# ご利用の流れ
 
 「名刺代わりに」をご利用いただく際の、カードの購入からギフトの到着までの流れをご説明します。
 
 ## 全体フロー
 
-<section class="notice">
 以下の5つのステップで、簡単にギフトを贈ったり受け取ったりすることができます。
-</section>
-
-### サービスの全体像
-```mermaid
-sequenceDiagram
-    actor SD as 贈り主
-    participant S as ショップ
-    participant system as 名刺代わりに  
-    actor RC as 受け取り主
-    
-    SD->>S: 1. カードを店頭で購入
-    SD->>RC: 2. カードを手渡しでプレゼント
-    RC->>system: 3. QRスキャン・ギフト確認
-    RC->>system: 4. QRからお届け先を入力
-    system-->>S: 発送指示
-    S->>RC: 5. ギフトを発送・到着
-```
 
 ### 1 カードを購入する
 ショップやイベント会場にて、ギフトカードを購入してください。カードには「名刺代わりに」の体験を始めるためのQRコードが印字されています。
@@ -64,44 +46,52 @@ sequenceDiagram
 ---
 
 
+### サービスの全体像
+```mermaid
+sequenceDiagram
+    actor SD as 贈り主
+    participant S as ショップ
+    participant system as 名刺代わりに  
+    actor RC as 受け取り主
+    
+    SD->>S: 1. カードを店頭で購入
+    SD->>RC: 2. カードを手渡しでプレゼント
+    RC->>system: 3. QRスキャン・ギフト確認
+    RC->>system: 4. QRからお届け先を入力
+    system-->>S: 発送指示
+    S->>RC: 5. ギフトを発送・到着
+```
 
-<section class="hero">
+---
 
-# 名刺代わりにが贈る、新しいギフトの形
 
-</section>
+<section class="p-10 bg-black rounded-xl text-gray-100">
+  <h1>「<span class="text-emerald-400">名刺代わりに</span>」</br>が贈る、</br>新しい<span class="text-amber-400">ギフト</span>の形</h1>
 
 <div class="grid-help">
+  <section class="benefit">
+    <h2>手渡しの「想い」をのせて</h2>
+    <p>デジタル全盛の時代だからこそ、物理的なカードを「手渡す」という行為には、言葉以上の重みが宿ります。その瞬間の温度感も一緒にプレゼントしましょう。</p>
+  </section>
 
-<section class="benefit">
+  <section class="benefit">
+    <h2>モノとして残る、唯一の価値</h2>
+    <p>受け取ってスキャンした後も、カードはあなたの手元に残ります。ふとした時に目に入るその一枚が、大切な人との思い出を呼び起こすトリガーになります。</p>
+  </section>
 
-### 手渡しの「想い」をのせて
-デジタル全盛の時代だからこそ、物理的なカードを「手渡す」という行為には、言葉以上の重みが宿ります。その瞬間の温度感も一緒にプレゼントしましょう。
+  <section class="benefit">
+    <h2>連絡先も、思い出も、これ一枚で</h2>
+    <p>カードは単なるギフトの引き換え券ではありません。最新の連絡先がいつでも確認できる「動く名刺」として、受け取った後の関係性をより豊かに彩ります。</p>
+  </section>
 
-</section>
-
-<section class="benefit">
-
-### モノとして残る、唯一の価値
-受け取ってスキャンした後も、カードはあなたの手元に残ります。ふとした時に目に入るその一枚が、大切な人との思い出を呼び起こすトリガーになります。
-
-</section>
-
-<section class="benefit">
-
-### 連絡先も、思い出も、これ一枚で
-カードは単なるギフトの引き換え券ではありません。最新の連絡先がいつでも確認できる「動く名刺」として、受け取った後の関係性をより豊かに彩ります。
-
-</section>
-
-<section class="benefit">
-
-### 終わらない、ギフトのストーリー
-ギフトが届いた後も、チャットで感謝を伝えたり、過去の旅路を振り返ったり。「名刺代わりに」は、贈った瞬間から始まる新しい物語を支え続けます。
-
-</section>
-
+  <section class="benefit">
+    <h2>終わらない、ギフトのストーリー</h2>
+    <p>ギフトが届いた後も、チャットで感謝を伝えたり、過去の旅路を振り返ったり。「名刺代わりに」は、贈った瞬間から始まる新しい物語を支え続けます。</p>
+  </section>
 </div>
+</section>
+
+---
 
 ## まずはアカウントを作りましょう
 

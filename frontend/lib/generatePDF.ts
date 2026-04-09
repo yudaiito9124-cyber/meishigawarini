@@ -70,13 +70,16 @@ export const generatePDF = async (batch: any, paperformat: string, cardformat: s
     let codes = batch.codes || [];
     if (codes.length === 0) return;
 
+    const pf = paperformats[paperformat];
+    const pageWidth = pf.pageWidth; // mm
+    const pageHeight = pf.pageHeight; // mm
+
     let doc = new jsPDF({
-        orientation: 'p',
+        orientation: (pageWidth > pageHeight ? 'l' : 'p'),
         unit: 'mm',
-        format: 'a4'
+        format: [pageWidth, pageHeight]
     });
 
-    const pf = paperformats[paperformat];
     let cf = typeof cardformat === 'string' ? cardformats[cardformat] : cardformat;
 
     if (!pf || !cf) {
@@ -130,8 +133,6 @@ export const generatePDF = async (batch: any, paperformat: string, cardformat: s
     ]);
 
     // paper format
-    const pageWidth = pf.pageWidth; // mm
-    const pageHeight = pf.pageHeight; // mm
     const cols = pf.cols;
     const rows = pf.rows;
     const cardWidth = cf.width; // mm

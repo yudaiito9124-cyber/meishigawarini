@@ -2,73 +2,40 @@
 title: 管理者用ヘルプ：概要
 ---
 
-<section class="manual-container">
-
-# システム管理者用ドキュメント
+# 概要
 
 このセクションは管理者専用のヘルプページです。システムの管理方法や各機能の詳細について説明します。
 
-## ご利用の流れ
+## 運用フローの確認
 
-<section class="notice">
-システムの全体像（ユーザー体験）を把握するには、以下のフロー図をご確認ください。
-</section>
+システムの全体像や管理者が運用する際の流れについては、以下のガイドを確認してください。
 
-<a href="/help/overview" class="card-help" data-icon="book">
-### 全体フロー（ユーザー視点）
-ユーザーがカードを受け取ってからギフトを受け取るまでの流れを解説します。
-</a>
+- [**全体フロー（ユーザー視点）**](/help/overview)
+  ユーザーがカードを受け取ってからギフトを受け取るまでの流れを解説します。
+- [**システム管理者 運用フロー**](/admin/help/flow)
+  カード発行からショップ管理、監視業務までの流れを解説します。
 
-各機能の詳細な操作方法については、以下のセクションを選択してください。
+## 管理機能の詳細
 
-<section class="notice">
-管理者がシステムを運用する際の全体的な流れ（カード発行、ショップ開設、メンテナンスなど）については、以下のフロー図をご確認ください。
-</section>
+各機能の操作方法については、以下のページを参照してください。
 
-<a href="/admin/help/flow" class="card-help" data-icon="settings">
-### システム管理者 運用フロー
-カード発行からショップ管理、監視業務までの流れを解説します。
-</a>
-
-## 管理機能の一覧
-
-<div class="grid-help">
-
-<a href="/admin/help/qrcodes" class="card-help" data-icon="book">
-### カード一覧
-個別カードの検索やBAN処理、履歴の確認方法。
-</a>
-
-<a href="/admin/help/cardorders" class="card-help" data-icon="package">
-### カード印刷
-カードプリンタ等での印刷用PDF、画像データなどのバッチ管理について。
-</a>
-
-<a href="/admin/help/designs" class="card-help" data-icon="settings">
-### デザイン設定
-カードデザインの登録、レイアウト編集。
-</a>
-
-<a href="/admin/help/shops" class="card-help" data-icon="store">
-### ショップ管理
-新規ショップの開設、オーナーの紐付け。
-</a>
-
-<a href="/admin/help/tools" class="card-help" data-icon="bug">
-### ツール
-データのエクスポートやメンテナンス操作。
-</a>
-
-</div>
+- [**カード一覧**](/admin/help/qrcodes)
+  個別カードの検索やBAN処理、履歴の確認方法。
+- [**カード印刷**](/admin/help/cardorders)
+  カードプリンタ等での印刷用PDF、画像データの管理について。
+- [**デザイン設定**](/admin/help/designs)
+  カードデザインの登録、レイアウト編集。
+- [**ショップ管理**](/admin/help/shops)
+  新規ショップの開設、オーナーの紐付け。
+- [**ツール**](/admin/help/tools)
+  データのエクスポートやメンテナンス操作。
 
 ## 権限について
 
-システム管理画面は **管理者（Administrators / GlobalAdmins）**権限を持つユーザーのみがアクセス可能です。また、多要素認証（MFA）が必須となっています。
+システム管理画面は **管理者（Administrators / GlobalAdmins）** 権限を持つユーザーのみがアクセス可能です。また、多要素認証（MFA）が必須となっています。
 
-### 1 管理者（Administrators）
-システム管理画面にアクセスが可能
+### 1. 管理者（Administrators）
+システム管理画面にアクセスが可能です。
 
-### 2 GlobalAdmins
-システム管理画面にアクセスが可能 + 他のユーザーが管理しているすべてのショップを管理可能
-
-</section>
+### 2. GlobalAdmins
+システム管理画面にアクセスが可能で、他のユーザーが管理しているすべてのショップを管理できます。

@@ -84,7 +84,7 @@ export const paperformats: { [format: string]: any } = {
         rows_gap: 0, // mm
         offset_x: 0, // mm
         offset_y: 0, // mm
-        uraomote: false,
+        uraomote: true,
         comment: "",
         scale: 1,
         dots: false,

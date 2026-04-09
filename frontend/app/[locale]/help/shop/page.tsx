@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { getTranslations } from 'next-intl/server';
-import { ArrowLeft, BookOpen, Settings, ChevronRight, PlaneTakeoff, CircleUserRound, CreditCard, Zap, Filter, MousePointerClick, LayoutDashboard } from 'lucide-react';
+import { ArrowLeft, BookOpen, Settings, ChevronRight, PlaneTakeoff, CircleUserRound, CreditCard, Zap, Filter, MousePointerClick, Waypoints, Store } from 'lucide-react';
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }) {
     const { locale } = await params;
@@ -26,6 +26,9 @@ export default function ShopHelpGatewayPage() {
 
                 {/* Header Section */}
                 <div className="mb-10 text-center">
+                    <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 text-primary shadow-sm mx-auto">
+                        <Store className="h-8 w-8" />
+                    </div>
                     <h1 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
                         ショップ運用マニュアル
                     </h1>
@@ -40,7 +43,7 @@ export default function ShopHelpGatewayPage() {
                     <Link href="/help/shop/flow" className="group relative rounded-xl border border-primary/20 bg-primary/5 p-8 shadow-sm transition-all hover:border-primary/50 hover:shadow-md block md:col-span-2">
                         <div className="flex items-center gap-6">
                             <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg">
-                                <LayoutDashboard className="h-8 w-8" />
+                                <Waypoints className="h-8 w-8" />
                             </div>
                             <div>
                                 <h2 className="text-2xl font-bold tracking-tight text-foreground group-hover:text-primary transition-colors">

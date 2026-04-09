@@ -4,9 +4,27 @@ import Link from 'next/link';
 import { remark } from 'remark';
 import remarkParse from 'remark-parse';
 import remarkRehype from 'remark-rehype';
+import rehypeRaw from 'rehype-raw';
 import rehypeReact from 'rehype-react';
 import * as prod from 'react/jsx-runtime';
-import { ArrowLeft, ArrowRight, BookOpen, Settings, ChevronRight, Store, Package, Bug, ExternalLink, ArrowUpRight } from 'lucide-react';
+import {
+  ArrowLeft,
+  ArrowRight,
+  BookOpen,
+  Settings,
+  ChevronRight,
+  Store,
+  Package,
+  Bug,
+  ExternalLink,
+  ArrowUpRight,
+  Waypoints,
+  SendHorizontal,
+  CircleUserRound,
+  Crown,
+  Gift,
+  QrCode
+} from 'lucide-react';
 
 import { HelpImage } from './HelpImage';
 import { Mermaid } from './Mermaid';
@@ -17,17 +35,38 @@ const IconMap: Record<string, React.ElementType> = {
   bug: Bug,
   book: BookOpen,
   settings: Settings,
+  waypoints: Waypoints,
+  send: SendHorizontal,
+  user: CircleUserRound,
+  crown: Crown,
+  gift: Gift,
+  qrcode: QrCode,
 };
 
 const production = {
   Fragment: prod.Fragment,
   jsx: prod.jsx,
   jsxs: prod.jsxs,
-  components: {
+};
+
+export async function MarkdownRenderer({ content, className, categoryIcon: Icon, categoryTitle }: { content: string; className?: string; categoryIcon?: React.ElementType; categoryTitle?: string }) {
+  const components = {
     h1: ({ children }: any) => (
-      <h1 className="text-3xl font-bold tracking-tight sm:text-4xl text-center mb-4">
-        {children}
-      </h1>
+      <div className="flex flex-col items-center mb-8">
+        {Icon && (
+          <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 text-primary shadow-sm">
+            <Icon className="h-8 w-8" />
+          </div>
+        )}
+        {categoryTitle && (
+          <span className="text-sm font-bold uppercase tracking-widest text-primary/60 mb-2">
+            {categoryTitle}
+          </span>
+        )}
+        <h1 className="text-3xl font-bold tracking-tight sm:text-4xl text-center">
+          {children}
+        </h1>
+      </div>
     ),
     h2: ({ children, className }: any) => {
       if (className === 'card-title') {
@@ -50,7 +89,7 @@ const production = {
         if (nodes?.props?.children) return flatten(nodes.props.children);
         return '';
       };
-      
+
       const text = flatten(children).trim();
       const match = text.match(/^(\d+)/);
       if (match) {
@@ -89,15 +128,15 @@ const production = {
     img: ({ src, alt }: any) => <HelpImage src={src} alt={alt} />,
     a: ({ href, children, className, 'data-icon': dataIcon }: any) => {
       const isInternal = href?.startsWith('/');
-      
+
       // Premium Help Card styling
       if (className === 'card-help') {
-        const Icon = dataIcon ? IconMap[dataIcon] : ChevronRight;
+        const CardIcon = dataIcon ? IconMap[dataIcon] : ChevronRight;
         return (
           <Link href={href} className="group relative rounded-xl border bg-card p-8 shadow-sm transition-all hover:border-primary/50 hover:shadow-md block h-full">
-            {Icon && (
+            {CardIcon && (
               <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary">
-                <Icon className="h-6 w-6" />
+                <CardIcon className="h-6 w-6" />
               </div>
             )}
             <div className="space-y-2">
@@ -114,10 +153,10 @@ const production = {
       if (isInternal) {
         // Distinguish between manual-to-manual links and manual-to-app action links
         const isManualLink = href.startsWith('/help') || href.startsWith('/admin/help');
-        
+
         return (
-          <Link 
-            href={href} 
+          <Link
+            href={href}
             className={`
               inline-flex items-center font-bold text-primary 
               underline decoration-primary/30 underline-offset-4 
@@ -131,10 +170,10 @@ const production = {
         );
       }
       return (
-        <a 
-          href={href} 
-          target="_blank" 
-          rel="noopener noreferrer" 
+        <a
+          href={href}
+          target="_blank"
+          rel="noopener noreferrer"
           className="inline-flex items-center font-bold text-primary underline decoration-primary/30 underline-offset-4 hover:decoration-primary transition-all px-1"
         >
           {children}
@@ -143,59 +182,59 @@ const production = {
       );
     },
     section: ({ children, className }: any) => {
-        if (className === 'notice') {
-            return (
-                <section className="rounded-lg bg-primary/5 p-6 border border-primary/20 my-6">
-                    {children}
-                </section>
-            );
-        }
-        if (className === 'benefit') {
-            return (
-                <section className="rounded-2xl bg-gradient-to-br from-primary/10 via-background to-primary/5 p-8 border-2 border-primary/20 my-10 shadow-lg text-center">
-                    {children}
-                </section>
-            );
-        }
-        if (className === 'hero') {
-          return (
-              <section className="py-12 bg-primary text-primary-foreground rounded-2xl px-6 my-10 shadow-xl text-center">
-                  {children}
-              </section>
-          );
-        }
-        if (className === 'manual-container') {
-          return (
-            <div className="space-y-12 rounded-xl bg-card p-6 shadow-sm border sm:p-10">
-              {children}
-            </div>
-          );
-        }
-        return <section className={className}>{children}</section>;
+      if (className === 'notice') {
+        return (
+          <section className="rounded-lg bg-primary/5 p-6 border border-primary/20 my-6">
+            {children}
+          </section>
+        );
+      }
+      if (className === 'benefit') {
+        return (
+          <section className="rounded-2xl bg-gradient-to-br from-card/100 via-card/50 to-background/30 p-8 border-2 border-primary/20 my-0 shadow-lg text-center">
+            {children}
+          </section>
+        );
+      }
+      if (className === 'hero') {
+        return (
+          <section className="p-6 bg-primary text-primary-foreground rounded-2xl shadow-xl text-center items-center mb-0">
+            {children}
+          </section>
+        );
+      }
+      if (className === 'manual-container') {
+        return (
+          <div className="space-y-12 rounded-xl bg-card p-6 shadow-sm border sm:p-10">
+            {children}
+          </div>
+        );
+      }
+      return <section className={className}>{children}</section>;
     },
     div: ({ children, className }: any) => {
-        if (className === 'notice-inner') {
-            return (
-                <div className="flex items-center justify-between rounded bg-background p-3 shadow-inner">
-                    {children}
-                </div>
-            );
-        }
-        if (className === 'grid-help') {
-          return (
-            <div className="grid gap-6 md:grid-cols-2 mb-10">
-              {children}
-            </div>
-          );
-        }
-        if (className === 'card-footer') {
-          return (
-            <div className="grid gap-6 md:grid-cols-1 mt-10">
-              {children}
-            </div>
-          );
-        }
-        return <div className={className}>{children}</div>;
+      if (className === 'notice-inner') {
+        return (
+          <div className="flex items-center justify-between rounded bg-background p-3 shadow-inner">
+            {children}
+          </div>
+        );
+      }
+      if (className === 'grid-help') {
+        return (
+          <div className="grid gap-2 md:grid-cols-1 mb-10 mt-0">
+            {children}
+          </div>
+        );
+      }
+      if (className === 'card-footer') {
+        return (
+          <div className="grid gap-6 md:grid-cols-1 mt-10">
+            {children}
+          </div>
+        );
+      }
+      return <div className={className}>{children}</div>;
     },
     ul: ({ children }: any) => (
       <ul className="list-disc list-inside mb-4 space-y-1 opacity-90">
@@ -227,14 +266,13 @@ const production = {
         {children}
       </blockquote>
     ),
-  },
-};
+  };
 
-export async function MarkdownRenderer({ content, className }: { content: string; className?: string }) {
   const file = await remark()
     .use(remarkParse)
     .use(remarkRehype, { allowDangerousHtml: true })
-    .use(rehypeReact, production as any)
+    .use(rehypeRaw)
+    .use(rehypeReact, { ...production, components } as any)
     .process(content);
 
   return <div className={className}>{file.result}</div>;

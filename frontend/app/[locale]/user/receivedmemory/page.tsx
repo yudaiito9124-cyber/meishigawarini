@@ -17,9 +17,27 @@ export default function ReceivedHistoryPage() {
     const [activeStage, setActiveStage] = useState<'peek' | 'flipped' | 'none'>('none');
     const [viewMode, setViewMode] = useState<'grid' | 'stack'>('stack');
     const [hoveredId, setHoveredId] = useState<string | null>(null);
+    const [isAnimating, setIsAnimating] = useState(false);
     const containerRef = useRef<HTMLDivElement>(null);
 
     const handleItemClick = (id: string) => {
+        if (isAnimating) return;
+
+        // Determine transition duration based on current state and view mode
+        let duration = 0;
+        if (activeId === id) {
+            if (activeStage === 'peek') {
+                duration = 700; // Flip duration
+            } else {
+                duration = viewMode === 'grid' ? 50 : 700; // Closing duration
+            }
+        } else {
+            duration = viewMode === 'grid' ? 50 : 700; // Opening duration
+        }
+
+        setIsAnimating(true);
+        setTimeout(() => setIsAnimating(false), duration);
+
         if (activeId === id) {
             if (activeStage === 'peek') {
                 setActiveStage('flipped');
@@ -156,6 +174,10 @@ export default function ReceivedHistoryPage() {
                             <div
                                 className="fixed inset-0 z-10 bg-transparent cursor-default"
                                 onClick={(e) => {
+                                    if (isAnimating) return;
+                                    const duration = viewMode === 'grid' ? 50 : 700;
+                                    setIsAnimating(true);
+                                    setTimeout(() => setIsAnimating(false), duration);
                                     setActiveId(null);
                                     setActiveStage('none');
                                 }}
@@ -180,7 +202,7 @@ export default function ReceivedHistoryPage() {
                                 transform: `
                                     rotate(${(index % 2 === 0 ? 1 : -1) * (index * 0.5)}deg)
                                     ${isActive ? 'translateY(-50%)' : (isHovered ? 'translateY(1px)' : '')} 
-                                    scale(${isActive ? 1.05 : (isHovered ? 1.0 : 1)})
+                                    scale(${isActive ? 1.10 : (isHovered ? 1.0 : 1)})
                                 `,
                             } : {};
 
@@ -200,7 +222,7 @@ export default function ReceivedHistoryPage() {
                                     style={wrapperStyle}
                                 >
                                     <div
-                                        className={cn(`group relative aspect-[84/52] w-full cursor-pointer transition-all rounded-3xl pointer-events-auto select-none`, viewMode === "grid" ? "duration-0" : "duration-1000")}
+                                        className={cn(`group relative aspect-[84/52] w-full cursor-pointer transition-all rounded-3xl select-none`, viewMode === "grid" ? "duration-0" : "duration-700 ease-out", isAnimating ? "pointer-events-none" : "pointer-events-auto")}
                                         style={{
                                             perspective: '1400px',
                                             transformStyle: 'preserve-3d',
@@ -226,7 +248,7 @@ export default function ReceivedHistoryPage() {
 
                                         {/* The rotating container */}
                                         <div
-                                            className={`w-full h-full relative preserve-3d transition-all duration-700 md:duration-700 rounded-2xl ${isFlipped ? 'rotate-y-180 scale-[1.03]' : (isActive ? 'scale-[1.02]' : '')
+                                            className={`w-full h-full relative preserve-3d transition-all duration-700 md:duration-700 rounded-2xl ${isFlipped ? 'rotate-y-180 scale-[1.05]' : (isActive ? 'scale-[1.05]' : '')
                                                 }`}
                                             style={{
                                                 transformStyle: 'preserve-3d',
@@ -243,7 +265,7 @@ export default function ReceivedHistoryPage() {
                                                     transform: 'translateZ(1px)'
                                                 }}
                                             >
-                                                <Card className="w-full h-full p-0 border-b-[6px] border-indigo-950/40 bg-slate-100 rounded-2xl overflow-hidden border-none shadow-none">
+                                                <Card className="w-full h-full p-0 border-b-[3px] border-gray-400 border-b-indigo-800 bg-slate-100 rounded-2xl overflow-hidden border-x border-t shadow-xl ">
                                                     <CardContent className="p-0 h-full relative rounded-2xl overflow-hidden">
                                                         {/* Card Design Image */}
                                                         <div className="absolute inset-0 w-full h-full pointer-events-none rounded-2xl overflow-hidden">
@@ -302,7 +324,7 @@ export default function ReceivedHistoryPage() {
                                                     transform: 'rotateY(180deg) translateZ(1px)'
                                                 }}
                                             >
-                                                <Card className="w-full h-full p-0 border-b-4 border-indigo-950 bg-indigo-950 rounded-2xl shadow-2xl overflow-hidden">
+                                                <Card className="w-full h-full p-0 border-b-[3px] border-b-indigo-700 border-indigo-900 bg-indigo-950 rounded-2xl shadow-2xl overflow-hidden">
                                                     <CardContent className="p-6 h-full flex flex-col text-white border-2 border-white/10 rounded-2xl">
                                                         {/* Top Section */}
                                                         <div className="pointer-events-none">

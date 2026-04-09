@@ -4,7 +4,7 @@ title: ショップオーナー用ヘルプ：運用フロー
 
 <section class="manual-container">
 
-# ショップ管理者 運用フロー
+# 運用フロー
 
 ショップの開設からカードの発注、商品の発送までの主要な業務フローを解説します。
 
@@ -14,7 +14,6 @@ title: ショップオーナー用ヘルプ：運用フロー
 
 ```mermaid
 sequenceDiagram
-    autonumber
     actor SA as システム管理者
     actor SO as ショップ管理者
     actor SD as 贈り主 (Sender)

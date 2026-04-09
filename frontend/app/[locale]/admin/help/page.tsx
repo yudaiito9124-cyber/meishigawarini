@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { getTranslations } from 'next-intl/server';
-import { ArrowLeft, BookOpen, Settings, ChevronRight, Store, Package, Bug, LayoutDashboard, QrCode } from 'lucide-react';
+import { ArrowLeft, BookOpen, Settings, ChevronRight, Store, Package, Bug, Waypoints, QrCode, Crown } from 'lucide-react';
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }) {
     const { locale } = await params;
@@ -25,6 +25,9 @@ export default function AdminHelpGatewayPage() {
 
                 {/* Header Section */}
                 <div className="mb-10 text-center">
+                    <div className="inline-flex h-16 w-16 items-center justify-center rounded-full bg-white/10 text-white mb-4 shadow-sm">
+                        <Crown className="h-8 w-8" />
+                    </div>
                     <h1 className="text-3xl font-bold tracking-tight text-white sm:text-4xl">
                         システム管理者マニュアル
                     </h1>
@@ -39,7 +42,7 @@ export default function AdminHelpGatewayPage() {
                     <Link href="/admin/help/flow" className="group relative rounded-xl border border-white/10 bg-white/5 p-8 shadow-sm transition-all hover:bg-white/10 hover:border-white/20 block md:col-span-2">
                         <div className="flex items-center gap-6">
                             <div className="flex h-16 w-16 items-center justify-center rounded-full bg-white text-mist-900 shadow-lg">
-                                <LayoutDashboard className="h-8 w-8" />
+                                <Waypoints className="h-8 w-8" />
                             </div>
                             <div>
                                 <h2 className="text-2xl font-bold tracking-tight text-white group-hover:text-white/80 transition-colors">

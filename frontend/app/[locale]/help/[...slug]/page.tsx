@@ -1,6 +1,6 @@
 import { getTranslations } from 'next-intl/server';
 import Link from 'next/link';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Waypoints, Gift, SendHorizontal, CircleUserRound, Store, Crown } from 'lucide-react';
 import fs from 'fs/promises';
 import path from 'path';
 import matter from 'gray-matter';
@@ -14,6 +14,23 @@ interface Props {
     slug: string[];
   }>;
 }
+
+const CategoryIconMap: Record<string, React.ElementType> = {
+  overview: Waypoints,
+  receive: Gift,
+  send: SendHorizontal,
+  user: CircleUserRound,
+  shop: Store,
+  admin: Crown,
+};
+
+const CategoryTitleMap: Record<string, string> = {
+  overview: 'ご利用ガイド',
+  receive: '受取人マニュアル',
+  send: '贈り主マニュアル',
+  user: 'マイページヘルプ',
+  shop: 'ショップ管理',
+};
 
 export async function generateMetadata({ params }: Props) {
   const { locale, slug } = await params;
@@ -47,16 +64,16 @@ export default async function DynamicHelpPage({ params }: Props) {
 
   const { data, content } = matter(fileContent);
 
+  // Determine category icon based on root slug
+  const category = slug[0];
+  const Icon = CategoryIconMap[category];
+  const categoryTitle = CategoryTitleMap[category];
+
   // Determine parent link
   const parentSlug = slug.slice(0, -1);
   let parentPath = parentSlug.length > 0 ? `/help/${parentSlug.join('/')}` : '/help';
 
-  // Special case for 'overview' (Flow) page requested by user to return to /help/shop
-  if (slug[0] === 'overview') {
-    parentPath = '/help/shop';
-  }
-
-  const backLabel = parentSlug.length > 0 ? '戻る' : (slug[0] === 'overview' ? '戻る' : 'ヘルプのトップに戻る');
+  const backLabel = parentSlug.length > 0 ? '戻る' : 'ヘルプのトップに戻る';
 
   return (
     <div className="min-h-screen bg-background pb-20 pt-10">
@@ -73,7 +90,7 @@ export default async function DynamicHelpPage({ params }: Props) {
         </div>
 
         <div className="flex-grow font-sans">
-          <MarkdownRenderer content={content} />
+          <MarkdownRenderer content={content} categoryIcon={Icon} categoryTitle={categoryTitle} />
         </div>
 
         {/* Footer Section */}
@@ -90,6 +107,14 @@ export default async function DynamicHelpPage({ params }: Props) {
             <Link href="/shop" className="mt-4">
               <Button variant="outline" className="rounded-full px-8">
                 ショップ管理画面に戻る
+              </Button>
+            </Link>
+          )}
+
+          {slug[0] === 'admin' && (
+            <Link href="/admin" className="mt-4">
+              <Button variant="outline" className="rounded-full px-8">
+                管理者画面に戻る
               </Button>
             </Link>
           )}

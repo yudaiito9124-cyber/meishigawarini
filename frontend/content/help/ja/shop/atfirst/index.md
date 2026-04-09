@@ -4,7 +4,7 @@ title: ショップ運用のヘルプ - まず初めに
 
 <section class="manual-container">
 
-# ショップ運用マニュアル（まず初めに）
+# まず初めに
 
 ## 用意するもの
 

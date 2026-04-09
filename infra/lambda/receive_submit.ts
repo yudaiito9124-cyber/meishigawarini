@@ -1,13 +1,3 @@
-/**
- * 概要: ギフト配送先情報の登録
- * 詳細: 
- *  - 被贈答者が入力した配送先情報(名前、住所、電話番号等)をSK=ORDERとして保存します。
- *  - DynamoDBのトランザクション(TransactWrite)を使用し、METADATAのステータスをACTIVEからUSEDへアトミックに変更します。
- *  - 二重送信防止、有効期限の遅延評価、およびレートリミット検証を実施します。
- *  - 登録成功時、受取人への確認メール送信、ショップ提供者への通知メール送信、およびチャット通知リストへの自動登録を行います。
- *
- * エンドポイント: POST /receive/submit
- */
 import { APIGatewayProxyHandler } from 'aws-lambda';
 import { TransactWriteCommand, GetCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
 import { CognitoIdentityProviderClient, AdminGetUserCommand } from '@aws-sdk/client-cognito-identity-provider';
@@ -16,7 +6,8 @@ import { sendLocalizedEmail } from './templates/email';
 import { checkAndExpire } from './utils/expiration';
 import { successResponse, errorResponse } from './utils/response';
 import { ddb, TABLE_NAME } from './share/db';
-import { getQrId, getPIN } from './utils/request';
+import { getQrId, getPIN, getUserId } from './utils/request';
+import { appendToHistory } from './utils/history';
 import { ReceiveApiSchema } from '@shared/api-types';
 
 const cognito = new CognitoIdentityProviderClient({});
@@ -103,6 +94,16 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 }
             ]
         }));
+
+        // 【履歴追加特典: ログイン中のユーザーであれば RECEIVEDLOG に追加】
+        const userId = getUserId(event);
+        if (userId) {
+            try {
+                await appendToHistory(ddb, TABLE_NAME, userId, 'RECEIVEDLOG', qr_id);
+            } catch (e) {
+                console.error('Failed to append to RECEIVEDLOG:', e);
+            }
+        }
 
         // ====================================================================
         // 副作用処理 (通知と購読)

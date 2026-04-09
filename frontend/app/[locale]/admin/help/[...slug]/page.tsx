@@ -1,6 +1,6 @@
 import { getTranslations } from 'next-intl/server';
 import { Link } from '@/i18n/routing';
-import { ArrowLeft, Home } from 'lucide-react';
+import { ArrowLeft, Home, Crown } from 'lucide-react';
 import fs from 'fs/promises';
 import path from 'path';
 import matter from 'gray-matter';
@@ -52,7 +52,7 @@ export default async function AdminHelpPage({ params }: Props) {
   const parentPath = parentSlug.length > 0 ? `/admin/help/${parentSlug.join('/')}` : '/admin/help';
 
   return (
-    <div className="min-h-screen bg-mist-900 text-white pb-20 pt-10 px-4 sm:px-6 lg:px-10">
+    <div className="dark min-h-screen bg-mist-900 text-white pb-20 pt-10 px-4 sm:px-6 lg:px-10">
       <div className="max-w-4xl mx-auto">
         {/* Breadcrumb / Navigation */}
         <div className="flex justify-between items-center mb-10">
@@ -67,14 +67,8 @@ export default async function AdminHelpPage({ params }: Props) {
 
         {/* Content Section */}
         <div className="bg-mist-200/10 border border-white/5 rounded-3xl p-8 sm:p-12 backdrop-blur-xl shadow-2xl overflow-hidden">
-          <div className="mb-8 border-b border-white/10 pb-6">
-            <h2 className="text-4xl font-extrabold tracking-tight bg-gradient-to-r from-white to-white/60 bg-clip-text text-transparent">
-              {data.title || slug[slug.length - 1]}
-            </h2>
-          </div>
-
-          <div className="prose prose-invert max-w-none ">
-            <MarkdownRenderer content={content} />
+          <div className="prose prose-invert max-w-none">
+            <MarkdownRenderer content={content} categoryIcon={Crown} />
           </div>
         </div>
 

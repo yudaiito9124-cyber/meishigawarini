@@ -20,6 +20,9 @@ mermaid.initialize({
     lineColor: '#00796b',
     secondaryColor: '#f1f8e9',
     tertiaryColor: '#ffffff',
+  },
+  sequence: {
+    showSequenceNumbers: false,
   }
 });
 

@@ -862,23 +862,6 @@ export default function ReceivePage() {
         return { days, hours, minutes, seconds };
     };
 
-    if (error) {
-        return (
-            <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-                <Card className="w-full max-w-md border-red-200">
-                    <CardHeader className="bg-red-50">
-                        <CardTitle className="text-red-800">Error</CardTitle>
-                    </CardHeader>
-                    <CardContent className="p-6">
-                        <p className="text-red-600">{error}</p>
-                    </CardContent>
-                </Card>
-            </div>
-        );
-    }
-
-
-
     const handleSubscribe = async () => {
         if (!notificationEmail) return;
 
@@ -963,6 +946,7 @@ export default function ReceivePage() {
 
         setZipCode(filtered);
     };
+
     useEffect(() => {
         // ページの状態に応じてbodyの背景を同期させ、オーバースクロール時の白見えを防ぐ
         const body = document.body;
@@ -991,6 +975,21 @@ export default function ReceivePage() {
             body.style.filter = "";
         };
     }, [step]);
+
+    if (error) {
+        return (
+            <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+                <Card className="w-full max-w-md border-red-200">
+                    <CardHeader className="bg-red-50">
+                        <CardTitle className="text-red-800">Error</CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-6">
+                        <p className="text-red-600">{error}</p>
+                    </CardContent>
+                </Card>
+            </div>
+        );
+    }
 
     return (
         <div ref={containerRef} className={cn("min-h-screen w-full bg-gray-50 flex flex-col items-center justify-center py-8 px-4 transition-all duration-1000", step === "COMPLETED" && "bg-olive-300 sepia-[.2] shadow-[inset_0_0_500px_rgba(0,0,0,0.8)]")}>
