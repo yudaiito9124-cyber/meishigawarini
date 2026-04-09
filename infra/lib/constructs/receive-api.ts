@@ -50,7 +50,7 @@ export class ReceiveApi extends cdk.NestedStack {
         apigateway.IdentitySource.header('x-qr-id'),
         apigateway.IdentitySource.header('x-qr-pin'),
       ],
-      resultsCacheTtl: cdk.Duration.minutes(5),
+      resultsCacheTtl: cdk.Duration.seconds(0),
     });
 
     // --- Lambda Definitions ---

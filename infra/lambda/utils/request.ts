@@ -64,11 +64,15 @@ export const getProductId = (event: APIGatewayProxyEvent, body: any = {}): strin
  * リクエストから UserId (Cognito) を安全に取得します。
  */
 export const getUserId = (event: APIGatewayProxyEvent): string | undefined => {
-    return (
-        event.requestContext?.authorizer?.user_id ||
-        event.requestContext?.authorizer?.principalId ||
-        event.requestContext?.authorizer?.claims?.sub
-    );
+    // 1. Authorizer from Custom Lambda Authorizer (context.user_id)
+    if (event.requestContext?.authorizer?.user_id) return event.requestContext.authorizer.user_id;
+    // 2. Cognito claims (claims.sub)
+    if (event.requestContext?.authorizer?.claims?.sub) return event.requestContext.authorizer.claims.sub;
+    // 3. Fallback to principalId, but ignore generic receiver/guest IDs for history purposes
+    const pid = event.requestContext?.authorizer?.principalId;
+    if (pid && !pid.startsWith('receiver-') && !pid.startsWith('guest-')) return pid;
+
+    return undefined;
 };
 
 /**

@@ -1431,9 +1431,6 @@ export default function ReceivePage() {
                             {
                                 step === "FORM" || step === "PROMOTION" ? t('titles.form') + (step === "PROMOTION" ? " (sample)" : "") : ""}
                         </CardTitle>
-                        <p className="text-sm text-gray-500 mt-2 max-w-[80%] mx-auto leading-relaxed">
-                            {t('roleSelection.description')}
-                        </p>
                     </CardHeader>
 
                     <CardContent>
