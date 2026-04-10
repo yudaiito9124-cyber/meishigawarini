@@ -1,7 +1,24 @@
 /**
- * ファイル概要: システム管理者向けダッシュボード
- * 目的: QRコードのバッチ生成機能や生成履歴の確認、およびQRコードの個別ステータス管理やBAN処理を行います。
+ * ファイル概要: システム管理者向け統合ダッシュボード (Admin Dashboard)
+ * 
+ * 役割:
+ * システム全体の運用・管理を一括して行うための管理者専用画面です。
+ * 主にQRコードのバッチ生成、注文管理（Card Orders）、デザイン管理、ショップ権限管理、
+ * およびデバッグ用のデータダンプツールを提供します。
+ * 
+ * 主要機能:
+ * 1. QRコードの生成とエクスポート（PDF/CSV）。
+ * 2. カード注文（印刷依頼）のステータス管理とワークフロー。
+ * 3. 任意のQRコード・ユーザー・ショップのステータス確認とBAN/復元処理。
+ * 4. ショップに対するカードデザインの割当。
+ * 5. 新規ショップ作成、オーナー変更、マネージャー紐付け。
+ * 6. システムデバッグ用のDynamoDBデータダンプ。
+ * 
+ * セキュリティ:
+ * このページへのアクセスは Amplify の Cognito グループ (Administrators/GlobalAdmins) 
+ * によってバックエンド側でも厳格に制限されています。
  */
+
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -42,32 +59,59 @@ import { Textarea } from "@/components/ui/textarea";
 import { adminApi } from "@/lib/api/admin";
 import OrderDetailsDialog from "@/components/admin/OrderDetailsDialog";
 
-
+/**
+ * 管理画面メインコンポーネント
+ */
 export default function AdminPage() {
+    /** 翻訳用フック (AdminPage namespace) */
     const t = useTranslations('AdminPage');
+    /** エラー翻訳用フック */
     const { translateError } = useBackendError();
+    /** 生成するQRコードの数 */
     const [count, setCount] = useState(10);
+    /** 検索キーワード (現在はQRCodeListSectionが主に担当) */
     const [keyword, setKeyword] = useState("");
+    /** 管理者による手動生成時の対象ショップID */
     const [shopId, setShopId] = useState("");
+    /** 紐付ける商品ID(オプション) */
     const [productId, setProductId] = useState("");
+    /** 紐付ける会員ID(オプション) */
     const [ownerUuid, setOwnerUuid] = useState("");
+    /** 紐付ける贈り主ID(オプション) */
     const [senderId, setSenderId] = useState("");
+    /** 有効期限設定 */
     const [expiryDate, setExpiryDate] = useState("");
+    /** 生成時に即アクティベートするかどうかの設定 */
     const [activateNow, setActivateNow] = useState(false);
+    /** メタデータ（ShopID等）を使用した詳細設定を使用するか */
     const [useMetadataOptions, setUseMetadataOptions] = useState(false);
+    /** このセッション中に生成されたバッチの履歴 */
     const [generatedBatches, setGeneratedBatches] = useState<any[]>([]);
+    /** PDF生成時の用紙フォーマット（A4等） */
     const [paperFormat, setPaperFormat] = useState("10S31251");
+    /** カードのデザイン（システムのプリセットまたはDBカスタムデザイン） */
     const [cardFormat, setCardFormat] = useState("gakuchousenbeiv1");
+    /** DBから取得したカスタムデザイン一覧 */
     const [dbCardDesigns, setDbCardDesigns] = useState<any[]>([]);
+    /** デザイン情報の再取得が必要かどうかのフラグ */
     const [reloadDbCardDesigns, setReloadDbCardDesigns] = useState(true);
+    /** 生成中フラグ */
     const [isGenerating, setIsGenerating] = useState(false);
+    /** CSVエクスポート中フラグ (OrderIDを保持) */
     const [isExportingCsv, setIsExportingCsv] = useState<string | null>(null);
+    /** アクティブなタブ (qrcodes / cardorders / designs / shops / tools) */
     const [activeTab, setActiveTab] = useState("qrcodes");
+    /** カード注文一覧 */
     const [cardOrders, setCardOrders] = useState<any[]>([]);
+    /** カード注文読み込み中フラグ */
     const [cardOrdersLoading, setCardOrdersLoading] = useState(false);
+    /** カード注文のフィルターステータス (ORDERED / PRINTING / SHIPPED 等) */
     const [cardOrderFilterStatus, setCardOrderFilterStatus] = useState("ORDERED");
+    /** カード注文のショップフィルター */
     const [cardOrderFilterShopId, setCardOrderFilterShopId] = useState("");
+    /** ルーター */
     const router = useRouter();
+    /** 直近でコピーしたID (UI通知用) */
     const [copiedId, setCopiedId] = useState<string | null>(null);
 
     // ID Search states
@@ -76,6 +120,9 @@ export default function AdminPage() {
     const [searchedOrder, setSearchedOrder] = useState<any>(null);
 
 
+    /**
+     * クリップボードにテキストをコピーします。
+     */
     const handleCopy = (id: string) => {
         navigator.clipboard.writeText(id).then(() => {
             setCopiedId(id);
@@ -83,6 +130,9 @@ export default function AdminPage() {
         });
     };
 
+    /**
+     * カスタムカードデザインの一覧をバックエンドから取得します。
+     */
     const fetchDbCardDesigns = async () => {
         try {
             const data = await adminApi.admin_carddesigns_list({});
@@ -92,6 +142,9 @@ export default function AdminPage() {
         }
     };
 
+    /**
+     * タブ切り替えや初期化時のデータ取得制御。
+     */
     useEffect(() => {
         if (reloadDbCardDesigns && (activeTab === "qrcodes" || activeTab === "cardorders" || activeTab === "shops")) {
             fetchDbCardDesigns();
@@ -105,6 +158,9 @@ export default function AdminPage() {
         }
     }, [activeTab, reloadDbCardDesigns, cardOrderFilterStatus]);
 
+    /**
+     * カード注文の一覧を取得します（フィルタ条件に従う）。
+     */
     const fetchCardOrders = async () => {
         setCardOrdersLoading(true);
         try {
@@ -120,9 +176,17 @@ export default function AdminPage() {
         }
     };
 
+    /**
+     * カード注文のステータスを更新します。
+     * ワークフローの制御（未処理 -> 印刷中 -> 発送済み等）を行います。
+     * @param shopId 対象ショップID
+     * @param orderId 対象注文ID
+     * @param status 新しいステータス
+     * @param batchId 紐付けるQRバッチID (印刷工程開始時に自動設定されることが多い)
+     */
     const handleUpdateCardOrderStatus = async (shopId: string, orderId: string, status: string, batchId?: string) => {
         try {
-            // UIに即座に反映させるためローカルステートを更新
+            // UIに即座に反映させるため楽観的更新を実施
             setCardOrders(prev => prev.map(o => o.order_id === orderId ? { ...o, status, batch_id: batchId || o.batch_id, ts_updated_at: new Date().toISOString() } : o));
 
             await adminApi.admin_card_orders_update({
@@ -132,12 +196,13 @@ export default function AdminPage() {
                 batch_id: batchId
             });
 
-            // GSIの反映待ち時間を考慮して1秒後に再取得
+            // GSI(Global Secondary Index)の反映遅延を考慮し、少々の待機後に一覧を再取得
             setTimeout(() => fetchCardOrders(), 1000);
         } catch (e) {
             console.error("Failed to update status:", e);
             alert(translateError('Internal Server Error'));
-            fetchCardOrders(); // エラー時は元の状態に戻すため再取得
+            // エラー時はDBの状態を正として再取得し直す
+            fetchCardOrders();
         }
     };
 
@@ -149,40 +214,52 @@ export default function AdminPage() {
 
 
 
+    /**
+     * 指定されたカード注文 (Card Order) に対して、PDFまたはCSVのエクスポートを実行します。
+     * 必要に応じて、このタイミングで新規のQRコードを生成（バッチ作成）します。
+     * 
+     * フロー:
+     * 1. 注文に紐づくバッチがあるか確認。
+     * 2. あれば既存バッチの内容を取得。なければ新規生成 API を叩く。
+     * 3. 印刷物生成用のデータをローカルバッチ履歴に追加。
+     * 4. デザイン情報（システム定義 or カスタム定義）を解決。
+     * 5. generatePDF / generateCSVExport を呼び出してブラウザからダウンロード。
+     * 
+     * @param order 注文データ
+     * @param type エクスポート形式 ('pdf' | 'csv')
+     */
     const handleExport = async (order: any, type: 'pdf' | 'csv') => {
-        setIsExportingCsv(order.order_id); // Reusing existing state for progress
+        setIsExportingCsv(order.order_id); // UIの進捗表示に使用
         try {
             let codes: any[] = [];
             let batchId = order.batch_id;
 
             if (batchId) {
-                // 1. If batch_id already exists, use it regardless of status
+                // 【ケースA】既にバッチIDが注文に紐付いている場合 -> 既存データを取得
                 const data = await adminApi.admin_qr_batch_get({ batch_id: batchId });
                 codes = data.data;
 
-                // If the status was still ORDERED, we should update it to PRINTING (if not done already)
+                // もしステータスが ORDERED のままなら、印刷開始(PRINTING)に更新
                 if (order.status === 'ORDERED') {
                     await handleUpdateCardOrderStatus(order.shop_id, order.order_id, 'PRINTING', batchId);
                 }
             } else if (order.status === 'ORDERED') {
-                // 2. Generate NEW QR codes only for ORDERED status with no batch_id
+                // 【ケースB】まだQRコードが未生成の場合 -> 新規一括生成を実行
                 const data = await adminApi.admin_qr_generate({
                     order_id: order.order_id
                 });
                 codes = data.data;
                 batchId = data.batch_id;
 
-                // After generation, the Lambda already updates the order, 
-                // but we refresh the UI to show the new status.
-                // GSIの反映待ち時間を考慮して1秒後に再取得
+                // Lambda側で注文データの更新も行われるが、念のためUIを同期
                 setTimeout(() => fetchCardOrders(), 1000);
             } else {
-                // 3. No batch_id for non-ORDERED status
+                // 特殊ケース：バッチ情報なしに発送等へ移行している場合
                 alert("No QR codes found for this order. It may have been processed without saving a batch ID.");
                 return;
             }
 
-            // 4. Trigger download
+            // ダウンロードトリガー用のバッチオブジェクト作成
             const batch = {
                 id: batchId,
                 count: codes.length,
@@ -192,13 +269,14 @@ export default function AdminPage() {
                 design_id: order.design_id
             };
 
-            // Update local history
+            // ローカルの生成履歴に追加（セッション中のみ保持）
             setGeneratedBatches(prev => {
                 const exists = prev.find(b => b.id === batchId);
                 if (exists) return prev;
                 return [batch, ...prev];
             });
 
+            // デザインIDの解決（カスタム design_id または システムプリセット）
             const resolveDesign = (designId?: string) => {
                 const targetId = designId || cardFormat;
                 const dbDesign = dbCardDesigns.find(d => d.design_id === targetId);
@@ -209,6 +287,7 @@ export default function AdminPage() {
             };
             const design = resolveDesign(order.design_id);
 
+            // PDF/CSVのダウンロード実行
             if (type === 'pdf') {
                 await generatePDF(batch, paperFormat, design);
             } else {
@@ -222,10 +301,17 @@ export default function AdminPage() {
         }
     };
 
+    /**
+     * フォーム入力内容から新規の「カード注文 (Card Order)」を作成し、
+     * 即座にQRコード生成とPDFダウンロード（初期配布用）までを一括して実行します。
+     * 
+     * 本システムでは、QRコードのみの生成は行わず、必ず「注文」に紐付けることで
+     * 発送フローやデザイン履歴、メタ情報の整合性を担保しています。
+     */
     const handleGenerate = async () => {
         setIsGenerating(true);
         try {
-            // 1. Create a CARD_ORDER first (Unifying the flow)
+            // 1. CARD_ORDER エンティティを作成 (DBに永続化)
             const orderRes = await adminApi.admin_card_orders_create({
                 shop_id: shopId,
                 quantity: count,
@@ -237,10 +323,10 @@ export default function AdminPage() {
                 activate_now: activateNow
             });
 
-            // 2. Refresh the list to show the new order
+            // 2. 注文履歴を再読込
             await fetchCardOrders();
 
-            // 3. Manually construct/trigger the export for the newly created order
+            // 3. 作成された注文を元に、生成・ダウンロード処理を開始 (handleExportを共有)
             const newOrder = {
                 order_id: orderRes.order_id,
                 shop_id: shopId,
@@ -261,28 +347,32 @@ export default function AdminPage() {
         }
     };
 
+    /**
+     * ID（注文ID、バッチID、QRコードID）による各リソースの検索を実行します。
+     * プレフィックス(QR#, ORDER#等)の正規化を行い、適切なAPIエンドポイントへ振り分けます。
+     */
     const handleIdSearch = async () => {
         if (!searchId.trim()) return;
         setIsSearching(true);
         try {
-            // 入力の正規化: 先頭のプレフィックス (ORDER#, QR_BATCH#, QR#) を除去
+            // 入力の正規化: 先頭のプレフィックスを除去して純粋なUUID/IDを取り出す
             let orderId = searchId.trim().replace(/^(ORDER#|QR_BATCH#|QR#)/, '');
 
             console.log(`[AdminSearch] Starting search workflow for normalized ID: ${orderId}`);
 
-            // 1. Try Batch lookup
+            // 1. バッチID（QRコードの束）としての検索を優先試行
             try {
-                // まずはバッチIDとして検索（同じID形式の場合に備えて）
                 const batchRes = await adminApi.admin_qr_batch_get({ batch_id: orderId });
                 if (batchRes && batchRes.order_id) {
+                    // バッチに紐づく注文IDを発見した場合は、注文情報の取得へ移行
                     console.log(`[AdminSearch] Found matching Batch. Resolving to OrderID: ${batchRes.order_id}`);
                     orderId = batchRes.order_id;
                 }
             } catch (e) {
-                // Not a batch ID, continue to Order lookup
+                // バッチIDでない場合はそのまま注文IDとして扱う
             }
 
-            // 2. Order lookup
+            // 2. 確定した注文IDを用いて、詳細情報を取得
             const orderRes = await adminApi.admin_card_orders_get({ order_id: orderId });
             setSearchedOrder(orderRes);
         } catch (e: any) {
@@ -395,6 +485,11 @@ export default function AdminPage() {
 
 
 
+                {/* 
+                 * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                 * ─── QRコード管理タブ (QR Codes) ──────────────────────────────────────
+                 * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                 */}
                 {activeTab === "qrcodes" && (
                     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
 
@@ -414,6 +509,11 @@ export default function AdminPage() {
 
 
 
+                {/* 
+                 * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                 * ─── カード注文管理タブ (Card Orders) ──────────────────────────────────
+                 * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                 */}
                 {activeTab === "cardorders" && (
                     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
 
@@ -855,6 +955,11 @@ export default function AdminPage() {
 
 
 
+                {/* 
+                 * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                 * ─── ショップ管理タブ (Shops) ─────────────────────────────────────────
+                 * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                 */}
                 {activeTab === "shops" && (
                     <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 animate-in fade-in slide-in-from-bottom-2 duration-300 items-start">
                         {/* ショップのメタデータ管理 (NEW) */}
@@ -875,6 +980,11 @@ export default function AdminPage() {
 
 
 
+                {/* 
+                 * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                 * ─── システムツールタブ (Tools) ────────────────────────────────────────
+                 * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                 */}
                 {activeTab === "tools" && (
                     <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 animate-in fade-in slide-in-from-bottom-2 duration-300 items-start">
                         {/* データダンプ */}
@@ -886,6 +996,11 @@ export default function AdminPage() {
 
 
 
+                {/* 
+                 * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                 * ─── デザイン管理タブ (Designs) ───────────────────────────────────────
+                 * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                 */}
                 {activeTab === "designs" && (
                     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
                         <CardDesignEditor apiUrl={NEXT_PUBLIC_API_URL} />
@@ -901,6 +1016,10 @@ export default function AdminPage() {
     );
 }
 
+/**
+ * QRコード一覧セクション
+ * ステータス別の表示切り替え、キーワード検索、CSVエクスポート機能を提供します。
+ */
 function QRCodeListSection({ apiUrl, onGeneratePDF, paperFormat, cardFormat, dbCardDesigns }: {
     apiUrl: string,
     onGeneratePDF: (batch: any, paperformat: string, cardformat: string | any) => Promise<void>,
@@ -922,8 +1041,12 @@ function QRCodeListSection({ apiUrl, onGeneratePDF, paperFormat, cardFormat, dbC
     // データ取得制限（50件）を超えてまだデータがあるかどうかを管理するフラグ
     const [hasMore, setHasMore] = useState(false);
 
+    /** 表示密度の状態（通常 / コンパクト） */
     const isDense = isDenseManual !== null ? isDenseManual : (codes.length > 30);
 
+    /**
+     * 現在表示されているQRコード一覧をCSV形式でエクスポートします。
+     */
     const handleExportCSV = () => {
         if (codes.length === 0) return;
 
@@ -995,6 +1118,10 @@ function QRCodeListSection({ apiUrl, onGeneratePDF, paperFormat, cardFormat, dbC
         document.body.removeChild(link);
     };
 
+    /**
+     * 指定されたステータスまたは検索キーワードに基づいてQRコードを取得します。
+     * 表示パフォーマンスとコストのため、1回の取得を50件に制限しています。
+     */
     const fetchCodes = async (targetStatus?: string) => {
         setLoading(true);
         try {
@@ -1015,6 +1142,9 @@ function QRCodeListSection({ apiUrl, onGeneratePDF, paperFormat, cardFormat, dbC
         }
     };
 
+    /**
+     * BANNED ステータスのQRコードをすべて一括削除します（管理者用）。
+     */
     const handleDeleteAllBanned = async () => {
         if (status !== 'BANNED') return;
         if (!confirm(t('list.deleteBanned.confirm'))) return;
@@ -1155,6 +1285,10 @@ function QRCodeListSection({ apiUrl, onGeneratePDF, paperFormat, cardFormat, dbC
     );
 }
 
+/**
+ * QRコード一覧の各行コンポーネント
+ * クリックで詳細ダイアログを表示し、各種メタデータの確認とBAN/復元が可能です。
+ */
 function QRCodeRow({ item, apiUrl, onGeneratePDF, onRefresh, paperFormat, cardFormat, dbCardDesigns, isDense }: {
     item: any;
     apiUrl: string;
@@ -1604,6 +1738,10 @@ function QRCodeRow({ item, apiUrl, onGeneratePDF, onRefresh, paperFormat, cardFo
     );
 }
 
+/**
+ * QRコードのBAN / 復元を実行するボタンコンポーネント。
+ * BAN時には理由（メモ）の入力を求めます。
+ */
 function BanButton({ qr_id, apiUrl, onSuccess, size = "sm", className, isBanned = false }: {
     qr_id: string,
     apiUrl: string,
@@ -1694,6 +1832,10 @@ function BanButton({ qr_id, apiUrl, onSuccess, size = "sm", className, isBanned 
     );
 }
 
+/**
+ * システムデバッグ用データダンプセクション。
+ * 特定のプレフィックス（PK）を指定してDynamoDBのアイテムを直接参照します。
+ */
 function DataDumpSection({ apiUrl }: { apiUrl: string }) {
     const t = useTranslations('AdminPage');
 
@@ -1843,6 +1985,10 @@ function DumpCard({
     );
 }
 
+/**
+ * ショップ管理者（マネージャー）の紐付けセクション。
+ * 複数のユーザーIDと複数ショップIDを指定して一括で紐付け・紐付け解除が可能です。
+ */
 function ManagerLinkingSection({ apiUrl }: { apiUrl: string }) {
     const t = useTranslations('AdminPage');
     const [userIdsStr, setUserIdsStr] = useState("");
@@ -1850,6 +1996,8 @@ function ManagerLinkingSection({ apiUrl }: { apiUrl: string }) {
     const [loading, setLoading] = useState(false);
     const [validationData, setValidationData] = useState<{ users: any[], shops: any[] } | null>(null);
     const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+    const [linkAction, setLinkAction] = useState<"execute" | "unlink">("execute");
+    const [resultMessage, setResultMessage] = useState<string | null>(null);
 
     const handleValidate = async () => {
         const uids = Array.from(new Set(userIdsStr.split('\n').map(s => s.trim()).filter(Boolean)));
@@ -1887,13 +2035,12 @@ function ManagerLinkingSection({ apiUrl }: { apiUrl: string }) {
             await adminApi.admin_links({
                 user_ids: uids,
                 shop_ids: sids,
-                action: 'execute'
+                action: linkAction
             });
-            alert(t('list.managerLinking.success'));
+            const msg = linkAction === 'execute' ? t('list.managerLinking.successLink') : t('list.managerLinking.successUnlink');
             setIsConfirmOpen(false);
-            setUserIdsStr("");
-            setShopIdsStr("");
             setValidationData(null);
+            setResultMessage(msg);
         } catch (e) {
             alert(t('list.managerLinking.error'));
         } finally {
@@ -1909,6 +2056,26 @@ function ManagerLinkingSection({ apiUrl }: { apiUrl: string }) {
             </CardHeader>
             <CardContent className="space-y-4">
                 <p className="text-sm text-gray-500">{t('list.managerLinking.description')}</p>
+                
+                <div className="flex items-center gap-2 p-1 bg-gray-100 rounded-lg w-fit">
+                    <Button 
+                        size="sm" 
+                        variant={linkAction === 'execute' ? 'default' : 'ghost'} 
+                        onClick={() => setLinkAction('execute')}
+                        className="h-8"
+                    >
+                        {t('list.managerLinking.actionLink')}
+                    </Button>
+                    <Button 
+                        size="sm" 
+                        variant={linkAction === 'unlink' ? 'default' : 'ghost'} 
+                        onClick={() => setLinkAction('unlink')}
+                        className="h-8"
+                    >
+                        {t('list.managerLinking.actionUnlink')}
+                    </Button>
+                </div>
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
                         <Label htmlFor="linkingUserIds">{t('list.managerLinking.userIds')}</Label>
@@ -1932,15 +2099,16 @@ function ManagerLinkingSection({ apiUrl }: { apiUrl: string }) {
                     </div>
                 </div>
                 <Button onClick={handleValidate} disabled={loading || !userIdsStr || !shopIdsStr} className="w-full">
-                    {loading ? t('list.managerLinking.validating') : t('list.managerLinking.validateButton')}
+                    {loading ? t('list.managerLinking.validating') : (linkAction === 'execute' ? t('list.managerLinking.validateButtonLink') : t('list.managerLinking.validateButtonUnlink'))}
                 </Button>
 
+                {/* Confirm Dialog */}
                 <Dialog open={isConfirmOpen} onOpenChange={setIsConfirmOpen}>
-                    <DialogContent className="max-w-2xl">
+                    <DialogContent className="max-w-2xl text-black">
                         <DialogHeader>
-                            <DialogTitle>{t('list.managerLinking.confirmTitle')}</DialogTitle>
+                            <DialogTitle>{linkAction === 'execute' ? t('list.managerLinking.confirmTitleLink') : t('list.managerLinking.confirmTitleUnlink')}</DialogTitle>
                             <DialogDescription>
-                                {t('list.managerLinking.confirmMessage')}
+                                {linkAction === 'execute' ? t('list.managerLinking.confirmMessageLink') : t('list.managerLinking.confirmMessageUnlink')}
                             </DialogDescription>
                         </DialogHeader>
                         <div className="space-y-4 py-4 max-h-[60vh] overflow-y-auto">
@@ -1949,7 +2117,7 @@ function ManagerLinkingSection({ apiUrl }: { apiUrl: string }) {
                                 <ul className="list-disc list-inside space-y-1 text-sm">
                                     {validationData?.users.map((u: any) => (
                                         <li key={u.id}>
-                                            <span className="font-mono text-xs text-gray-500 mr-2">{u.id}</span>
+                                            <span className="font-mono text-xs text-gray-400 mr-2">{u.id}</span>
                                             <span className="font-medium">{u.email}</span>
                                         </li>
                                     ))}
@@ -1960,7 +2128,7 @@ function ManagerLinkingSection({ apiUrl }: { apiUrl: string }) {
                                 <ul className="list-disc list-inside space-y-1 text-sm">
                                     {validationData?.shops.map((s: any) => (
                                         <li key={s.id}>
-                                            <span className="font-mono text-xs text-gray-500 mr-2">{s.id}</span>
+                                            <span className="font-mono text-xs text-gray-400 mr-2">{s.id}</span>
                                             <span className="font-medium">{s.name}</span>
                                             <span className="text-gray-500 text-xs ml-2">({s.email})</span>
                                         </li>
@@ -1972,8 +2140,25 @@ function ManagerLinkingSection({ apiUrl }: { apiUrl: string }) {
                             <Button variant="outline" onClick={() => setIsConfirmOpen(false)} disabled={loading}>
                                 {t('list.managerLinking.cancel')}
                             </Button>
-                            <Button onClick={handleExecute} disabled={loading}>
-                                {loading ? t('list.managerLinking.executing') : t('list.managerLinking.executeButton')}
+                            <Button onClick={handleExecute} disabled={loading} variant={linkAction === 'unlink' ? 'destructive' : 'default'}>
+                                {loading ? t('list.managerLinking.executing') : (linkAction === 'execute' ? t('list.managerLinking.executeButtonLink') : t('list.managerLinking.executeButtonUnlink'))}
+                            </Button>
+                        </div>
+                    </DialogContent>
+                </Dialog>
+
+                {/* Result Dialog */}
+                <Dialog open={!!resultMessage} onOpenChange={(open) => !open && setResultMessage(null)}>
+                    <DialogContent className="text-black">
+                        <DialogHeader>
+                            <DialogTitle>{t('list.managerLinking.resultTitle')}</DialogTitle>
+                            <DialogDescription>
+                                {resultMessage}
+                            </DialogDescription>
+                        </DialogHeader>
+                        <div className="flex justify-end">
+                            <Button onClick={() => setResultMessage(null)}>
+                                {t('list.managerLinking.closeButton')}
                             </Button>
                         </div>
                     </DialogContent>
@@ -1983,6 +2168,10 @@ function ManagerLinkingSection({ apiUrl }: { apiUrl: string }) {
     );
 }
 
+/**
+ * ショップの所有権（Owner）変更セクション。
+ * 既存のオーナーから別のユーザーへショップの管理権限を完全に移譲します。
+ */
 function ShopOwnerChangeSection({ apiUrl }: { apiUrl: string }) {
     const t = useTranslations('AdminPage');
     const [shopId, setShopId] = useState("");
@@ -2099,6 +2288,10 @@ function ShopOwnerChangeSection({ apiUrl }: { apiUrl: string }) {
     );
 }
 
+/**
+ * 簡易ショップ作成セクション。
+ * 指定したユーザーをオーナーとする新規ショップをデフォルト設定で作成します。
+ */
 function AdminShopCreationSection({ apiUrl }: { apiUrl: string }) {
     const t = useTranslations('AdminPage');
     const [userId, setUserId] = useState("");
@@ -2193,6 +2386,9 @@ function AdminShopCreationSection({ apiUrl }: { apiUrl: string }) {
     );
 }
 
+/**
+ * ショップに使用を許可するカードデザインを個別設定するセクション。
+ */
 function AdminShopCardDesignLinkSection({ apiUrl, dbCardDesigns }: { apiUrl: string, dbCardDesigns: any[] }) {
     const t = useTranslations('AdminPage');
     const tLink = useTranslations('AdminPage.list.shopCardDesignLink');
@@ -2386,6 +2582,10 @@ function AdminShopCardDesignLinkSection({ apiUrl, dbCardDesigns }: { apiUrl: str
 
 
 
+/**
+ * カード注文一覧セクション
+ * 印刷所などへの発注ステータス（ORDERED, PRINTING等）を管理し、QRデータの書き出しを行います。
+ */
 function CardOrderListSection({
     orders,
     loading,

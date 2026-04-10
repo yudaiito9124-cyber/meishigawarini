@@ -1,11 +1,19 @@
 /**
- * 概要: 商品（プロダクト）の管理 (ショップ用)
- * 詳細: 
- *  - 署名付きアセットURLの生成、商品メタデータの更新、および論理削除処理を管理します。
- *  - 商品の作成・更新時には、カードデザインの権限チェックおよびS3パスのクリーンアップが行われます。
- *
- * エンドポイント: POST /shop/products
+ * @file shop_products.ts
+ * @role ショップ用：商品（Product）管理ハンドラー
+ * @responsibility
+ *  - ショップが提供するギフト商品のカタログ情報を管理します。
+ *  - 【S3アセット管理の安全性】
+ *    DynamoDB には一時的な署名付き URL を保存せず、`stripSignature` で純粋な S3 パスのみを永続化。
+ *    取得時（`list`）に `signUrlIfS3` を通じて動的に閲覧用 URL を生成することで、URL の期限切れや流出を防ぎます。
+ *  - 【デザイン資産の保護】
+ *    ショップが利用できるカードデザイン（`design_id`）を厳格に制限。システム共通デザイン、または管理者が当該ショップに個別に許可したもののみが設定可能です。
+ *  - 【安全な削除（Logical Delete）】
+ *    `status = DELETED` による論理削除を実装。既にアクティブなギフト券（QR）が紐付いている場合は、整合性保護のため削除を拒否します。
+ * @context
+ *  - 店舗が「どのカードで何を贈るか」を定義するための、マスターデータ管理の主要な口となります。
  */
+
 import { APIGatewayProxyHandler } from 'aws-lambda';
 import { PutCommand, QueryCommand, GetCommand, UpdateCommand, BatchGetCommand } from '@aws-sdk/lib-dynamodb';
 import { checkShopOwnerOrGM } from './share/shop-auth';
@@ -30,7 +38,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 
         if (!userId) return errorResponse(401, 'Unauthorized');
 
-        // パスベースのルーティング互換性
+        // 互換性: 旧パスベースのルーティングに対応
         const resPath = event.resource;
         if (resPath.endsWith('/list')) action = 'list';
         else if (resPath.endsWith('/create')) action = 'create';
@@ -39,21 +47,20 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 
         if (!shopId) return errorResponse(400, 'Missing shopId');
 
-        // 権限チェック
+        // 権限検証: ショップの管理者であることを確認
         const shopMetadata = await checkShopOwnerOrGM(ddb, TABLE_NAME, shopId, userId, event);
         if (!shopMetadata) return errorResponse(403, 'Forbidden');
 
-        // ====================================================================
-        // ACTION: create (新規商品の作成)
         // --------------------------------------------------------------------
-        // 目的: ショップに紐づく新しい商品を登録します。
-        // ====================================================================
+        // ACTION: create (新規商品の作成)
+        // 目的: ショップ固有のギフト券（商品）を新規登録。
+        // --------------------------------------------------------------------
         if (action === 'create') {
             const { name, description, image_url, price, valid_days, detail_html, design_id } = body as ShopApiSchema['shop_products_create'];
             if (!name) return errorResponse(400, 'Missing product name');
             if (!design_id) return errorResponse(400, 'Missing design_id');
 
-            // カードデザインの利用権限チェック
+            // セキュリティ: 指定されたデザイン ID がそのショップで許可されているか評価
             const isSystemDesign = !!getSystemDesign(design_id);
             const isAllowedDesign = shopMetadata.card_designs?.includes(design_id);
             if (!isSystemDesign && !isAllowedDesign) return errorResponse(403, 'Disallowed design_id');
@@ -66,6 +73,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 Item: {
                     PK: `SHOP#${shopId}`, SK: `PRODUCT#${productId}`,
                     product_id: productId, name, description,
+                    // 重要: RichText 領域内の画像 URL から署名を除去して保存
                     detail_html: stripSignaturesInHtml(detail_html || '', BUCKET_NAME),
                     image_url: stripSignature(image_url),
                     price, valid_days: Math.min(valid_days || DEFAULT_VALID_DAYS, 180),
@@ -79,11 +87,10 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             return apiResponse(201, { product_id: productId, message: 'Product created' });
         }
 
-        // ====================================================================
-        // ACTION: list (商品一覧の取得)
         // --------------------------------------------------------------------
-        // 目的: ショップに紐づく全商品を一覧取得し、デザイン情報をマージします。
-        // ====================================================================
+        // ACTION: list (商品一覧の取得とアセットの署名)
+        // 目的: カタログデータを取得し、ブラウザで表示可能な URL へ結合・変換。
+        // --------------------------------------------------------------------
         if (action === 'list') {
             const res = await ddb.send(new QueryCommand({
                 TableName: TABLE_NAME,
@@ -91,21 +98,21 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 ExpressionAttributeValues: { ':pk': `SHOP#${shopId}`, ':sk': 'PRODUCT#' }
             }));
 
-            // DELETED 以外を抽出
+            // 論理削除済みのアイテムは非表示
             const items = (res.Items || []).filter(item => item.status !== 'DELETED');
             
-            // design_id を正規化
+            // 下位互換処理
             items.forEach(item => {
                 if (!item.design_id && (item as any).card_design_id) {
                     item.design_id = (item as any).card_design_id;
                 }
             });
 
+            // 【Enrichment: カードデザインのメタデータを一括マージ】
             const designIds = Array.from(new Set(items.map(item => item.design_id).filter(id => !!id)));
             const designMap: Record<string, any> = {};
 
             if (designIds.length > 0) {
-                // デザインメタデータの一括取得
                 const batchRes = await ddb.send(new BatchGetCommand({
                     RequestItems: { [TABLE_NAME]: { Keys: designIds.map(id => ({ PK: 'CARD_DESIGN#METADATA', SK: id })) } }
                 }));
@@ -119,7 +126,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                         bgimgf: await signUrlIfS3(d.bgimgf, BUCKET_NAME)
                     };
                 }
-                // システムデザインの補完
+                // システム標準デザインのフォールバック
                 for (const id of designIds) {
                     if (!designMap[id]) {
                         const sys = getSystemDesign(id);
@@ -128,7 +135,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 }
             }
 
-            // 画像の署名とデザイン情報のアタッチ
+            // 【URL 署名: 相対パスを一時的な閲覧用 URL へ置換】
             for (const item of items) {
                 if (item.image_url) item.image_url = await signUrlIfS3(item.image_url, BUCKET_NAME);
                 if (item.detail_html) item.detail_html = await signUrlsInHtml(item.detail_html, BUCKET_NAME);
@@ -137,19 +144,16 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             return successResponse({ items });
         }
 
-        // ====================================================================
-        // ACTION: update (商品情報の更新)
         // --------------------------------------------------------------------
-        // 目的: 価格、有効期間、デザインなどの属性を部分更新します。
-        // ====================================================================
+        // ACTION: update (商品の属性更新)
+        // 目的: 既存商品の価格やデザインの変更に対応。
+        // --------------------------------------------------------------------
         if (action === 'update') {
             const product_id = getProductId(event, body);
             const { status, name, description, image_url, price, valid_days, detail_html, design_id } = body as ShopApiSchema['shop_products_update'];
             
             if (!product_id) return errorResponse(400, 'Missing product ID');
 
-            // 【確認フェーズ】
-            // 理由: 更新対象の商品が存在するか、および現在の状態（削除済でないか等）を事前に確認します。
             const currentRes = await ddb.send(new GetCommand({
                 TableName: TABLE_NAME,
                 Key: { PK: `SHOP#${shopId}`, SK: `PRODUCT#${product_id}` }
@@ -157,7 +161,6 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             if (!currentRes.Item) return errorResponse(404, 'Product not found');
             if (currentRes.Item.status === 'DELETED') return errorResponse(400, 'Cannot update a deleted product');
 
-            // 【実施フェーズ】
             const updateExpr: string[] = ['ts_updated_at = :now'];
             const attrNames: Record<string, string> = { '#status': 'status' };
             const attrValues: Record<string, any> = { ':now': new Date().toISOString() };
@@ -170,6 +173,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             }
             if (name) { updateExpr.push('#name = :name'); attrNames['#name'] = 'name'; attrValues[':name'] = name; }
             if (description !== undefined) { updateExpr.push('description = :desc'); attrValues[':desc'] = description; }
+            // 保存前に S3 パスから署名（QueryString）を除去
             if (image_url !== undefined) { updateExpr.push('image_url = :img'); attrValues[':img'] = stripSignature(image_url); }
             if (price !== undefined) { updateExpr.push('price = :price'); attrValues[':price'] = price; }
             if (valid_days !== undefined) { updateExpr.push('valid_days = :vd'); attrValues[':vd'] = Math.min(valid_days, 180); }
@@ -192,11 +196,10 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             return successResponse({ message: 'Product updated' });
         }
 
-        // ====================================================================
-        // ACTION: delete (商品の論理削除)
         // --------------------------------------------------------------------
-        // 目的: 商品を削除済み(DELETED)状態にします。稼働中のQRがある場合は不可。
-        // ====================================================================
+        // ACTION: delete (商品の論理削除と安全チェック)
+        // 目的: 公開停止済みの商品を削除（DELETED 状態に移行）させます。
+        // --------------------------------------------------------------------
         if (action === 'delete') {
             const product_id = getProductId(event, body);
             if (!product_id) return errorResponse(400, 'Missing product ID');
@@ -207,7 +210,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             if (!prodRes.Item) return errorResponse(404, 'Product not found');
             if (prodRes.Item.status !== 'STOPPED') return errorResponse(400, 'Product must be STOPPED to delete');
 
-            // 稼働中のQRコード検索
+            // 安全チェック: 現在進行中の QR コードが存在する場合は削除を許可しない
             const [usedRes, activeRes] = await Promise.all([
                 ddb.send(new QueryCommand({ TableName: TABLE_NAME, IndexName: 'GSI1', KeyConditionExpression: 'GSI1_PK = :pk', ExpressionAttributeValues: { ':pk': 'QR#USED' } })),
                 ddb.send(new QueryCommand({ TableName: TABLE_NAME, IndexName: 'GSI1', KeyConditionExpression: 'GSI1_PK = :pk', ExpressionAttributeValues: { ':pk': 'QR#ACTIVE' } }))
@@ -215,7 +218,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             const relatedQRs = [...(usedRes.Items || []), ...(activeRes.Items || [])].filter(q => q.product_id === product_id && q.shop_id === shopId);
             if (relatedQRs.length > 0) return errorResponse(409, 'Cannot delete product with active QRs');
 
-            // 論理削除の実行
+            // 論理削除の実施
             const deletedItem = { ...prodRes.Item, status: 'DELETED', GSI1_PK: 'PRODUCT#DELETED', GSI1_SK: new Date().toISOString(), ts_updated_at: new Date().toISOString() };
             await ddb.send(new PutCommand({ TableName: TABLE_NAME, Item: deletedItem }));
             

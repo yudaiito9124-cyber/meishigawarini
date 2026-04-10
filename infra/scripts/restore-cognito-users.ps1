@@ -1,4 +1,15 @@
-# Restore-CognitoUsers.ps1
+<#
+.SYNOPSIS
+    バックアップされた JSON ファイルから Cognito ユーザーを復元（インポート）します。
+.DESCRIPTION
+    `backup-cognito-users.ps1` で作成された JSON ファイルを読み込み、
+    指定された UserPool へユーザーを再作成します。
+    パスワードはリセットされ、ユーザーは初回ログイン時にパスワード変更が必要になります。
+.PARAMETER UserPoolId
+    復元先の AWS Cognito User Pool ID。
+.PARAMETER BackupFile
+    読み込むバックアップ JSON ファイルのパス。
+#>
 param (
     [Parameter(Mandatory=$true)]
     [string]$UserPoolId,

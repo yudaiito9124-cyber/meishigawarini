@@ -1,6 +1,14 @@
 /**
  * ファイル概要: ユーザー新規登録ページ
- * 目的: 新規ショップオーナーなどにCognito経由でのアカウント作成(サインアップ)機能を提供します。
+ * 
+ * 役割:
+ * 名刺代わりに。プラットフォームへの新規アカウント作成インターフェースを提供します。
+ * Cognito (Amplify) を利用して、メールアドレスベースのユーザー登録を行います。
+ * 
+ * 登録フロー:
+ * 1. サインアップ試行 (signUp)
+ * 2. メールアドレス確認待ち (CONFIRM_SIGN_UP) へ遷移し、確認コード入力を促す。
+ * 3. 完了後、ログインページへ誘導または自動サインイン。
  */
 'use client';
 
@@ -13,15 +21,28 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 
+/**
+ * 新規登録ページコンポーネント
+ */
 export default function RegisterPage() {
+    /** 翻訳用フック */
     const t = useTranslations('RegisterPage');
     const router = useRouter();
+
+    /** 入力値：メールアドレス */
     const [email, setEmail] = useState('');
+    /** 入力値：パスワード */
     const [password, setPassword] = useState('');
+    /** エラー表示用 */
     const [error, setError] = useState('');
+    /** 登録処理中フラグ */
     const [loading, setLoading] = useState(false);
+    /** 登録成功フラグ（UI切り替え用） */
     const [success, setSuccess] = useState(false);
 
+    /**
+     * サインアップ処理を実行します。
+     */
     const handleRegister = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
@@ -35,24 +56,24 @@ export default function RegisterPage() {
                     userAttributes: {
                         email,
                     },
-                    autoSignIn: true // Try to sign in immediately after confirmation
+                    // 確認コード入力後の自動サインインを有効化
+                    autoSignIn: true 
                 }
             });
 
-            // console.log('Sign up result:', { isSignUpComplete, nextStep });
-
             if (isSignUpComplete) {
+                // 通常はここで完了せず nextStep が CONFIRM_SIGN_UP になる
                 setSuccess(true);
             } else if (nextStep.signUpStep === 'CONFIRM_SIGN_UP') {
+                // 確認コード入力ページへ、メールアドレスをパラメータとして保持して遷移
                 router.push(`/verify?username=${encodeURIComponent(email)}`);
             }
 
         } catch (err: any) {
+            // エラーハンドリング：既に登録されている場合など
             if (err.name === 'UsernameExistsException' || err.code === 'UsernameExistsException') {
-                // Determine if we should log this or not. For now, let's skip logging to avoid confusion.
                 setError(t('errors.usernameExists'));
             } else {
-                // console.error('Register error', err);
                 setError(err.message || t('errors.default'));
             }
         } finally {

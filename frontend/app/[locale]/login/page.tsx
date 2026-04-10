@@ -1,7 +1,21 @@
 /**
- * ファイル概要: ユーザーログインページ
- * 目的: Cognitoを利用した認証機能を提供し、既存ユーザーがショップ管理画面などにアクセスできるようにします。
+ * ファイル概要: ユーザー認証（ログイン）ページ
+ * 
+ * 役割:
+ * Amazon Cognito (Amplify SDK) を利用したマルチ認証インターフェースを提供します。
+ * ユーザーのアイデンティティを確認し、ロール（管理者・ショップオーナー・一般ユーザー）に基づく
+ * 適切なページへの振り分けを担当します。
+ * 
+ * 仕様:
+ * 1. 認証方式: 標準ID/パスワード、MFA（TOTP）、および Hosted UI (AWS 統合) をサポート。
+ * 2. 自動ルーティング: 
+ *    - 管理者グループ所属者: 管理者用ダッシュボードへのリンクを表示。
+ *    - ショップオーナー: 複数ショップ所有時は選択肢を表示、単一所有時は自動遷移。
+ *    - 一般ユーザー: ユーザーマイページ (`/user`) へ。
+ * 3. ステータス管理: セッションの即時チェックを行い、有効な場合はログインフォームを省略。
+ * 4. セキュリティ: 多要素認証 (MFA) のチャレンジ応答フローを完全に実装。
  */
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -17,28 +31,50 @@ import { cn } from '@/lib/utils';
 import { shopApi } from '@/lib/api/shop';
 import { HelpCircle, Crown, Store, Loader2, User, LogOut } from 'lucide-react';
 
+/**
+ * ログインページコンポーネント
+ * 認証状態、MFA、およびユーザー権限（管理者判定）を管理します。
+ */
 export default function LoginPage() {
+    /** 翻訳用フック */
     const t = useTranslations('LoginPage');
     const router = useRouter();
+
+    /** 入力フィールド：メールアドレス */
     const [email, setEmail] = useState('');
+    /** 入力フィールド：パスワード */
     const [password, setPassword] = useState('');
+    /** 入力フィールド：MFAコード（TOTP等） */
     const [mfaCode, setMfaCode] = useState('');
+    /** MFA入力画面の表示フラグ */
     const [showMfa, setShowMfa] = useState(false);
+    /** エラーメッセージ表示 */
     const [error, setError] = useState('');
+    /** 処理中フラグ（初期値 true でセッションチェックから開始） */
     const [loading, setLoading] = useState(true);
+    /** ログイン済みフラグ */
     const [isLoggedIn, setIsLoggedIn] = useState(false);
+    /** ユーザーのメールアドレス（表示用） */
     const [userEmail, setUserEmail] = useState('');
+    /** ユーザーID (Subject ID) */
     const [userId, setUserId] = useState('');
+    /** 所属グループ情報（管理者向け） */
     const [userInfo, setUserInfo] = useState('');
+    /** 所有ショップが1つのみかどうか（UI切り替え用） */
     const [singleShopOwner, setSingleShopOwner] = useState<boolean>(true);
+    /** 管理者（Administratorsグループ所属）フラグ */
     const [isAdmin, setIsAdmin] = useState(false);
 
+    /**
+     * 現在の認証セッションを確認し、ログイン済みであれば権限情報を取得します。
+     */
     const checkAuth = async () => {
         try {
             const session = await fetchAuthSession();
             if (session.tokens) {
                 const payload = session.tokens.idToken?.payload || {};
                 const groups = (payload['cognito:groups'] as string[]) || [];
+                /** Administrators または GlobalAdmins グループ所属を確認 */
                 const isAdmin = groups.includes('Administrators') || groups.includes('GlobalAdmins');
                 const sub = payload['sub'] as string || "";
 
@@ -50,7 +86,7 @@ export default function LoginPage() {
                 }
                 setIsLoggedIn(true);
 
-                // APIを叩いてショップ情報を取得（自動作成を回避）
+                // 権限確認後、所有ショップなどの状況に応じてリダイレクト
                 await redirectShopPage(sub);
             } else {
                 handleHostedUILogin();
@@ -60,30 +96,30 @@ export default function LoginPage() {
         }
     };
 
+    /**
+     * ログイン直後のリダイレクト先を判定します。
+     * 一般ユーザーの場合、所有ショップの有無によって遷移先が変わります。
+     */
     const redirectShopPage = async (sub: string) => {
-
         setLoading(true);
         try {
+            // 管理者の場合は管理画面リンクを表示するため、リダイレクトせずに留まる
             if (isAdmin) {
                 return;
             }
+            // ショップリストを取得（まだ存在しないユーザーの場合は空リストが返る）
             const data = await shopApi.shop_list({ no_create: true });
             const shops = data.shops || [];
 
-            console.log("shops: " + shops)
-            console.log("data: " + data)
             if (shops.length === 0) {
-                // ショップを持たないユーザーはプロフィールへ
-                console.log("onshops");
+                // ショップを持たない（または未登録の）ユーザーはプロフィールページへ
                 router.push(`/user`);
             } else {
-                console.log("any shops");
-
+                // 1つ以上のショップがある場合は、ログイン後の選択肢を表示
                 setSingleShopOwner(shops.length === 1);
-                // ショップ選択UIに留まる (ショップリストがあれば、そこで選択可能)
             }
         } catch (e) {
-            // エラー時はプロフィールへフォールバック
+            // 例外時は安全策としてプロフィールページへフォールバック
             router.push(`/user`);
         } finally {
             setLoading(false);
@@ -105,6 +141,10 @@ export default function LoginPage() {
         }
     };
 
+    /**
+     * Amplify SDK を利用したログイン処理を実行します。
+     * ステータスに応じて MFA画面への切り替えや完了確認ページへの遷移を行います。
+     */
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
@@ -112,33 +152,35 @@ export default function LoginPage() {
 
         try {
             if (showMfa) {
-                // MFAコードの送信
+                // MFA (TOTP) コードの確認およびログイン完了
                 const { isSignedIn } = await confirmSignIn({
                     challengeResponse: mfaCode
                 });
                 if (isSignedIn) {
-                    await checkAuth(); // checkAuth内でredirectShopPageも呼ばれる
+                    await checkAuth();
                 }
                 return;
             }
 
-            // 通常のID/PWログイン
+            // 標準的な ID/PW 認証の試行
             const { isSignedIn, nextStep } = await signIn({ username: email, password });
 
             if (isSignedIn) {
-                await checkAuth(); // checkAuth内でredirectShopPageも呼ばれる
+                await checkAuth();
                 return;
             } else {
+                // 認証完了までに追加ステップ（メール確認・MFA等）が必要な場合
                 if (nextStep.signInStep === 'CONFIRM_SIGN_UP') {
                     router.push(`/verify?username=${encodeURIComponent(email)}`);
                 } else if (nextStep.signInStep === 'CONFIRM_SIGN_IN_WITH_TOTP_CODE') {
-                    // MFA入力画面に切り替え
+                    // MFA入力画面を表示
                     setShowMfa(true);
                 } else {
                     setError(`Additional step required: ${nextStep.signInStep}`);
                 }
             }
         } catch (err: any) {
+            // エラーハンドリング：アカウント未確認やパスワード誤りなど
             if (err.name === 'NotAuthorizedException' || err.code === 'NotAuthorizedException') {
                 setError(t('errors.notAuthorized'));
             } else if (err.name === 'UserNotConfirmedException' || err.code === 'UserNotConfirmedException') {
@@ -147,7 +189,6 @@ export default function LoginPage() {
             } else if (err.name === 'CodeMismatchException') {
                 setError(t('errors.invalidAuthCode'));
             } else {
-                // console.error('Login error', err);
                 setError(err.message || t('errors.default'));
             }
         } finally {

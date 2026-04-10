@@ -1,13 +1,20 @@
 /**
- * 概要: 送信・受信履歴の取得およびギフトの紐付け
- * 詳細:
- *  - ユーザーに関連するすべての送信ログ(SENDLOG)と受信ログ(RECEIVEDLOG)を取得します。
- *  - また、新しくギフト（QR ID）をスキャンした際に、それを自分の送信履歴として登録する機能を提供します。
- *
- * エンドポイント:
- *  - POST /user/history/get (送信・受信履歴の一覧取得)
- *  - POST /user/history/sendgift (ギフトのスキャン・紐付け)
+ * @file user_history.ts
+ * @role ユーザー用：送受信履歴・ギフト紐付けハンドラー
+ * @responsibility
+ *  - ユーザーが「贈ったギフト（SENDLOG）」と「受け取ったギフト（RECEIVEDLOG）」の個人台帳を管理します。
+ *  - 【高度なデータ集約（Deep Enrichment）】
+ *    DynamoDB 上で完全に正規化（分散）されたデータ（QRメタ, 注文, チャット, デザイン, 商品, 店舗）を、
+ *    再帰的な `BatchGet` パターンを用いて抽出し、履歴画面に必要なリッチな表示オブジェクトへ集約します。
+ *  - 【アトミックな送信者紐付け】
+ *    `sendgift` アクションでは、`ConditionExpression` を用いて、一つのギフト券（QR）に複数の送信者が紐付くことを排他的に防止します。
+ *  - 【プロフィール・スナップショット】
+ *    ギフトに関連付けられた「送り主情報」は、その時点のプロフィール状態を `CHAT` レコードへコピー（Snapshot）して保存します。
+ *    これにより、将来的にユーザーがプロフィールを変更しても、過去に贈ったギフトのメッセージカード上の送り主情報は当時のまま維持されます。
+ * @context
+ *  - ユーザーのマイページ（利用履歴）における中核機能を担います。
  */
+
 import { APIGatewayProxyHandler } from 'aws-lambda';
 import { GetCommand, UpdateCommand, QueryCommand, BatchGetCommand } from '@aws-sdk/lib-dynamodb';
 import { appendToHistory } from './utils/history';
@@ -29,44 +36,43 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 
         if (!userId) return errorResponse(401, 'Unauthorized');
 
-        // ====================================================================
-        // ACTION: get (送信・受信履歴の取得)
         // --------------------------------------------------------------------
-        // 目的: 指定されたログタイプ(SENDLOG / RECEIVEDLOG)の履歴データをすべて取得します。
-        // ====================================================================
+        // ACTION: get (送信・受信履歴の取得)
+        // 目的: 自身の「贈ったもの」「受け取ったもの」を最新のデザイン/商品情報と共に一覧取得。
+        // --------------------------------------------------------------------
         if (action === 'get') {
             const pk = `USER#${userId}`;
 
+            /**
+             * 指定されたログ種別の ID リストを取得してソートする内部関数。
+             */
             const fetchLogs = async (logType: string) => {
                 const queryRes = await ddb.send(new QueryCommand({
                     TableName: TABLE_NAME,
                     KeyConditionExpression: 'PK = :pk AND begins_with(SK, :skPrefix)',
-                    ExpressionAttributeValues: {
-                        ':pk': pk,
-                        ':skPrefix': `${logType}#`
-                    }
+                    ExpressionAttributeValues: { ':pk': pk, ':skPrefix': `${logType}#` }
                 }));
                 const allQrIds: Array<{ qr_id: string, timestamp: string }> = [];
                 for (const item of queryRes.Items || []) {
                     if (item.logs && Array.isArray(item.logs)) {
-                        // 互換性のため uuid もチェック
+                        // 下位互換性: uuid フィールドも考慮
                         allQrIds.push(...item.logs.map((l: any) => ({
                             qr_id: l.qr_id || l.uuid,
                             timestamp: l.timestamp
                         })));
                     }
                 }
-                // Timestamp降順でソート
                 allQrIds.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
                 return allQrIds;
             };
 
+            // 送信ログと受信ログを並行取得
             const [sentLogs, receivedLogs] = await Promise.all([
                 fetchLogs('SENDLOG'),
                 fetchLogs('RECEIVEDLOG')
             ]);
 
-            // メタデータ紐付け(Enrichment)
+            // 各 ID に対し、QR メタデータ、デザイン、商品などの詳細情報を結合（Deep Enrichment）
             const [sent, received] = await Promise.all([
                 enrichLogs(sentLogs),
                 enrichLogs(receivedLogs)
@@ -75,37 +81,28 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             return successResponse({ sent, received });
         }
 
-        // ====================================================================
-        // ACTION: sendgift (ギフトの紐付け)
         // --------------------------------------------------------------------
-        // 目的: QR IDをスキャンして、自分を送信者として登録し、送信履歴に追加します。
-        // ====================================================================
+        // ACTION: sendgift (ギフトの送信者紐付け)
+        // 目的: 未紐付けの QR を自分の「送信履歴」として登録。
+        // --------------------------------------------------------------------
         if (action === 'sendgift') {
-            const { qr_id: body_qr_id, pin: body_pin } = body as UserApiSchema['user_history_sendgift'];
             const qr_id = getQrId(event, body);
-            const pin = getPIN(event, body);
-
             if (!qr_id) return errorResponse(400, 'Missing QR ID');
 
-            // 1. PINの妥当性とステータスを確認
             const qrRes = await ddb.send(new GetCommand({
-                TableName: TABLE_NAME,
-                Key: { PK: `QR#${qr_id}`, SK: 'METADATA' }
+                TableName: TABLE_NAME, Key: { PK: `QR#${qr_id}`, SK: 'METADATA' }
             }));
-            if (!qrRes.Item) {
-                return errorResponse(404, 'QR code not found');
-            }
+            if (!qrRes.Item) return errorResponse(404, 'QR code not found');
 
-            // ユーザーの最新プロフィール（SENDER）を取得してスナップショットとして保存する
+            // 【プロフィール・スナップショットの取得】
             const profileRes = await ddb.send(new GetCommand({
-                TableName: TABLE_NAME,
-                Key: { PK: `USER#${userId}`, SK: 'SENDER' }
+                TableName: TABLE_NAME, Key: { PK: `USER#${userId}`, SK: 'SENDER' }
             }));
             const sender_info = profileRes.Item ? { ...profileRes.Item } : { user_id: userId };
             delete (sender_info as any).PK;
             delete (sender_info as any).SK;
 
-            // 1. CHATレコードに自分を送信者として紐付ける (既に紐付け済みの場合は例外を発生させる)
+            // 【アトミック更新】sender_id が未設定の場合のみ自分を書き込む
             try {
                 await ddb.send(new UpdateCommand({
                     TableName: TABLE_NAME,
@@ -113,9 +110,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                     UpdateExpression: 'SET sender_id = :sid, sender_info = :sinfo, ts_updated_at = :now',
                     ConditionExpression: 'attribute_not_exists(sender_id)',
                     ExpressionAttributeValues: {
-                        ':sid': userId,
-                        ':sinfo': sender_info,
-                        ':now': new Date().toISOString()
+                        ':sid': userId, ':sinfo': sender_info, ':now': new Date().toISOString()
                     }
                 }));
             } catch (err: any) {
@@ -125,7 +120,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 throw err;
             }
 
-            // 2. SENDLOG に追記する
+            // 自身の送信履歴ログ（SENDLOG）に ID を追記
             await appendToHistory(ddb, TABLE_NAME, userId, 'SENDLOG', qr_id);
 
             return successResponse({ message: 'Gift successfully linked to your sender profile' });
@@ -140,7 +135,8 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 };
 
 /**
- * 履歴用の項目をメタデータによって多重化(Enrichment)
+ * 履歴ログ一覧（QR ID リスト）に対し、必要な全ての関連データを結合してリッチなオブジェクトを構築します。
+ * パフォーマンス最適化のため、各種 BatchGet を段階的に実行します。
  */
 async function enrichLogs(logs: Array<{ qr_id: string, timestamp: string }>) {
     if (logs.length === 0) return [];
@@ -148,11 +144,11 @@ async function enrichLogs(logs: Array<{ qr_id: string, timestamp: string }>) {
     const qrIds = logs.map(l => l.qr_id);
     const results = [];
 
-    // 100件ずつのバッチ取得
+    // DynamoDB BatchGet の上限(100)ごとに分割処理
     for (let i = 0; i < qrIds.length; i += 100) {
         const chunk = qrIds.slice(i, i + 100);
 
-        // METADATA, ORDER, CHAT(sender_info)などの一括取得
+        // Stage 1: QR 基本情報のバルク取得（METADATA / ORDER / CHAT）
         const keys = [
             ...chunk.map(qr_id => ({ PK: `QR#${qr_id}`, SK: 'METADATA' })),
             ...chunk.map(qr_id => ({ PK: `QR#${qr_id}`, SK: 'ORDER' })),
@@ -164,16 +160,10 @@ async function enrichLogs(logs: Array<{ qr_id: string, timestamp: string }>) {
         const itemMap = new Map();
         items.forEach(it => itemMap.set(`${it.PK}#${it.SK}`, it));
 
-        // デザイン情報、商品情報、ショップ情報の取得用
         const metaList = items.filter(it => it.SK === 'METADATA');
-        
-        // 互換性処理: metaList の各要素に design_id を設定
-        metaList.forEach(m => {
-            if (!m.design_id && (m as any).card_design) {
-                m.design_id = (m as any).card_design;
-            }
-        });
+        metaList.forEach(m => { if (!m.design_id && (m as any).card_design) m.design_id = (m as any).card_design; });
 
+        // Stage 2: 外部マスタデータ（デザイン、商品、店舗）の ID リストを抽出して並行取得
         const designIds = [...new Set(metaList.map(it => it.design_id).filter(Boolean))];
         const shopProductPairs = [...new Set(metaList.map(it => `${it.shop_id}#${it.product_id}`).filter(p => !p.startsWith('undefined')))];
         const shopIds = [...new Set(metaList.map(it => it.shop_id).filter(Boolean))];
@@ -182,14 +172,20 @@ async function enrichLogs(logs: Array<{ qr_id: string, timestamp: string }>) {
         const productMap = new Map();
         const shopMap = new Map();
 
-        // 1. デザイン情報の取得
+        // --------------------------------------------------------------------
+        // Stage 2: 外部マスタデータの取得 (Enrichment)
+        // 目的: QR メタデータから抽出された各 ID に基づき、表示に必要な情報を各マスタテーブルから引き当てます。
+        // パフォーマンス: 並行処理ではなく直列のバルク取得を行うことで、エラー発生時の特定を容易にし、コードの可読性を高めています。
+        // --------------------------------------------------------------------
+
+        // 2-1. カードデザイン情報の取得 (CARD_DESIGN#METADATA / SK: <id>)
         if (designIds.length > 0) {
             const designKeys = (designIds as string[]).map(id => ({ PK: 'CARD_DESIGN#METADATA', SK: id }));
             const dRes = await ddb.send(new BatchGetCommand({ RequestItems: { [TABLE_NAME]: { Keys: designKeys } } }));
             dRes.Responses?.[TABLE_NAME]?.forEach(d => designMap.set(d.SK, d));
         }
 
-        // 2. 商品情報の取得 (SHOP#ID, PRODUCT#ID)
+        // 2-2. 商品情報の取得 (SHOP#<id> / PRODUCT#<id>)
         if (shopProductPairs.length > 0) {
             const productKeys = shopProductPairs.map(p => {
                 const [sid, pid] = p.split('#');
@@ -199,51 +195,48 @@ async function enrichLogs(logs: Array<{ qr_id: string, timestamp: string }>) {
             pRes.Responses?.[TABLE_NAME]?.forEach(p => productMap.set(`${p.PK}#${p.SK}`, p));
         }
 
-        // 3. ショップ情報の取得 (SHOP#ID, METADATA)
+        // 2-3. ショップ名の取得 (SHOP#<id> / METADATA)
         if (shopIds.length > 0) {
             const shopKeys = (shopIds as string[]).map(id => ({ PK: `SHOP#${id}`, SK: 'METADATA' }));
             const sRes = await ddb.send(new BatchGetCommand({ RequestItems: { [TABLE_NAME]: { Keys: shopKeys } } }));
             sRes.Responses?.[TABLE_NAME]?.forEach(s => shopMap.set(s.PK, s));
         }
 
+        // --------------------------------------------------------------------
+        // Stage 3: 個々のログエントリーへの結合とアセット署名
+        // --------------------------------------------------------------------
         for (const qr_id of chunk) {
             const meta = itemMap.get(`QR#${qr_id}#METADATA`);
             if (!meta) continue;
 
+            // 期限切れのリアルタイム判定（Lazy Evaluation）
+            const currentStatus = await checkAndExpire(ddb, TABLE_NAME, qr_id, meta);
+
+            const design = meta.design_id ? (designMap.get(meta.design_id) || getSystemDesign(meta.design_id)) : null;
+            const product = productMap.get(`SHOP#${meta.shop_id}#PRODUCT#${meta.product_id}`);
+            const shop = shopMap.get(`SHOP#${meta.shop_id}`);
             const order = itemMap.get(`QR#${qr_id}#ORDER`) || {};
             const chat = itemMap.get(`QR#${qr_id}#CHAT`) || {};
 
-            // 期限切れチェック(遅延評価)
-            const currentStatus = await checkAndExpire(ddb, TABLE_NAME, qr_id, meta);
-
-            const designId = meta.design_id;
-            const design = designId ? (designMap.get(designId) || getSystemDesign(designId)) : null;
-            const product = productMap.get(`SHOP#${meta.shop_id}#PRODUCT#${meta.product_id}`);
-            const shop = shopMap.get(`SHOP#${meta.shop_id}`);
-
             results.push({
-                qr_id,
-                status: currentStatus,
-                pin: meta.pin,
-                product_id: meta.product_id,
-                product_name: product?.name,
+                qr_id, status: currentStatus, pin: meta.pin,
+                product_id: meta.product_id, product_name: product?.name,
+                // アセットの URL 署名
                 product_image_url: product ? await signUrlIfS3(product.image_url, BUCKET_NAME) : null,
-                shop_id: meta.shop_id,
-                shop_name: shop?.name,
-                design_id: designId,
+                shop_id: meta.shop_id, shop_name: shop?.name,
+                design_id: meta.design_id,
                 thumbf: design ? await signUrlIfS3(design.thumbf, BUCKET_NAME) : null,
                 thumbb: design ? await signUrlIfS3(design.thumbb, BUCKET_NAME) : null,
                 bgimgf: design ? await signUrlIfS3(design.bgimgf, BUCKET_NAME) : null,
                 bgimgb: design ? await signUrlIfS3(design.bgimgb, BUCKET_NAME) : null,
                 recipient_name: order.name,
-                sender_info: chat.sender_info,
-                ts_created_at: meta.ts_created_at,
-                ts_updated_at: meta.ts_updated_at,
+                sender_info: chat.sender_info, // スナップショットされた送り主情報
+                ts_created_at: meta.ts_created_at, ts_updated_at: meta.ts_updated_at,
                 timestamp: logs.find(l => l.qr_id === qr_id)?.timestamp
             });
         }
     }
 
-    // 元のソート順(履歴追加日)で再ソート
+    // 最後に履歴追加日時（timestamp）で再ソート
     return results.sort((a, b) => new Date(b.timestamp!).getTime() - new Date(a.timestamp!).getTime());
 }

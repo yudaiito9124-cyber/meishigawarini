@@ -1,3 +1,14 @@
+/**
+ * @file user-api.ts
+ * @role 一般ユーザー API 構築コンストラクト
+ * @responsibility
+ *  - 贈り主（Sender）および被贈答者（Receiver）がログイン後に利用する REST API エンドポイントを定義します。
+ *  - 【認証の統合】`shopAuthorizer` ロジックを再利用し、Cognito ID トークンに基づいた安全な本人確認と、自身のプロフィール・履歴へのアクセスのみを許可します。
+ *  - 【パーソナライズ機能】プロフィール管理、ギフト送信履歴、受け取りアカウント設定など、エンドユーザー向けのコア機能を提供します。
+ * @context
+ *  - `InfraStack` からインスタンス化され、`/user/*` 配下のルーティングを管理します。
+ */
+
 import * as cdk from 'aws-cdk-lib';
 import { Construct } from 'constructs';
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
@@ -20,6 +31,12 @@ export interface UserApiProps {
   grantTablePermissions: (fn: lambda.IFunction, write?: boolean) => void;
 }
 
+/**
+ * ユーザー向け API サブシステム。
+ * 
+ * @description
+ * ユーザー自身のプロフィール、ギフト履歴、および受取人としての配送先情報の管理をサポートします。
+ */
 export class UserApi extends cdk.NestedStack {
   public readonly userResource: apigateway.Resource;
 
@@ -27,11 +44,15 @@ export class UserApi extends cdk.NestedStack {
     super(scope, id);
 
     const { table, bucket, userPool, userPoolClient, api, commonProps, allowedOrigins, grantTablePermissions } = props;
-
-    // Use Shop Authorizer logic since it correctly authorizes based on Cognito ID Token
-    // If no shopId is provided in path, it simply checks token validity and returns userId.
     const lampath = (name: string) => path.join(__dirname, `../../lambda/${name}.ts`);
     const authpath = (name: string) => path.join(__dirname, `../../lambda/authorizer/${name}.ts`);
+
+    /**
+     * ユーザー認証 (UserAuthorizer)
+     * - `shopAuthorizer` のロジックを共有します。
+     * - ショップ ID が指定されない場合、このハンドラーは単なる ID トークンの検証器として機能し、
+     *   デコードされた `userId` を後続の Lambda へ渡します。
+     */
     const userAuthFn = new nodejs.NodejsFunction(this, 'UserAuthorizerFn', {
       entry: authpath('shopAuthorizer'),
       environment: {
@@ -48,7 +69,7 @@ export class UserApi extends cdk.NestedStack {
       resultsCacheTtl: cdk.Duration.minutes(5),
     });
 
-    // Lambda Definitions
+    // --- Lambda Definitions ---
     const fnProps = {
       ...commonProps,
       environment: {
@@ -65,16 +86,20 @@ export class UserApi extends cdk.NestedStack {
     const user_history = new nodejs.NodejsFunction(this, 'user_history', { entry: lampath('user_history'), ...fnProps });
     const user_receiver = new nodejs.NodejsFunction(this, 'user_receiver', { entry: lampath('user_receiver'), ...fnProps });
 
-    // Grant Permissions
+    // --- Permissions ---
     [user_profile, user_history, user_receiver].forEach(fn => {
       grantTablePermissions(fn, true);
       bucket.grantRead(fn);
     });
+
     // Profile needs write/delete for images
     bucket.grantPut(user_profile);
     bucket.grantDelete(user_profile);
 
-    // Helper to add resource
+    /**
+     * ルーティングの構築
+     * `/user/*` 配下のリソースを定義します。
+     */
     const addResourceWithCors = (parent: apigateway.IResource, pathPart: string): apigateway.Resource => {
       const res = parent.addResource(pathPart) as apigateway.Resource;
       res.addCorsPreflight({
@@ -85,7 +110,7 @@ export class UserApi extends cdk.NestedStack {
       return res;
     };
 
-    // Routes
+    // /user
     this.userResource = new apigateway.Resource(this, 'UserTopResource', {
       parent: api.root,
       pathPart: 'user'

@@ -1,6 +1,21 @@
+/**
+ * ファイル概要: 管理者用ヘルプ動的レンダリングページ (Dynamic Admin Help)
+ * 
+ * 役割:
+ * マニュアルの実体（Markdown）を読み込み、メタデータおよびコンテンツをレンダリングします。
+ * スラッグに基づいたディレクトリ検索を行い、存在しない場合は 404 を返します。
+ * 管理画面のダークテーマに合わせたスタイリングが適用されます。
+ * 
+ * 主要機能:
+ * 1. Markdownファイルの読み込みとFrontmatter（gray-matter）の解析。
+ * 2. `MarkdownRenderer` によるリッチなドキュメント表示（アイコン、Mermaid対応）。
+ * 3. 動的なメタデータ生成。
+ * 4. 親ディレクトリへの自動的なブレッドクラムリンク。
+ */
+
 import { getTranslations } from 'next-intl/server';
 import { Link } from '@/i18n/routing';
-import { ArrowLeft, Home, Crown } from 'lucide-react';
+import { ArrowLeft, Home, Crown, CreditCard, Printer, Paintbrush, Store, Wrench, BookOpen, Waypoints, Search } from 'lucide-react';
 import fs from 'fs/promises';
 import path from 'path';
 import matter from 'gray-matter';
@@ -46,6 +61,20 @@ export default async function AdminHelpPage({ params }: Props) {
   }
 
   const { data, content } = matter(fileContent);
+  const slugKey = slug[0];
+
+  const IconMap: Record<string, any> = {
+    qrcodes: CreditCard,
+    cardorders: Printer,
+    designs: Paintbrush,
+    shops: Store,
+    tools: Wrench,
+    overview: BookOpen,
+    flow: Waypoints,
+    whereisid: Search,
+  };
+
+  const CategoryIcon = IconMap[slugKey] || Crown;
 
   // Parent link logic
   const parentSlug = slug.slice(0, -1);
@@ -68,7 +97,7 @@ export default async function AdminHelpPage({ params }: Props) {
         {/* Content Section */}
         <div className="bg-mist-200/10 border border-white/5 rounded-3xl p-8 sm:p-12 backdrop-blur-xl shadow-2xl overflow-hidden">
           <div className="prose prose-invert max-w-none">
-            <MarkdownRenderer content={content} categoryIcon={Crown} mermaidVariant="dark" />
+            <MarkdownRenderer content={content} categoryIcon={CategoryIcon} mermaidVariant="dark" />
           </div>
         </div>
 

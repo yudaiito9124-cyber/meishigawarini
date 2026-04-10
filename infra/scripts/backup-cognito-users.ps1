@@ -1,4 +1,15 @@
-# Backup-CognitoUsers.ps1
+<#
+.SYNOPSIS
+    Cognito ユーザープールの全ユーザーを JSON 形式でバックアップします。
+.DESCRIPTION
+    指定された UserPoolId に属するすべてのユーザー情報を取得し、
+    タイムスタンプ付きの JSON ファイルとしてローカルに保存します。
+    不慮のデータ消失や、ステージ間でのデータ移行前のスナップショットとして使用します。
+.PARAMETER UserPoolId
+    バックアップ対象の AWS Cognito User Pool ID（例：ap-northeast-1_xxxxxxxxx）。
+.EXAMPLE
+    .\backup-cognito-users.ps1 -UserPoolId "ap-northeast-1_xxxxxxxxx"
+#>
 param (
     [Parameter(Mandatory=$true)]
     [string]$UserPoolId

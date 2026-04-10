@@ -1,3 +1,18 @@
+/**
+ * ファイル概要: 一般ユーザー向けマイページ (User Dashboard)
+ * 
+ * 役割:
+ * 会員登録した一般ユーザーが、自身のプロフィール確認、ギフト送信、
+ * 送受信履歴の閲覧、配送先設定など、システム内の主要アクションへアクセスするための
+ * ハブ（ポータル）画面として機能します。
+ * 
+ * 主要機能:
+ * 1. プロフィール閲覧（ユーザーID、メールアドレスの表示）。
+ * 2. 各機能へのナビゲーション（プロフィール編集、ギフト送信、送信履歴、受信履歴、配送設定）。
+ * 3. ログアウト処理。
+ * 4. ショップオーナー向け管理画面への誘導。
+ */
+
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
@@ -8,14 +23,27 @@ import { Button } from "@/components/ui/button";
 import { UserPen, Send, Inbox, QrCode, LogOut, ChevronDown, Truck, Copy, Check } from 'lucide-react';
 import { signOut, fetchUserAttributes, getCurrentUser } from 'aws-amplify/auth';
 
+/**
+ * ユーザーダッシュボード（マイページ）コンポーネント
+ */
 export default function UserDashboardPage() {
+    /** 翻訳用フック (UserProfilePage namespace) */
     const t = useTranslations('UserProfilePage');
+    /** ルーター */
     const router = useRouter();
+    /** ユーザーのメールアドレス */
     const [userEmail, setUserEmail] = useState<string>('');
+    /** ユーザーの一意なID (Cognito sub) */
     const [userId, setUserId] = useState<string>('');
+    /** コピー完了表示用のID保持ステート */
     const [copiedId, setCopiedId] = useState<string | null>(null);
+    /** スクロール同期用のコンテナ参照 */
     const containerRef = useRef<HTMLDivElement>(null);
 
+    /**
+     * IDをクリップボードにコピーし、一時的に成功表示を出します。
+     * @param id コピー対象のID文字列
+     */
     const handleCopy = (id: string) => {
         navigator.clipboard.writeText(id).then(() => {
             setCopiedId(id);
@@ -23,6 +51,9 @@ export default function UserDashboardPage() {
         });
     };
 
+    /**
+     * 初期化時にAmplifyからユーザー属性を取得します。
+     */
     useEffect(() => {
         const fetchUserData = async () => {
             try {
@@ -44,8 +75,11 @@ export default function UserDashboardPage() {
         fetchUserData();
     }, []);
 
+    /**
+     * ページ背景色とbody/htmlの背景色を同期させます。
+     * モバイルブラウザでのオーバースクロール時に白い隙間が見えるのを防ぐためのユーティリティ。
+     */
     useEffect(() => {
-        // ページの状態に応じてbodyの背景を同期させ、オーバースクロール時の白見えを防ぐ
         const body = document.body;
         const html = document.documentElement;
 
@@ -66,6 +100,9 @@ export default function UserDashboardPage() {
         };
     }, []);
 
+    /**
+     * サインアウト処理を実行し、トップページへ遷移します。
+     */
     const handleLogout = async () => {
         try {
             await signOut();
@@ -75,6 +112,10 @@ export default function UserDashboardPage() {
         }
     };
 
+    /**
+     * 「マイショップを作成」ボタンのアクション。
+     * 確認後、ショップ管理トップへ遷移します。
+     */
     const handleCreatesop = async () => {
         try {
             if (confirm(t("createMyShopConfirm"))) {
@@ -86,6 +127,9 @@ export default function UserDashboardPage() {
 
     }
 
+    /**
+     * ダッシュボードに表示する各機能カードの定義。
+     */
     const navItems = [
         {
             title: t('editProfile'),
@@ -137,6 +181,7 @@ export default function UserDashboardPage() {
     return (
         <div ref={containerRef} className="flex flex-col min-h-screen bg-slate-50 font-sans">
             <main className="flex-1 max-w-4xl w-full mx-auto p-6 sm:p-8 lg:p-12 space-y-12 pb-16 pt-16">
+                {/* ヘッダーエリア: プロフィール情報の要約 */}
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 mb-12">
                     <div>
                         <h1 className="text-4xl font-black text-gray-900 tracking-tighter mb-2">{t('title')}</h1>
@@ -162,6 +207,7 @@ export default function UserDashboardPage() {
                             <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest ml-2">{t('userEmail')} : {userEmail ? userEmail : "..."}</p>
                         </div>
                     </div>
+                    {/* 操作ボタン（戻る/ログアウト） */}
                     <div className="flex items-center gap-2">
                         <Button variant="outline" className="rounded-full bg-white/50 backdrop-blur-sm border-gray-200 text-gray-600 hover:text-gray-900 shadow-sm" onClick={() => router.push('/login')}>
                             <ChevronDown className="h-4 w-4 mr-1 rotate-90" /> {t('back')}
@@ -173,6 +219,7 @@ export default function UserDashboardPage() {
                     </div>
                 </div>
 
+                {/* ナビゲーションカードグリッド */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 mt-8">
                     {navItems.map((item, idx) => (
                         <Card
@@ -181,7 +228,7 @@ export default function UserDashboardPage() {
                             className={`group cursor-pointer transition-all hover:-translate-y-2 active:scale-95 shadow-xl hover:shadow-2xl border-none bg-white/80 backdrop-blur-xl rounded-[2rem] overflow-hidden`}
                         >
                             <CardContent className="p-8 flex flex-col items-center justify-center text-center gap-6 h-full relative overflow-hidden">
-                                {/* Subtle background glow */}
+                                {/* インタラクティブな背景装飾 */}
                                 <div className={`absolute -right-4 -bottom-4 w-24 h-24 rounded-full ${item.bg} opacity-20 blur-2xl group-hover:scale-150 transition-transform`} />
 
                                 <div className={`p-5 rounded-2xl ${item.bg} shadow-inner transition-transform group-hover:scale-110`}>
@@ -196,6 +243,7 @@ export default function UserDashboardPage() {
                     ))}
                 </div>
             </main>
+            {/* フッター誘導：ショップ管理機能への切り替え */}
             <div className="flex justify-center p-8 pb-12">
                 <Button
                     className="rounded-full px-8 h-12 bg-white/50 backdrop-blur-sm border border-gray-200 text-gray-400 hover:text-red-500 hover:bg-red-50 hover:border-red-100 transition-all font-bold"

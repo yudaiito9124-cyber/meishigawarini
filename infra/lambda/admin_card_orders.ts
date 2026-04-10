@@ -1,11 +1,15 @@
 /**
- * 概要: カード発注の管理（管理者用）
- * 詳細: 
- *  - 全てのショップからのカード発注一覧をステータス別（GSI1使用）に取得し、ショップ名やオーナー情報をマージして返却します。
- *  - 発注ステータスの更新（ORDERED -> SHIPPED 等）をアトミックに実行します。
- *
- * エンドポイント: POST /admin/card_orders
+ * @file admin_card_orders.ts
+ * @role 管理者用：カード発注管理ハンドラー
+ * @responsibility
+ *  - ショップから依頼された、または管理者が手動作成した「カード発注（名刺の印刷依頼等）」を表示・作成・更新します。
+ *  - 【データ検索】GSI1 を用いたステータス別の高速な受注一覧取得。
+ *  - 【情報マージ】受注レコードに欠けている「ショップの実名」や「オーナーのメールアドレス」を DynamoDB から追加取得し、UI 向けに情報集約（Enrichment）します。
+ *  - 【ステータス管理】注文のライフサイクル（ORDERED -> SHIPPED -> COMPLETED 等）をアトミックに更新します。
+ * @context
+ *  - 運営・印刷担当者が「どのショップから何枚の注文が来ているか」を確認し、発送処理を行うための主要なエンドポイントです。
  */
+
 import { APIGatewayProxyHandler } from 'aws-lambda';
 import { QueryCommand, UpdateCommand, BatchGetCommand, PutCommand, GetCommand } from '@aws-sdk/lib-dynamodb';
 import { successResponse, errorResponse } from './utils/response';
@@ -25,29 +29,28 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         const action = getAction(event, body);
         const now = new Date().toISOString();
 
-        // ====================================================================
+        // --------------------------------------------------------------------
         // ACTION: list (発注一覧の取得)
         // --------------------------------------------------------------------
-        // 目的: 管理者向けに特定ステータスの注文を全件取得し、詳細情報をマージします。
-        // ====================================================================
+        // 目的: 指定ステータスの注文を全件取得し、管理画面で判読しやすいよう詳細情報を結合します。
+        // インデックス設計: GSI1 (PK: CARD_ORDER#<STATUS>, SK: ts_created_at) を使用して最新順に取得。
+        // --------------------------------------------------------------------
         if (action === 'list') {
             const { status = 'ORDERED', limit = 50 } = body as AdminApiSchema['admin_card_orders_list'];
 
-            // ステータスに応じたGSI1検索 (最新順)
-            // GSI1_PK: CARD_ORDER#<STATUS> をパーティションキーとして、最新順(ScanIndexForward: false)に取得
+            // 1. ステータスに応じた GSI1 検索
             const result = await ddb.send(new QueryCommand({
                 TableName: TABLE_NAME,
                 IndexName: 'GSI1',
                 KeyConditionExpression: 'GSI1_PK = :pk',
                 ExpressionAttributeValues: { ':pk': `CARD_ORDER#${status}` },
-                ScanIndexForward: false,
+                ScanIndexForward: false, // 降順 (最新が上)
                 Limit: limit
             }));
 
-
             const items = result.Items || [];
 
-            // 互換性処理: design_id がない場合は card_design を使用
+            // 互換性処理: 内部フィールド名の統一
             items.forEach((item: any) => {
                 if (!item.design_id && item.card_design) {
                     item.design_id = item.card_design;
@@ -55,10 +58,10 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             });
 
             if (items.length > 0) {
+                // 2. 情報マージ (Enrichment)
+                // 各注文レコードが持つ shop_id を元に、ショップ名とオーナー情報を一括取得します。
                 const shopIds = [...new Set(items.map((i: any) => i.shop_id).filter(Boolean))];
                 if (shopIds.length > 0) {
-                    // ショップメタデータの一括取得
-                    // SHOP#<shop_id> をPK、METADATAをSKとするレコードを、BatchGetCommandで一括取得してマージします
                     const shopKeys = shopIds.map(id => ({ PK: `SHOP#${id}`, SK: 'METADATA' }));
                     const batchRes = await ddb.send(new BatchGetCommand({
                         RequestItems: {
@@ -69,7 +72,6 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                             }
                         }
                     }));
-
 
                     const shopMap: Record<string, { name: string, owner_id?: string }> = {};
                     const ownerIds = new Set<string>();
@@ -97,7 +99,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                         }
                     }
 
-                    // データをマージ
+                    // 取得データを注文リストにマージ
                     for (const item of items) {
                         if (item.shop_id && shopMap[item.shop_id]) {
                             item.shop_name = shopMap[item.shop_id].name;
@@ -109,7 +111,8 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                     }
                 }
 
-                // --- 新規追加: デザイン情報のEnrichment (thumbnails) ---
+                // 3. デザイン情報のマージ (Thumbnails)
+                // 管理者が目視でカードデザインを確認できるよう、署名付き URL を付与します。
                 const designIds = [...new Set(items.map((i: any) => i.design_id).filter(Boolean))];
                 if (designIds.length > 0) {
                     const keys = designIds.map(id => ({ PK: 'CARD_DESIGN#METADATA', SK: id }));
@@ -124,7 +127,6 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 
                     const metaMap = new Map<string, any>();
                     for (const d of (batchRes.Responses?.[TABLE_NAME] || [])) {
-                        // 署名付きURLの生成 (S3パスの場合)
                         if (d.thumbf) d.thumbf = await signUrlIfS3(d.thumbf, BUCKET_NAME);
                         if (d.thumbb) d.thumbb = await signUrlIfS3(d.thumbb, BUCKET_NAME);
                         metaMap.set(d.SK, d);
@@ -146,20 +148,17 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             return successResponse({ items, count: items.length, hasMore: !!result.LastEvaluatedKey });
         }
 
-        // ====================================================================
-        // ACTION: create (カード発注の新規作成)
         // --------------------------------------------------------------------
-        // 目的: 管理者が特定のショップへの受託（発注）を手動で作成します。
-        // ====================================================================
+        // ACTION: create (カード発注の手動作成)
+        // --------------------------------------------------------------------
+        // 目的: 管理者が特定のショップへの受託（発注）を直接投入します。
+        // セキュリティ: 投入前に validateQRParams を呼び出し、ショップ・商品・オーナーの不整合がないか厳密にチェックします。
+        // --------------------------------------------------------------------
         if (action === 'create') {
             const {
                 shop_id, quantity, design_id, product_id, shop_user_id,
                 sender_user_id, expiration_date, activate_now
             } = body as AdminApiSchema['admin_card_orders_create'];
-
-            // if (!shop_id || !quantity || !design_id) {
-            //     return errorResponse(400, 'Missing shop_id, quantity, or design_id');
-            // }
 
             // 整合性チェックの実行
             const validationResult: any = await validateQRParams(ddb, TABLE_NAME, BUCKET_NAME, {
@@ -180,9 +179,8 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             const order_id = generateId();
             const userId = getUserId(event);
 
-            // CARD_ORDERの新規作成
-            // PK: CARD_ORDER#ADMIN<admin_id>, SK: ORDER#<order_id> 
-            // 管理対象として検索しやすくするため、GSI1(ステータス別)とGSI2(Order ID検索用)のインデックス情報も付与します。
+            // 注文データの保存
+            // PK: CARD_ORDER#ADMIN<id> (管理者が作成した証跡としての PK)
             await ddb.send(new PutCommand({
                 TableName: TABLE_NAME,
                 Item: {
@@ -200,41 +198,36 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                     activate_now: !!activate_now,
                     ts_created_at: now,
                     ts_updated_at: now,
-                    user_id_order: userId, // 作成した管理者のID
+                    user_id_order: userId,
                     user_id_create: null,
-                    // 管理用インデックス情報:
-                    // GSI1: ステータス別の全件リスト表示用
+                    // インデックス用フィールド:
                     GSI1_PK: `CARD_ORDER#ORDERED`,
                     GSI1_SK: now,
-                    // GSI2: Order ID (UUID) からの直接検索用
                     GSI2_PK: `CARD_ORDER#${order_id}`,
                     GSI2_SK: now
                 }
             }));
 
-
             return successResponse({ message: 'Card order created', order_id });
         }
 
-        // ====================================================================
+        // --------------------------------------------------------------------
         // ACTION: update (ステータス更新)
         // --------------------------------------------------------------------
-        // 目的: 管理者が発注のステータス（SHIPPED, COMPLETED 等）を更新します。
-        // ====================================================================
+        // 目的: 「発送済(SHIPPED)」や「完了(COMPLETED)」へのステータス遷移。
+        // 実装: GSI2 で order_id から PK/SK を逆引きしてから、アトミックな UpdateCommand を実行します。
+        // --------------------------------------------------------------------
         if (action === 'update') {
             const { order_id, status, batch_id } = body as AdminApiSchema['admin_card_orders_update'];
             if (!order_id || !status) return errorResponse(400, 'Missing order_id or status');
 
-            // 1. GSI2 を使用して正確な PK, SK を取得する (SHOP# か ADMIN# かを特定)
-            // Order ID (UUID) は SK に含まれているため、直接アトミックに更新するには PK/SK のペアを知る必要があります。
-            // そのため、まず GSI2 (GSI2_PK = CARD_ORDER#<order_id>) で対象レコードを特定します。
+            // 1. GSI2 を使用して正確な PK, SK を取得
             const lookup = await ddb.send(new QueryCommand({
                 TableName: TABLE_NAME,
                 IndexName: 'GSI2',
                 KeyConditionExpression: 'GSI2_PK = :pk',
                 ExpressionAttributeValues: { ':pk': `CARD_ORDER#${order_id}` }
             }));
-
 
             const targetItem = lookup.Items?.[0];
             if (!targetItem) return errorResponse(404, 'Order not found');
@@ -266,20 +259,19 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             return successResponse({ message: 'Order status updated' });
         }
 
-        // ====================================================================
-        // ACTION: get (特定の発注情報の取得)
         // --------------------------------------------------------------------
-        // 目的: order_id から特定の発注情報を取得し、デザイン情報やショップ情報をマージします。
-        // ====================================================================
+        // ACTION: get (個別発注詳細の取得)
+        // --------------------------------------------------------------------
+        // 目的: 特定の注文の詳細、および関連するショップ・オーナー・デザイン情報を一括取得します。
+        // 備考: ID 形式の揺れ（古い形式の ID 等）に対応するため複数のプレフィックスでフォールバック検索を行います。
+        // --------------------------------------------------------------------
         if (action === 'get') {
             const { order_id } = body as AdminApiSchema['admin_card_orders_get'];
             if (!order_id) return errorResponse(400, 'Missing order_id');
 
-            // GSI2 を使用して検索
-            // Order ID (UUID) から直接レコードを特定するために、インデックス GSI2 を利用します。
-            // ログに検索対象のIDを出力して CloudWatch でデバッグ可能にします。
             console.log(`[AdminSearch] Searching for order_id: ${order_id}`);
 
+            // A. 標準プレフィックスでの検索
             let result = await ddb.send(new QueryCommand({
                 TableName: TABLE_NAME,
                 IndexName: 'GSI2',
@@ -287,7 +279,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 ExpressionAttributeValues: { ':pk': `CARD_ORDER#${order_id}` }
             }));
 
-            // フォールバック: CARD_ORDER# なしのプレフィックス（古いデータ、または別の格納形式）を念のため試行
+            // B. 互換用: ORDER# プレフィックスでの検索
             if (!result.Items || result.Items.length === 0) {
                 console.log(`[AdminSearch] No match found with prefix CARD_ORDER#. Trying fallback ORDER#...`);
                 result = await ddb.send(new QueryCommand({
@@ -298,7 +290,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 }));
             }
 
-            // フォールバック2: プレフィックスなし
+            // C. 互換用: プレフィックスなしでの直接検索
             if (!result.Items || result.Items.length === 0) {
                 console.log(`[AdminSearch] No match found with prefix ORDER#. Trying direct UUID lookup...`);
                 result = await ddb.send(new QueryCommand({
@@ -315,15 +307,12 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 return errorResponse(404, 'Order not found');
             }
 
-            console.log(`[AdminSearch] Order found! PK: ${item.PK}, SK: ${item.SK}, Status: ${item.status}`);
-
-
-            // Enrichment: 互換性処理
+            // Enrichment
             if (!item.design_id && item.card_design) {
                 item.design_id = item.card_design;
             }
 
-            // Enrichment: ショップ情報
+            // ショップ情報の追加取得
             if (item.shop_id) {
                 const shopRes = await ddb.send(new GetCommand({
                     TableName: TABLE_NAME,
@@ -343,7 +332,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 }
             }
 
-            // Enrichment: デザイン情報
+            // デザイン情報の追加取得 + S3 署名
             if (item.design_id) {
                 const designRes = await ddb.send(new GetCommand({
                     TableName: TABLE_NAME,

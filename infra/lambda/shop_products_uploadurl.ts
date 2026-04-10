@@ -1,10 +1,12 @@
 /**
- * 概要: 商品画像アップロード用のURL生成 (ショップ用)
- * 詳細: 
- *  - ショップ管理者が新商品の画像をアップロードするためのS3署名付きURL(PutObject)を発行します。
- *  - オブジェクトキーは `shop/{shopId}/products/{productId}/{id}.ext` の形式で保存され、ショップごとのディレクトリ分離を保証します。
- *
- * エンドポイント: POST /shop/products/upload-url
+ * @file shop_products_uploadurl.ts
+ * @role ショップ用：アセット（商品画像等）アップロード用 URL 生成ハンドラー
+ * @responsibility
+ *  - ショップ管理者が新商品の画像や店舗ロゴ等をアップロードするための S3 署名付き URL (PutObject) を発行します。
+ *  - 【ディレクトリ・アイソレーション】オブジェクトキーを `shop/{shopId}/products/{productId}/{id}.ext` の形式で構築し、テナント（ショップ）間でのデータ混在を物理的に防止します。
+ *  - 【ユースケース切替】一般商品の画像だけでなく、`shopcontent` フォルダ（ロゴや紹介画像）へのアップロードにも柔軟に対応します。
+ * @context
+ *  - フロントエンドから直接 S3 へ安全に大容量データを送信させるための、プロキシ認証レイヤーとして機能します。
  */
 import { APIGatewayProxyHandler } from 'aws-lambda';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';

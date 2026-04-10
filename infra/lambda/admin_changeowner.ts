@@ -1,19 +1,14 @@
 /**
- * 概要: ショップオーナー権限の譲渡（管理者用）
- * 詳細:
- *  - 特定のショップ（SHOP#METADATA）の所有者（owner_id）を別のユーザーへ変更します。
- *  - この操作はデータの不整合を防ぐため、DynamoDBの「トランザクション」(TransactWriteCommand)を使用してアトミックに実行します。
- *  - 以下の3つの処理を同期的・不可分に実行します。
- *    1. ショップ側の「現在のオーナーID」と「参照用インデックス(GSI2)」を新オーナーのものに書き換え。
- *    2. 旧オーナー側の「所有ショップリスト(owner_shop_ids)」から当該ショップIDを削除し、必要に応じてロール(SHOP_MANAGER)を剥奪。
- *    3. 新オーナー側の「所有ショップリスト」へ当該ショップIDを追加し、ロール(SHOP_MANAGER)を付与。
- *
- * エンドポイント: POST /admin/changeowner
- * リクエストボディ:
- *  - shopId (string): 対象ショップID (必須)
- *  - newUserId (string): 譲渡先のユーザーUUID (必須)
- *  - action (string): "validate" (事前確認) | "execute" (実行) (必須)
+ * @file admin_changeowner.ts
+ * @role 管理者用：ショップオーナー権限譲渡ハンドラー
+ * @responsibility
+ *  - 特定のショップの所有権（owner_id）を別のユーザーへ安全に譲渡します。
+ *  - 【アトミック性】DynamoDB `TransactWriteCommand` を使用し、ショップ、旧オーナー、新オーナーの 3 つのレコード更新を同期的に、かつ不可分に実行します。これにより、所有者不在や二重所有などの不整合を防止します。
+ *  - 【自動ロール管理】譲渡により「所有ショップが 0件になった旧オーナー」からは `SHOP_MANAGER` ロールを自動剥奪し、逆に「最初のショップを所有した新オーナー」にはロールを自動付与します。
+ * @context
+ *  - ショップの売却や運営交代時、管理者が代理で権限を変更するために使用されます。
  */
+
 import { APIGatewayProxyHandler } from 'aws-lambda';
 import { GetCommand, TransactWriteCommand } from '@aws-sdk/lib-dynamodb';
 import { CognitoIdentityProviderClient, AdminGetUserCommand } from '@aws-sdk/client-cognito-identity-provider';
@@ -26,7 +21,6 @@ const cognito = new CognitoIdentityProviderClient({});
 
 export const handler: APIGatewayProxyHandler = async (event) => {
     try {
-        // CORSプリフライトへの即時対応
         if (event.httpMethod === 'OPTIONS') return successResponse();
 
         const body = JSON.parse(event.body || '{}');
@@ -35,11 +29,11 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 
         if (!userId) return errorResponse(401, 'Unauthorized');
 
-        // ====================================================================
-        // ACTION: validate (オーナー変更の事前確認)
         // --------------------------------------------------------------------
-        // 目的: 現在のオーナーと新オーナーの情報を取得し、不整合がないか確認します。
-        // ====================================================================
+        // ACTION: validate (譲渡前の事前確認)
+        // --------------------------------------------------------------------
+        // 目的: 譲渡元・譲渡先の双方のユーザーが存在し、メールアドレスが特定できるかを確認して UI に表示します。
+        // --------------------------------------------------------------------
         if (action === 'validate') {
             const { shop_id, new_user_id } = body as AdminApiSchema['admin_changeowner'];
             if (!shop_id || !new_user_id) return errorResponse(400, 'Missing shop_id or new_user_id');
@@ -47,10 +41,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             const cleanShopId = shop_id.replace(/^SHOP#/, '');
             const cleanNewUserId = new_user_id.replace(/^USER#/, '');
 
-            /**
-             * 【ステップ1: ショップ情報の取得】
-             * 指定ショップの現在のオーナーID(oldOwnerId)とショップ名(shopName)を確認。
-             */
+            // 1. ショップの現況確認
             const shopRes = await ddb.send(new GetCommand({
                 TableName: TABLE_NAME,
                 Key: { PK: `SHOP#${cleanShopId}`, SK: 'METADATA' }
@@ -60,10 +51,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             const currentOwnerId = shopRes.Item.owner_id;
             const shopName = shopRes.Item.name;
 
-            /**
-             * 【ステップ2: 旧オーナーの連絡先取得】
-             * Cognitoからメールアドレスを取得（表示用）。
-             */
+            // 2. 旧オーナー情報の取得
             let oldOwnerEmail = 'Unknown';
             try {
                 const oldUserRes = await cognito.send(new AdminGetUserCommand({ UserPoolId: USER_POOL_ID, Username: currentOwnerId }));
@@ -72,10 +60,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 console.warn(`Failed to fetch old owner email: ${currentOwnerId}`, e);
             }
 
-            /**
-             * 【ステップ3: 新オーナー候補の確認】
-             * Cognitoからメールアドレスを取得。新オーナーが存在しない場合は権限譲渡不可。
-             */
+            // 3. 新オーナー候補情報の取得（Cognito と DB の両面から）
             const newUserRes = await ddb.send(new GetCommand({ TableName: TABLE_NAME, Key: { PK: `USER#${cleanNewUserId}`, SK: 'SHOP' } }));
             let newOwnerEmail = newUserRes.Item?.email;
 
@@ -92,23 +77,24 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             return successResponse({ shopName, oldOwnerEmail, newOwnerEmail: newOwnerEmail || 'Unknown' });
         }
 
-        // ====================================================================
-        // ACTION: execute (オーナー変更の実行)
         // --------------------------------------------------------------------
-        // 目的: 複数テーブルの整合性を保ちつつ、オーナー権限を一括譲渡します。
-        // ====================================================================
+        // ACTION: execute (権限譲渡の実行)
+        // --------------------------------------------------------------------
+        // 目的: データベースの整合性を維持しつつ一気に権限を移譲します。
+        // トランザクション内容:
+        //  1. SHOP#METADATA の owner_id 更新
+        //  2. 旧オーナー (USER#ID, SK:SHOP) の owner_shop_ids から削除
+        //  3. 新オーナー (USER#ID, SK:SHOP) の owner_shop_ids へ追加
+        // --------------------------------------------------------------------
         if (action === 'execute') {
             const { shop_id, new_user_id } = body as AdminApiSchema['admin_changeowner'];
             if (!shop_id || !new_user_id) return errorResponse(400, 'Missing shop_id or new_user_id');
 
             const cleanShopId = shop_id.replace(/^SHOP#/, '');
             const cleanNewUserId = new_user_id.replace(/^USER#/, '');
-
             const now = new Date().toISOString();
 
-            /**
-             * 1. 現在のショップ状態を再取得
-             */
+            // 1. ショップ・新旧オーナーの現状を再取得（競合防止）
             const shopRes = await ddb.send(new GetCommand({ TableName: TABLE_NAME, Key: { PK: `SHOP#${cleanShopId}`, SK: 'METADATA' } }));
             if (!shopRes.Item) return errorResponse(404, 'Shop not found');
 
@@ -118,9 +104,6 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 
             if (oldOwnerId === cleanNewUserId) return errorResponse(400, 'New owner is the same as the current owner');
 
-            /**
-             * 2. 新オーナー候補の解決
-             */
             const newUserRes = await ddb.send(new GetCommand({ TableName: TABLE_NAME, Key: { PK: `USER#${cleanNewUserId}`, SK: 'SHOP' } }));
             let newUserEmail = newUserRes.Item?.email;
             if (!newUserEmail) {
@@ -129,18 +112,11 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             }
             if (!newUserEmail) return errorResponse(400, 'Could not resolve new user email');
 
-            /**
-             * 3. 旧オーナーの現在情報の取得
-             */
             const oldUserRes = await ddb.send(new GetCommand({ TableName: TABLE_NAME, Key: { PK: `USER#${oldOwnerId}`, SK: 'SHOP' } }));
 
-            /**
-             * 4. トランザクション・バッチの構築 (TransactWriteCommand)
-             */
+            // 2. トランザクション構築
             const transactItems: any[] = [
-                /**
-                 * 【処理A: ショップメタデータの所有権更新】
-                 */
+                // 処理 A: ショップ情報の更新
                 {
                     Update: {
                         TableName: TABLE_NAME,
@@ -151,9 +127,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 }
             ];
 
-            /**
-             * 【処理B: 旧オーナーの権限剥奪】
-             */
+            // 処理 B: 旧オーナーのリスト更新 & ロール剥奪
             if (oldUserRes.Item) {
                 const currentOwnerShops = oldUserRes.Item.owner_shop_ids || [];
                 const updatedOwnerShops = currentOwnerShops.filter((id: string) => id !== cleanShopId);
@@ -161,6 +135,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 const attrValues: any = { ':new_list': updatedOwnerShops, ':now': now };
                 const attrNames: any = {};
 
+                // 他に所有ショップがない場合はロールを一般に戻す
                 if (updatedOwnerShops.length === 0) {
                     const roles = oldUserRes.Item.roles || [];
                     const updatedRoles = roles.filter((r: string) => r !== 'SHOP_MANAGER');
@@ -173,9 +148,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 });
             }
 
-            /**
-             * 【処理C: 新オーナーへの権限付与】
-             */
+            // 処理 C: 新オーナーへの権限追加
             const newUserOwnerShops = newUserRes.Item?.owner_shop_ids || [];
             const newUserGmShops = newUserRes.Item?.gm_shop_ids || [];
             const updatedNewUserOwnerShops = Array.from(new Set([...newUserOwnerShops, cleanShopId]));
@@ -188,14 +161,13 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                     Update: { TableName: TABLE_NAME, Key: { PK: `USER#${cleanNewUserId}`, SK: 'SHOP' }, UpdateExpression: 'SET owner_shop_ids = :new_owner_list, gm_shop_ids = :new_gm_list, #roles = :new_roles, ts_updated_at = :now', ExpressionAttributeNames: { '#roles': 'roles' }, ExpressionAttributeValues: { ':new_owner_list': updatedNewUserOwnerShops, ':new_gm_list': updatedNewUserGmShops, ':new_roles': updatedNewUserRoles, ':now': now } }
                 });
             } else {
+                // 初めてショップを持つユーザーの場合はレコードを新規作成
                 transactItems.push({
                     Put: { TableName: TABLE_NAME, Item: { PK: `USER#${cleanNewUserId}`, SK: 'SHOP', email: newUserEmail, roles: ['SHOP_MANAGER'], owner_shop_ids: [cleanShopId], gm_shop_ids: [], ts_created_at: now, ts_updated_at: now } }
                 });
             }
 
-            /**
-             * トランザクションの実行。いずれかの処理が失敗すれば、全てがロールバックされます。
-             */
+            // 実行（全成功か全失敗のいずれか）
             await ddb.send(new TransactWriteCommand({ TransactItems: transactItems }));
 
             return successResponse({ message: 'Owner changed successfully' });

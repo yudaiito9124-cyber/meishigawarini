@@ -1,11 +1,16 @@
 /**
- * 概要: ギフト受取完了の確定
- * 詳細: 
- *  - 被贈答者が商品を受け取ったことを確認し、ステータスを`SHIPPED`から`COMPLETED`へ変更します。
- *  - PINによる認証を行い、正当な受取人による操作であることを保証します。
- *
- * エンドポイント: POST /receive/completed
+ * @file receive_completed.ts
+ * @role ゲスト用：受取確認（完了）ハンドラー
+ * @responsibility
+ *  - 被贈答者が商品を手元に受け取ったことを最終確認し、ギフトのライフサイクルを完了（`COMPLETED`）させます。
+ *  - 【アトミックな完了処理】
+ *    - `ConditionExpression` を用い、現在のステータスが `SHIPPED` である場合のみ更新を許可することで、二重完了処理や不正な状態遷移を防止します。
+ *  - 【システム・フィードバック】
+ *    - 完了後、チャットへ「ギフトが届きました」というシステムメッセージを自動投稿し、贈り主と受取人の双方に安心感を提供します。
+ * @context
+ *  - 発送済み（SHIPPED）の状態からのみ遷移可能な、最終的な成功状態への扉です。
  */
+
 import { APIGatewayProxyHandler } from 'aws-lambda';
 import { UpdateCommand, GetCommand } from '@aws-sdk/lib-dynamodb';
 import { sendSystemNotification } from './utils/notification';
@@ -24,8 +29,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         
         if (!qr_id || !pin) return errorResponse(400, 'Missing qr_id or pin');
 
-        // 【DB操作: GetItem】
-        // 理由: QRコードのメタデータを取得し、PINの一致とステータスを検証。
+        // 1. ギフトの存在と PIN の妥当性確認
         const qrRes = await ddb.send(new GetCommand({
             TableName: TABLE_NAME, Key: { PK: `QR#${qr_id}`, SK: 'METADATA' }
         }));
@@ -35,28 +39,25 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         }
 
         const item = qrRes.Item;
-        const currentStatus = item.status;
 
-        // ステータス遷移のバリデーション (発送済み(SHIPPED)から完了へ)
-        if (currentStatus !== 'SHIPPED') {
-            return errorResponse(409, `Cannot mark as completed from current state: ${currentStatus}`);
+        // ステータスバリデーション: 発送済み（SHIPPED）でないものは完了できない
+        if (item.status !== 'SHIPPED') {
+            return errorResponse(409, `Cannot mark as completed from current state: ${item.status}`);
         }
 
         const now = new Date().toISOString();
 
-        // 【DB操作: UpdateItem】
-        // 理由: statusをCOMPLETEDに変更し、完了日時を記録。
+        // 【Atomic Update】status を COMPLETED へ移行
         await ddb.send(new UpdateCommand({
             TableName: TABLE_NAME,
             Key: { PK: `QR#${qr_id}`, SK: 'METADATA' },
             UpdateExpression: 'SET #status = :completed, GSI1_PK = :gsi_pk, GSI1_SK = :now, ts_completed_at = :now, ts_updated_at = :now',
-            ConditionExpression: '#status = :shipped', // 二重操作防止
+            ConditionExpression: '#status = :shipped', // 途中でステータスが変わっていないことを保証
             ExpressionAttributeNames: { '#status': 'status' },
             ExpressionAttributeValues: { ':completed': 'COMPLETED', ':shipped': 'SHIPPED', ':gsi_pk': 'QR#COMPLETED', ':now': now }
         }));
 
-        // 【事後処理: システム通知】
-        // 理由: 送り主・受け取り人の双方に受取完了を通知し、チャット履歴にシステムメッセージを残します。
+        // 【事後通知】チャット内への自動投稿と関係者への通知
         try {
             await sendSystemNotification(qr_id, 'DeliveryCompleted', pin);
         } catch (e) {

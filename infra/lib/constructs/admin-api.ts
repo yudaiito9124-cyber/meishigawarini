@@ -1,3 +1,14 @@
+/**
+ * @file admin-api.ts
+ * @role 管理者 API 構築コンストラクト
+ * @responsibility
+ *  - システム管理者（Administrators / GlobalAdmins）向けの REST API エンドポイントを一括定義します。
+ *  - 【高度な認可】`adminAuthorizer` を使用し、JWT 検証に加えて MFA（多要素認証）の実施状況や特定のユーザーグループ所属を厳格にチェックします。
+ *  - 【広範な権限付与】各 Lambda 関数に対し、DynamoDB, S3, Cognito への強力な管理権限を適切に付与します。
+ * @context
+ *  - `InfraStack` からインスタンス化され、`/admin/*` 配下のルーティングとバックエンドロジックを統合します。
+ */
+
 import * as cdk from 'aws-cdk-lib';
 import { Construct } from 'constructs';
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
@@ -20,6 +31,13 @@ export interface AdminApiProps {
   grantTablePermissions: (fn: lambda.IFunction, write?: boolean) => void;
 }
 
+/**
+ * 管理用 API サブシステム。
+ * 
+ * @description
+ * ダンプ、リンク管理、オーナー変更、QR コード一括発行、デザイン管理など、
+ * システム全体の運用・不整合リカバリ・設定更新を行うための全エンドポイントを構成します。
+ */
 export class AdminApi extends cdk.NestedStack {
   public readonly adminResource: apigateway.Resource;
 
@@ -58,7 +76,12 @@ export class AdminApi extends cdk.NestedStack {
     const lampath = (name: string) => path.join(__dirname, `../../lambda/${name}.ts`);
     const authpath = (name: string) => path.join(__dirname, `../../lambda/authorizer/${name}.ts`);
 
-    // AdminAuthorizer の作成 （ユーザーがAdminかチェックするための認証処理）
+    /**
+     * カスタム認証 (AdminAuthorizer)
+     * - API Gateway の TokenAuthorizer として動作します。
+     * - Lambda 内で JWT をデコードし、セッション、MFA、所属グループを検証します。
+     * - 結果は 5 分間キャッシュされ、後続の同一トークンによるリクエスト性能を向上させます。
+     */
     const adminAuthorizer = new nodejs.NodejsFunction(this, 'adminAuthorizer', {
       entry: authpath('adminAuthorizer'),
       environment: {
@@ -227,7 +250,13 @@ export class AdminApi extends cdk.NestedStack {
     ////////////////////////////////////////////////////////////////////////////////
     // URLに対するLambdaの紐づけ
 
-    // Helper to add resource
+    ////////////////////////////////////////////////////////////////////////////////
+    /**
+     * ルーティングの構築
+     * リソースの親子関係を定義し、各メソッドに Lambda 統合と Authorizer を紐付けます。
+     */
+
+    // ヘルパー: CORS 設定付きリソース追加
     const addResourceWithCors = (parent: apigateway.IResource, pathPart: string): apigateway.Resource => {
       const res = parent.addResource(pathPart) as apigateway.Resource;
       res.addCorsPreflight({
@@ -238,7 +267,7 @@ export class AdminApi extends cdk.NestedStack {
       return res;
     };
 
-    // /admin
+    // /admin (管理トップレベル)
     this.adminResource = new apigateway.Resource(this, 'AdminTopResource', {
       parent: api.root,
       pathPart: 'admin'

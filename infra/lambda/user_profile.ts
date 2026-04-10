@@ -1,22 +1,19 @@
 /**
- * 概要: ユーザープロフィールの取得・更新 (Cognito認証)
- * 詳細:
- *  - ユーザー自身の「送り主情報」(Sender Info)を管理します。
- *  - 送り主情報はDynamoDBに保存され、チャット画面（QRスキャン後）でカードデザインとともに表示される中核的なデータです。
- *  - プロフィールには属性情報、プロフィール画像(card_image_url)、自由記述HTML(detail_html)、およびアセット画像(html_image_urls)が含まれます。
- *  - S3上の画像については、保存時は署名なしのURL、取得時は署名付きのURL(Presigned URL)として扱うよう制御します。
- *
- * エンドポイント:
- *  - POST /user/profile/get (ログインユーザーのプロフィールを取得)
- *  - POST /user/profile/update (ログインユーザーのプロフィールを更新・保存)
- *  - POST /user/profile/uploadurl (プロフィール画像等アップロード用の署名付きURLを取得)
- *
- * リクエストボディ (共通項目):
- *  - action: "get" | "update" | "uploadurl" (リソースパスに基づく自動判別もサポート)
- *
- * セキュリティ:
- *  - Cognito Authorizerにより、リクエストを送信した本人のデータのみにアクセスできるよう制限されます。
+ * @file user_profile.ts
+ * @role ユーザー用：プロフィール（送り主情報）管理ハンドラー
+ * @responsibility
+ *  - ギフトを贈る側の「自分（送り主）」情報を管理します。この情報は QR スキャン後のメッセージ画面等で表示される重要なデータです。
+ *  - 【アセット・ライフサイクル】
+ *    - `get`: 保存された S3 パスを署名付き URL に変換し、セキュアな閲覧を可能にします。
+ *    - `update`: プロフィール画像（`card_image_url`）や詳細内の画像を差し替えた際、古いファイルを S3 から物理削除（Storage Cleanup）します。
+ *    - `uploadurl`: クライアントが重いバイナリ（画像）を Lambda 経由せず直接 S3 に送れるよう、書き込み用の一時署名付き URL を発行します。
+ *  - 【互換性・動的更新】
+ *    - 過去のフロントエンド実装との互換性を保つため、キャメルケースのフィールド名をスネークケースへ自動マッピングします。
+ *    - `UpdateExpression` を動的に構築することで、プロフィールの部分更新を汎用的に行えるようにしています。
+ * @context
+ *  - Cognito Authorizer と連携し、自身の `userId` に紐付くデータのみを安全に編集できる設計になっています。
  */
+
 import { APIGatewayProxyHandler } from 'aws-lambda';
 import { GetCommand, UpdateCommand, QueryCommand, BatchGetCommand } from '@aws-sdk/lib-dynamodb';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
@@ -41,6 +38,9 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         
         if (!userId) return errorResponse(401, 'Unauthorized');
 
+        /**
+         * プロフィールレコード内の各種 S3 パスに対し、ブラウザ表示用の署名（URL）を付与する内部関数。
+         */
         const signProfile = async (profile: any) => {
             const signed = { ...profile };
             delete signed.PK;
@@ -60,14 +60,10 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             return signed;
         };
 
-        // ====================================================================
+        // --------------------------------------------------------------------
         // ACTION: get (プロフィールの取得)
         // --------------------------------------------------------------------
-        // 目的: ログイン中のユーザーIDに紐づく「送り主」(SENDER) プロフィール情報を取得します。
-        // S3上の画像データについては、フロントエンドから参照可能な「署名付きURL」に変換して返却します。
-        // ====================================================================
         if (action === 'get') {
-            const {} = body as UserApiSchema['user_profile_get'];
             const pk = `USER#${userId}`;
             const sk = 'SENDER';
 
@@ -82,20 +78,16 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 
             const profile = await signProfile(getRes.Item);
             return successResponse({ profile, user_id: userId });
-
-            return successResponse({ profile, user_id: userId });
         }
 
-        // ====================================================================
-        // ACTION: update (プロフィールの更新)
         // --------------------------------------------------------------------
-        // 目的: ユーザーの「送り主」(SENDER) プロフィール情報を保存・部分更新。
-        // ====================================================================
+        // ACTION: update (プロフィールの更新とアセット掃除)
+        // --------------------------------------------------------------------
         if (action === 'update') {
             const { profile: profile_input, deleted_html_image_urls } = body as UserApiSchema['user_profile_update'];
             if (!profile_input) return errorResponse(400, 'Missing profile data');
 
-            // 後方互換性のため camelCase を snake_case にマッピング
+            // 後方互換性マッピング: camelCase パラメータを DB 用の snake_case へ内部変換
             const profile: any = { ...profile_input };
             const mapping: { [key: string]: string } = {
                 cardImageUrl: 'card_image_url',
@@ -110,14 +102,12 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 }
             });
 
-            const pk = `USER#${userId}`;
-            const sk = 'SENDER';
-
             const restrictedKeys = ['ts_created_at', 'ts_updated_at', 'PK', 'SK', 'user_id'];
             const keys = Object.keys(profile).filter(k => !restrictedKeys.includes(k));
 
             if (keys.length === 0) return errorResponse(400, 'No valid fields to update');
 
+            // 保存用のデータクリーンアップ（署名なしパスへの変換）
             const cleanProfile = {
                 ...profile,
                 card_image_url: stripSignature(profile.card_image_url),
@@ -125,9 +115,10 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 detail_html: stripSignaturesInHtml(profile.detail_html, BUCKET_NAME)
             };
 
+            // 動的な UpdateExpression の構築
             const updateRes = await ddb.send(new UpdateCommand({
                 TableName: TABLE_NAME,
-                Key: { PK: pk, SK: sk },
+                Key: { PK: `USER#${userId}`, SK: 'SENDER' },
                 UpdateExpression: 'SET #ts_up = :now, #ts_cr = if_not_exists(#ts_cr, :now), ' +
                     keys.map((_, i) => `#f${i} = :v${i}`).join(', '),
                 ExpressionAttributeNames: {
@@ -139,16 +130,17 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                     ':now': new Date().toISOString(),
                     ...keys.reduce((acc, k, i) => ({ ...acc, [`:v${i}`]: cleanProfile[k] }), {})
                 },
-                ReturnValues: 'ALL_OLD'
+                ReturnValues: 'ALL_OLD' // 以前の画像 URL を特定するために古い値を参照
             }));
 
-            // 不要画像の物理削除
+            // 【物理削除】古いプロフィール画像が不要になった場合に削除
             const oldImageUrl = updateRes.Attributes?.card_image_url;
             const newImageUrl = cleanProfile.card_image_url;
             if (oldImageUrl && oldImageUrl !== newImageUrl) {
                 await deleteFileByUrl(oldImageUrl, BUCKET_NAME);
             }
 
+            // 【物理削除】HTML コンテンツから削除された画像を削除
             const oldHtmlUrls = updateRes.Attributes?.html_image_urls || [];
             const newHtmlUrls = cleanProfile.html_image_urls || [];
             const toDelete = oldHtmlUrls.filter((url: string) => !newHtmlUrls.includes(url));
@@ -156,6 +148,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 await deleteFileByUrl(url, BUCKET_NAME);
             }
 
+            // クライアントからの明示的な削除要求への対応
             if (deleted_html_image_urls && Array.isArray(deleted_html_image_urls)) {
                 for (const url of deleted_html_image_urls) {
                     const cleanUrl = stripSignature(url);
@@ -165,24 +158,24 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 }
             }
 
+            // 更新後の最新状態を署名付き URL で再取得して返却
             const finalProfileRes = await ddb.send(new GetCommand({
                 TableName: TABLE_NAME,
-                Key: { PK: pk, SK: sk }
+                Key: { PK: `USER#${userId}`, SK: 'SENDER' }
             }));
             const finalProfile = await signProfile(finalProfileRes.Item);
 
             return successResponse({ message: 'Profile updated successfully', profile: finalProfile });
         }
 
-        // ====================================================================
-        // ACTION: uploadurl (アップロード用URLの取得)
         // --------------------------------------------------------------------
-        // 目的: ブラウザから直接S3へファイルをアップロードするための署名付きURLを発行
-        // ====================================================================
+        // ACTION: uploadurl (アップロード用 URL の発行)
+        // --------------------------------------------------------------------
         if (action === 'uploadurl') {
             const { filename, content_type } = body as UserApiSchema['user_profile_uploadurl'];
             if (!filename || !content_type) return errorResponse(400, 'Missing filename or content_type');
 
+            // ユーザー毎のプレフィックスを付けてパスを衝突防止
             const timestamp = Date.now();
             const key = `user/${userId}/profile/${timestamp}-${filename}`;
 
@@ -192,10 +185,11 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 ContentType: content_type
             });
 
+            // 5 分間有効なアップロード用 URL を発行
             const uploadUrl = await getSignedUrl(s3Client, command, { expiresIn: 300 });
             const region = process.env.AWS_REGION || 'ap-northeast-1';
             const rawPublicUrl = `https://${BUCKET_NAME}.s3.${region}.amazonaws.com/${key}`;
-            const publicUrl = await signUrlIfS3(rawPublicUrl, BUCKET_NAME);
+            const publicUrl = await signUrlIfS3(rawPublicUrl, BUCKET_NAME); // 表示確認用も併せて返却
             
             return successResponse({ uploadUrl, publicUrl });
         }

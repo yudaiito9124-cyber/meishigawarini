@@ -1,4 +1,12 @@
-# Backup-CognitoGroups.ps1
+<#
+.SYNOPSIS
+    Cognito ユーザープールのグループ定義を JSON 形式でバックアップします。
+.DESCRIPTION
+    UserPool 内の全グループ情報を取得し、JSON ファイルとして出力します。
+    Administrators や GlobalAdmins 等の権限設計を保持するために使用します。
+.PARAMETER UserPoolId
+    バックアップ対象の AWS Cognito User Pool ID。
+#>
 param (
     [Parameter(Mandatory=$true)]
     [string]$UserPoolId

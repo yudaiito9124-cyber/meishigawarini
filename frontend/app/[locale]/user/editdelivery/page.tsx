@@ -1,3 +1,17 @@
+/**
+ * ファイル概要: 配送先情報設定ページ (Delivery Settings)
+ * 
+ * 役割:
+ * ユーザーがギフトを受け取る際のデフォルトの配送先情報（氏名、住所、電話番号等）を
+ * 事前に登録・編集するための画面です。
+ * 
+ * 主要機能:
+ * 1. 登録済み配送先情報の取得とフォームへの初期値反映。
+ * 2. 入力バリデーション（郵便番号、電話番号、メールアドレスの一致確認）。
+ * 3. 入力補助（全角数字の半角変換など）。
+ * 4. 配送先情報の更新保存。
+ */
+
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
@@ -10,22 +24,44 @@ import { Label } from "@/components/ui/label";
 import { Loader2, Save, ChevronDown, Truck } from 'lucide-react';
 import { userApi } from '@/lib/api/user';
 
+/**
+ * 配送先設定ページコンポーネント
+ */
 export default function DeliverySettingsPage() {
+    /** 受取・配送関連の翻訳 namespace: ReceivePage.formStep */
     const t = useTranslations('ReceivePage.formStep');
+    /** エラーメッセージ関連の翻訳 namespace: ReceivePage.errors */
     const te = useTranslations('ReceivePage.errors');
+    /** ユーザープロファイル全般の翻訳 namespace: UserProfilePage */
     const tp = useTranslations('UserProfilePage');
+    /** ルーター */
     const router = useRouter();
 
+    /** データ初期読み込み中フラグ */
     const [loading, setLoading] = useState(false);
+    /** 保存処理中フラグ */
     const [saving, setSaving] = useState(false);
+    
+    // --- フォームステート ---
+    /** 氏名 */
     const [name, setName] = useState('');
+    /** 郵便番号 */
     const [zip_code, setZipCode] = useState('');
+    /** 住所 */
     const [address, setAddress] = useState('');
+    /** 電話番号 */
     const [phone, setPhone] = useState('');
+    /** メールアドレス */
     const [email, setEmail] = useState('');
+    /** 確認用メールアドレス */
     const [email2, setEmail2] = useState('');
+    
+    /** 背景同期用のコンテナ参照 */
     const containerRef = useRef<HTMLDivElement>(null);
 
+    /**
+     * 初回レンダリング時にバックエンドから現在の配送先情報を取得します。
+     */
     useEffect(() => {
         const loadData = async () => {
             setLoading(true);
@@ -48,8 +84,10 @@ export default function DeliverySettingsPage() {
         loadData();
     }, []);
 
+    /**
+     * ページ背景色とbody/htmlの背景色を同期させます。
+     */
     useEffect(() => {
-        // ページの状態に応じてbodyの背景を同期させ、オーバースクロール時の白見えを防ぐ
         const body = document.body;
         const html = document.documentElement;
 
@@ -70,17 +108,22 @@ export default function DeliverySettingsPage() {
         };
     }, [loading]);
 
+    /**
+     * 保存ボタンクリック時のイベントハンドラ
+     * フォームのバリデーションチェック後、APIを介して情報を更新します。
+     */
     const handleSave = async (e: React.FormEvent) => {
         e.preventDefault();
 
         const form = e.currentTarget as HTMLFormElement;
 
+        // HTML5 標準のバリデーションチェック
         if (!form.checkValidity()) {
             form.reportValidity();
             return;
         }
 
-        // この辺の処理がないとpatternに設定しているのに素通りします
+        // 郵便番号と電話番号のカスタムバリデーション（桁数チェック）
         const zipDigits = zip_code.replace(/\D/g, '').length;
         const phoneDigits = phone.replace(/\D/g, '').length;
 
@@ -94,6 +137,7 @@ export default function DeliverySettingsPage() {
             return;
         }
 
+        // メールアドレス一致確認
         if (email && email !== email2) {
             alert(t('email-mismatch-error'));
             return;
@@ -119,6 +163,10 @@ export default function DeliverySettingsPage() {
         }
     };
 
+    /**
+     * 郵便番号入力時の自動フォーマット処理。
+     * 全角の半角変換、数字とハイフン以外の除去、桁数制限を行います。
+     */
     const handleZipCodeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         let rawValue = e.target.value;
         let converted = rawValue.replace(/[０-９]/g, (s) => String.fromCharCode(s.charCodeAt(0) - 0xFEE0)).replace(/[ー‐―－]/g, "-");
@@ -128,6 +176,10 @@ export default function DeliverySettingsPage() {
         setZipCode(filtered);
     };
 
+    /**
+     * 電話番号入力時の自動フォーマット処理。
+     * 全角の半角変換、数字とハイフン以外の除去、桁数制限を行います。
+     */
     const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         let rawValue = e.target.value;
         let converted = rawValue.replace(/[０-９]/g, (s) => String.fromCharCode(s.charCodeAt(0) - 0xFEE0)).replace(/[ー‐―－]/g, "-");
@@ -147,6 +199,7 @@ export default function DeliverySettingsPage() {
 
     return (
         <div ref={containerRef} className="min-h-screen bg-slate-50 flex flex-col items-center py-12 px-4 text-gray-900 font-sans">
+            {/* ナビゲーション（ダッシュボードへ戻る） */}
             <div className="w-full max-w-3xl flex justify-start mb-6">
                 <Button
                     variant="outline"
@@ -172,6 +225,7 @@ export default function DeliverySettingsPage() {
                 </CardHeader>
                 <CardContent className="p-10 space-y-10">
                     <form id="delivery-form" onSubmit={handleSave} className="space-y-10">
+                        {/* 氏名 */}
                         <div className="space-y-3">
                             <Label htmlFor="name" className="text-md font-black text-slate-600 uppercase tracking-widest ml-1">{t('name')}</Label>
                             <Input
@@ -184,6 +238,7 @@ export default function DeliverySettingsPage() {
                             />
                         </div>
 
+                        {/* 郵便番号 */}
                         <div className="space-y-3">
                             <Label htmlFor="zip_code" className="text-md font-black text-slate-600 uppercase tracking-widest ml-1">{t('zip_code')}</Label>
                             <Input
@@ -197,6 +252,7 @@ export default function DeliverySettingsPage() {
                             />
                         </div>
 
+                        {/* 住所 */}
                         <div className="space-y-3">
                             <Label htmlFor="address" className="text-md font-black text-slate-600 uppercase tracking-widest ml-1">{t('address')}</Label>
                             <Input
@@ -209,6 +265,7 @@ export default function DeliverySettingsPage() {
                             />
                         </div>
 
+                        {/* 電話番号 */}
                         <div className="space-y-3">
                             <Label htmlFor="phone" className="text-md font-black text-slate-600 uppercase tracking-widest ml-1">{t('phone')}</Label>
                             <Input
@@ -223,6 +280,7 @@ export default function DeliverySettingsPage() {
                             />
                         </div>
 
+                        {/* メールアドレス（通知用） */}
                         <div className="space-y-3">
                             <Label htmlFor="email" className="text-md font-black text-slate-600 uppercase tracking-widest ml-1">{t('email')}</Label>
                             <Input
@@ -233,6 +291,7 @@ export default function DeliverySettingsPage() {
                                 placeholder={t('email-placeholder')}
                                 className="rounded-2xl border-gray-200 focus:ring-rose-500 focus:border-rose-500 h-14 bg-gray-50/50 text-lg shadow-inner"
                             />
+                            {/* 確認用（入力時のみ表示） */}
                             {email && (
                                 <div className="space-y-3 mt-4 animate-in fade-in slide-in-from-top-2">
                                     <Input

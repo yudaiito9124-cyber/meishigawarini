@@ -1,3 +1,14 @@
+/**
+ * @file receive-api.ts
+ * @role ギフト受取人 API 構築コンストラクト
+ * @responsibility
+ *  - ギフトを受け取ったゲスト会員向けの REST API エンドポイントを定義します。
+ *  - 【非会員認可】`receiveAuthorizer` を使用し、Cognito ログインなしで QR-ID と PIN によるセッションベースのアクセス制御を実現します。
+ *  - 【限定的な公開性】`/share/{qr_id}` エンドポイントのみ、SNS シェアや一般閲覧のために完全公開（Authorizer なし）として構成します。
+ * @context
+ *  - `InfraStack` からインスタンス化され、`/receive/*` および `/share/*` 配下のルーティングを管理します。
+ */
+
 import * as cdk from 'aws-cdk-lib';
 import { Construct } from 'constructs';
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
@@ -21,6 +32,13 @@ export interface ReceiveApiProps {
   grantTablePermissions: (fn: lambda.IFunction, write?: boolean) => void;
 }
 
+/**
+ * 受取・シェア用 API サブシステム。
+ * 
+ * @description
+ * 贈り主から届いたギフトの閲覧、配送先情報の入力、チャット機能、
+ * およびギフト内容の外部シェア機能を提供するためのエンドポイントを構成します。
+ */
 export class ReceiveApi extends cdk.NestedStack {
   public readonly receiveResource: apigateway.Resource;
 
@@ -29,11 +47,16 @@ export class ReceiveApi extends cdk.NestedStack {
 
     const { table, bucket, userPool, userPoolClient, api, commonProps, allowedOrigins, grantTablePermissions } = props;
 
-    // Helper for lambda paths
     const lampath = (name: string) => path.join(__dirname, `../../lambda/${name}.ts`);
     const authpath = (name: string) => path.join(__dirname, `../../lambda/authorizer/${name}.ts`);
 
-    // --- Receive Authorizer (Custom Lambda Authorizer) ---
+    /**
+     * ゲスト用認証 (ReceiveAuthorizer)
+     * - ギフト受取人はアカウントを持たずログインもしないため、QR コードに付随する ID と PIN を
+     *   リクエストヘッダー (`x-qr-id`, `x-qr-pin`) から取得して認証します。
+     * - `resultsCacheTtl` を 0 秒に設定し、リアルタイムの PIN 無効化・BAN 状態が即座に
+     *   反映されるようにしています。
+     */
     const receive_authorizer_fn = new nodejs.NodejsFunction(this, 'receive_authorizer_fn', {
       entry: authpath('receiveAuthorizer'),
       environment: {
@@ -90,7 +113,6 @@ export class ReceiveApi extends cdk.NestedStack {
     const receive_chat = new nodejs.NodejsFunction(this, 'receive_chat', { entry: lampath('receive_chat'), ...fnProps });
     const receive_subscription = new nodejs.NodejsFunction(this, 'receive_subscription', { entry: lampath('receive_subscription'), ...fnProps });
 
-    // Pass userPool details to receive_sender for history logging
     const receive_sender = new nodejs.NodejsFunction(this, 'receive_sender', {
       entry: lampath('receive_sender'),
       ...fnProps,
@@ -103,13 +125,12 @@ export class ReceiveApi extends cdk.NestedStack {
 
     const receive_upload_url = new nodejs.NodejsFunction(this, 'receive_upload_url', { entry: lampath('receive_upload_url'), ...fnProps });
 
-    // --- Share API (No Authorizer) ---
     const share_get = new nodejs.NodejsFunction(this, 'share_get', {
       entry: lampath('share_get'),
       ...fnProps,
     });
 
-    // Grant Permissions
+    // --- Permissions ---
     const allLambdas = [receive_verify, receive_submit, receive_completed, receive_chat, receive_subscription, receive_sender, receive_upload_url, share_get];
     allLambdas.forEach(fn => {
       grantTablePermissions(fn, true);
@@ -122,8 +143,10 @@ export class ReceiveApi extends cdk.NestedStack {
       }));
     });
 
-    // --- Routes ---
-    // Helper to add resource
+    /**
+     * ルーティングの構築
+     * `/receive/*` 配下（保護対象）および `/share/*` 配下（公開対象）を定義します。
+     */
     const addResourceWithCors = (parent: apigateway.IResource, pathPart: string): apigateway.Resource => {
       const res = parent.addResource(pathPart) as apigateway.Resource;
       res.addCorsPreflight({
@@ -134,6 +157,7 @@ export class ReceiveApi extends cdk.NestedStack {
       return res;
     };
 
+    // /receive (受取トップレベル)
     this.receiveResource = new apigateway.Resource(this, 'ReceiveTopResource', {
       parent: api.root,
       pathPart: 'receive'
@@ -165,7 +189,11 @@ export class ReceiveApi extends cdk.NestedStack {
     const uploadUrlRoot = addResourceWithCors(this.receiveResource, 'uploadurl');
     addResourceWithCors(uploadUrlRoot, 'get').addMethod('POST', new apigateway.LambdaIntegration(receive_upload_url), routeOptions);
 
-    // --- Share Endpoint (Public) ---
+    /**
+     * --- Share エンドポイント (完全公開) ---
+     * このリソースは Authorizer を通さないパブリックな閲覧用です。
+     * シェアされたギフトの内容（メッセージ、画像など）を表示するために使用されます。
+     */
     const shareResource = api.root.addResource('share');
     const shareQrIdResource = shareResource.addResource('{qr_id}');
     shareQrIdResource.addMethod('GET', new apigateway.LambdaIntegration(share_get));

@@ -1,3 +1,14 @@
+/**
+ * @file userAuthorizer.ts
+ * @role 一般ユーザー用 Lambda Authorizer (Request Authorizer)
+ * @responsibility
+ *  - エンドユーザー（送り主・受取人としてログインしているユーザー）の API アクセスを認可します。
+ *  - Cognito ID トークンの妥当性を検証し、ユーザーを一意に識別する ID（sub）を確定させます。
+ * @context
+ *  - マイページや履歴取得（`/user/...`）などのエンドポイントに適用されます。
+ *  - ここで特定された `user_id` は `appendToHistory` 等の処理において、正しいユーザーレコードを特定するために極めて重要です。
+ */
+
 import { APIGatewayAuthorizerResult, APIGatewayRequestAuthorizerEvent } from 'aws-lambda';
 import { CognitoJwtVerifier } from 'aws-jwt-verify';
 import { getHeader } from '../utils/request';
@@ -5,16 +16,27 @@ import { getHeader } from '../utils/request';
 const USER_POOL_ID = process.env.USER_POOL_ID || '';
 const CLIENT_ID = process.env.CLIENT_ID || '';
 
-// JWT検証用の検証器を作成
+/** JWT 検証器の初期化 */
 const verifier = CognitoJwtVerifier.create({
   userPoolId: USER_POOL_ID,
   tokenUse: 'id',
   clientId: CLIENT_ID,
 });
 
+/**
+ * ユーザー認可ハンドラー。
+ * 
+ * @description
+ * 1. authorization ヘッダーからトークンを抽出。
+ * 2. `aws-jwt-verify` により、Cognito User Pool ID と Client ID に基づいた署名検証を実施。
+ * 3. 認可成功時、トークンの `sub` クレームを `user_id` として、且つ `principalId` として返却。
+ * 
+ * @param event - APIGateway からのリクエスト認可イベント。
+ * @returns IAM ポリシー。
+ */
 export const handler = async (event: APIGatewayRequestAuthorizerEvent): Promise<APIGatewayAuthorizerResult> => {
   try {
-    // 1. authorizationヘッダーからトークンを抽出
+    // 1. authorization ヘッダーからトークンを抽出
     const authorizationToken = getHeader(event.headers, 'authorization');
     if (!authorizationToken) {
       console.log('No authorization token provided');
@@ -29,15 +51,15 @@ export const handler = async (event: APIGatewayRequestAuthorizerEvent): Promise<
     }
 
     // 2. JWT (Cognito ID Token) の検証
-    // - 有効期限、署名、発行元 (iss)、クライアントID (aud) を検証します。
+    // - 有効期限、署名、発行元 (iss)、クライアント ID (aud) を検証します。
     const payload = await verifier.verify(token);
-    const userId = payload.sub; // Cognitoのユーザー一意識別子 (sub)
+    const userId = payload.sub; // Cognito のユーザー一意識別子 (sub)
     const groups = (payload['cognito:groups'] as string[]) || [];
 
     // 3. 認可ポリシーの生成
     // - 検証に成功した場合、userId を principalId として 'Allow' ポリシーを返却します。
     // - context に含めた情報は、後続の Lambda ハンドラーで 
-    //   event.requestContext.authorizer.userId 等として参照可能です。
+    //   event.requestContext.authorizer.user_id 等として参照可能です。
     return generatePolicy(userId, 'Allow', event.methodArn, {
       username: payload['cognito:username'] as string,
       email: payload.email as string,
@@ -47,17 +69,13 @@ export const handler = async (event: APIGatewayRequestAuthorizerEvent): Promise<
 
   } catch (err) {
     console.error('Token verification failed:', err);
-    // トークンが無効な場合 (期限切れ、改ざん等) は 401 Unauthorized (Deny) を返却
+    // トークンが無効な場合 (期限切れ、改ざん等) は 403 Forbidden (Deny) を返却（APIGateway はこれを 401 に変換可能）
     return generatePolicy('verification-failed', 'Deny', event.methodArn);
   }
 };
 
 /**
- * API Gateway に返すための認可ポリシーを生成する
- * @param principalId ユーザーを一意に識別するID (ログやメトリクスで使用)
- * @param effect 'Allow' (許可) または 'Deny' (拒否)
- * @param resource リクエストされたリソースのARN
- * @param context 後続のLambdaハンドラーに引き継ぐ追加情報
+ * API Gateway に返却する認可ポリシーを生成。
  */
 function generatePolicy(principalId: string, effect: string, resource: string, context?: any): APIGatewayAuthorizerResult {
   const authResponse: any = {
@@ -68,8 +86,7 @@ function generatePolicy(principalId: string, effect: string, resource: string, c
         {
           Action: 'execute-api:Invoke',
           Effect: effect,
-          // 特定のURLだけでなく、このAPIステージ全体へのアクセスを許可する (キャッシュ対策)
-          // 例: arn:aws:execute-api:region:account:api-id/stage/*
+          // キャッシュ対策：ステージ全体の Wildcard に対して許可
           Resource: resource.split('/').slice(0, 2).join('/') + '/*',
         },
       ],
@@ -77,7 +94,7 @@ function generatePolicy(principalId: string, effect: string, resource: string, c
   };
 
   if (context) {
-    authResponse.context = context; // 後続の Lambda で event.requestContext.authorizer.[key] として取得可能
+    authResponse.context = context;
   }
 
   return authResponse;

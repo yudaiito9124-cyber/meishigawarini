@@ -1,7 +1,16 @@
 /**
- * ファイル概要: 個別ショップ管理のダッシュボード
- * 目的: 指定されたショップのQRコードリンク、商品作成・管理、受注一覧、および発送処理などの機能を提供します。
+ * ファイル概要: 個別ショップ管理ダッシュボード
+ * 
+ * 役割:
+ * 特定のショップ（店舗）に関連する管理機能を集約したハブページです。
+ * 商品管理、受注（発送）管理、カードのアクティベーション（紐付け）、
+ * および物理カードの発注機能など、実務に必要な機能をタブ形式で提供します。
+ * 
+ * 状態管理:
+ * - ShopProvider: ショップ固有のコンテキスト情報を子コンポーネント全体へ提供。
+ * - activeTab: 現在表示中の管理セクションを制御。
  */
+
 'use client';
 
 import { useState } from 'react';
@@ -15,11 +24,21 @@ import { OrderCardSection } from '@/components/shop/OrderCardSection';
 import { ShopHeader } from '@/components/shop/ShopHeader';
 import { ShopProvider } from '@/context/ShopContext';
 
+/**
+ * ショップ管理ページコンポーネント
+ */
 export default function ShopPage() {
+    /** 翻訳用フック */
     const t = useTranslations('ShopPage');
     const params = useParams();
+    
+    /** 
+     * URLパラメータから shopId を抽出 
+     * 配列形式で返される可能性を考慮した正規化
+     */
     const shopId = (Array.isArray(params.shopId) ? params.shopId[0] : params.shopId) as string;
 
+    /** 現在選択中のタブ状態 ('activation' | 'shipping' | 'products' | 'orderCard') */
     const [activeTab, setActiveTab] = useState("activation");
 
     return (
@@ -29,7 +48,7 @@ export default function ShopPage() {
 
                 <div className="max-w-7xl mx-auto px-4 sm:px-8 py-4 sm:py-8 space-y-6">
 
-                    {/* Tabs */}
+                    {/* --- 管理機能切り替えタブ (モバイル時はグリッド2列) --- */}
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
                         <button
                             onClick={() => setActiveTab("activation")}
@@ -77,24 +96,28 @@ export default function ShopPage() {
                         </button>
                     </div>
 
+                    {/* --- アクティベーション（QR紐付け）セクション --- */}
                     {activeTab === 'activation' && (
                         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
                             <CardActivationSection shopId={shopId as string} />
                         </div>
                     )}
 
+                    {/* --- 発送管理（受注リスト）セクション --- */}
                     {activeTab === 'shipping' && (
                         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
                             <CardListSection shopId={shopId as string} />
                         </div>
                     )}
 
+                    {/* --- 商品管理（ギフトアイテム）セクション --- */}
                     {activeTab === 'products' && (
                         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
                             <ProductsSection shopId={shopId as string} />
                         </div>
                     )}
 
+                    {/* --- カード発注（資材注文）セクション --- */}
                     {activeTab === 'orderCard' && (
                         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
                             <OrderCardSection shopId={shopId as string} />

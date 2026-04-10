@@ -1,3 +1,12 @@
+/**
+ * @file update-infra.ts
+ * @role インフラ構成自動修正（パッチ）スクリプト
+ * @responsibility
+ *  - CDK スタックの定義ファイル (`infra-stack.ts`) を直接読み書きし、特定の構成（Cognito ティアや認証フロー）をプログラムから書き換えます。
+ *  - マニュアルでの書き換えミスを防ぎ、一貫した状態でデプロイ環境を整えるための補助ツールです。
+ * @context
+ *  - 特に Cognito の パスキー (WebAuthn) 対応に必要な ESSENTIALS ティアへの移行や、`ALLOW_USER_AUTH` フローの有効化を自動化するために使用されます。
+ */
 
 import fs from 'fs';
 
@@ -27,10 +36,10 @@ const replacement = `    // パスキー (WebAuthn) 対応のために Essential
     ];`;
 
 if (content.includes(target)) {
-    content = content.replace(target, replacement);
-    fs.writeFileSync(path, content, 'utf8');
-    console.log('Successfully updated infra-stack.ts');
+  content = content.replace(target, replacement);
+  fs.writeFileSync(path, content, 'utf8');
+  console.log('Successfully updated infra-stack.ts');
 } else {
-    console.error('Target content not found');
-    process.exit(1);
+  console.error('Target content not found');
+  process.exit(1);
 }

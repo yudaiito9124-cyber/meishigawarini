@@ -1,4 +1,14 @@
-# Restore-CognitoGroups.ps1
+<#
+.SYNOPSIS
+    バックアップされた JSON ファイルから Cognito グループを復元します。
+.DESCRIPTION
+    JSON ファイルに基づき、UserPool 内にグループを再作成します。
+    既存のグループがある場合はエラーになりますが、スクリプト内で継続するように制御しています。
+.PARAMETER UserPoolId
+    復元先の AWS Cognito User Pool ID。
+.PARAMETER BackupFile
+    読み込むグループバックアップ JSON ファイルのパス。
+#>
 param (
     [Parameter(Mandatory=$true)]
     [string]$UserPoolId,

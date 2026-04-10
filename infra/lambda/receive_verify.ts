@@ -1,13 +1,21 @@
 /**
- * 概要: ギフト受取開始時の認証と情報取得
- * 詳細: 
- *  - 被贈答者がスキャンしたQRコードのPIN認証を行い、ギフトの現在のステータスを確認します。
- *  - レートリミット（失敗回数制限）およびパスワード保護の検証を行います。
- *  - 期限切れの遅延評価（Lazy Expiration）を実施し、必要に応じてステータスを更新します。
- *  - 認証成功時、関連するショップ情報、商品情報、デザイン情報の他、発送済みであれば追跡情報も一括取得します。
- *
- * エンドポイント: POST /receive/verify
+ * @file receive_verify.ts
+ * @role ゲスト用：ギフト券認証・初期データ取得ハンドラー
+ * @responsibility
+ *  - QR スキャンの第一到達点として、PIN および任意のパスワードによる認証を行い、ギフトの詳細情報を返却します。
+ *  - 【二段階認証】
+ *    1. `PIN`: 物理カードに記載された 4 桁の番号（ Authorizer で一括検証）。
+ *    2. `Password`: 受取人が追加設定した（または管理者による）任意のパスワード。`bcrypt` で安全に照合します。
+ *  - 【広域データ集約（Wide Enrichment）】
+ *    `BatchGetCommand` を用い、ギフトに関連する「ショップ」「商品」「カードデザイン」「発送情報（ORDER）」を 1 回のクエリで並行取得します。
+ *  - 【セキュアな情報開示】
+ *    パスワード認証の状態（`isAuthorizedByPassword`）に応じて、追跡番号や管理者メモなどの機密情報の露出を制御します。
+ *  - 【プロモーション対応】
+ *    `PROMOTION` ステータスのギフトについては、PIN が不明な場合でも限定的な情報の開示を許可する例外ロジックを含みます。
+ * @context
+ *  - ギフト受取画面のレンダリングに必要な情報のほぼ全てを供給する、最も重要な読み取り API です。
  */
+
 import { APIGatewayProxyHandler } from 'aws-lambda';
 import { GetCommand, UpdateCommand, BatchGetCommand } from '@aws-sdk/lib-dynamodb';
 import { CognitoIdentityProviderClient, AdminGetUserCommand } from '@aws-sdk/client-cognito-identity-provider';
@@ -36,20 +44,20 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 
         if (!qr_id || !pin) return errorResponse(400, 'Missing qr_id or pin');
 
-        // 【確認フェーズ 1: QRコードの状態確認】
-        // Note: PIN認証と連続試行制限は receiveAuthorizer.ts で既に検証済みです。
+        // 1. QR メタデータの取得
+        // Note: PIN 認証および連続試行制限は Authorizer で既に検証済みです。
         const qrRes = await ddb.send(new GetCommand({
             TableName: TABLE_NAME, Key: { PK: `QR#${qr_id}`, SK: 'METADATA' }
         }));
 
+        // プロモーション用ギフトを除き、PIN が不一致の場合はリジェクト
         if (!qrRes.Item || String(qrRes.Item.pin) !== String(pin) && qrRes.Item.status !== 'PROMOTION') {
             return errorResponse(404, 'Invalid Gift or PIN');
         }
 
         const item = qrRes.Item;
 
-
-        // 【確認フェーズ 3: パスワード保護の検証】
+        // 2. パスワード保護の検証（設定されている場合）
         let isAuthorizedByPassword = true;
         let isPasswordProtected = false;
         if (item.password_hash) {
@@ -61,19 +69,10 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             }
         }
 
-        let status = item.status;
-        const now = new Date();
+        // 3. 期限切れのリアルタイム判定（Lazy Expiration）
+        const status = await checkAndExpire(ddb, TABLE_NAME, qr_id, item as any);
 
-        // 【確認フェーズ 4: 期限切れチェック (遅延評価)】
-        status = await checkAndExpire(ddb, TABLE_NAME, qr_id, item as any);
-
-
-        // 基本的な受取可能チェック (無効なステータスだがBANNEDでない場合は enriched data を返す)
-        // ここでの許可により、EXPIREDやPROMOTIONの状態でもギフト情報が見れるようになります。
-
-        // ====================================================================
-        // 情報の紐付け (実施フェーズ / Enrichment)
-        // ====================================================================
+        // 4. 各種関連エンティティのバルク取得（Enrichment）
         const shopId = item.shop_id;
         const productId = item.product_id;
         const designId = item.design_id || (item as any).card_design;
@@ -82,6 +81,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         if (shopId) keys.push({ PK: `SHOP#${shopId}`, SK: 'METADATA' });
         if (shopId && productId) keys.push({ PK: `SHOP#${shopId}`, SK: `PRODUCT#${productId}` });
         if (designId) keys.push({ PK: 'CARD_DESIGN#METADATA', SK: designId });
+        // パスワード認証成功時かつ発送済みの時のみ、オーダー（発送追跡）情報を取得
         if (isAuthorizedByPassword && status === 'SHIPPED') keys.push({ PK: `QR#${qr_id}`, SK: 'ORDER' });
 
         const batchRes = await ddb.send(new BatchGetCommand({
@@ -95,7 +95,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         const design = designMeta || (designId ? getSystemDesign(designId) : null);
         const order = responses.find(r => r.PK === `QR#${qr_id}` && r.SK === 'ORDER');
 
-        // ショップオーナーのEmailフォールバック (Cognito)
+        // ショップオーナーの Email フォールバック（Cognito から取得）
         let shopEmail = shop?.email;
         if (!shopEmail && shop?.owner_id && USER_POOL_ID) {
             const user = await cognito.send(new AdminGetUserCommand({
@@ -104,6 +104,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             shopEmail = user?.UserAttributes?.find(attr => attr.Name === 'email')?.Value;
         }
 
+        // 表示用レスポンスの構築とアセットの閲覧用署名
         const result: any = {
             qr_id, status, shop_id: shopId, product_id: productId,
             shop_name: shop?.name,
@@ -116,11 +117,12 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             } : null,
             design: design ? {
                 design_id: designId,
+                // システム標準デザイン（パス始まり）か S3 デザインかを判別して署名
                 thumbf: design.thumbf?.startsWith('/') ? design.thumbf : await signUrlIfS3(design.thumbf, BUCKET_NAME),
                 thumbb: design.thumbb?.startsWith('/') ? design.thumbb : await signUrlIfS3(design.thumbb, BUCKET_NAME),
                 bgimgf: design.bgimgf?.startsWith('/') ? design.bgimgf : await signUrlIfS3(design.bgimgf, BUCKET_NAME)
             } : null,
-            // 権限制御が必要なフィールド
+            // 【セキュリティ】認証状態に応じて機密情報を出し分け
             delivery_company: isAuthorizedByPassword ? order?.delivery_company : undefined,
             tracking_number: isAuthorizedByPassword ? order?.tracking_number : undefined,
             memo_for_users: isAuthorizedByPassword ? item.memo_for_users : undefined,

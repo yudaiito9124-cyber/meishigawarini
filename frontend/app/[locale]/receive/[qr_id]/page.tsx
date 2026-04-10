@@ -1,7 +1,28 @@
 /**
  * ファイル概要: ダイナミック受取ページ (QRコードスキャン後)
- * 目的: スキャンされたQRコード(UUID)に基づいてギフト情報を表示し、PIN認証、受取人の住所入力、チャット機能、およびステータス管理機能を提供します。
+ * 
+ * 役割:
+ * ギフトを受け取るユーザー（または送り主自身）がQRコードをスキャンした後に遷移する
+ * メインのインターフェースです。ギフトの内容確認、PIN認証、配送先情報の入力、
+ * チャット機能、および送り主プロフィールの閲覧・編集機能を集約しています。
+ * 
+ * 主要なステータス遷移 (step):
+ * - PIN: 暗証番号入力待ち
+ * - FORM: 配送先情報入力待ち（アクティブ状態）
+ * - SUCCESS: 配送依頼完了（住所入力済み）
+ * - SHIPPED: 発送済み（追跡番号表示・受取確認待ち）
+ * - COMPLETED: 全工程完了（「思い出」としてチャットのみ閲覧可）
+ * - RESTRICTED: パスワード保護状態
+ * - EXPIRED: 有効期限切れ
+ * - PROMOTION: サンプル表示用
+ * 
+ * 技術的特徴:
+ * - Next.js App Router 採用 ([locale] による多言語化)。
+ * - `aws-amplify` による Cognito 認証との連携。
+ * - `receiveApi` および `userApi` によるバックエンド連携。
+ * - `canvas-confetti` による演出効果。
  */
+
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
@@ -103,7 +124,16 @@ const EmptySenderInfoWithLinks = (senderinfo: any) => {
     });
 };
 
+/**
+ * 受取ページメインコンポーネント
+ * 
+ * 非常に多くの状態（ステータス）と、それに紐づく複雑なUI表示を管理します。
+ * ギフトのライフサイクル（未受取 -> 住所入力 -> 配送中 -> 完了）における
+ * すべてのユーザー体験をこの単一のコンポーネントで提供します。
+ */
 export default function ReceivePage() {
+    // --- Hook & Parameter Init ---
+    /** 各種翻訳フック */
     const t = useTranslations('ReceivePage');
     const tt = useTranslations('Time');
     const tst = useTranslations('Status');
@@ -113,54 +143,90 @@ export default function ReceivePage() {
     const qr_id = params?.qr_id as string;
     const locale = params?.locale as string;
 
+    /** 処理中フラグ */
     const [loading, setLoading] = useState(false);
+    /** ギフト本体のデータ */
     const [gift, setGift] = useState<any>(null);
+    /** 暗証番号 (PIN) */
     const [pin, setPin] = useState("");
+    /** 配送先：氏名 */
     const [name, setName] = useState("");
+    /** 配送先：郵便番号 */
     const [zip_code, setZipCode] = useState("");
+    /** 配送先：住所 */
     const [address, setAddress] = useState("");
+    /** 配送先：電話番号 */
     const [phone, setPhone] = useState("");
+    /** 配送先：メールアドレス */
     const [email, setEmail] = useState("");
+    /** 配送先：メールアドレス（確認用） */
     const [email2, setEmail2] = useState("");
+    /** 希望配送日 */
     const [preferred_date, setPreferredDate] = useState("");
+    /** 希望配送時間帯 */
     const [preferred_time, setPreferredTime] = useState("");
 
-    // Password Protection State
+    // --- パスワード保護関連の状態 ---
+    /** 設定用パスワード */
     const [password, setPassword] = useState("");
+    /** 設定用確認パスワード */
     const [confirmPassword, setConfirmPassword] = useState("");
-    const [isRestricted, setIsRestricted] = useState(false); // True if password protected and not unlocked
-    const [unlockPassword, setUnlockPassword] = useState(""); // For entering password to view details
+    /** 閲覧制限中フラグ */
+    const [isRestricted, setIsRestricted] = useState(false);
+    /** 閲覧解除用パスワード */
+    const [unlockPassword, setUnlockPassword] = useState("");
 
-    // Chat State
+    // --- チャット・コミュニケーション関連の状態 ---
+    /** メッセージ履歴リスト */
     const [messages, setMessages] = useState<any[]>([]);
+    /** チャット上の表示名 */
     const [chatName, setChatName] = useState("");
+    /** 送信メッセージバッファ */
     const [chatMessage, setChatMessage] = useState("");
+    /** チャット送信中フラグ */
     const [chatLoading, setChatLoading] = useState(false);
+    /** 選択中の添付ファイル */
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
+    /** ファイルアップロード中フラグ */
     const [uploading, setUploading] = useState(false);
+    /** 添付ファイルの総容量情報 */
     const [totalSizeInfo, setTotalSizeInfo] = useState<number | null>(null);
 
-    // Subscription
+    // --- 通知・演出・アニメーション関連の状態 ---
+    /** 発送通知用メールアドレス */
     const [notificationEmail, setNotificationEmail] = useState("");
+    /** 通知登録中フラグ */
     const [subscribing, setSubscribing] = useState(false);
+    /** 完了時のホワイトフェード演出フラグ */
     const [showWhiteFade, setShowWhiteFade] = useState(false);
+    /** ギフト開封アニメーション（拡大）フラグ */
     const [isExpanding, setIsExpanding] = useState(false);
 
-    // Auth & Role state
+    // --- 認証・ロール（役割）管理 ---
+    /** ログイン済みフラグ */
     const [isLoggedIn, setIsLoggedIn] = useState(false);
+    /** 操作者の役割（送り主 or 受け取り主） */
     const [userRole, setUserRole] = useState<'sender' | 'receiver' | null>(null);
+    /** 役割選択画面の表示フラグ */
     const [showRoleSelection, setShowRoleSelection] = useState(false);
 
-    // Sender Info State
+    // --- 送り主プロフィール（デジタル名刺）関連の状態 ---
+    /** 表示用の送り主情報 */
     const [senderInfo, setSenderInfo] = useState<any>(null);
+    /** 保存・同期中のプログレス表示 */
     const [senderInfoLoading, setSenderInfoLoading] = useState(false);
+    /** プロフィール編集モードフラグ */
     const [isEditingSender, setIsEditingSender] = useState(false);
+    /** フォームの全項目定義 */
     const SENDER_FORM_KEYS = [
         "name", "job_title", "company", "department", "email", "phone", "phone_direct",
         "address", "HP", "memo", "SNS_Facebook", "SNS_Instagram", "SNS_Threads",
         "SNS_X", "SNS_YouTube", "SNS_LINE", "SNS_TikTok", "Service_Eight", "Service_Linktree"
     ];
 
+    // --- Profile Form State ---
+
+    /** プロフィール編集フォームのバッファ */
     const [senderForm, setSenderForm] = useState({
         name: "",
         job_title: "",
@@ -187,9 +253,15 @@ export default function ReceivePage() {
         html_image_urls: [] as string[],
         import_id: ""
     });
+    /** HTMLコンテンツ内で使用するアセットURLリスト */
     const [htmlImageUrls, setHtmlImageUrls] = useState<string[]>([]);
+    /** 詳細HTML編集エリアの表示状態 */
     const [showDetailHtmlSection, setShowDetailHtmlSection] = useState(false);
 
+    /**
+     * 送り主プロフィールフォームの更新処理
+     * ユーザーIDによるインポート処理のトリガーも兼ねています。
+     */
     const updateSenderForm = (field: string, value: string) => {
         setSenderForm(prev => ({ ...prev, [field]: value }));
         if (field === 'import_id' && value.trim().startsWith('USER#') && value.includes(', SENDER')) {
@@ -197,6 +269,9 @@ export default function ReceivePage() {
         }
     };
 
+    /**
+     * 外部ID（ユーザーID）からプロフィール情報を読み込みます。
+     */
     const handleImportFromId = useCallback(async (id: string, silent: boolean = false) => {
         let importId = id.trim().replace(', SENDER', '');
         // Ensure prefix if missing
@@ -237,19 +312,25 @@ export default function ReceivePage() {
             if (!silent) setSenderInfoLoading(false);
         }
     }, [qr_id, pin, t]);
+
+    // --- Component Local Logic ---
     const [chatcontent, setChatcontent] = useState("");
     const containerRef = useRef<HTMLDivElement>(null);
 
-    // Steps: PIN -> FORM (or SHIPPED/SUCCESS) -> RESTRICTED (if blocked)
+    /**
+     * 画面遷移（ステップ）の制御状態
+     * PIN -> FORM (or SHIPPED/SUCCESS) -> RESTRICTED (if blocked)
+     */
     const [step, setStep] = useState<"PIN" | "FORM" | "SUCCESS" | "SHIPPED" | "EXPIRED" | "COMPLETED" | "RESTRICTED" | "PROMOTION">("PIN");
 
+    /** エラー表示用 */
     const [error, setError] = useState<string | null>(null);
     const [pinError, setPinError] = useState("");
 
-    // Check auth status
+    /** 認証状態の初期チェック（Safari対応のワークアラウンド含む） */
     useEffect(() => {
         const checkAuth = async () => {
-            // Safari workaround: Skip hang if no obvious session hint exists
+            // SafariでのCognitoセッションチェック時のハングを防ぐためのヒント確認
             const hasSessionHint = typeof window !== 'undefined' &&
                 Object.keys(localStorage).some(key => key.startsWith('CognitoIdentityServiceProvider'));
 
@@ -268,6 +349,10 @@ export default function ReceivePage() {
         checkAuth();
     }, []);
 
+    /**
+     * PIN認証を実行します。
+     * 成功した場合はギフト情報をロードし、開封アニメーションを開始します。
+     */
     const handleVerifyPin = async (e: React.FormEvent) => {
         window.scrollTo(0, 0);
         e.preventDefault();
@@ -276,23 +361,23 @@ export default function ReceivePage() {
         setError(null);
 
         try {
-            // Step 1: Verify PIN (Critical Path)
+            // Step 1: PIN認証（クリティカルパス）
             const data = await receiveApi.verify(qr_id, pin);
 
-            // Step 2: Start loading secondary data (Background/Parallel)
-            // This is non-blocking to ensure UI transition happens immediately after verification
+            // Step 2: 二次データのロード（非同期で並列実行、UI遷移を優先する）
             loadMessages().catch(err => {
                 console.error("Delayed message load error:", err);
             });
 
-            // Once verification is successful, start the expansion animation
+            // 認証成功後、ギフト箱の拡大アニメーションを開始
             setIsExpanding(true);
             setGift(data);
             setHasLoadedChat(true);
 
-            // Wait for the duration of the expansion animation (800ms)
+            // アニメーション時間分待機
             await new Promise(resolve => setTimeout(resolve, 1000));
 
+            // ステータスに応じた次のステップの決定
             if (data.status === 'COMPLETED') {
                 setShowWhiteFade(true);
             } else if (['ACTIVE', 'USED', 'SHIPPED', `RESTRICTED`, `PROMOTION`].includes(data.status) && !error) {
@@ -304,7 +389,7 @@ export default function ReceivePage() {
                 setIsRestricted(true);
             } else {
                 setIsRestricted(false);
-                // Check status
+                // ステータス振り分け
                 if (data.status === 'USED') {
                     setStep("SUCCESS");
                 } else if (data.status === 'COMPLETED') {
@@ -326,9 +411,8 @@ export default function ReceivePage() {
             }
 
         } catch (err: any) {
-            // console.error(err);
             setPinError(t('errors.invalidPin'));
-            setIsExpanding(false); // Reset animation if verification fails
+            setIsExpanding(false); // 失敗時はアニメーションをリセット
         } finally {
             setLoading(false);
             setIsExpanding(false);
@@ -390,6 +474,10 @@ export default function ReceivePage() {
         }
     };
 
+    /**
+     * 配送先住所を送信します。
+     * バリデーション及びパスワード一致確認も含みます。
+     */
     const handleAddressSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
@@ -404,7 +492,7 @@ export default function ReceivePage() {
             return;
         }
 
-        // この辺の処理がないとpatternに設定しているのに素通りします
+        // 郵便番号・電話番号の桁数厳密チェック
         const zipDigits = zip_code.replace(/\D/g, '').length;
         const phoneDigits = phone.replace(/\D/g, '').length;
 
@@ -444,7 +532,6 @@ export default function ReceivePage() {
             });
             setStep("SUCCESS");
         } catch (error: any) {
-            // console.error("Submission error:", error);
             alert(translateError(error.message, error.detail) || error.message || t('errors.submitFailed'));
         } finally {
             setLoading(false);
@@ -470,10 +557,14 @@ export default function ReceivePage() {
         }
     };
 
+    /**
+     * チャット履歴、送り主プロフィール、および自身のプロフィール情報を一括取得し、
+     * フォームの初期値や役割の自動判定を行います。
+     */
     const loadMessages = useCallback(async () => {
         try {
-            // Unauthenticated users in Safari can hang on Cognito session checks (getCurrentUser/fetchAuthSession).
-            // We skip these calls if we already know the user is not logged in.
+            // 未ログインユーザー（Safari等）でのセッションチェック時のハングを回避しつつ、
+            // ロールに応じたプロフィール情報を並行取得
             const promises: Promise<any>[] = [
                 receiveApi.receive_chat_get(qr_id, pin, {})
             ];
@@ -483,7 +574,6 @@ export default function ReceivePage() {
                 promises.push(userApi.user_receiver_get({}).catch(() => null));
                 promises.push(userApi.user_profile_get({}).catch(() => null));
             } else {
-                // Return nulls for unauthenticated users to match the array destructuring
                 promises.push(Promise.resolve(null));
                 promises.push(Promise.resolve(null));
                 promises.push(Promise.resolve(null));
@@ -494,7 +584,7 @@ export default function ReceivePage() {
             setMessages(data.messages || []);
             setTotalSizeInfo(data.total_size_bytes || 0);
 
-            // Pre-fill receiver info immediately if available
+            // 受取人情報が既に登録されている場合はフォームにプリフィル
             if (receiverData?.receiver_info) {
                 setName(prev => prev || receiverData.receiver_info.name || '');
                 setZipCode(prev => prev || receiverData.receiver_info.zip_code || receiverData.receiver_info.zipCode || '');
@@ -504,43 +594,39 @@ export default function ReceivePage() {
                 setEmail2(prev => prev || receiverData.receiver_info.email || '');
             }
 
-            // Pre-fill chat sender name based on registered personal info
+            // チャット上の自身の名前をプロフィールの名前から設定
             const myRegisteredName = receiverData?.receiver_info?.name || profileData?.profile?.name || '';
             if (myRegisteredName) {
                 setChatName(prev => prev || myRegisteredName);
             }
 
             if (data.sender_id) {
-                // Restoration/Auto-assign logic:
+                // ロールの自動割当：
                 if (authUser && authUser.userId === data.sender_id) {
                     setUserRole('sender');
                 } else if (authUser) {
-                    // If someone else is the sender, the logged-in user is automatically the receiver
+                    // 他者が送り主である場合は、自身を受け取り主とみなす
                     setUserRole('receiver');
                 }
 
-                // Prioritize top-level sender_id
                 setShowRoleSelection(false);
                 handleImportFromId(data.sender_id, true);
             } else if (data.sender_info) {
                 setHtmlImageUrls(data.sender_info.html_image_urls || []);
-                // Sanitize: Convert null values to empty strings to avoid React warning
                 const sanitizedInfo = { ...data.sender_info };
                 Object.keys(sanitizedInfo).forEach(key => {
                     if (sanitizedInfo[key] === null) sanitizedInfo[key] = "";
                 });
-                // Set senderInfo for display
                 setSenderInfo({ ...sanitizedInfo, sender_id: data.sender_id });
                 setShowRoleSelection(false);
             } else {
                 setSenderInfo(null);
-                // Only show role selection if no sender data at all
+                // 送り主データが一切ない場合にのみ役割選択を表示
                 if (authUser) {
                     setShowRoleSelection(true);
                 }
             }
 
-            // If sender_id exists, we definitely hide selection and editing
             if (data.sender_id) {
                 setShowRoleSelection(false);
                 setIsEditingSender(false);
@@ -623,6 +709,10 @@ export default function ReceivePage() {
 
 
 
+    /**
+     * チャットメッセージ（および添付ファイル）を送信します。
+     * 画像の場合はリサイズ処理を行い、S3へアップロードした後にメッセージを送信します。
+     */
     const handleChatSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if ((!chatMessage && !selectedFile) || !chatName) return;
@@ -635,22 +725,24 @@ export default function ReceivePage() {
                 let uploadFile: File | Blob = selectedFile;
                 let finalFilename = selectedFile.name;
 
-                // Resize if image
+                // 画像の場合はWebPへリサイズ/変換
                 if (selectedFile.type.startsWith("image/")) {
                     try {
                         uploadFile = await resizeImage(selectedFile);
-                        finalFilename = `${generateId()}.webp`; // Force WebP extension
+                        finalFilename = `${generateId()}.webp`;
                     } catch (err) {
-                        // console.error("Resize failed, using original", err);
+                        // リサイズ失敗時はオリジナルを使用
                     }
                 }
 
+                // アップロード用署名付きURLの取得
                 const { uploadUrl, fileUrl } = await receiveApi.receive_uploadurl_get(qr_id, pin, {
                     filename: finalFilename,
                     content_type: uploadFile.type,
                     file_size: uploadFile.size
                 });
 
+                // S3へ直接アップロード
                 const uploadRes = await fetch(uploadUrl, {
                     method: "PUT",
                     headers: { "content-type": uploadFile.type },
@@ -667,6 +759,7 @@ export default function ReceivePage() {
                 };
             }
 
+            // メッセージ内容をバックエンドへ送信
             await receiveApi.receive_chat_send(qr_id, pin, {
                 username: chatName,
                 message: chatMessage,
@@ -677,6 +770,7 @@ export default function ReceivePage() {
             });
             setChatMessage("");
             setSelectedFile(null);
+            // 送信後に履歴を再読み込み
             await loadMessages();
         } catch (e: any) {
             alert(t('chat.sendFailed') + (translateError(e.message, e.detail) || e.message));
@@ -686,6 +780,10 @@ export default function ReceivePage() {
         }
     };
 
+    /**
+     * 送り主プロフィール情報を更新します。
+     * @param fields 明示的に更新したいフィールド（省略時はフォームの現在値を使用）
+     */
     const handleSenderInfoUpdate = async (fields?: any) => {
         setSenderInfoLoading(true);
         try {
@@ -697,7 +795,7 @@ export default function ReceivePage() {
                 ...(fields || senderForm),
                 ts_updated_at: new Date().toISOString()
             };
-            // Ensure sender_id is NOT stored inside sender_info for DB optimization
+            // DB最適化のため、sender_idは情報の内側に含めない
             if (updatedSenderInfo.sender_id) {
                 delete updatedSenderInfo.sender_id;
             }
@@ -1045,7 +1143,7 @@ export default function ReceivePage() {
 
 
 
-            {/* Memory Section */}
+            {/* ========== メモリーセクション (受取完了後の思い出表示) ========== */}
             {step === "COMPLETED" && gift && (
                 <div className="w-full max-w-xl mt-20 mb-30 overflow-hidden relative bg-mauve-100/40 rounded-xl shadow-sm">
                     <Card className="border-none shadow-none bg-transparent">
@@ -1066,6 +1164,7 @@ export default function ReceivePage() {
                                 </p>
                             </div>
 
+                            {/* [メモリー] 時系列データの概要表示 */}
                             <div className="grid grid-cols-2 gap-4 w-full pt-4">
                                 <div className="bg-white/40 backdrop-blur-sm p-4 rounded-2xl border border-gray-200/50 shadow-sm flex flex-col items-center gap-2">
                                     <div className="p-2 bg-gray-50 rounded-lg">
@@ -1444,7 +1543,8 @@ export default function ReceivePage() {
                 </Card>
             )}
 
-            {/* --- Form Section --- */}
+            {/* ========== 配送先情報 / サンプル入力セクション ========== */}
+            {/* 住所入力待ち（FORM）またはデモ表示（PROMOTION）状態でのみ表示 */}
             {(!showRoleSelection && ["FORM", "PROMOTION"].includes(step)) && (
                 <Card className="w-full max-w-xl mt-12 border shadow-2xl shadow-emerald-500/40 bg-white/95 backdrop-blur-2xl overflow-hidden animate-in fade-in slide-in-from-bottom-8 duration-700 ring-1 ring-emerald-500/10">
                     <CardHeader className="pb-4 pt-8 text-center">
@@ -1637,7 +1737,7 @@ export default function ReceivePage() {
             )
             }
 
-            {/* --- Notification Section --- */}
+            {/* ========== 通知・ステータスセクション (配送状況・受取確認等) ========== */}
             {
                 (["SUCCESS", "SHIPPED", "EXPIRED", "RESTRICTED"].includes(step)) && (
                     <Card className="w-full max-w-xl mt-20">
@@ -1772,8 +1872,7 @@ export default function ReceivePage() {
                 )
             }
 
-
-            {/* Sender Info Section */}
+            {/* ========== 送り主プロフィールセクション (デジタル名刺) ========== */}
             {
                 // 送り主情報を追加するボタン
                 (step === "FORM" && !isLoggedIn && !isEditingSender && EmptySenderInfo(senderInfo) && gift?.status === 'ACTIVE') && (
@@ -2282,7 +2381,7 @@ export default function ReceivePage() {
             }
 
 
-            {/* Chat Section */}
+            {/* ========== チャットセクション (ステータスに応じたコミュニケーション) ========== */}
             {
                 step !== "PIN" && (
                     <Card className={cn("w-full max-w-xl mt-20 flex flex-col", step !== "COMPLETED" && "max-h-[calc(100vh-12rem)] min-h-[800px] overflow-hidden")}>

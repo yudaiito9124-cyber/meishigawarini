@@ -1,6 +1,13 @@
 /**
- * Centralized CORS Header Definitions
- * Used by both Infra (CDK) and Lambda (Backend)
+ * @file constants.ts
+ * @role システム共通定数定義
+ * @responsibility
+ *  - インフラ（CDK）とアプリケーション（Lambda）の両層で使用される、横断的な定数（主に通信ヘッダー）を管理します。
+ *  - 【CORS 戦略の集中管理】
+ *    各 API（Admin, Shop, User, Receive）が個別に必要とするカスタムヘッダー（x-qr-id, x-shop-id 等）を体系化し、
+ *    API Gateway の Preflight 応答と Lambda の実応答ヘッダーの一貫性を維持します。
+ * @context
+ *  - セキュリティと可用性のバランスを保つための、通信プロトコルの定義層として機能します。
  */
 
 export const CORS_HEADERS = {

@@ -1,6 +1,13 @@
 /**
  * ファイル概要: アカウント確認(検証)ページ
- * 目的: サインアップ後にCognitoから送信される認証コードを入力し、アカウントの確定処理を行います。
+ * 
+ * 役割:
+ * 新規登録（サインアップ）後、ユーザーのメールアドレスに送信された確認コードを入力し、
+ * Cognito上のユーザーを「CONFIRMED」ステータスに移行させるためのインターフェースです。
+ * 
+ * 構成:
+ * - VerifyContent: クエリパラメータ (username) の取得と認証処理の本体。
+ * - VerifyPage: useSearchParams 等のフックを利用するため Suspense でラップした公開コンポーネント。
  */
 'use client';
 
@@ -13,17 +20,30 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Label } from "@/components/ui/label";
 import { useTranslations } from 'next-intl';
 
+/**
+ * 検証フォーム本体
+ */
 function VerifyContent() {
+    /** 翻訳用フック */
     const t = useTranslations('VerifyPage');
     const router = useRouter();
     const searchParams = useSearchParams();
+    
+    /** URLパラメータから初期ユーザー名（メール）を取得 */
     const initialUsername = searchParams.get('username') || '';
 
+    /** 入力値：ユーザー名 */
     const [username, setUsername] = useState(initialUsername);
+    /** 入力値：確認コード */
     const [code, setCode] = useState('');
+    /** エラー表示用 */
     const [error, setError] = useState('');
+    /** 処理中フラグ */
     const [loading, setLoading] = useState(false);
 
+    /**
+     * アカウントの確認処理を実行します。
+     */
     const handleVerify = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
@@ -90,6 +110,11 @@ function VerifyContent() {
     );
 }
 
+/**
+ * アカウント確認ページ
+ * Next.js の仕様により、useSearchParams を使用するコンポーネントは
+ * Suspense境界内に配置する必要があります。
+ */
 export default function VerifyPage() {
     const t = useTranslations('VerifyPage');
     return (

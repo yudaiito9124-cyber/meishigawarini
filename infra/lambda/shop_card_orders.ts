@@ -1,11 +1,18 @@
 /**
- * 概要: ショップ用カード発注管理
- * 詳細: 
- *  - ショップオーナーまたはGM向けに、物理カードの発注(create)、一覧表示(list)、キャンセル(cancel)、受取完了処理(complete)を提供します。
- *  - 注文情報は CARD_ORDER#SHOP{shopId} をパーティションキーとして管理されます。
- *
- * エンドポイント: POST /shop/card_orders
+ * @file shop_card_orders.ts
+ * @role ショップ用：物理カード発注（CARD_ORDER）管理ハンドラー
+ * @responsibility
+ *  - ショップオーナーまたは GM が、ギフト印字用の物理カードをシステム管理者に発注する機能を管理します。
+ *  - 【ライフサイクル管理】以下の状態遷移を管理します。
+ *    - `create`: `ORDERED`（注文済）状態のレコードを生成。注文内容はインデックス（GSI1）経由で管理者に通知されます。
+ *    - `list`: ショップの発注履歴を一覧表示。デザイン情報のサムネイルを動的に結合（Enrichment）します。
+ *    - `cancel`: 制作開始（管理者による `PRINTING` 化）前であればキャンセル可能。
+ *    - `complete`: 管理者が発送（`SHIPPED`）した注文に対し、受取完了を宣言。
+ *  - 【権限モデル】`checkShopOwnerOrGM` により、対象ショップのオーナーまたは GM ロールを持つユーザーのみに操作を限定します。
+ * @context
+ *  - ショップが在庫を補充したり、特定のデザイン・商品が紐付いたカードを新規作成する際の入り口となるプロセスです。
  */
+
 import { APIGatewayProxyHandler } from 'aws-lambda';
 import { PutCommand, QueryCommand, GetCommand, UpdateCommand, BatchGetCommand } from '@aws-sdk/lib-dynamodb';
 import { checkShopOwnerOrGM } from './share/shop-auth';
@@ -32,15 +39,16 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 
         const now = new Date().toISOString();
 
-        // 権限チェック
+        // --------------------------------------------------------------------
+        // 権限検証: 操作者がショップの正当な管理者（オーナー/GM）かチェック
+        // --------------------------------------------------------------------
         const shopMetadata = await checkShopOwnerOrGM(ddb, TABLE_NAME, shopId, userId, event);
         if (!shopMetadata) return errorResponse(403, 'Forbidden');
 
-        // ====================================================================
-        // ACTION: create (新規カード発注の作成)
         // --------------------------------------------------------------------
-        // 目的: ショップに紐づく新規カード発注(CARD_ORDER)レコードの作成
-        // ====================================================================
+        // ACTION: create (新規カード発注の作成)
+        // 目的: 管理者（システム側）への印刷依頼レコードを生成します。
+        // --------------------------------------------------------------------
         if (action === 'create') {
             const { quantity, design_id, product_id, shop_user_id, sender_user_id, expiration_date, activate_now } = body as ShopApiSchema['shop_card_orders_create'];
 
@@ -48,7 +56,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 return errorResponse(400, 'Missing quantity or design_id');
             }
 
-            // 整合性チェックの実行
+            // 指定された商品やデザインが有効か、生成ツール（qr-validation）で事前評価
             const validationResult: any = await validateQRParams(ddb, TABLE_NAME, BUCKET_NAME, {
                 shopId,
                 productId: product_id,
@@ -84,12 +92,12 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                     activate_now: !!activate_now,
                     ts_created_at: now,
                     ts_updated_at: now,
-                    user_id_order: userId, // 作成したショップ担当者のID
+                    user_id_order: userId, // 自端末の操作者 ID
                     user_id_create: null,
-                    // 管理者一覧用インデックス (GSI1)
+                    // 【GSI1】管理者の「未処理一覧」に表示させるためのフラグ
                     GSI1_PK: `CARD_ORDER#ORDERED`,
                     GSI1_SK: now,
-                    // ID逆引き用インデックス (GSI2)
+                    // 【GSI2】バッチ生成時などに ID から直接引けるように逆引き用インデックス
                     GSI2_PK: `CARD_ORDER#${orderId}`,
                     GSI2_SK: now
                 }
@@ -98,11 +106,10 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             return apiResponse(201, { message: 'Card order created', order_id: orderId });
         }
 
-        // ====================================================================
-        // ACTION: list (発注履歴の一覧取得)
         // --------------------------------------------------------------------
-        // 目的: 特定のショップに紐づくカード発注履歴を最新順(降順)に取得
-        // ====================================================================
+        // ACTION: list (発注履歴の一覧取得)
+        // 目的: 過去の全発注履歴を取得し、デザイン情報を結合して返却します。
+        // --------------------------------------------------------------------
         if (action === 'list') {
             const result = await ddb.send(new QueryCommand({
                 TableName: TABLE_NAME,
@@ -111,18 +118,19 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                     ':pk': `CARD_ORDER#SHOP${shopId}`,
                     ':sk': 'ORDER#'
                 },
-                ScanIndexForward: false
+                ScanIndexForward: false // 最新順
             }));
 
             const items = result.Items || [];
-            // 互換性処理: design_id がない場合は card_design を使用
+            
+            // 互換性処理
             items.forEach((item: any) => {
                 if (!item.design_id && item.card_design) {
                     item.design_id = item.card_design;
                 }
             });
 
-            // --- 新規追加: デザイン情報のEnrichment (thumbnails) ---
+            // 【Enrichment】デザイン情報のサムネイルを結合
             const designIds = [...new Set(items.map((i: any) => i.design_id).filter(Boolean))];
             if (designIds.length > 0) {
                 const keys = designIds.map(id => ({ PK: 'CARD_DESIGN#METADATA', SK: id }));
@@ -136,11 +144,8 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 }));
 
                 const metaMap = new Map<string, any>();
-                const { BUCKET_NAME } = require('./share/db');
-                const { signUrlIfS3 } = require('./utils/s3');
-                const { getSystemDesign } = require('./utils/designs');
-
                 for (const d of (batchRes.Responses?.[TABLE_NAME] || [])) {
+                    // S3 のパスであれば一時的な署名付き URL に変換
                     if (d.thumbf) d.thumbf = await signUrlIfS3(d.thumbf, BUCKET_NAME);
                     if (d.thumbb) d.thumbb = await signUrlIfS3(d.thumbb, BUCKET_NAME);
                     metaMap.set(d.SK, d);
@@ -161,11 +166,10 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             return successResponse({ items });
         }
 
-        // ====================================================================
-        // ACTION: cancel (発注キャンセル)
         // --------------------------------------------------------------------
-        // 目的: 「ORDERED」状態の発注をキャンセル済みに変更します。
-        // ====================================================================
+        // ACTION: cancel (発注キャンセル)
+        // 目的: 印刷作業に入る前の「ORDERED」状態に限り、発注の取り消しを許可します。
+        // --------------------------------------------------------------------
         if (action === 'cancel') {
             const { order_id } = body as ShopApiSchema['shop_card_orders_cancel'];
             if (!order_id) return errorResponse(400, 'Missing order_id');
@@ -195,11 +199,10 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             return successResponse({ message: 'Order cancelled' });
         }
 
-        // ====================================================================
-        // ACTION: complete (受取完了)
         // --------------------------------------------------------------------
-        // 目的: 発送済み(SHIPPED)の発注を完了(COMPLETED)に変更します。
-        // ====================================================================
+        // ACTION: complete (受取完了宣言)
+        // 目的: 物理カードの納品（発送済 SHIPPED）を確認し、ステータスを最終状態（COMPLETED）にします。
+        // --------------------------------------------------------------------
         if (action === 'complete') {
             const { order_id } = body as ShopApiSchema['shop_card_orders_complete'];
             if (!order_id) return errorResponse(400, 'Missing order_id');

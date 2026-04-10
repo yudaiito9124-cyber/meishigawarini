@@ -1,30 +1,55 @@
+/**
+ * ファイル概要: セキュア・レスポンシブ HTML レンダリングコンポーネント (Sandboxed HTML Renderer)
+ * 
+ * 役割:
+ * 第三者（ショップオーナー等）が作成した HTML コンテンツを、安全かつ美しく表示します。
+ * iframe によるサンドボックス化、DOMPurify によるサニタイズ、厳格な CSP 設定により、
+ * XSS（クロスサイトスクリプティング）などの攻撃から親サイトを保護します。
+ * 
+ * 主要機能:
+ * 1. サンドボックス iframe 内での HTML レンダリング。
+ * 2. コンテンツ量に応じた iframe の高さ自動調整 (ResizeObserver & postMessage)。
+ * 3. DOMPurify による危険なタグ/属性の除去。
+ * 4. Content Security Policy (CSP) による外部リソース取得の制限。
+ * 5. ダークモード対応の自動スタイル注入。
+ */
+
 "use client";
 import { useState, useEffect, useId, useMemo } from "react";
 import DOMPurify from "isomorphic-dompurify";
 
-
-
-
-
+/**
+ * 外部 HTML を安全に表示するためのコンポーネント
+ * 
+ * @param html 表示対象の HTML 文字列
+ * @param darkMode ダークモード用のスタイルを適用するかどうか
+ */
 export default function ResponsiveSecureFrame({ html, darkMode = false }: { html: string, darkMode?: boolean }) {
+    /** iframe の高さを状態として保持 */
     const [height, setHeight] = useState("400px");
+    /** インスタンスごとに一意の ID を生成 (postMessage の識別に使用) */
     const iframeId = useId();
 
+    // ─── iframe 内からの高さ通知受信処理 ───
     useEffect(() => {
+        /**
+         * iframe 内のスクリプトから送られてくるリサイズ要求をハンドリングします。
+         */
         const handleMessage = (event: MessageEvent) => {
-            // sandboxに allow-same-origin がある場合はオリジンが親と同じになる
+            // セキュリティチェック: 同一オリジンまたは sandbox 特有の "null" オリジンのみ許可
             const isSameOrigin = event.origin === window.location.origin;
             const isNullOrigin = event.origin === "null";
 
             if (!isNullOrigin && !isSameOrigin) return;
 
+            // リサイズ要求かつ自分宛ての ID かどうかを確認
             if (event.data && event.data.type === "resize-iframe" && event.data.id === iframeId) {
-                // React側の setHeight 部分
-                const nextHeight = Math.ceil(event.data.height); // +2を一旦消す
+                const nextHeight = Math.ceil(event.data.height);
 
                 setHeight((prev) => {
                     const currentHeight = parseInt(prev);
                     const diff = nextHeight - currentHeight;
+                    // 微小な変化（4px未満）は無視して再レンダリングを抑制
                     if (Math.abs(diff) < 4) return prev;
 
                     return `${nextHeight}px`;
@@ -35,24 +60,32 @@ export default function ResponsiveSecureFrame({ html, darkMode = false }: { html
         return () => window.removeEventListener("message", handleMessage);
     }, [iframeId]);
 
+    /**
+     * srcDoc に渡す HTML 文字列を生成・サニタイズします。
+     * メモ化により無駄な再生成を防ぎます。
+     */
     const srcDoc = useMemo(() => {
+        // 1. DOMPurify によるサニタイズ
+        // コンテンツに必要なスタイルや埋め込み（YouTube等）は許可する。
         const sanitizedRaw = DOMPurify.sanitize(html, {
             ADD_TAGS: ["style", "link", "meta", "iframe"],
             ADD_ATTR: ["href", "rel", "class", "style", "crossorigin", "integrity", "target", "src", "width", "height", "frameborder", "allow", "allowfullscreen", "title", "loading", "referrerpolicy"],
             WHOLE_DOCUMENT: true,
         });
+
+        // カスタムフック: iframe タグに対してセキュリティ属性を強制適用
         DOMPurify.removeAllHooks();
         DOMPurify.addHook('afterSanitizeAttributes', function (node) {
             if (node.tagName === 'IFRAME') {
                 const src = node.getAttribute('src') || '';
-                // YouTubeとGoogle Maps以外は認めない、あるいはsandboxを強制
+                // 許可されているドメイン (YouTube / Google Maps) 以外は sandbox を強制
                 const isYouTube = src.includes('youtube.com/') || src.includes('youtube-nocookie.com/');
                 const isGoogleMaps = src.includes('google.co.jp/maps') || src.includes('google.com/maps');
 
                 if (!isYouTube && !isGoogleMaps) {
                     node.setAttribute('sandbox', 'allow-scripts');
                 }
-                // 外部のiframeが親（あなたのサイト）を操作できないよう属性を追加
+                // 親サイトへの情報漏洩を防ぐ
                 node.setAttribute('referrerpolicy', 'no-referrer');
             }
         });
@@ -60,7 +93,8 @@ export default function ResponsiveSecureFrame({ html, darkMode = false }: { html
         const parser = new DOMParser();
         const doc = parser.parseFromString(sanitizedRaw, "text/html");
 
-        // 1. セキュリティ & Base設定
+        // 2. セキュリティ設定 (Content Security Policy)
+        // インラインスクリプトを許可しつつ、外部への接続先を厳密にホワイトリスト化する。
         const trustedCDNs = [
             "https://fonts.googleapis.com",
             "https://fonts.gstatic.com",
@@ -71,6 +105,7 @@ export default function ResponsiveSecureFrame({ html, darkMode = false }: { html
             "https://use.fontawesome.com",
             "https://cdn.tailwindcss.com"
         ].join(" ");
+
         const embedDomains = [
             "https://www.youtube.com",
             "https://www.youtube-nocookie.com",
@@ -95,15 +130,16 @@ export default function ResponsiveSecureFrame({ html, darkMode = false }: { html
         `.replace(/\s+/g, ' ');
         doc.head.prepend(meta);
 
+        // a タグをすべて別タブで開くように設定
         const base = doc.createElement("base");
         base.target = "_blank";
         doc.head.append(base);
 
-        // 2. 計測スクリプト：内側のコンテナサイズだけを正確に測る
+        // 3. 高さ計測用スクリプトの注入
         const script = doc.createElement("script");
         script.textContent = `
-        // script.textContent の中身を以下に差し替え
         (function() {
+            // 自分のコンテンツサイズを測って親に通知する関数
             const sendHeight = () => {
                 const el = document.getElementById('content-inner');
                 if (!el) return;
@@ -114,6 +150,7 @@ export default function ResponsiveSecureFrame({ html, darkMode = false }: { html
                 const body = document.body;
                 const html = document.documentElement;
 
+                // 各種計測値の中から最大値を採用し、見切れを防ぐ
                 const height = Math.max(
                     el.offsetHeight,
                     el.scrollHeight,
@@ -131,15 +168,16 @@ export default function ResponsiveSecureFrame({ html, darkMode = false }: { html
                 }, "*");
             };
 
-            // 初回、ロード時、リサイズ時
+            // イベント登録
             window.addEventListener("load", sendHeight);
             window.addEventListener("resize", sendHeight);
             
-            // フォント読み込み完了時に再計算（これで見切れが直るケースが多い）
+            // WebFont 読み込み完了時にも実行（高さが変わりやすいため）
             if (document.fonts) {
                 document.fonts.ready.then(sendHeight);
             }
 
+            // コンテンツの動的な変化を監視
             if (typeof ResizeObserver !== 'undefined') {
                 const observer = new ResizeObserver(() => requestAnimationFrame(sendHeight));
                 observer.observe(document.body);
@@ -147,14 +185,12 @@ export default function ResponsiveSecureFrame({ html, darkMode = false }: { html
                 observer.observe(document.getElementById('content-inner'));
             }
 
-            // 念のため、初期化から数秒間は定期的に送る（動的な埋め込み対策）
+            // タイマーによるバックアップ（外部リソース読み込み対策）
             [500, 1000, 3000].forEach(delay => setTimeout(sendHeight, delay));
         })();
         `;
-        // Move script to the end of body to ensure it executes after elements are created
-        // Update: Instead of appending to head here, we will append it after body items in doc.body
 
-        // 3. リセットスタイル：途切れを防止しつつ、100vhの連鎖を止める
+        // 4. リセットスタイルと基本表示の注入
         const style = doc.createElement("style");
         style.textContent = `
             html, body { 
@@ -164,36 +200,36 @@ export default function ResponsiveSecureFrame({ html, darkMode = false }: { html
                 height: auto !important;
                 min-height: 0 !important;
                 overflow: visible !important;
-                ${darkMode ? "color: #cbd5e1 !important;" : ""} /* slate-300 */
+                ${darkMode ? "color: #cbd5e1 !important;" : ""} /* ダークモード時のフォント色調整 */
                 font-family: sans-serif;
             }
             a {
-                ${darkMode ? "color: #34d399 !important;" : ""} /* emerald-400 */
+                ${darkMode ? "color: #34d399 !important;" : ""} /* ダークモード時のリンク色調整 */
             }
             #content-inner {
-                display: block; /* flow-root よりも確実な場合がある */
+                display: block; 
                 width: 100%;
                 height: auto !important;
-                /* 上下のマージンが突き抜けて計測不能になるのを防ぐ魔法のプロパティ */
+                /* 上下のマージンが突き抜けて計測不能になる（Margin Collapsing）を防ぐ */
                 padding: 1px 0; 
                 margin: 0;
                 box-sizing: border-box;
             }
-            /* 画像やiframeが親を突き破るのを防ぐ */
+            /* 画像などが親要素を突き破らないように制限 */
             img, video, iframe {
                 max-width: 100%;
             }
         `;
         doc.head.append(style);
 
-        // 4. ボディ全体を計測用divで包む
+        // 5. ボディ全体を計測用ラッパー div で包み直す
         const innerWrapper = doc.createElement("div");
         innerWrapper.id = "content-inner";
         while (doc.body.firstChild) {
             innerWrapper.appendChild(doc.body.firstChild);
         }
         doc.body.appendChild(innerWrapper);
-        doc.body.appendChild(script); // Append script after innerWrapper
+        doc.body.appendChild(script);
 
         return doc.documentElement.outerHTML;
     }, [html, iframeId, darkMode]);
@@ -202,6 +238,7 @@ export default function ResponsiveSecureFrame({ html, darkMode = false }: { html
         <div style={{ width: "100%", display: "block", position: "relative" }}>
             <iframe
                 srcDoc={srcDoc}
+                // サンドボックス属性の権限設定
                 sandbox="allow-scripts allow-popups allow-forms allow-presentation allow-same-origin"
                 scrolling="no"
                 style={{
@@ -211,7 +248,7 @@ export default function ResponsiveSecureFrame({ html, darkMode = false }: { html
                     border: "none",
                     backgroundColor: "transparent",
                     display: "block",
-                    transition: "none",
+                    transition: "none", // リサイズ時のガクつきを抑えるため無効化
                     overflow: "hidden"
                 }}
                 title="Secure Sandbox"

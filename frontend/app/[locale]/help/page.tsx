@@ -1,8 +1,23 @@
+/**
+ * ファイル概要: ヘルプ・操作マニュアル インデックスページ
+ * 
+ * 役割:
+ * 受取人、贈り主、ショップオーナーなど、役割に応じた操作マニュアルへの導線を提供します。
+ * Markdown形式で提供される各詳細ページへの玄関口となります。
+ * 
+ * 仕様:
+ * 1. Server Component として実装し、SEOのためのメタデータ生成に対応。
+ * 2. 視認性の高いカード形式のナビゲーション。
+ */
+
 import Image from 'next/image';
 import Link from 'next/link';
 import { getTranslations } from 'next-intl/server';
 import { Store, Package, ChevronRight, Bug, SendHorizontal, Gift, CircleUserRound, Waypoints, Crown, CircleQuestionMark } from 'lucide-react';
 
+/**
+ * SEO用メタデータの生成
+ */
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }) {
     const { locale } = await params;
     const t = await getTranslations({ locale, namespace: 'Metadata' });
@@ -13,6 +28,9 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
     };
 }
 
+/**
+ * ヘルプインデックスページコンポーネント
+ */
 export default function HelpPage() {
     return (
         <div className="min-h-screen bg-background pt-10 flex flex-col">

@@ -1,3 +1,19 @@
+/**
+ * ファイル概要: ギフト一括送信ページ (Send Gift / Bulk Scan)
+ * 
+ * 役割:
+ * 複数のギフトQRコードを連続してスキャンし、一括して自身の「送信済み履歴」に
+ * 追加するための機能を提供します。
+ * ギフトの物理カードを大量に配布する際などに、手元の履歴として残す操作を効率化します。
+ * 
+ * 主要機能:
+ * 1. カメラによるQRコードの一括スキャン。
+ * 2. 入力（URLまたはQR ID）からのQR ID抽出ロジック。
+ * 3. スキャン後の確認リスト管理（重複排除、個別削除）。
+ * 4. 手動入力によるQR ID追加。
+ * 5. 非同期ループによる一括処理と、進捗状況のオーバーレイ表示。
+ */
+
 "use client";
 
 import { useEffect, useState, useRef } from "react";
@@ -11,23 +27,44 @@ import { Loader2, QrCode, ScanLine, X, ChevronDown, CheckCircle2 } from "lucide-
 import QRScanner from "@/components/ui/qr-scanner";
 import { userApi } from "@/lib/api/user";
 
+/**
+ * ギフト送信ページコンポーネント
+ */
 export default function SendGiftPage() {
+    /** 翻訳用フック (UserProfilePage namespace) */
     const t = useTranslations('UserProfilePage');
+    /** バックエンドエラー翻訳フック */
     const { translateError } = useBackendError();
+    /** ルーター */
     const router = useRouter();
 
+    /** スキャン実行中フラグ */
     const [isScanning, setIsScanning] = useState(false);
+    /** スキャン済みQR IDのリスト（重複なし） */
     const [scannedQrIds, setScannedQrIds] = useState<string[]>([]);
+    /** 手動入力用バッファ */
     const [scannedUrl, setScannedUrl] = useState("");
+    /** 手動入力入力欄の表示状態 */
     const [showManualInput, setShowManualInput] = useState(false);
+    /** 一括処理実行中フラグ */
     const [processing, setProcessing] = useState(false);
+    /** 完了メッセージ */
     const [successMsg, setSuccessMsg] = useState("");
+    /** エラーメッセージ */
     const [errorMsg, setErrorMsg] = useState("");
+    /** 個別処理結果のリスト */
     const [bulkResults, setBulkResults] = useState<Array<{ qrId: string, status: 'success' | 'error', message?: string }>>([]);
+    /** 確認画面表示フラグ */
     const [isConfirming, setIsConfirming] = useState(false);
+    /** 処理完了件数（進捗表示用） */
     const [completedCount, setCompletedCount] = useState(0);
+    /** 背景同期用のコンテナ参照 */
     const containerRef = useRef<HTMLDivElement>(null);
 
+    /**
+     * 入力文字列（URLまたは生ID）からQR IDを抽出し、リストに追加します。
+     * @param urlToProcess スキャンされたテキストまたは入力テキスト
+     */
     const handleUrl = (urlToProcess: string) => {
         setErrorMsg("");
         setSuccessMsg("");
@@ -73,6 +110,10 @@ export default function SendGiftPage() {
         }
     };
 
+    /**
+     * リストにあるQR IDを一括で送信履歴に追加します。
+     * 各IDに対して順次APIリクエストを送り、結果を集計します。
+     */
     const handleBulkLink = async () => {
         if (scannedQrIds.length === 0) return;
 
@@ -81,10 +122,11 @@ export default function SendGiftPage() {
         setCompletedCount(0);
         const results: Array<{ qrId: string, status: 'success' | 'error', message?: string }> = [];
 
+        // 並列リクエストによる過負荷を避けるため、1つずつ逐次処理
         for (let i = 0; i < scannedQrIds.length; i++) {
             const qrId = scannedQrIds[i];
             try {
-                // PINは一旦無効化
+                // PINなしで履歴登録（送信者側の操作）
                 await userApi.user_history_sendgift({ qr_id: qrId, pin: "" });
                 results.push({ qrId, status: 'success' });
             } catch (e: any) {
@@ -110,6 +152,7 @@ export default function SendGiftPage() {
         handleUrl(scannedUrl);
     };
 
+    /** ページ背景色とbody/htmlの背景色を同期させます */
     useEffect(() => {
         // ページの状態に応じてbodyの背景を同期させ、オーバースクロール時の白見えを防ぐ
         const body = document.body;

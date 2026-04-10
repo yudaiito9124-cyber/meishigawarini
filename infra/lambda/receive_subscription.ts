@@ -1,12 +1,17 @@
 /**
- * 概要: ギフト受取人によるチャット通知配信の購読登録
- * 詳細: 
- *  - 被贈答者が自身のメールアドレスを登録し、チャットにメッセージが届いた際に通知を受け取れるようにします。
- *  - 被贈答者側の言語設定(locale)を保存し、通知テンプレートの言語を出し分け可能にします。
- *  - 登録成功時には不正ログイン試行のレートリミットをリセットします。
- *
- * エンドポイント: POST /receive/subscription
+ * @file receive_subscription.ts
+ * @role ゲスト用：チャット通知（メール購読）管理ハンドラー
+ * @responsibility
+ *  - 被贈答者が自身のメールアドレスを登録し、チャットに動きがあった際のリアルタイム通知を有効化します。
+ *  - 【多言語対応の購読管理】
+ *    - `notification_emails` (Set): 重複を排除して配送先 Email を管理します。
+ *    - `email_preferences` (Map): 各 Email ごとに `ja` / `en` の優先言語を記録し、ローカライズされた通知送信を可能にします。
+ *  - 【レートリミットの自己浄化（Self-Healing）】
+ *    - 正当な PIN でこのステップに到達した際、それまでに蓄積された `failed_attempts` や `locked_until`（連続試行失敗によるロック）を自動的に解除し、以降の操作のストレスを解消します。
+ * @context
+ *  - ギフトの体験を「一過性の閲覧」から「贈り主との双方向コミュニケーション」へと繋げる重要な接点です。
  */
+
 import { APIGatewayProxyHandler } from 'aws-lambda';
 import { GetCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
 import { successResponse, errorResponse } from './utils/response';
@@ -25,8 +30,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         
         if (!qr_id || !pin || !email) return errorResponse(400, 'Missing required fields');
 
-        // 【DB操作: GetItem】
-        // 理由: 署名、PIN、およびステータスの妥当性を確認。
+        // 1. PIN 認証とメタデータの取得
         const qrRes = await ddb.send(new GetCommand({
             TableName: TABLE_NAME, Key: { PK: `QR#${qr_id}`, SK: 'METADATA' }
         }));
@@ -37,8 +41,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 
         const lang = locale === 'ja' ? 'ja' : 'en';
 
-        // 【DB操作: UpdateItem (CHAT) - Step 1: 購読登録と言語設定】
-        // 理由: notification_emails(String Set)にメールを追加し、email_preferences Mapを初期化(if_not_exists)。
+        // 2. 購読リストの更新と Map の初期化
         await ddb.send(new UpdateCommand({
             TableName: TABLE_NAME,
             Key: { PK: `QR#${qr_id}`, SK: 'CHAT' },
@@ -46,8 +49,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             ExpressionAttributeValues: { ':new_email': new Set([email]), ':empty_map': {}, ':now': new Date().toISOString() }
         }));
 
-        // 【DB操作: UpdateItem (CHAT) - Step 2: 言語設定の書き込み】
-        // 理由: Step1でemail_preferencesが確実に初期化された後に言語キーをセット（元の2ステップ方式と同一）。
+        // 3. 個別の言語設定を Map 内へ書き込み
         await ddb.send(new UpdateCommand({
             TableName: TABLE_NAME,
             Key: { PK: `QR#${qr_id}`, SK: 'CHAT' },
@@ -56,8 +58,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             ExpressionAttributeValues: { ':lang': lang }
         }));
 
-        // ログイン試行制限(failed_attempts)のクリーンアップ
-        // 理由: 認証に成功して購読まで到達したため、蓄積された失敗回数をリセット。
+        // 【自己浄化】正当なユーザーによるアクセスが確認されたため、失敗制限をリセット
         try {
             if (qrRes.Item.failed_attempts || qrRes.Item.locked_until) {
                 await ddb.send(new UpdateCommand({

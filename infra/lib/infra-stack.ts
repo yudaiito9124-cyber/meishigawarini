@@ -1,3 +1,19 @@
+/**
+ * @file infra-stack.ts
+ * @role メインインフラストラクチャ・スタック定義
+ * @responsibility
+ *  - 「名刺代わりに」システムの全マネージドリソース（DB, ストレージ, 認証, API 基盤）の定義と紐付け。
+ *  - 【環境戦略】
+ *    - `prod` ステージ: 既存のデータベース（TableV2）をインポートして利用し、データの永続性を最優先します。
+ *    - `stg` 等の非本番: 毎回新規にテーブルを作成し、スタック削除時にデータの自動破棄（RemovalPolicy.DESTROY）を許可してコストとクリーンさを保ちます。
+ *  - 【セキュリティ設計】
+ *    - API Gateway での 404/403 偽装（セキュリティ・バイ・オブスキュアリティ）によるエンドポイント探索の防止。
+ *    - S3 バケットのパブリックアクセス完全遮断と、ドメイン制限付き CORS 設定。
+ *    - Cognito MFA のオプション強制と WebAuthn (Passkeys) の有効化。
+ * @context
+ *  - `InfraStack` からインスタンス化され、システム全体の土台として機能します。
+ */
+
 import * as cdk from 'aws-cdk-lib';
 import { Construct } from 'constructs';
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
@@ -19,6 +35,13 @@ export interface InfraStackProps extends cdk.StackProps {
   stage: string;
 }
 
+/**
+ * システムのコア・インフラスタック。
+ * 
+ * @description
+ * 単一のスタック内で VPC を使用しないサーバーレス構成（DynamoDB + S3 + Cognito + Lambda + API Gateway）を定義します。
+ * 各 API モジュールは Construct として分割され、関心の分離を実現しています。
+ */
 export class InfraStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props: InfraStackProps) {
     super(scope, id, props);
@@ -26,9 +49,11 @@ export class InfraStack extends cdk.Stack {
     const stage = props.stage;
     const suffix = stage === 'prod' ? '' : `-${stage}`;
 
-
     ////////////////////////////////////////////////////////////////////////////////
-    // CORS設定
+    /**
+     * CORS 設定
+     * フロントエンドのドメインおよびローカル開発環境からのアクセスを許可します。
+     */
     const extraOrigins = process.env.CORS_ALLOWED_ORIGINS
       ? process.env.CORS_ALLOWED_ORIGINS.split(',')
       : [];
@@ -40,10 +65,13 @@ export class InfraStack extends cdk.Stack {
       ...extraOrigins
     ];
 
-
     ////////////////////////////////////////////////////////////////////////////////
-    // データベース（テキストデータ）
-    // DynamoDB Table
+    /**
+     * データベース (DynamoDB TableV2)
+     * 【ステージによる分岐】
+     * - prod: 既存テーブルをインポート。データの物理削除を防止。
+     * - 非本番: PK/SK 構成の新テーブルを作成。
+     */
     let table: dynamodb.ITable;
     if (stage === 'prod') {
       table = dynamodb.Table.fromTableName(this, 'MeishiGawariniTableV2-Original', 'InfraStack-MeishiGawariniTableV218E81B62-17GD6BQFOY8ZG');
@@ -58,11 +86,10 @@ export class InfraStack extends cdk.Stack {
       });
     }
 
-    // DynamoDBの逆引き用インデックス
-    // GSIs are already on the original production table. 
-    // We only add them to the newly created tables (Staging etc.)
+    /**
+     * DynamoDB 二次インデックス (GSI)
+     */
     if (table instanceof dynamodb.Table) {
-      // GSI for Status Listing
       table.addGlobalSecondaryIndex({
         indexName: 'GSI1',
         partitionKey: { name: 'GSI1_PK', type: dynamodb.AttributeType.STRING },
@@ -70,7 +97,6 @@ export class InfraStack extends cdk.Stack {
         projectionType: dynamodb.ProjectionType.ALL,
       });
 
-      // GSI2 for Reverse Lookups (ShopIndex + OwnerIndex)
       table.addGlobalSecondaryIndex({
         indexName: 'GSI2',
         partitionKey: { name: 'GSI2_PK', type: dynamodb.AttributeType.STRING },
@@ -79,16 +105,16 @@ export class InfraStack extends cdk.Stack {
       });
     }
 
-    // DynamoDBへのアクセス権限をLambdaに付与するヘルパー関数
-    // Helper to grant permissions including GSIs for imported table
+    /**
+     * 権限セット・ヘルパー
+     * インデックスを含めた適切な権限を Lambda に付与します。
+     */
     const grantTablePermissions = (fn: lambda.IFunction, write: boolean = false) => {
       if (write) {
         table.grantReadWriteData(fn);
       } else {
         table.grantReadData(fn);
       }
-      // If table is an imported table (it doesn't have addGlobalSecondaryIndex)
-      // or even if it's new, we need to ensure index permissions for Query operations.
       fn.addToRolePolicy(new iam.PolicyStatement({
         actions: write
           ? ['dynamodb:Query', 'dynamodb:Scan', 'dynamodb:BatchGetItem', 'dynamodb:GetItem', 'dynamodb:PutItem', 'dynamodb:UpdateItem', 'dynamodb:DeleteItem']
@@ -97,10 +123,10 @@ export class InfraStack extends cdk.Stack {
       }));
     };
 
-
     ////////////////////////////////////////////////////////////////////////////////
-    // データベース（メディアデータ）
-    // S3 Bucket for Product Images
+    /**
+     * ストレージ (S3 Bucket)
+     */
     const bucketId = `ProductImageBucket${suffix}`;
     const bucket = new s3.Bucket(this, bucketId, {
       removalPolicy: stage === 'prod' ? cdk.RemovalPolicy.RETAIN : cdk.RemovalPolicy.DESTROY,
@@ -108,7 +134,7 @@ export class InfraStack extends cdk.Stack {
       cors: [
         {
           allowedMethods: [s3.HttpMethods.GET, s3.HttpMethods.PUT, s3.HttpMethods.HEAD],
-          allowedOrigins: allowedOrigins, // Locked down to domains
+          allowedOrigins: allowedOrigins,
           allowedHeaders: ['*'],
         },
       ],
@@ -116,16 +142,15 @@ export class InfraStack extends cdk.Stack {
       blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
     });
 
-
     ////////////////////////////////////////////////////////////////////////////////
-    // ユーザ一覧・認証
-    // Cognito User Pool
+    /**
+     * 認証 (Cognito User Pool)
+     */
     const userPoolId = `MeishiGawariniUserPool${suffix}`;
     const userPool = new cognito.UserPool(this, userPoolId, {
       selfSignUpEnabled: true,
       signInAliases: { email: true },
       autoVerify: { email: true },
-      // Enable MFA
       mfa: cognito.Mfa.OPTIONAL,
       mfaSecondFactor: {
         sms: true,
@@ -145,24 +170,21 @@ export class InfraStack extends cdk.Stack {
       removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
 
-    // Add User Pool Domain for Hosted UI
-    // Note: Prefix must be globally unique across AWS in the region.
     userPool.addDomain('CognitoDomain', {
       cognitoDomain: {
         domainPrefix: `meishigawarini${suffix}`,
       },
     });
 
-    // パスキー (WebAuthn) 対応のために Essentials ティアに設定
     const cfnUserPool = userPool.node.defaultChild as cognito.CfnUserPool;
     cfnUserPool.userPoolTier = 'ESSENTIALS';
 
     const userPoolClient = new cognito.UserPoolClient(this, 'MeishiGawariniUserPoolClient', {
       userPool,
       authFlows: { userSrp: true },
-      idTokenValidity: cdk.Duration.hours(1),       // IDトークン有効期限: 1時間
-      accessTokenValidity: cdk.Duration.hours(1),   // アクセストークン有効期限: 1時間
-      refreshTokenValidity: cdk.Duration.days(30),  // リフレッシュトークン有効期限: 30日
+      idTokenValidity: cdk.Duration.hours(1),
+      accessTokenValidity: cdk.Duration.hours(1),
+      refreshTokenValidity: cdk.Duration.days(30),
       supportedIdentityProviders: [
         cognito.UserPoolClientIdentityProvider.COGNITO,
         cognito.UserPoolClientIdentityProvider.GOOGLE,
@@ -177,16 +199,12 @@ export class InfraStack extends cdk.Stack {
           ...allowedOrigins.map(origin => `${origin}/ja/`),
           ...allowedOrigins.map(origin => `${origin}/en/`),
           ...allowedOrigins.map(origin => `${origin}/login/`),
-          ...allowedOrigins.map(origin => `${origin}/ja/login/`),
-          ...allowedOrigins.map(origin => `${origin}/en/login/`),
         ],
         logoutUrls: [
           ...allowedOrigins.map(origin => `${origin}/`),
           ...allowedOrigins.map(origin => `${origin}/ja/`),
           ...allowedOrigins.map(origin => `${origin}/en/`),
           ...allowedOrigins.map(origin => `${origin}/login/`),
-          ...allowedOrigins.map(origin => `${origin}/ja/login/`),
-          ...allowedOrigins.map(origin => `${origin}/en/login/`),
         ],
         scopes: [
           cognito.OAuthScope.EMAIL,
@@ -197,25 +215,22 @@ export class InfraStack extends cdk.Stack {
       },
     });
 
-    // ALLOW_USER_AUTH を有効化 (パスキー / WebAuthn に必要)
     const cfnUserPoolClient = userPoolClient.node.defaultChild as cognito.CfnUserPoolClient;
     cfnUserPoolClient.explicitAuthFlows = [
       'ALLOW_USER_SRP_AUTH',
       'ALLOW_REFRESH_TOKEN_AUTH',
-      'ALLOW_USER_AUTH'
+      'ALLOW_USER_AUTH' // WebAuthn (Passkeys) 用
     ];
 
-
-
-
     ////////////////////////////////////////////////////////////////////////////////
-    // ルーティング・API制御
-    // API Gateway
+    /**
+     * API 基盤 (API Gateway REST API)
+     */
     const apiId = `MeishiGawariniApi${suffix}`;
     const api = new apigateway.RestApi(this, apiId, {
       restApiName: `MeishiGawarini Service${suffix}`,
       description: `Backend API for MeishiGawarini`,
-      deploy: false, // Disabling auto-deployment to resolve circular dependency with NestedStacks
+      deploy: false,
     });
 
     // --- 認証エラー(401)を 404 に偽装しつつ CORS を許可 ---
@@ -309,10 +324,10 @@ export class InfraStack extends cdk.Stack {
       },
     } as any);
 
-
     ////////////////////////////////////////////////////////////////////////////////
-    // Lambda共通設定
-    // Lambda Layer or Bundling
+    /**
+     * Lambda 関数の共通設定
+     */
     const commonProps = {
       handler: 'handler',
       environment: { // 環境変数の受け渡し
@@ -322,13 +337,11 @@ export class InfraStack extends cdk.Stack {
         RESEND_API_KEY: process.env.RESEND_API_KEY || '', // Added Resend API Key
         NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL || '',
       },
-      timeout: cdk.Duration.seconds(30), // タイムアウト設定
-      bundling: { // バンドリング設定
+      timeout: cdk.Duration.seconds(30),
+      bundling: {
         externalModules: ['@aws-sdk/client-dynamodb', '@aws-sdk/lib-dynamodb', '@aws-sdk/client-s3', '@aws-sdk/s3-request-presigner', '@aws-sdk/client-ses'],
       }
     };
-
-
 
     // 各APIの設定(LambdaとURL、権限の紐づけ)
     // Admin API
@@ -378,12 +391,12 @@ export class InfraStack extends cdk.Stack {
       grantTablePermissions,
     });
 
-    // --- Manual Deployment to resolve circular dependency ---
-    // Change the Logical ID by adding a timestamp to force a new Deployment resource in CloudFormation.
-    // Also reference the Resource IDs from the NestedStacks to ensure they are included in the deployment.
+    /**
+     * デプロイメント定義
+     */
     const deployment = new apigateway.Deployment(this, `ApiDeployment-${new Date().getTime()}`, {
       api: api,
-      description: `Comprehensive CORS fix - Refs: ${adminApi.adminResource.resourceId}, ${shopApi.shopResource.resourceId}, ${userApi.userResource.resourceId}, ${receiveApi.receiveResource.resourceId}`,
+      description: `Comprehensive deployment - Refs: ${adminApi.adminResource.resourceId}, ${shopApi.shopResource.resourceId}, ${userApi.userResource.resourceId}, ${receiveApi.receiveResource.resourceId}`,
     });
     deployment.node.addDependency(adminApi);
     deployment.node.addDependency(shopApi);
@@ -397,8 +410,10 @@ export class InfraStack extends cdk.Stack {
       stageName: 'prod',
     });
 
-
-    // Outputs
+    /**
+         * 外部出力 (Outputs)
+         * フロントエンドの設定ファイルや運用時に必要な情報を出力します。
+     */
     new cdk.CfnOutput(this, 'ApiUrl', { value: apiStage.urlForPath() });
     new cdk.CfnOutput(this, 'UserPoolId', { value: userPool.userPoolId });
     new cdk.CfnOutput(this, 'UserPoolClientId', { value: userPoolClient.userPoolClientId });

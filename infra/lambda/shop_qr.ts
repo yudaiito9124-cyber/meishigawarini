@@ -1,12 +1,20 @@
 /**
- * 概要: QRコード情報の取得・リンク・アクティベート (ショップ用)
- * 詳細: 
- *  - 特定のショップに紐づくQRコードの一覧取得(list)、商品への紐付け（link）、および有効化（activate）を管理します。
- *  - 状態チェック(check)機能により、スキャンされたQRコードが現在そのショップで利用可能か判定します。
- *  - 有効期限の遅延評価（checkAndExpire）により、データの整合性を保ちます。
- *
- * エンドポイント: POST /shop/qr
+ * @file shop_qr.ts
+ * @role ショップ用：QR コード / ギフト券運用管理ハンドラー
+ * @responsibility
+ *  - 店舗スタッフが QR コードをスキャンし、商品（ギフト）を紐付け、有効化する一連のオペレーションを管理します。
+ *  - 【主要アクション】
+ *    - `check`: スキャンされた QR コードが自ショップで利用可能（状態・帰属）かを確認します。
+ *    - `list`: 自ショップに紐付いている（GSI2 使用）QR コードの一覧を取得。
+ *    - `link`: 未割当（UNASSIGNED）の状態から、特定の商品やメモを紐付けます。`activate_now` オプションによる一括有効化もサポート。
+ *    - `activate`: リンク済み（LINKED）の QR コードを、最終的に利用可能（ACTIVE）な状態へ移行させます。
+ *  - 【整合性・セキュリティ】
+ *    - `checkAndExpire`: 動作の都度、有効期限を遅延評価し、実態に合わせたステータス更新を自動で行います。
+ *    - `ConditionExpression`: 紐付け処理において、アトミックな更新を保証し、他ショップによる同一コードの不正操作や二重登録を物理的に防ぎます。
+ * @context
+ *  - 店舗のレジ横や発送作業現場で、物理カードを「ただの紙」から「価値のあるギフトカード」に変える、運用の中核を担うプロセスです。
  */
+
 import { APIGatewayProxyHandler } from 'aws-lambda';
 import { GetCommand, UpdateCommand, QueryCommand } from '@aws-sdk/lib-dynamodb';
 import { checkShopOwnerOrGM, checkUserShopPermission } from './share/shop-auth';
@@ -27,7 +35,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         const shopId = getShopId(event, body);
         let action = getAction(event, body);
 
-        // パスベースのルーティング互換性
+        // 互換性: 旧パスベースのルーティングに対応
         const resPath = event.resource;
         if (resPath.endsWith('/list')) action = 'list';
         else if (resPath.endsWith('/link')) action = 'link';
@@ -37,17 +45,15 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         if (!shopId) return errorResponse(400, 'Missing shopId');
         if (!userId) return errorResponse(401, 'Unauthorized');
 
-        // 権限チェック
+        // 権限検証
         const shopMetadata = await checkShopOwnerOrGM(ddb, TABLE_NAME, shopId, userId, event);
         if (!shopMetadata) return errorResponse(403, 'Forbidden');
 
-        // ====================================================================
-        // ACTION: check (QRコードの状態チェック)
         // --------------------------------------------------------------------
-        // 目的: 指定されたQRコードが自ショップで利用可能（未割当またはリンク済）かを確認します。
-        // ====================================================================
+        // ACTION: check (QR コードの状態チェック / 事前確認)
+        // 目的: スキャンされた QR コードが「自店舗のものか」「紐付け可能か」を確認。
+        // --------------------------------------------------------------------
         if (action === 'check') {
-            const { qr_id: body_qr_id } = body as ShopApiSchema['shop_qrcodecheck'];
             const qr_id = getQrId(event, body);
             if (!qr_id) return errorResponse(400, 'Missing qr_id');
 
@@ -58,23 +64,23 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 
             const qrItem = qrRes.Item;
             
-            // 期限切れの自動判定とステータス更新
+            // 重要: 有効期限の遅延評価（取得と同時に判定・更新を行う「Lazy Evaluation」手法）
             const currentStatus = await checkAndExpire(ddb, TABLE_NAME, qr_id, qrItem as any);
             if (currentStatus === 'EXPIRED') return errorResponse(410, 'QR Code has expired');
 
-            // 帰属ショップの確認
+            // セキュリティ: 他ショップの QR コードは操作不能
             if (qrItem.shop_id && qrItem.shop_id !== shopId) {
                 return errorResponse(403, 'QR does not belong to this shop');
             }
 
-            // 状態のバリデーション (UNASSIGNED または LINKED のみ許可)
+            // オペレーションバリデーション: 既に受け取られたり、エラー状態のものは除外
             if (currentStatus !== 'UNASSIGNED' && currentStatus !== 'LINKED') {
                 return errorResponse(409, `QR is in invalid state: ${currentStatus}`);
             }
 
+            // 既に商品が紐付いている場合は、その情報を付加して返却（再リンク用）
             let productName = '';
             let productLinked = false;
-
             if (qrItem.product_id) {
                 const productRes = await ddb.send(new GetCommand({
                     TableName: TABLE_NAME, Key: { PK: `SHOP#${shopId}`, SK: `PRODUCT#${qrItem.product_id}` }
@@ -88,13 +94,11 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             return successResponse({ product_id: qrItem.product_id, product_name: productName, product_linked: productLinked, status: currentStatus });
         }
 
-        // ====================================================================
-        // ACTION: list (ショップQR一覧の取得)
         // --------------------------------------------------------------------
-        // 目的: ショップに関連付けられた（GSI2_PK = SHOP#{id}）QRコードを一覧表示します。
-        // ====================================================================
+        // ACTION: list (ショップ帰属 QR 一覧)
+        // 目的: GSI2 インデックス（SHOP#ID）を用いて、自ショップに関連付けられた全 QR を取得。
+        // --------------------------------------------------------------------
         if (action === 'list') {
-            const { shop_id } = body as ShopApiSchema['shop_qr_list'];
             const res = await ddb.send(new QueryCommand({
                 TableName: TABLE_NAME, IndexName: 'GSI2',
                 KeyConditionExpression: 'GSI2_PK = :sid', ExpressionAttributeValues: { ':sid': `SHOP#${shopId}` }
@@ -102,7 +106,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 
             const rawItems = res.Items || [];
             
-            // 期限切れの遅延評価を行いながらデータを整形
+            // 全アイテムに対して個別に期限切れ判定を実行しながら整形
             const items = await Promise.all(rawItems.map(async (item) => {
                 const qrid = item.PK.replace('QR#', '');
                 const status = await checkAndExpire(ddb, TABLE_NAME, qrid, item as any);
@@ -120,13 +124,13 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             return successResponse({ items });
         }
 
-        // ====================================================================
-        // ACTION: link (商品への紐付け)
         // --------------------------------------------------------------------
-        // 目的: 未割当のQRコードを特定の商品に紐付けます。activate_now=trueで即時有効化。
-        // ====================================================================
+        // ACTION: link (商品との紐付け実行)
+        // 目的: 「紙のカード」に「特定のギフト価値（商品）」をアトミックに定義します。
+        // --------------------------------------------------------------------
         if (action === 'link') {
-            const { qr_id: body_qr_id, product_id: body_product_id, memo_for_users, memo_for_shop, activate_now } = body as ShopApiSchema['shop_qr_link'];
+            const bodyTyped = body as ShopApiSchema['shop_qr_link'];
+            const { memo_for_users, memo_for_shop, activate_now } = bodyTyped;
             const qr_id = getQrId(event, body);
             const product_id = getProductId(event, body);
             
@@ -143,8 +147,9 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             const qrItem = qrCheck.Item;
             const product = prodCheck.Item;
 
-            // バリデーション
+            // 各種ビジネスロジック・バリデーション
             if (qrItem.status !== "UNASSIGNED" && qrItem.status !== "LINKED") return errorResponse(409, 'QR state is not unassigned or linked');
+            // 特定ユーザー専用 QR（reserved）の場合、そのショップに所属しているかチェック
             if (qrItem.owner_id && !await checkUserShopPermission(ddb, TABLE_NAME, shopId, qrItem.owner_id)) return errorResponse(403, 'Permission denied for this reserved QR');
             if (qrItem.shop_id && qrItem.shop_id !== shopId) return errorResponse(403, 'QR belongs to another shop');
             if (qrItem.product_id && qrItem.product_id !== product_id) return errorResponse(409, 'QR is reserved for another product');
@@ -153,6 +158,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             const now = new Date().toISOString();
             const status = activate_now ? 'ACTIVE' : 'LINKED';
             
+            // 有効期限の算出（有効化されるタイミングで商品の valid_days に基づいて設定）
             let expiresAt = qrItem.ts_expired_at;
             if (activate_now && !expiresAt) {
                 const expDate = new Date();
@@ -160,6 +166,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 expiresAt = expDate.toISOString();
             }
 
+            // 更新クエリの構築
             let updateExpr = 'SET #status = :status, shop_id = :sid, product_id = :pid, GSI1_PK = :gsi_pk, GSI1_SK = :now, GSI2_PK = :gsi2_pk, GSI2_SK = :now, ts_linked_at = :now, ts_updated_at = :now';
             const attrValues: any = {
                 ':status': status, ':sid': shopId, ':pid': product_id,
@@ -175,7 +182,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             }
 
             // 【DB操作: UpdateItem】
-            // アトミックにリンク処理を実行。条件式により二重登録や他店舗の介入を防ぐ。
+            // 排他制御: 他のプロセスの介入を防ぐ ConditionExpression を指定
             await ddb.send(new UpdateCommand({
                 TableName: TABLE_NAME, Key: { PK: `QR#${qr_id}`, SK: 'METADATA' },
                 UpdateExpression: updateExpr,
@@ -186,13 +193,11 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             return successResponse({ message: 'QR Linked successfully', status });
         }
 
-        // ====================================================================
-        // ACTION: activate (リンク済みQRの有効化)
         // --------------------------------------------------------------------
-        // 目的: 既に特定の商品に紐付いている(LINKED)QRコードを利用可能(ACTIVE)にします。
-        // ====================================================================
+        // ACTION: activate (リンク済み QR の強制有効化 / 確定)
+        // 目的: 既にリンク済みの QR コードに対し、最終的な利用許可を与えます。
+        // --------------------------------------------------------------------
         if (action === 'activate') {
-            const { qr_id: body_qr_id } = body as ShopApiSchema['shop_qr_activate'];
             const qr_id = getQrId(event, body);
             if (!qr_id) return errorResponse(400, 'Missing qr_id');
 
@@ -201,14 +206,13 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             if (qrRes.Item.status !== 'LINKED') return errorResponse(409, 'QR is not in LINKED state');
             if (qrRes.Item.shop_id !== shopId) return errorResponse(403, 'QR does not belong to this shop');
 
-            // 有効期限の計算
+            // 商品設定から有効期間を取得し、現在時刻から期限を算出
             const prodRes = await ddb.send(new GetCommand({ TableName: TABLE_NAME, Key: { PK: `SHOP#${shopId}`, SK: `PRODUCT#${qrRes.Item.product_id}` } }));
             const validDays = prodRes.Item?.valid_days || DEFAULT_VALID_DAYS;
             const now = new Date();
             const expiresAt = new Date(now);
             expiresAt.setDate(expiresAt.getDate() + validDays);
 
-            // 【DB操作: UpdateItem】
             await ddb.send(new UpdateCommand({
                 TableName: TABLE_NAME, Key: { PK: `QR#${qr_id}`, SK: 'METADATA' },
                 UpdateExpression: 'SET #status = :active, ts_activated_at = :now, ts_expired_at = :exp, GSI1_PK = :gsi_pk, GSI1_SK = :now, ts_updated_at = :now',

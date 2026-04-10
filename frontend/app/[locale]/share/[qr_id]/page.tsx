@@ -1,9 +1,15 @@
 /**
- * 概要: ギフトシェア用公開ページ
- * 詳細: 
- *  - PIN認証なしで、ギフトの情報を閲覧できるページです。
- *  - URLパラメータ (?product, ?card, ?shop) によって表示内容を制御します。
- *  - セキュリティのため、送り主(Sender)の個人情報やチャット、配送先情報は一切表示しません。
+ * ファイル概要: ギフトシェア用公開ページ
+ * 
+ * 役割:
+ * SNS（X, Facebook等）でシェアされた際に、第三者がギフトの内容を閲覧するためのページです。
+ * 送り主が「何を贈ったか」をフォロワーや友人に伝えるためのショーケースとして機能します。
+ * 
+ * 仕様:
+ * 1. PIN認証なしでアクセス可能（一般公開設定）。
+ * 2. URLパラメータ (?product, ?card, ?shop) によって表示するセクションを動的に制御。
+ * 3. セキュリティ遵守: 送り主の個人情報、チャット履歴、配送先情報は一切表示せず、ギフトの「外観」のみを公開。
+ * 4. プレミアム演出: 3Dカードフリップアニメーションと洗練されたタイポグラフィを採用。
  */
 "use client";
 
@@ -17,18 +23,34 @@ import { receiveApi } from "@/lib/api/receive";
 import SandboxedHtml from "@/components/SandboxedHtml";
 import { cn } from "@/lib/utils";
 
+/**
+ * ギフトシェアページコンポーネント
+ * 
+ * クエリパラメータに基づき、以下の3つのセクションを切り替えて表示します：
+ * - Card Design: 贈られたカードの3Dプレビュー
+ * - Gift Item: 商品名、画像、詳細説明
+ * - Shop Identity: 発送元ショップの情報
+ */
 export default function SharePage() {
+    /** 受取ページと同じ翻訳 namespace を利用 */
     const t = useTranslations('ReceivePage');
     const params = useParams();
     const searchParams = useSearchParams();
     const qr_id = params?.qr_id as string;
 
+    /** 読み込み状態 */
     const [loading, setLoading] = useState(true);
+    /** 公開用ギフトデータ */
     const [data, setData] = useState<any>(null);
+    /** エラー状態 */
     const [error, setError] = useState<string | null>(null);
+    /** 3Dカードの反転状態 */
     const [isFlipped, setIsFlipped] = useState(false);
 
-    // オプションの取得 (パラメータが存在するかどうかで判定)
+    /**
+     * URLパラメータの存在チェック
+     * シェアリングダイアログでの選択に基づいて、表示内容を動的に切り替えます。
+     */
     const showProduct = searchParams.has('product');
     const showCard = searchParams.has('card');
     const showShop = searchParams.has('shop');
@@ -132,7 +154,7 @@ export default function SharePage() {
                                 />
                             </div>
 
-                            {/* Rotating Container */}
+                            {/* 3D回転を実現するコンテナ */}
                             <div
                                 className={cn(
                                     "w-full h-full relative preserve-3d transition-all duration-700 md:duration-1000 rounded-[2rem]",

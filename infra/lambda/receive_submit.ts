@@ -1,3 +1,24 @@
+/**
+ * @file receive_submit.ts
+ * @role ゲスト用：ギフト受取・配送先登録（チェックアウト）ハンドラー
+ * @responsibility
+ *  - 被贈答者が配送先住所を入力し、ギフト券を「使用済み」にして商品の配送を確定させます。
+ *  - 【トランザクションによる整合性】
+ *    - `TransactWrite`:
+ *      1. `QR#METADATA`: ステータスを `ACTIVE` から `USED` へ遷移させ、パスワード保護（任意）を設定。
+ *      2. `QR#ORDER`: 配送先情報（住所・氏名・希望日時）を持つオーダーレコードを新規作成。
+ *    - これにより、住所登録されたのにステータスが更新されない、といった不整合を防ぎます。
+ *  - 【遅延評価による最終防衛】
+ *    - 登録の直前で `checkAndExpire` を実行し、入力中に期限が切れたギフトを確実にブロックします。
+ *  - 【受取履歴への自動追加】
+ *    - 被贈答者がログイン済みの場合、ギフト ID を `RECEIVEDLOG` へ追加し、自分の履歴からいつでもチャットを見返せるようにします。
+ *  - 【購読と通知のマルチキャスト】
+ *    - 受取人の Email をチャットの通知リストへ自動登録（Subscribe）し、登録完了メールを送信。
+ *    - 同時にショップオーナーに対しても、新しい注文が入ったことを通知します。
+ * @context
+ *  - ギフトを受け取るという体験のクライマックスであり、最もデータ整合性が求められるポイントです。
+ */
+
 import { APIGatewayProxyHandler } from 'aws-lambda';
 import { TransactWriteCommand, GetCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
 import { CognitoIdentityProviderClient, AdminGetUserCommand } from '@aws-sdk/client-cognito-identity-provider';
@@ -24,8 +45,6 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         // フロントエンドの入れ子構造(shipping_info)を使用
         const shipping = body.shipping_info || {};
         const { name, address, zip_code, phone, email, preferred_date, preferred_time, client_timestamp } = shipping;
-
-        // その他のパラメータ
         const password = body.password;
 
         if (!qr_id || !pin || !name || !address) {
@@ -95,7 +114,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             ]
         }));
 
-        // 【履歴追加特典: ログイン中のユーザーであれば RECEIVEDLOG に追加】
+        // 【受取体験の継続】ログイン中のユーザーであれば RECEIVEDLOG に自動追加
         const userId = getUserId(event);
         if (userId) {
             try {
@@ -144,6 +163,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                     productId ? ddb.send(new GetCommand({ TableName: TABLE_NAME, Key: { PK: `SHOP#${shopId}`, SK: `PRODUCT#${productId}` } })) : { Item: undefined }
                 ]);
 
+                // ショップ個別の Email がなければオーナー（Cognito）の Email を使用
                 let shopEmail = shopRes.Item?.email;
                 if (!shopEmail && shopRes.Item?.owner_id && USER_POOL_ID) {
                     const userRes = await cognito.send(new AdminGetUserCommand({
@@ -166,7 +186,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                         lang: 'ja'
                     });
                 }
-            } catch (e) { console.error('Shop provider notification failed', e); }
+            } catch (e) { console.error('Shop notification failed', e); }
         }
 
         return successResponse({ message: 'Address submitted successfully', order_id: `ORDER#${qr_id}` });

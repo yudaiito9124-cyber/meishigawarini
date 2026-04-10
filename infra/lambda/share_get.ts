@@ -1,12 +1,19 @@
 /**
- * 概要: シェア用公開情報の取得
- * 詳細: 
- *  - PIN認証なしで、QR IDに関連付けられた公開可能なギフト情報（商品、ショップ、デザイン）を取得します。
- *  - 被贈答者の個人情報や、贈り主(Sender)の氏名・プロフィール・メッセージ等は一切含みません。
- *  - ギフトがBANNED（利用停止）状態の場合はエラーを返します。
- *
- * エンドポイント: GET /share/{qr_id}
+ * @file share_get.ts
+ * @role 一般公開用：ギフト券公開情報取得ハンドラー
+ * @responsibility
+ *  - SNS 等でシェアされたギフト ID を元に、公開可能な範囲の商品・店舗情報を返却します。
+ *  - 【プライバシー保護の徹底】
+ *    - シェア用エンドポイントは PIN 認証を必要としないため、被贈答者の実名、配送先、メッセージ内容、贈り主の個人プロフィール等は一切含めない設計になっています。
+ *    - ユーザーのプライバシーを侵害することなく、受け取ったデジタルギフトの「嬉しさ（商品とデザイン）」だけをシェア可能です。
+ *  - 【可視性の制御（Kill-switch）】
+ *    - `status === 'BANNED'` の場合のみ、情報の開示を完全にブロックします。その他の状態（EXPIRED 等）では、アーカイブとして過去の情報を閲覧可能です。
+ *  - 【パブリック・エンリッチメント】
+ *    - `BatchGetCommand` を用い、ショップ情報、商品情報、デザイン情報を一括取得し、必要最低限の項目に絞って返却します。
+ * @context
+ *  - 認証なしでアクセスされるため、セキュリティとプライバシーへの配慮が最も強く求められる領域です。
  */
+
 import { APIGatewayProxyHandler } from 'aws-lambda';
 import { GetCommand, BatchGetCommand } from '@aws-sdk/lib-dynamodb';
 import { signUrlIfS3, signUrlsInHtml } from './utils/s3';
@@ -15,7 +22,6 @@ import { checkAndExpire } from './utils/expiration';
 import { successResponse, errorResponse } from './utils/response';
 import { ddb, TABLE_NAME, BUCKET_NAME } from './share/db';
 import { getQrId } from './utils/request';
-import { PublicApiSchema } from '@shared/api-types';
 
 export const handler: APIGatewayProxyHandler = async (event) => {
     try {
@@ -24,10 +30,9 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         const qr_id = getQrId(event);
         if (!qr_id) return errorResponse(400, 'Missing qr_id');
 
-        // 【フェーズ 1: ギフトの基本ステータス確認】
+        // 1. ギフトの基本ステータス確認
         const qrRes = await ddb.send(new GetCommand({
-            TableName: TABLE_NAME,
-            Key: { PK: `QR#${qr_id}`, SK: 'METADATA' }
+            TableName: TABLE_NAME, Key: { PK: `QR#${qr_id}`, SK: 'METADATA' }
         }));
 
         if (!qrRes.Item) return errorResponse(404, 'Gift Not Found');
@@ -35,12 +40,12 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         const item = qrRes.Item;
         const currentStatus = await checkAndExpire(ddb, TABLE_NAME, qr_id, item as any);
 
-        // BANNED（停止中）の場合は情報を返さない
+        // BANNED（停止中）の場合は情報を一切返さない（緊急遮断）
         if (item.status === 'BANNED') {
             return errorResponse(403, 'This gift is restricted');
         }
 
-        // 【フェーズ 2: 関連情報の取得 (Enrichment)】
+        // 2. 関連情報の結合（Enrichment）
         const shopId = item.shop_id;
         const productId = item.product_id;
         const designId = item.design_id || (item as any).card_design;
@@ -66,24 +71,22 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             design = designMeta || (designId ? getSystemDesign(designId) : null);
         }
 
-        // 【フェーズ 3: レスポンスの構築】
-        // セキュリティのため、公開して良い項目のみを厳選して返却
+        // 3. レスポンスの構築（厳選された公開項目のみ）
         const result = {
             qr_id,
             status: currentStatus,
             shop: shop ? {
                 name: shop.name || 'Unknown Shop',
-                // detail_html は必要に応じて含める（署名が必要な画像が含まれている可能性があるため signUrlsInHtml を通す）
                 detail_html: shop.detail_html ? await signUrlsInHtml(shop.detail_html, BUCKET_NAME) : undefined
             } : null,
-            // 受け取りページ(receive_verify.ts)との互換性のためのフィールド
+            // 被贈答者用 verify ページ等との互換性フィールド。
             shop_name: shop?.name,
             shop_detail_html: shop?.detail_html ? await signUrlsInHtml(shop.detail_html, BUCKET_NAME) : undefined,
             product: product ? {
                 name: product.name,
                 image_url: product.image_url ? await signUrlIfS3(product.image_url, BUCKET_NAME) : undefined,
                 detail_html: product.detail_html ? await signUrlsInHtml(product.detail_html, BUCKET_NAME) : undefined,
-                price: product.price // 価格は公開情報として含めても良いか？（通常はギフトなので隠す場合もあるが、シェア用ならあっても良いかも。今回は含める）
+                price: product.price
             } : null,
             design: design ? {
                 design_id: designId,

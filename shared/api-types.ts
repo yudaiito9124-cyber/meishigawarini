@@ -1,6 +1,12 @@
 /**
- * 概要: フロントエンドとバックエンドで共有されるAPIの型定義
- * 目的: APIのリクエストボディなどの型を一本化し、静的な型チェックを可能にします。
+ * @file api-types.ts
+ * @role フロントエンド・バックエンド共有 API スキマ定義
+ * @responsibility
+ *  - システム全体の API リクエストペイロードの型定義を一本化し、開発時の型安全性を保証します。
+ *  - 【契約としての型】フロントエンドが送信すべきデータ構造と、バックエンドが期待する構造の「単一の真実（Single Source of Truth）」として機能します。
+ *  - 各サブシステム（Admin, Shop, User, Receive, Public）ごとに独立した型定義を提供し、大規模なインターフェースを整理しています。
+ * @context
+ *  - フロントエンドの API クライアントおよびバックエンドの Lambda ハンドラーの両方でインポートされ、インターフェースの不整合をコンパイル時に検知します。
  */
 
 // ==========================================
@@ -10,7 +16,7 @@ export type AdminApiSchema = {
     // 管理
     admin_check: {};
     admin_dump: { pks?: string[], keys?: { pk: string, sk: string }[], gsi2_pks?: string[] }; //PKのみ、またはPK+SKでレコードを取得
-    admin_links: { shop_ids: string[]; user_ids: string[]; action: "validate" | "execute" }; //ショップと別の管理者をリンク
+    admin_links: { shop_ids: string[]; user_ids: string[]; action: "validate" | "execute" | "unlink" }; //ショップと別の管理者をリンク・解除
     admin_changeowner: { shop_id: string, new_user_id: string, action: "validate" | "execute" }; // ショップのオーナー変更
     admin_shop_create: { name: string; description?: string; owner_id?: string; gm_ids?: string[] }; // ショップの作成
     admin_shop_carddesign_link_get: { shop_id: string }; // ショップとカードデザインの紐付け取得

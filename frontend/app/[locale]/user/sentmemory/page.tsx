@@ -1,3 +1,19 @@
+/**
+ * ファイル概要: 送信済ギフト履歴ページ (Sent Memory)
+ * 
+ * 役割:
+ * ユーザーがこれまでに他者へ送ったギフトカードの一覧を表示します。
+ * ギフトカードを「スタック」または「グリッド」で視覚的に管理し、
+ * 送ったギフトの内容、PINコード、受取状況などを振り返ることができます。
+ * 
+ * 主要機能:
+ * 1. 送信済ギフトの一覧取得と表示。
+ * 2. 表示モードの切り替え（スタック / グリッド）。
+ * 3. 3Dフリップアニメーションによるカード詳細の確認。
+ * 4. PINコードの確認とクリップボードコピー。
+ * 5. 該当ギフトの受け取り用URLへのアクセス。
+ */
+
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
@@ -9,30 +25,46 @@ import { Loader2, Send, ChevronDown, ExternalLink, Copy, Check, LayoutGrid, Laye
 import { userApi } from "@/lib/api/user";
 import { cn } from "@/lib/utils";
 
+/**
+ * 送信済ギフト履歴コンポーネント
+ */
 export default function SendHistoryPage() {
+    /** 翻訳用フック (UserProfilePage namespace) */
     const t = useTranslations('UserProfilePage');
+    /** ルーター */
     const router = useRouter();
 
+    /** 現在詳細表示（またはフリップ）されているカードのID */
     const [activeId, setActiveId] = useState<string | null>(null);
+    /** カードの状態 ('peek': 浮き上がり, 'flipped': 裏返し, 'none': 通常) */
     const [activeStage, setActiveStage] = useState<'peek' | 'flipped' | 'none'>('none');
+    /** 表示モード ('grid': 一覧, 'stack': 重なり) */
     const [viewMode, setViewMode] = useState<'grid' | 'stack'>('stack');
+    /** ホバー中のカードID */
     const [hoveredId, setHoveredId] = useState<string | null>(null);
+    /** アニメーション実行中フラグ (連打防止用) */
     const [isAnimating, setIsAnimating] = useState(false);
+    /** 背景同期用のコンテナ参照 */
     const containerRef = useRef<HTMLDivElement>(null);
 
+    /**
+     * カードクリック時の挙動を制御します。
+     * 表示モードや現在の状態に基づき、アニメーション時間を動的に計算し、段階的に状態を遷移させます。
+     * @param id クリックされたカードのQR ID
+     */
     const handleItemClick = (id: string) => {
         if (isAnimating) return;
 
-        // Determine transition duration based on current state and view mode
+        // 現在の状態と表示モードに基づいて遷移時間を決定
         let duration = 0;
         if (activeId === id) {
             if (activeStage === 'peek') {
-                duration = 700; // Flip duration
+                duration = 700; // 裏返す(Flip)時間
             } else {
-                duration = viewMode === 'grid' ? 50 : 700; // Closing duration
+                duration = viewMode === 'grid' ? 50 : 700; // 閉じる時間
             }
         } else {
-            duration = viewMode === 'grid' ? 50 : 700; // Opening duration
+            duration = viewMode === 'grid' ? 50 : 700; // 開く時間
         }
 
         setIsAnimating(true);
@@ -51,7 +83,9 @@ export default function SendHistoryPage() {
         }
     };
 
+    /** データ読み込み中フラグ */
     const [loading, setLoading] = useState(true);
+    /** 履歴データの一覧 */
     const [history, setHistory] = useState<Array<{
         qr_id: string,
         timestamp: string,
@@ -63,14 +97,21 @@ export default function SendHistoryPage() {
         bgimgb?: string,
         shop_name?: string
     }>>([]);
+    /** コピー完了表示用 ID */
     const [copiedId, setCopiedId] = useState<string | null>(null);
 
+    /**
+     * テキストをクリップボードにコピーします。
+     */
     const handleCopy = (text: string) => {
         navigator.clipboard.writeText(text);
         setCopiedId(text);
         setTimeout(() => setCopiedId(null), 2000);
     };
 
+    /**
+     * バックエンドから送信済み履歴を取得します。
+     */
     const fetchHistory = useCallback(async () => {
         setLoading(true);
         try {
@@ -87,6 +128,9 @@ export default function SendHistoryPage() {
         fetchHistory();
     }, [fetchHistory]);
 
+    /**
+     * ページ背景色とbody/htmlの背景色を同期させます。
+     */
     useEffect(() => {
         // ページの状態に応じてbodyの背景を同期させ、オーバースクロール時の白見えを防ぐ
         const body = document.body;
@@ -172,6 +216,7 @@ export default function SendHistoryPage() {
                         ? "grid grid-cols-1 md:grid-cols-2 gap-10 p-10"
                         : "flex flex-col items-center w-full max-w-xl mx-auto space-y-0 pb-32 pt-0"
                     }>
+                        {/* 背景オーバーレイ: アクティブなカードがある場合に背景クリックで閉じるための透明レイヤー */}
                         {activeId && (
                             <div
                                 className="fixed inset-0 z-10 bg-transparent cursor-default"

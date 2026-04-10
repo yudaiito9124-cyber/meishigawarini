@@ -1,22 +1,19 @@
 /**
- * 【システムデザインのマッピング管理】
- * このファイルは、フロントエンドの定数ファイル (frontend/lib/constants/designs.ts) をインポートして、
- * システムデザインの画像パスを自動的に抽出します。
- * 
- * 役割:
- * - データベース (DynamoDB) に `CARD_DESIGN#METADATA` レコードが存在しない「システムデザイン」について、
- *   APIレスポンス（ギフト履歴や管理画面のサムネイル表示等）として提供する画像パスを管理します。
- * 
- * ポイント:
- * 新しいデザインの追加や変更は `frontend/lib/constants/designs.ts` で行うだけで、
- * ここでの個別の更新は不要です。
+ * @file designs.ts
+ * @role システムプリセットデザイン管理ユーティリティ
+ * @responsibility
+ *  - フロントエンドで定義された基本デザイン（カードフォーマット）をバックエンド側でも利用可能にします。
+ *  - データベースにカスタムデザインが登録されていない場合のデフォルトデザイン情報を提供します。
+ * @context
+ *  - `frontend/lib/constants/designs.ts` をソースとして参照し、バックエンド・フロントエンド間でのデザイン ID の整合性を保証します。
+ *  - ギフト履歴の表示や管理画面等、カード外観情報の Enrichment（補完）プロセスで使用されます。
  */
 
 import { cardformats } from '../../../frontend/lib/constants/designs';
 
 /**
- * System-provided card designs mapping.
- * Automatically extracted from the frontend constants to ensure a single source of truth.
+ * システム提供のカードデザインマッピング。
+ * フロントエンドの定数から自動抽出され、単一のソース（SSoT）を維持します。
  */
 export const SYSTEM_DESIGNS: Record<string, { thumbf: string; thumbb: string; bgimgf: string; bgimgb: string; width?: number; height?: number; }> = Object.fromEntries(
     Object.entries(cardformats).map(([id, cfg]: [string, any]) => [
@@ -26,7 +23,10 @@ export const SYSTEM_DESIGNS: Record<string, { thumbf: string; thumbb: string; bg
 );
 
 /**
- * Returns the system design if it exists, otherwise null.
+ * デザイン ID に基づいてシステムプリセットのデザイン情報を取得します。
+ * 
+ * @param designId - 取得したいデザインの ID。
+ * @returns デザイン情報オブジェクト。システムプリセットに存在しない場合は null を返します。
  */
 export function getSystemDesign(designId: string | undefined): { thumbf: string; thumbb: string; bgimgf: string; bgimgb: string; width?: number; height?: number; } | null {
     if (!designId) return null;

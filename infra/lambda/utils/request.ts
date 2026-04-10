@@ -1,7 +1,22 @@
+/**
+ * @file request.ts
+ * @role API リクエスト解析ユーティリティ
+ * @responsibility
+ *  - API Gateway 実行イベント（APIGatewayProxyEvent）から各種パラメータを抽出します。
+ *  - パラメータ抽出における優先順位（Authorizer > Path > Header > Body）を定義し、一貫したアクセスを提供します。
+ *  - 大文字小文字を区別しないヘッダー検索等のフールプルーフな補助機能を提供します。
+ * @context
+ *  - Lambda 関数の冒頭でリクエスト内容をパースし、ビジネスロジックに必要な ID 等を取得するために使用されます。
+ */
+
 import { APIGatewayProxyEvent } from 'aws-lambda';
 
 /**
- * Perform a case-insensitive header lookup.
+ * ヘッダー名の大文字小文字を区別せずに値を検索します。
+ * 
+ * @param headers - API イベントのヘッダーオブジェクト。
+ * @param key - 検索したいヘッダー名（例: 'x-shop-id'）。
+ * @returns ヒットしたヘッダーの値、見つからない場合は undefined。
  */
 export const getHeader = (headers: Record<string, string | undefined> | null | undefined, key: string): string | undefined => {
     if (!headers) return undefined;
@@ -11,9 +26,14 @@ export const getHeader = (headers: Record<string, string | undefined> | null | u
 };
 
 /**
- * リクエストから QR ID を安全に取得します。
- * リクエストから QR ID を安全に取得します。
- * 優先順位: 1. Authorizer, 2. PathParameters, 3. Headers, 4. Body
+ * リクエストから QR ID を安全に抽出します。
+ * 
+ * @description
+ * 以下の優先順位で値を探索します（信頼度が高い順）：
+ * 1. カスタムオーソライザー (context.qr_id)
+ * 2. URL パスパラメータ ({qr_id})
+ * 3. リクエストヘッダー (x-qr-id)
+ * 4. リクエストボディ (qr_id)
  */
 export const getQrId = (event: APIGatewayProxyEvent, body: any = {}): string | undefined => {
     return (
@@ -25,8 +45,13 @@ export const getQrId = (event: APIGatewayProxyEvent, body: any = {}): string | u
 };
 
 /**
- * リクエストから PIN を安全に取得します。
- * 優先順位: 1. Authorizer, 2. Headers, 3. Body
+ * リクエストからギフト用 PIN コードを抽出します。
+ * 
+ * @description
+ * 探索優先順位:
+ * 1. カスタムオーソライザー (context.pin)
+ * 2. リクエストヘッダー (x-qr-pin)
+ * 3. リクエストボディ (pin)
  */
 export const getPIN = (event: APIGatewayProxyEvent, body: any = {}): string | undefined => {
     return (
@@ -37,7 +62,7 @@ export const getPIN = (event: APIGatewayProxyEvent, body: any = {}): string | un
 };
 
 /**
- * リクエストから ShopID を安全に取得します。
+ * リクエストからショップ ID を抽出します。
  */
 export const getShopId = (event: APIGatewayProxyEvent, body: any = {}): string | undefined => {
     return (
@@ -50,7 +75,7 @@ export const getShopId = (event: APIGatewayProxyEvent, body: any = {}): string |
 };
 
 /**
- * リクエストから ProductID を安全に取得します。
+ * リクエストから商品 ID を抽出します。
  */
 export const getProductId = (event: APIGatewayProxyEvent, body: any = {}): string | undefined => {
     return (
@@ -61,14 +86,20 @@ export const getProductId = (event: APIGatewayProxyEvent, body: any = {}): strin
 };
 
 /**
- * リクエストから UserId (Cognito) を安全に取得します。
+ * リクエストから認証済みユーザー ID (Cognito sub) を安全に抽出します。
+ * 
+ * @description
+ * ID トークンまたはカスタムオーソライザーからの情報を使用します。
+ * receiver (ギフト受取人) や guest ID は、正式なユーザー履歴用 ID としては返却しません。
  */
 export const getUserId = (event: APIGatewayProxyEvent): string | undefined => {
-    // 1. Authorizer from Custom Lambda Authorizer (context.user_id)
+    // 1. カスタムオーソライザー経由での取得 (context.user_id)
     if (event.requestContext?.authorizer?.user_id) return event.requestContext.authorizer.user_id;
-    // 2. Cognito claims (claims.sub)
+
+    // 2. Cognito 直接認証時の claims (claims.sub)
     if (event.requestContext?.authorizer?.claims?.sub) return event.requestContext.authorizer.claims.sub;
-    // 3. Fallback to principalId, but ignore generic receiver/guest IDs for history purposes
+
+    // 3. principalId の利用（ゲスト/受取人は除外）
     const pid = event.requestContext?.authorizer?.principalId;
     if (pid && !pid.startsWith('receiver-') && !pid.startsWith('guest-')) return pid;
 
@@ -76,7 +107,12 @@ export const getUserId = (event: APIGatewayProxyEvent): string | undefined => {
 };
 
 /**
- * リクエストパスの末尾（/list, /create 等）からアクション名を判定します。
+ * URL パス（末尾）またはリクエストボディからアクション名を取得します。
+ * 
+ * @description
+ * アクションベースのルーティングを実現するための中心機能です。
+ * - ボディの `action` フィールドがあれば最優先。
+ * - なければ URL `/auth/login` の `login` のように、末尾のセグメントをアクションとみなします。
  */
 export const getAction = (event: APIGatewayProxyEvent, body: any = {}): string | undefined => {
     // 1. ボディに action が明示されている場合はそれを優先

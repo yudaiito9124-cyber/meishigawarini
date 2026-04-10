@@ -1,11 +1,16 @@
 /**
- * 概要: 指定されたパーティションキー（PK）に紐づく全データのダンプ (管理者用)
- * 詳細: 
- *  - デバッグやデータメンテナンスを目的として、指定されたPKの各項目に対し、全ソートキー（SK）の属性情報を取得して返却します。
- *  - 開発および管理用途での詳細なデータ調査に使用。
- *
- * エンドポイント: POST /admin/dump
+ * @file admin_dump.ts
+ * @role 管理者用：汎用データダンプユーティリティ
+ * @responsibility
+ *  - 開発およびデバッグを目的として、特定のキー（PK、PK+SK、GSI2_PK）に紐づく生の DynamoDB データを抽出します。
+ *  - 【マルチモード検索】以下の 3 つの方式でデータを一括取得します。
+ *    1. `pks`: パーティションキー単位での全件スキャン（Query）。
+ *    2. `keys`: 完結したプライマリキー（PK + SK）による特定レコードの取得。
+ *    3. `gsi2_pks`: 逆引きインデックス（GSI2）を用いたレコード群の取得。
+ * @context
+ *  - システムの挙動が期待と異なる際、アプリケーション層の加工を通さない「生のデータ状態」を迅速に目視確認するために使用されます。
  */
+
 import { APIGatewayProxyHandler } from 'aws-lambda';
 import { QueryCommand } from '@aws-sdk/lib-dynamodb';
 import { successResponse, errorResponse } from './utils/response';
@@ -28,7 +33,10 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 
         let allItems: any[] = [];
 
-        // 1. 指定された各PKに対し、SKを条件とせずにQueryを実行して全関連アイテムを取得
+        // --------------------------------------------------------------------
+        // 1. パーティションキー(PK)単位でのダンプ
+        // 目的: 特定のエンティティ（例: USER#ID）に紐づく全レコード（SK 群）を一覧化します。
+        // --------------------------------------------------------------------
         for (const pk of pks) {
             const res = await ddb.send(new QueryCommand({
                 TableName: TABLE_NAME,
@@ -42,7 +50,10 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             }
         }
 
-        // 2. 指定されたPKとSKのペア(keys)に対し、特定のアイテムを取得
+        // --------------------------------------------------------------------
+        // 2. 特定キーペア(PK+SK)でのピンポイント取得
+        // 目的: 完全に特定された 1 レコードの詳細情報を取得します。
+        // --------------------------------------------------------------------
         for (const key of keys) {
             const res = await ddb.send(new QueryCommand({
                 TableName: TABLE_NAME,
@@ -56,7 +67,10 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             }
         }
 
-        // 3. GSI2 インデックスを使用して、特定のインデックスキー(GSI2_PK)からアイテムを取得
+        // --------------------------------------------------------------------
+        // 3. 逆引きインデックス(GSI2)での検索
+        // 目的: UUID 等のグローバル ID から、その実体（PK/SK ペア）を特定します。
+        // --------------------------------------------------------------------
         for (const gsi2_pk of gsi2_pks) {
             const res = await ddb.send(new QueryCommand({
                 TableName: TABLE_NAME,

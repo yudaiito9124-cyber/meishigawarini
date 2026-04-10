@@ -173,6 +173,23 @@
 // }
 
 
+/**
+ * ファイル概要: サービスランディングページ (LP)
+ * 
+ * 役割:
+ * 「名刺代わりに。」のコンセプト、使い方、ユースケースを一般ユーザーおよび
+ * 潜在的なショップオーナーに対して魅力的かつ簡潔に伝えます。
+ * 
+ * 主要セクション:
+ * 1. Hero: キャッチコピーとアクションボタン。
+ * 2. How it works: ギフトが届くまでの3ステップ。
+ * 3. ポイント: サービスのメリット（荷物ゼロ、サプライズ等）。
+ * 4. ユースケース: ビジネス、旅行、プレゼント等の具体的な活用シーン。
+ * 5. 対応ショップ: パートナー企業の紹介（現状は準備中表示）。
+ * 6. FAQ: 住所の取り扱いや送料に関するよくある質問。
+ * 7. Shop Owners: ショップ開設のメリット。
+ */
+
 import Link from 'next/link'
 import {
   Store,
@@ -200,8 +217,11 @@ import {
   Brush,
 } from 'lucide-react'
 
-// ─── データ定義 ───────────────────────────────────────────
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// ─── データ定義 (コンテンツ内容) ────────────────────────────────────────────────
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+/** ステップ解説データ */
 const steps = [
   {
     icon: Store,
@@ -229,6 +249,7 @@ const steps = [
   },
 ]
 
+/** サービスの特徴・メリット */
 const points = [
   {
     icon: Backpack,
@@ -262,6 +283,7 @@ const points = [
   },
 ]
 
+/** ユースケース */
 const useCases = [
   {
     icon: Briefcase,
@@ -301,6 +323,7 @@ const useCases = [
   },
 ]
 
+/** ショップ導入のメリット */
 const shopBenefits = [
   {
     icon: TrendingUp,
@@ -334,6 +357,7 @@ const shopBenefits = [
   },
 ]
 
+/** FAQ 内容 */
 const faqs = [
   {
     q: '住所情報は誰に提供されますか？',
@@ -357,7 +381,9 @@ const faqs = [
   },
 ]
 
-// ─── コンポーネント ───────────────────────────────────────
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// ─── 内部コンポーネント ──────────────────────────────────────────────────────
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 /** セクション上部の小さいラベル */
 function SectionLabel({ children }: { children: string }) {
@@ -368,23 +394,29 @@ function SectionLabel({ children }: { children: string }) {
   )
 }
 
-/** セクション見出し */
+/** セクション見出し (H2) */
 function SectionHeading({ children }: { children: string }) {
   return (
     <h2 className="text-3xl font-bold text-center mb-4">{children}</h2>
   )
 }
 
-// ─── ページ本体 ──────────────────────────────────────────
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// ─── ページ本体 (HomePage) ────────────────────────────────────────────────────
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 import { useTranslations } from 'next-intl';
 
 export default function HomePage() {
+  /** ページ固有の翻訳リソース */
   const t = useTranslations('HomePage');
+  /** サイト全体（サイト名等）の翻訳リソース */
   const ts = useTranslations('Site');
+
   return (
     <main className="bg-white text-black">
 
-      {/* ━━━ Nav ━━━ */}
+      {/* ━━━ Nav ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
       <nav className="fixed top-0 w-full flex justify-between items-center px-8 py-5 z-50 bg-white/80 backdrop-blur-sm border-b border-gray-50">
         <a href="#" className="font-black text-lg tracking-tight hover:opacity-80 transition-opacity">{ts("name")}</a>
         <div className="flex items-center gap-6">
@@ -400,14 +432,15 @@ export default function HomePage() {
         </div >
       </nav >
 
-      {/* ━━━ Hero ━━━ */}
-      < section className="flex flex-col items-center justify-center min-h-screen text-center px-6 pt-20 " >
+      {/* ━━━ Hero ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+      <section className="flex flex-col items-center justify-center min-h-screen text-center px-6 pt-20">
         <p className="text-xs text-gray-400 uppercase tracking-[0.2em] mb-7 font-medium">
           Asset Transfer Token Card
         </p>
 
-        {/*  center 揃えでも視覚重心が左にズレて見える。
-          句読点を <span> で囲んで -mr-[0.45em] を当てることで相殺する。
+        {/*  
+          日本語の句読点は視覚重心を左にズラすため、
+          末尾の「。」にネガティブマージンを適用してセンターバランスを調整。
         */}
         <h1 className="text-6xl md:text-8xl font-black leading-tight mb-8">
           名刺代わりに<span className=""></span><br />
@@ -441,11 +474,13 @@ export default function HomePage() {
         </div> */}
       </section >
 
-      {/* ━━━ How it works ━━━ */}
-      < section id="howto" className="py-28 px-6 bg-gray-50" >
+      {/* ━━━ How it works ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+      <section id="howto" className="py-28 px-6 bg-gray-50">
         <div className="max-w-4xl mx-auto">
           <SectionLabel>How it works</SectionLabel>
           <SectionHeading>たった3ステップ</SectionHeading>
+
+          {/* ステップフロー */}
           <div className="mt-16 mb-20 flex items-start justify-center gap-2 md:gap-4 flex-wrap">
             {steps.map(({ icon: Icon, step, title, dark }, i) => (
               <div key={step} className="flex items-start gap-2 md:gap-4">
@@ -470,7 +505,7 @@ export default function HomePage() {
             ))}
           </div>
 
-          {/* 3 points */}
+          {/* 特徴ポイントグリッド */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {points.map(({ icon: Icon, title, desc }) => (
               <div key={title} className="bg-white rounded-2xl p-6 border border-gray-100">
@@ -493,8 +528,8 @@ export default function HomePage() {
         </div>
       </section >
 
-      {/* ━━━ Use Cases ━━━ */}
-      < section id="usecases" className="py-28 px-6" >
+      {/* ━━━ Use Cases ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+      <section id="usecases" className="py-28 px-6">
         <div className="max-w-4xl mx-auto">
           <SectionLabel>Use Cases</SectionLabel>
           <SectionHeading>こんな場面で使えます</SectionHeading>
@@ -523,8 +558,8 @@ export default function HomePage() {
         </div>
       </section >
 
-      {/* ━━━ Shops ━━━ */}
-      < section id="shops" className="py-28 bg-gray-50 px-6" >
+      {/* ━━━ Shops ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+      <section id="shops" className="py-28 bg-gray-50 px-6">
         <div className="max-w-4xl mx-auto">
           <SectionLabel>Shops</SectionLabel>
           <SectionHeading>対応ショップ</SectionHeading>
@@ -545,8 +580,8 @@ export default function HomePage() {
         </div>
       </section >
 
-      {/* ━━━ FAQ ━━━ */}
-      < section className="py-28 px-6" >
+      {/* ━━━ FAQ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+      <section className="py-28 px-6">
         <div className="max-w-2xl mx-auto">
           <SectionLabel>FAQ</SectionLabel>
           <SectionHeading>よくある質問</SectionHeading>
@@ -564,8 +599,8 @@ export default function HomePage() {
         </div>
       </section >
 
-      {/* ━━━ For Shop Owners ━━━ */}
-      < section id="for-shops" className="py-28 px-6 bg-black text-white" >
+      {/* ━━━ For Shop Owners ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+      <section id="for-shops" className="py-28 px-6 bg-black text-white">
         <div className="max-w-3xl mx-auto text-center">
           <p className="text-xs text-gray-500 uppercase tracking-[0.2em] mb-4 font-medium">
             For Shop Owners
@@ -574,9 +609,10 @@ export default function HomePage() {
             あなたのお店も<br />参加しませんか
           </h2>
           <p className="text-gray-400 mb-12 leading-relaxed max-w-lg mx-auto">
-            商品を「誰かへの贈り物」として届ける、新しい販売チャネル。<br />
-            {/* ショップ登録・QRコード発行まですべて無料で始められます。 */}
+            商品を「誰かへの贈り物」として届ける、新しい販売チャネル。
           </p>
+
+          {/* ショップ導入メリットグリッド */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-12 text-left">
             {shopBenefits.map(({ icon: Icon, title, desc }) => (
               <div key={title} className="border border-gray-800 rounded-2xl p-5">
@@ -609,3 +645,4 @@ export default function HomePage() {
     </main >
   )
 }
+

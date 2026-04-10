@@ -1,3 +1,14 @@
+/**
+ * @file shop-api.ts
+ * @role ショップオーナー API 構築コンストラクト
+ * @responsibility
+ *  - ショップ運営・オーナー向けの REST API エンドポイントを一括定義します。
+ *  - 【マルチテナント認可】`shopAuthorizer` を使用し、リクエストされたショップ ID に対して実行ユーザーが権限を持っているか（オーナーまたは GM か）を動的に検証します。
+ *  - 【メディア操作権限】商品画像や QR コード等の商用アセットを扱うため、各 Lambda に S3 の Read/Write 権限を厳格に付与します。
+ * @context
+ *  - `InfraStack` からインスタンス化され、`/shop/*` 配下のルーティングを管理します。
+ */
+
 import * as cdk from 'aws-cdk-lib';
 import { Construct } from 'constructs';
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
@@ -20,6 +31,13 @@ export interface ShopApiProps {
   grantTablePermissions: (fn: lambda.IFunction, write?: boolean) => void;
 }
 
+/**
+ * ショップ管理用 API サブシステム。
+ * 
+ * @description
+ * 商品管理、QR 紐付け、注文ステータス更新、スタッフ管理など、
+ * ショップ日次運営に必要な全機能をフロントエンドへ提供します。
+ */
 export class ShopApi extends cdk.NestedStack {
   public readonly shopResource: apigateway.Resource;
 
@@ -28,9 +46,15 @@ export class ShopApi extends cdk.NestedStack {
 
     const { table, bucket, userPool, userPoolClient, api, commonProps, allowedOrigins, grantTablePermissions } = props;
 
-    // Shop Authorizer (Custom Lambda Authorizer)
     const lampath = (name: string) => path.join(__dirname, `../../lambda/${name}.ts`);
     const authpath = (name: string) => path.join(__dirname, `../../lambda/authorizer/${name}.ts`);
+
+    /**
+     * ショップ用カスタム認証 (ShopAuthorizer)
+     * - API Gateway の RequestAuthorizer として動作します。
+     * - リクエストヘッダーの `authorization` (ID Token) と `x-shop-id` を取得し、
+     *   対象ショップに対するユーザーの管理権限を検証します。
+     */
     const shopAuthFn = new nodejs.NodejsFunction(this, 'ShopAuthorizerFn', {
       entry: authpath('shopAuthorizer'),
       environment: {
@@ -47,7 +71,7 @@ export class ShopApi extends cdk.NestedStack {
       resultsCacheTtl: cdk.Duration.minutes(5),
     });
 
-    // Lambda Definitions
+    // --- Lambda Definitions ---
     const fnProps = {
       ...commonProps,
       environment: {
@@ -71,7 +95,7 @@ export class ShopApi extends cdk.NestedStack {
     const shop_orders = new nodejs.NodejsFunction(this, 'shop_orders', { entry: lampath('shop_orders'), ...fnProps });
     const shop_card_orders = new nodejs.NodejsFunction(this, 'shop_card_orders', { entry: lampath('shop_card_orders'), ...fnProps });
 
-    // Grant Permissions
+    // --- Permissions ---
     const allShopLambdas = [
       shop_list, shop_details, shop_products, shop_products_import,
       shop_products_uploadurl, shop_qr, shop_admins, shop_delete_images, shop_orders,
@@ -84,7 +108,10 @@ export class ShopApi extends cdk.NestedStack {
       bucket.grantDelete(fn);
     });
 
-    // Helper to add resource
+    /**
+     * ルーティングの構築
+     * `/shop/*` 以下の全エンドポイントを構成し、`shopAuthorizer` による保護を適用します。
+     */
     const addResourceWithCors = (parent: apigateway.IResource, pathPart: string): apigateway.Resource => {
       const res = parent.addResource(pathPart) as apigateway.Resource;
       res.addCorsPreflight({
@@ -95,7 +122,7 @@ export class ShopApi extends cdk.NestedStack {
       return res;
     };
 
-    // Shop Routes
+    // /shop
     this.shopResource = new apigateway.Resource(this, 'ShopTopResource', {
       parent: api.root,
       pathPart: 'shop'
@@ -108,7 +135,7 @@ export class ShopApi extends cdk.NestedStack {
 
     const routeOptions = { authorizer, authorizationType: apigateway.AuthorizationType.CUSTOM };
 
-    // Action-based POST Routes (Standard)
+    // --- Routes ---
     addResourceWithCors(this.shopResource, 'list').addMethod('POST', new apigateway.LambdaIntegration(shop_list), routeOptions);
 
     const detailsRes = addResourceWithCors(this.shopResource, 'details');
@@ -153,6 +180,5 @@ export class ShopApi extends cdk.NestedStack {
     addResourceWithCors(cardOrdersResource, 'list').addMethod('POST', new apigateway.LambdaIntegration(shop_card_orders), routeOptions);
     addResourceWithCors(cardOrdersResource, 'cancel').addMethod('POST', new apigateway.LambdaIntegration(shop_card_orders), routeOptions);
     addResourceWithCors(cardOrdersResource, 'complete').addMethod('POST', new apigateway.LambdaIntegration(shop_card_orders), routeOptions);
-
   }
 }

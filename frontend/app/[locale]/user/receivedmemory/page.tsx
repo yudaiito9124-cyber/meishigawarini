@@ -1,3 +1,19 @@
+/**
+ * ファイル概要: 受取済ギフト履歴ページ (Received Memory)
+ * 
+ * 役割:
+ * ユーザーがこれまでに受け取ったギフトカードの一覧（デジタルアーカイブ）を表示します。
+ * ギフトカードを物理的なカードのように「スタック（積み重ね）」または「グリッド」で表示し、
+ * クリックすることでカードをめくってPINコードや詳細情報を確認できるインタラクティブなUIを提供します。
+ * 
+ * 主要機能:
+ * 1. 受取済ギフトの一覧取得と表示。
+ * 2. 表示モードの切り替え（スタック形式 / グリッド形式）。
+ * 3. 3Dフリップアニメーションによるカードの「めくり」体験。
+ * 4. PINコードの確認とクリップボードコピー。
+ * 5. ギフト詳細（受け取り画面）への再アクセス。
+ */
+
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
@@ -9,30 +25,46 @@ import { Loader2, Inbox, ChevronDown, ExternalLink, Copy, Check, LayoutGrid, Lay
 import { userApi } from "@/lib/api/user";
 import { cn } from "@/lib/utils";
 
+/**
+ * 受取済ギフト履歴コンポーネント
+ */
 export default function ReceivedHistoryPage() {
+    /** 翻訳用フック (UserProfilePage namespace) */
     const t = useTranslations('UserProfilePage');
+    /** ルーター */
     const router = useRouter();
 
+    /** 現在詳細表示（またはフリップ）されているカードのID */
     const [activeId, setActiveId] = useState<string | null>(null);
+    /** カードの状態 ('peek': 浮き上がり, 'flipped': 裏返し, 'none': 通常) */
     const [activeStage, setActiveStage] = useState<'peek' | 'flipped' | 'none'>('none');
+    /** 表示モード ('grid': 一覧, 'stack': 重なり) */
     const [viewMode, setViewMode] = useState<'grid' | 'stack'>('stack');
+    /** ホバー中のカードID */
     const [hoveredId, setHoveredId] = useState<string | null>(null);
+    /** アニメーション実行中フラグ (連打防止用) */
     const [isAnimating, setIsAnimating] = useState(false);
+    /** 背景同期用のコンテナ参照 */
     const containerRef = useRef<HTMLDivElement>(null);
 
+    /**
+     * カードクリック時の挙動を制御します。
+     * 表示モードや現在の状態に基づき、アニメーション時間を動的に計算し、段階的に状態を遷移させます。
+     * @param id クリックされたカードのQR ID
+     */
     const handleItemClick = (id: string) => {
         if (isAnimating) return;
 
-        // Determine transition duration based on current state and view mode
+        // 現在の状態と表示モードに基づいて遷移時間を決定
         let duration = 0;
         if (activeId === id) {
             if (activeStage === 'peek') {
-                duration = 700; // Flip duration
+                duration = 700; // 裏返す(Flip)時間
             } else {
-                duration = viewMode === 'grid' ? 50 : 700; // Closing duration
+                duration = viewMode === 'grid' ? 50 : 700; // 閉じる時間
             }
         } else {
-            duration = viewMode === 'grid' ? 50 : 700; // Opening duration
+            duration = viewMode === 'grid' ? 50 : 700; // 開く時間
         }
 
         setIsAnimating(true);
@@ -51,7 +83,9 @@ export default function ReceivedHistoryPage() {
         }
     };
 
+    /** データ読み込み中フラグ */
     const [loading, setLoading] = useState(true);
+    /** 履歴データの一覧 */
     const [history, setHistory] = useState<Array<{
         qr_id: string,
         timestamp: string,
@@ -63,14 +97,22 @@ export default function ReceivedHistoryPage() {
         bgimgb?: string,
         shop_name?: string
     }>>([]);
+    /** コピー完了表示用 ID */
     const [copiedId, setCopiedId] = useState<string | null>(null);
 
+    /**
+     * テキストをクリップボードにコピーします。
+     * @param text コピー対象文字列
+     */
     const handleCopy = (text: string) => {
         navigator.clipboard.writeText(text);
         setCopiedId(text);
         setTimeout(() => setCopiedId(null), 2000);
     };
 
+    /**
+     * バックエンドから受取済み履歴を取得します。
+     */
     const fetchHistory = useCallback(async () => {
         setLoading(true);
         try {
@@ -87,6 +129,9 @@ export default function ReceivedHistoryPage() {
         fetchHistory();
     }, [fetchHistory]);
 
+    /**
+     * ページ背景色とbody/htmlの背景色を同期させます。
+     */
     useEffect(() => {
         // ページの状態に応じてbodyの背景を同期させ、オーバースクロール時の白見えを防ぐ
         const body = document.body;
@@ -134,7 +179,7 @@ export default function ReceivedHistoryPage() {
                             </div>
                         </div>
 
-                        {/* View Toggle */}
+                        {/* 表示モード切り替えスイッチ (グリッド / スタック) */}
                         <div className="flex bg-black/20 p-1 rounded-xl backdrop-blur-md border border-white/10">
                             <button
                                 onClick={() => setViewMode('grid')}
@@ -172,6 +217,7 @@ export default function ReceivedHistoryPage() {
                         ? "grid grid-cols-1 md:grid-cols-2 gap-10 p-10"
                         : "flex flex-col items-center w-full max-w-xl mx-auto space-y-0 pb-32 pt-0"
                     }>
+                        {/* 背景オーバーレイ: アクティブなカードがある場合に背景クリックで閉じるための透明レイヤー */}
                         {activeId && (
                             <div
                                 className="fixed inset-0 z-10 bg-transparent cursor-default"

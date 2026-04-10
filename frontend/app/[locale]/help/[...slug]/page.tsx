@@ -1,3 +1,17 @@
+/**
+ * ファイル概要: 動的ヘルプマニュアル・レンダリングページ
+ * 
+ * 役割:
+ * 指定されたパス (slug) に基づいて、プロジェクト内の Markdown ファイルを読み込み、
+ * ヘルプ記事としてレンダリングします。
+ * 
+ * 仕組み:
+ * 1. URL の [...slug] から `content/help/{locale}/{slug}/index.md` を特定。
+ * 2. gray-matter で Frontmatter (title等) と本文を分離。
+ * 3. カテゴリ（第1階層のslug）に応じてアイコンとタイトルを選択。
+ * 4. MarkdownRenderer で本文（Mermaid図式、Sanitized HTML含む）を表示。
+ */
+
 import { getTranslations } from 'next-intl/server';
 import Link from 'next/link';
 import { ArrowLeft, Waypoints, Gift, SendHorizontal, CircleUserRound, Store, Crown } from 'lucide-react';
@@ -15,6 +29,7 @@ interface Props {
   }>;
 }
 
+/** カテゴリ（ルートパス）とアイコンの対応定義 */
 const CategoryIconMap: Record<string, React.ElementType> = {
   overview: Waypoints,
   receive: Gift,
@@ -24,6 +39,7 @@ const CategoryIconMap: Record<string, React.ElementType> = {
   admin: Crown,
 };
 
+/** カテゴリと日本語タイトルの対応定義 */
 const CategoryTitleMap: Record<string, string> = {
   overview: 'ご利用ガイド',
   receive: '受取人マニュアル',
@@ -32,8 +48,12 @@ const CategoryTitleMap: Record<string, string> = {
   shop: 'ショップ管理',
 };
 
+/**
+ * MarkdownのFrontmatterからタイトルを抽出し、メタデータを生成します。
+ */
 export async function generateMetadata({ params }: Props) {
   const { locale, slug } = await params;
+  // index.md 形式のファイルパスを構築
   const filePath = path.join(process.cwd(), 'content', 'help', locale, ...slug, 'index.md');
 
   try {
@@ -51,6 +71,9 @@ export async function generateMetadata({ params }: Props) {
   }
 }
 
+/**
+ * 動的原稿（Markdown）を読み込んで表示するメインコンポーネント
+ */
 export default async function DynamicHelpPage({ params }: Props) {
   const { locale, slug } = await params;
   const filePath = path.join(process.cwd(), 'content', 'help', locale, ...slug, 'index.md');

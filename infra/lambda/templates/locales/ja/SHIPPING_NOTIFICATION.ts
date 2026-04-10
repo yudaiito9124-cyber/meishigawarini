@@ -1,3 +1,11 @@
+/**
+ * @file SHIPPING_NOTIFICATION.ts (ja)
+ * @description 受取人向けの発送完了通知（日本語）
+ * @placeholders
+ *  - {{baseUrl}}: アプリのベースURL
+ *  - {{qr_id}}: QRコード固有のID
+ *  - {{pin}}: アクセス用PINコード
+ */
 export const body = `
 商品の発送が完了しました。
 到着まで今しばらくお待ちください。

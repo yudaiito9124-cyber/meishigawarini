@@ -1,6 +1,18 @@
+/**
+ * ファイル概要: 管理者用ヘルプ・ゲートウェイページ (Admin Help Index)
+ * 
+ * 役割:
+ * システム管理者向けマニュアルの一覧を表示し、各操作カテゴリ（カード、ショップ、
+ * デザイン等）のドキュメントへのナビゲーションを提供します。
+ * 
+ * 主要コンポーネント:
+ * - ゲートウェイリンク: 各管理機能に対応するガイドへのリンク。
+ * - 統合アイコン: ダッシュボードと同じアイコンセットを使用して一貫性を確保。
+ */
+
 import Link from 'next/link';
 import { getTranslations } from 'next-intl/server';
-import { ArrowLeft, BookOpen, Settings, ChevronRight, Store, Package, Bug, Waypoints, QrCode, Crown } from 'lucide-react';
+import { ArrowLeft, BookOpen, Paintbrush, ChevronRight, Store, Printer, Search, Waypoints, CreditCard, Crown, Wrench } from 'lucide-react';
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }) {
     const { locale } = await params;
@@ -78,7 +90,7 @@ export default function AdminHelpGatewayPage() {
 
                     <Link href="/admin/help/qrcodes" className="group relative rounded-xl border border-white/10 bg-white/5 p-8 shadow-sm transition-all hover:bg-white/10 block">
                         <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-white/10 text-white">
-                            <QrCode className="h-6 w-6" />
+                            <CreditCard className="h-6 w-6" />
                         </div>
                         <h2 className="text-xl font-bold text-white group-hover:text-white/80 transition-colors">
                             カード一覧
@@ -94,7 +106,7 @@ export default function AdminHelpGatewayPage() {
 
                     <Link href="/admin/help/cardorders" className="group relative rounded-xl border border-white/10 bg-white/5 p-8 shadow-sm transition-all hover:bg-white/10 block">
                         <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-white/10 text-white">
-                            <Package className="h-6 w-6" />
+                            <Printer className="h-6 w-6" />
                         </div>
                         <h2 className="text-xl font-bold text-white group-hover:text-white/80 transition-colors">
                             カード印刷
@@ -110,7 +122,7 @@ export default function AdminHelpGatewayPage() {
 
                     <Link href="/admin/help/designs" className="group relative rounded-xl border border-white/10 bg-white/5 p-8 shadow-sm transition-all hover:bg-white/10 block">
                         <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-white/10 text-white">
-                            <Settings className="h-6 w-6" />
+                            <Paintbrush className="h-6 w-6" />
                         </div>
                         <h2 className="text-xl font-bold text-white group-hover:text-white/80 transition-colors">
                             デザイン設定
@@ -142,13 +154,29 @@ export default function AdminHelpGatewayPage() {
 
                     <Link href="/admin/help/tools" className="group relative rounded-xl border border-white/10 bg-white/5 p-8 shadow-sm transition-all hover:bg-white/10 block">
                         <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-white/10 text-white">
-                            <Bug className="h-6 w-6" />
+                            <Wrench className="h-6 w-6" />
                         </div>
                         <h2 className="text-xl font-bold text-white group-hover:text-white/80 transition-colors">
                             ツール
                         </h2>
                         <p className="mt-2 text-sm text-white/60">
                             データのエクスポートやメンテナンス用の特殊操作を説明します。
+                        </p>
+                        <div className="mt-6 flex items-center text-sm font-medium text-white/80">
+                            詳細を見る
+                            <ChevronRight className="ml-1 h-4 w-4 transition-transform group-hover:translate-x-1" />
+                        </div>
+                    </Link>
+
+                    <Link href="/admin/help/whereisid" className="group relative rounded-xl border border-white/10 bg-white/5 p-8 shadow-sm transition-all hover:bg-white/10 block">
+                        <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-white/10 text-white">
+                            <Search className="h-6 w-6" />
+                        </div>
+                        <h2 className="text-xl font-bold text-white group-hover:text-white/80 transition-colors">
+                            各種IDの確認方法
+                        </h2>
+                        <p className="mt-2 text-sm text-white/60">
+                            データのエクスポートやメンテナンス時に用いるIDの確認方法を説明します。
                         </p>
                         <div className="mt-6 flex items-center text-sm font-medium text-white/80">
                             詳細を見る

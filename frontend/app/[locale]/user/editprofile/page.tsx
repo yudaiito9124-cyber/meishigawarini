@@ -1,3 +1,19 @@
+/**
+ * ファイル概要: ユーザープロフィール編集ページ (Edit Profile)
+ * 
+ * 役割:
+ * ユーザー自身のデジタル名刺（プロフィール）情報を編集するための画面です。
+ * 名刺画像のアップロード、職歴情報、SNSリンク、およびリッチテキスト（HTML）による
+ * 詳細メッセージの設定機能を提供します。
+ * 
+ * 主要機能:
+ * 1. プロフィール情報の取得と表示（プレビュー形式 / 編集形式）。
+ * 2. プロフィール各項目（名前、会社、役職、住所、電話、SNS等）の更新。
+ * 3. 名刺画像のアップロードとリサイズ処理（WebP形式への変換）。
+ * 4. 詳細用リッチテキスト（detail_html）の編集と、インライン用画像のアップロード管理。
+ * 5. 編集内容のリアルタイムプレビュー（ReceivePageと共通のUIコンポーネントを使用）。
+ */
+
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
@@ -16,14 +32,16 @@ import { userApi } from "@/lib/api/user";
 import { resizeImage } from "@/lib/image-utils";
 import { generateId } from "@/lib/id";
 
+/** プロフィールフォームの各フィールドキーの定義 */
 const SENDER_FORM_KEYS = [
     "name", "job_title", "company", "department", "email", "phone", "phone_direct",
     "address", "HP", "memo", "SNS_Facebook", "SNS_Instagram", "SNS_Threads",
     "SNS_X", "SNS_YouTube", "SNS_LINE", "SNS_TikTok", "Service_Eight", "Service_Linktree"
 ];
 
-
-
+/**
+ * ユーザープロフィール編集コンポーネント
+ */
 export default function UserProfilePage() {
     const t = useTranslations('ReceivePage');
     const tUser = useTranslations('UserProfilePage');
@@ -39,6 +57,7 @@ export default function UserProfilePage() {
     const [deletedHtmlUrls, setDeletedHtmlUrls] = useState<string[]>([]);
     const containerRef = useRef<HTMLDivElement>(null);
 
+    /** プロフィール情報の取得（初期化） */
     const fetchSenderInfo = useCallback(async () => {
         setLoading(true);
         try {
@@ -60,6 +79,7 @@ export default function UserProfilePage() {
         fetchSenderInfo();
     }, [fetchSenderInfo]);
 
+    /** ページ背景色とbody/htmlの背景色を同期させます */
     useEffect(() => {
         // ページの状態に応じてbodyの背景を同期させ、オーバースクロール時の白見えを防ぐ
         const body = document.body;
@@ -86,6 +106,10 @@ export default function UserProfilePage() {
         setSenderForm((prev: any) => ({ ...prev, [field]: value }));
     };
 
+    /**
+     * 各種情報の更新実行
+     * テキストフィールド、HTML、画像の全情報をバックエンドへ送信します。
+     */
     const handleSenderInfoUpdate = async () => {
         setSenderInfoLoading(true);
         try {
@@ -116,6 +140,11 @@ export default function UserProfilePage() {
         }
     };
 
+    /**
+     * 名刺画像のアップロード処理。
+     * アップロード前にフロントエンドでリサイズとWebP化を行い、S3へ署名付きURL経由で送信します。
+     * @param file アップロード対象ファイル
+     */
     const handleSenderCardUpload = async (file: File) => {
         setSenderInfoLoading(true);
         try {
@@ -231,6 +260,10 @@ export default function UserProfilePage() {
         }));
     };
 
+    /**
+     * 与えられたプロフィール情報に表示すべき主要項目が含まれているかを判定します。
+     * （SNSリンクなどの付帯情報の有無もチェック対象）
+     */
     const EmptySenderInfoWithLinks = (info: any) => {
         return !info || Object.keys(info).every(key => {
             if (key.startsWith("ts_")) return true;
@@ -240,6 +273,9 @@ export default function UserProfilePage() {
         });
     };
 
+    /**
+     * テキスト内のURL（http/https）を抽出し、リンク（aタグ）としてレンダリングします。
+     */
     const renderTextWithLinks = (text: string) => {
         if (!text) return text;
         const urlRegex = /(https?:\/\/[^\s]+)/g;

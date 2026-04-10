@@ -34,8 +34,8 @@ title: 管理者用ヘルプ：概要
 
 システム管理画面は **管理者（Administrators / GlobalAdmins）** 権限を持つユーザーのみがアクセス可能です。また、多要素認証（MFA）が必須となっています。
 
-### 1. 管理者（Administrators）
+### 1 管理者（Administrators）
 システム管理画面にアクセスが可能です。
 
-### 2. GlobalAdmins
+### 2 GlobalAdmins
 システム管理画面にアクセスが可能で、他のユーザーが管理しているすべてのショップを管理できます。

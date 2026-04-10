@@ -1,12 +1,20 @@
 /**
- * 概要: 送り主・受け取り人間でのチャットメッセージ交換
- * 詳細: 
- *  - 特定のQRコードに関連付けられたチャット履歴の取得(list)および新規メッセージの送信(send)を管理。
- *  - 被贈答者(Receiver)によるメッセージ投稿時には、QRコードとPINの認証が必要です。
- *  - 各ギフトにおける画像添付などの累計ファイルサイズ(total_size_bytes)を追跡し、100MBの容量制限を課しています。
- *
- * エンドポイント: POST /receive/chat
+ * @file receive_chat.ts
+ * @role ゲスト用：チャットメッセージ管理ハンドラー
+ * @responsibility
+ *  - ギフトの贈り主（Sender）と受取人（Receiver）の間でメッセージや画像をやり取りするための非公開チャット機能を提供します。
+ *  - 【ストレージ管理とクォータ】
+ *    - 各ギフトごとに累計 100MB までのファイル添付を許可します。
+ *    - `total_size_bytes` を `UpdateCommand` の `ADD` 演算でアトミックに加算し、正確な容量計算を行います。
+ *  - 【強力な通知エコシステム】
+ *    - メッセージ送信時、そのチャットを「購読（notification_emails）」している全員、およびギフトの「作成者（sender_id）」へ自動通知メールを送信します。
+ *    - ユーザーごとの言語設定（`email_preferences`）に基づき、日本語または英語で通知を出し分けます。
+ *  - 【自己完結型のデータ構造】
+ *    - チャットレコード(`SK=CHAT`)には、作成時の送り主プロフィールのスナップショット（`sender_info`）が含まれており、送り主本人のプロフ変更に影響されずに当時の情報を表示可能です。
+ * @context
+ *  - 公開・非公開の境界線となるため、PIN 認証（Authorizer 経由）による厳格なアクセス制御が行われています。
  */
+
 import { APIGatewayProxyHandler } from 'aws-lambda';
 import { GetCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
 import { signUrlIfS3, signUrlsInHtml, stripSignature } from './utils/s3';
@@ -17,6 +25,7 @@ import { getQrId, getPIN, getAction } from './utils/request';
 import { ReceiveApiSchema } from '@shared/api-types';
 import { generateId } from './utils/id';
 
+/** 各ギフトチャットのストレージ上限（MB） */
 const CHAT_CAPACITY_LIMIT_MB = 100;
 
 export const handler: APIGatewayProxyHandler = async (event) => {
@@ -26,29 +35,23 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         const body = JSON.parse(event.body || '{}');
         const qr_id = getQrId(event, body);
         const pin = getPIN(event, body);
-        let action = getAction(event, body);
+        const action = getAction(event, body);
 
         if (!qr_id || !pin) return errorResponse(400, 'Missing qr_id or pin');
 
-        // Note: PIN verification and Rate Limiting are handled by receiveAuthorizer.ts
-        // so we can proceed directly to business logic.
+        // Note: PIN の照合および試行回数制限（Rate Limiting）は receiveAuthorizer.ts で一括処理されています。
 
-
-        // ====================================================================
-        // ACTION: list (チャット履歴の取得)
-        // ====================================================================
+        // --------------------------------------------------------------------
+        // ACTION: get (チャット履歴とコンテキストの取得)
+        // --------------------------------------------------------------------
         if (action === 'get') {
-            const { } = body as ReceiveApiSchema['receive_chat_get'];
-            // 【DB操作: GetItem】
-            // 理由: SK=CHATレコードを取得し、蓄積された全メッセージ(messages)を返します。
             const chatRes = await ddb.send(new GetCommand({
                 TableName: TABLE_NAME, Key: { PK: `QR#${qr_id}`, SK: 'CHAT' }
             }));
             const chatLog = chatRes.Item || { messages: [], total_size_bytes: 0, sender_info: null };
 
-            // 各メッセージの添付ファイルURLに署名を付与
+            // 各メッセージの互換性処理と添付ファイルへの署名
             const messages = (chatLog.messages || []).map((msg: any) => {
-                // 互換性担保: content があれば message に振替
                 if (!msg.message && msg.content) msg.message = msg.content;
                 if (!msg.username && msg.role) msg.username = msg.role;
                 return msg;
@@ -58,7 +61,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 if (msg.file_url) msg.file_url = await signUrlIfS3(msg.file_url, BUCKET_NAME);
             }
 
-            // 送り主情報の署名付きURL生成 (Enrichment)
+            // 【Enrichment】スナップショットされた送り主情報の S3 アセットに署名を付与
             const sender_info = chatLog.sender_info;
             if (sender_info) {
                 if (sender_info.card_image_url) sender_info.card_image_url = await signUrlIfS3(sender_info.card_image_url, BUCKET_NAME);
@@ -79,9 +82,9 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             });
         }
 
-        // ====================================================================
-        // ACTION: send (メッセージの送信)
-        // ====================================================================
+        // --------------------------------------------------------------------
+        // ACTION: send (メッセージ投稿と通知)
+        // --------------------------------------------------------------------
         if (action === 'send') {
             const { username, message, type, file_url, file_size, file_name, file_type } = body as ReceiveApiSchema['receive_chat_send'];
             if (!message && !file_url) return errorResponse(400, 'Empty message');
@@ -89,7 +92,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             const now = new Date().toISOString();
             const newMessage = {
                 id: generateId(),
-                role: 'RECEIVER',
+                role: 'RECEIVER', // このエンドポイント経由の投稿は常に Receiver 扱い
                 username: username || 'Receiver',
                 message: message,
                 type: type || 'text',
@@ -100,15 +103,14 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 ts_created_at: now
             };
 
-            // 容量制限のチェック
+            // ストレージ上限チェック
             const chatRes = await ddb.send(new GetCommand({ TableName: TABLE_NAME, Key: { PK: `QR#${qr_id}`, SK: 'CHAT' } }));
             const currentTotalSize = chatRes.Item?.total_size_bytes || 0;
             if (currentTotalSize + (file_size || 0) > CHAT_CAPACITY_LIMIT_MB * 1024 * 1024) {
                 return errorResponse(403, 'Chat storage capacity exceeded');
             }
 
-            // 【DB操作: UpdateItem】
-            // 理由: messagesリストに新メッセージを追記(list_append)し、累計ファイルサイズを加算(ADD)。
+            // 【Atomic Update】メッセージ追加とサイズ加算を同時に実行
             await ddb.send(new UpdateCommand({
                 TableName: TABLE_NAME,
                 Key: { PK: `QR#${qr_id}`, SK: 'CHAT' },
@@ -119,26 +121,22 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 }
             }));
 
-            // 【事後処理: 通知送信】
-            // 理由: チャット参加者（notification_emails）および送り主（sender_id）に新着メッセージを通知。
+            // 【通知処理】購読者および送信者（作成者）への一斉メール通知
             const recipientsSet = new Set<string>();
             if (chatRes.Item?.notification_emails) {
                 (chatRes.Item.notification_emails as string[]).forEach(e => recipientsSet.add(e));
             }
 
-            // 送り主IDが設定されている場合、プロフィールから最新のメールアドレスを取得
+            // 送り主 ID がある場合は最新のプロフから Email を取得（ snapshot ではなく master の Email を使用）
             const senderId = chatRes.Item?.sender_id;
             if (senderId) {
                 try {
                     const profileRes = await ddb.send(new GetCommand({
-                        TableName: TABLE_NAME,
-                        Key: { PK: `USER#${senderId}`, SK: 'SENDER' }
+                        TableName: TABLE_NAME, Key: { PK: `USER#${senderId}`, SK: 'SENDER' }
                     }));
-                    if (profileRes.Item?.email) {
-                        recipientsSet.add(profileRes.Item.email);
-                    }
+                    if (profileRes.Item?.email) recipientsSet.add(profileRes.Item.email);
                 } catch (e) {
-                    console.warn(`Failed to fetch sender profile for notification (sender_id: ${senderId}):`, e);
+                    console.warn(`Failed to fetch sender profile for notification:`, e);
                 }
             }
 

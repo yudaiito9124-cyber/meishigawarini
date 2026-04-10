@@ -1,7 +1,22 @@
+/**
+ * ファイル概要: ショップ管理用ヘルプ インデックスページ
+ * 
+ * 役割:
+ * ショップオーナーや運用担当者向けに、商品の登録から発送管理、
+ * カード発注といった具体的な業務フロー別のマニュアルへの導線を提供します。
+ * 
+ * 特徴:
+ * 1. 業務フロー図 (Flow) へのアクセスを最優先に配置。
+ * 2. 各管理機能（商品、アクティベーション、発送、発注）に対応した詳細マニュアルへ誘導。
+ */
+
 import Link from 'next/link';
 import { getTranslations } from 'next-intl/server';
 import { ArrowLeft, ChevronRight, Gift, QrCode, Truck, CreditCard, CircleUserRound, Filter, Waypoints, Store } from 'lucide-react';
 
+/**
+ * SEO用メタデータの生成
+ */
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }) {
     const { locale } = await params;
     const t = await getTranslations({ locale, namespace: 'Metadata' });
@@ -12,6 +27,9 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
     };
 }
 
+/**
+ * ショップヘルプゲートウェイページコンポーネント
+ */
 export default function ShopHelpGatewayPage() {
     return (
         <div className="min-h-screen bg-background pb-20 pt-10">
@@ -126,12 +144,12 @@ export default function ShopHelpGatewayPage() {
                     </Link>
 
                     {/* New: Card Application */}
-                    <Link href="/help/shop/apply" className="group relative rounded-xl border bg-card p-8 shadow-sm transition-all hover:border-primary/50 hover:shadow-md block">
+                    <Link href="/help/shop/card-order" className="group relative rounded-xl border bg-card p-8 shadow-sm transition-all hover:border-primary/50 hover:shadow-md block">
                         <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary">
                             <CreditCard className="h-6 w-6" />
                         </div>
                         <h2 className="text-2xl font-bold tracking-tight text-foreground group-hover:text-primary transition-colors">
-                            カード発注
+                            物理カード発注
                         </h2>
                         <p className="mt-2 text-muted-foreground">
                             新しい物理カードが必要になった際の、システム管理者への発注手順を説明します。

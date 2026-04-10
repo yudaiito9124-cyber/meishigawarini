@@ -1,11 +1,14 @@
 /**
- * 概要: 特定のQRコードをBAN（利用停止）または解除する。
- * 詳細: 
- *  - QRコードのステータスを一時的に`BANNED`に変更し、利用不能にします。
- *  - 解除時には、アイテムの属性（ts_completed_at等）から元の論理状態（COMPLETED, SHIPPED, USED, ACTIVE等）を自動判定して復元します。
- *
- * エンドポイント: POST /admin/qr/ban
+ * @file admin_qr_ban.ts
+ * @role 管理者用：QR コード BAN/解除ハンドラー
+ * @responsibility
+ *  - 特定のギフト（QR コード）を緊急停止（BAN）、または停止を解除します。
+ *  - 【アクセス遮断】BAN 状態の QR コードは `receiveAuthorizer` によりアクセスが拒否され、ギフトの受け取りが不能になります。
+ *  - 【インテリジェント復元】BAN 解除時、単に固定のステータスに戻すのではなく、レコードに刻まれたタイムスタンプ群（ts_shipped_at 等）を元に、本来あるべき論理状態（COMPLETED, SHIPPED, ACTIVE 等）を自動判定して復元します。
+ * @context
+ *  - 不正利用の疑いがある場合や、誤操作によるギフトの無効化処理、およびそのリカバリに使用されます。
  */
+
 import { APIGatewayProxyHandler } from 'aws-lambda';
 import { UpdateCommand, GetCommand } from '@aws-sdk/lib-dynamodb';
 import { isExpired } from './utils/expiration';
@@ -15,7 +18,17 @@ import { getQrId, getAction } from './utils/request';
 import { AdminApiSchema } from '@shared/api-types';
 
 /**
- * アイテムの属性から、BAN解除後に戻すべきステータスを判定します。
+ * アイテムの属性から、BAN 解除後に戻すべき論理ステータスを判定します。
+ * 
+ * @description
+ * 以下の優先順位でチェックを行い、その QR コードが辿った最後の「正常な状態」を特定します。
+ * 1. ts_completed_at があれば「完了（COMPLETED）」
+ * 2. ts_shipped_at があれば「配送中（SHIPPED）」
+ * 3. ts_submitted_at があれば「住所登録済（USED）」
+ * 4. 有期限であり、期限を過ぎていれば「期限切れ（EXPIRED）」
+ * 5. ts_activated_at があれば「有効（ACTIVE）」
+ * 6. ts_linked_at があれば「注文紐付け済（LINKED）」
+ * 7. いずれもなければ「未割当（UNASSIGNED）」
  */
 const getRevertStatus = (item: any): string => {
     if (item.ts_completed_at) return "COMPLETED";
@@ -40,8 +53,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         
         if (!qr_id) return errorResponse(400, 'Missing QR ID');
 
-        // 【DB操作: GetItem】
-        // 現在のステータスと、解除時の復帰判定に必要なタイムスタンプ類を取得
+        // 現状の取得 (復帰判定用)
         const currentRes = await ddb.send(new GetCommand({
             TableName: TABLE_NAME, Key: { PK: `QR#${qr_id}`, SK: 'METADATA' }
         }));
@@ -53,14 +65,13 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         const now = new Date().toISOString();
 
         if (currentStatus === 'BANNED') {
-            // ====================================================================
+            // --------------------------------------------------------------------
             // ACTION: UNBAN (復元)
-            // ====================================================================
+            // 目的: BAN 状態を解除し、自動判定された元のステータスに戻します。
+            // --------------------------------------------------------------------
             const revertStatus = getRevertStatus(item);
             console.log(`Unbanning QR ${qr_id}: Reverting to ${revertStatus}`);
 
-            // 【DB操作: UpdateItem】
-            // statusを復元し、GSI1_PKも同期。BAN関連フィールドを削除。
             await ddb.send(new UpdateCommand({
                 TableName: TABLE_NAME,
                 Key: { PK: `QR#${qr_id}`, SK: 'METADATA' },
@@ -73,13 +84,12 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 
             return successResponse({ message: 'QR Code Unbanned', qr_id, status: revertStatus });
         } else {
-            // ====================================================================
+            // --------------------------------------------------------------------
             // ACTION: BAN (停止)
-            // ====================================================================
+            // 目的: アクセスを強制遮断し、理由を記録します。
+            // --------------------------------------------------------------------
             console.log(`Banning QR ${qr_id} (current: ${currentStatus})`);
 
-            // 【DB操作: UpdateItem】
-            // statusをBANNEDに変更し、理由と実行日時を記録。
             await ddb.send(new UpdateCommand({
                 TableName: TABLE_NAME,
                 Key: { PK: `QR#${qr_id}`, SK: 'METADATA' },

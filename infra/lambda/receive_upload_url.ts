@@ -1,12 +1,17 @@
 /**
- * 概要: チャット添付用ファイルのアップロードURL生成
- * 詳細: 
- *  - 被贈答者によるチャット等でのファイル送信（画像等）を許可するため、S3の署名付きURL(PutObject)を発行します。
- *  - アップロード実行前に現時点での累計ファイルサイズ(total_size_bytes)を確認し、100MB制限を超えないかチェックします。
- *  - PIN認証に基づき、正当なユーザーのみがURLを取得できるように制御します。
- *
- * エンドポイント: POST /receive/upload-url
+ * @file receive_upload_url.ts
+ * @role ゲスト用：チャット添付用 S3 アップロード URL 生成ハンドラー
+ * @responsibility
+ *  - 受取人がチャットメッセージに画像や資料を添付できるように、S3 の署名付き URL（Presigned URL）を発行します。
+ *  - 【アップロード前クォータ検証】
+ *    - 署名を発行する前に `CHAT` レコードの `total_size_bytes` を取得し、今回申請されたファイルサイズを加算してもギフトごとの上限（100MB）を超えないか、厳格にチェックします。
+ *  - 【セキュアなパス設計】
+ *    - テンプレート：`qrcode/{qr_id}/chat/{id}.{ext}`
+ *    - QR ID ごとにディレクトリを分離し、さらにメッセージ個別の ID を付与することで、アセットの衝突と不正アクセスを防ぎます。
+ * @context
+ *  - サーバーを介さず直接 S3 へアップロードするフロントエンド処理の窓口となります。
  */
+
 import { APIGatewayProxyHandler } from 'aws-lambda';
 import { GetCommand } from '@aws-sdk/lib-dynamodb';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
@@ -19,6 +24,7 @@ import { getQrId, getPIN } from './utils/request';
 import { ReceiveApiSchema } from '@shared/api-types';
 
 const s3 = new S3Client({});
+/** チャットごとの累計ストレージ上限（100MB） */
 const CAPACITY_LIMIT_MB = 100;
 
 export const handler: APIGatewayProxyHandler = async (event) => {
@@ -32,8 +38,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         
         if (!qr_id || !pin || !filename) return errorResponse(400, 'Missing required fields');
 
-        // 【DB操作: GetItem】
-        // 理由: QRコードのメタデータを取得し、PINの一致とステータスを検証。
+        // 1. PIN 認証と基本妥当性チェック
         const qrRes = await ddb.send(new GetCommand({
             TableName: TABLE_NAME, Key: { PK: `QR#${qr_id}`, SK: 'METADATA' }
         }));
@@ -42,7 +47,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             return errorResponse(403, 'Unauthorized');
         }
 
-        // チャット容量制限のチェック (SK=CHATに蓄積された累計サイズを確認)
+        // 2. チャット容量制限のチェック (SK=CHAT に記録されている累計サイズを確認)
         const chatRes = await ddb.send(new GetCommand({
             TableName: TABLE_NAME, Key: { PK: `QR#${qr_id}`, SK: 'CHAT' }
         }));
@@ -53,16 +58,18 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             return errorResponse(403, `Capacity limit exceeded. Max ${CAPACITY_LIMIT_MB}MB.`);
         }
 
+        // 3. パス生成と署名発行
         const id = generateId();
         const ext = filename.split('.').pop() || 'bin';
         const key = `qrcode/${qr_id}/chat/${id}.${ext}`;
 
-        // S3 PutObject 署名付きURLの生成 (有効期限: 1時間)
         const command = new PutObjectCommand({
             Bucket: BUCKET_NAME,
             Key: key,
             ContentType: content_type || 'application/octet-stream'
         });
+
+        // 1時間有効な Presigned URL を発行
         const uploadUrl = await getSignedUrl(s3, command, { expiresIn: 3600 });
         const finalUrl = getPublicUrl(BUCKET_NAME, key);
 
