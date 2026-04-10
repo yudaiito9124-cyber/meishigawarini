@@ -11,8 +11,9 @@ This skill provides the AI assistant with the necessary instructions to maintain
 
 1.  **Strict Documentation**:
     *   **File Header**: Every file MUST start with a detailed header comment describing its role, responsibility, and context.
-    *   **In-Code Comments**: Use detailed comments for functions and complex logic. Do not just describe *what* the code does, but *why* it does it.
+    *   **In-Code Comments**: Use exhaustive comments for functions and complex logic. The code should be self-explanatory such that high-level documentation is not strictly necessary to understand the details.
     *   **Database Operations**: Add exhaustive comments to any code interacting with the database. Specify keys (PK, SK, GSI), the rationale for the query choice, and state transitions.
+    *   **The Map vs. The Truth**: Documents represent "The Map" (Architecture/Routing/Examples), while Source Code represents "The Truth" (Exhaustive details).
 2.  **Standardization & Simplification**:
     *   **Reuse Existing Patterns**: Do not reinvent solutions. Always search for and reuse existing utility functions, components, and patterns.
     *   **Mechanical Simplification**: Design logic to be simple and "API-like". Aim for implementations that can be maintained or replaced through mechanical, repeatable operations.
@@ -22,8 +23,13 @@ This skill provides the AI assistant with the necessary instructions to maintain
 4.  **Behavior & State Preservation**:
     *   **No Stealth UI Changes**: Never make large-scale visual or layout changes unless explicitly instructed.
     *   **Internal Consistency**: Ensure that any modification preserves the existing behavior and communication protocols between the Frontend and Backend.
-5.  **Lossless Editing**:
-    *   Never delete or simplify existing documentation or code examples unless they are proven incorrect. Always append or expand in a way that preserves the original information density.
+5.  **Lossless Editing & Anti-Deletion**:
+    *   **Prohibition of Deletion**: NEVER delete or overwrite existing documentation, comments, or examples without explicit user permission.
+    *   **Preservation**: Even when reorganizing information, ensure no data density is lost.
+    *   **The Triple Principles of Editing**:
+        1. **No Deletion**: Unauthorized removal of text is strictly prohibited.
+        2. **Information Increment**: Edits MUST result in an overall increase in information density (explanations, details, examples).
+        3. **Complete Transcription**: All previous content, including detailed wording and underlying "intent," must be fully transcribed and inherited into the new structure.
 6.  **Writing Constraints**:
     *   **No Vague Versioning**: Do not use terms like "latest version" (最新版) or "revised version" (修正版). Describe specific changes or states instead.
 
