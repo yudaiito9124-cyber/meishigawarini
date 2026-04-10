@@ -24,7 +24,7 @@ const app = new cdk.App();
  * デプロイステージの決定
  * デフォルトは 'stage'。CDK コンテキスト (-c stage=...) から取得します。
  */
-const stage = app.node.tryGetContext('prod') || 'stage';
+const stage = app.node.tryGetContext('stage') || 'stg';
 const envPath = path.join(__dirname, `../.env.${stage}`);
 require('dotenv').config({ path: envPath });
 
