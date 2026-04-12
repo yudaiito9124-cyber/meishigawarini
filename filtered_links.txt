@@ -1,0 +1,66 @@
+frontend/app/[locale]/admin/page.tsx:                        <Link href="/admin/help">
+frontend/app/[locale]/admin/page.tsx:                        {/* <Link href="/login" className="w-full sm:w-auto">
+frontend/app/[locale]/admin/page.tsx:                                <ExternalLink className="cursor-pointer w-4 h-4 shrink-0" onClick={() => window.open(`/${locale}/receive/${qr_id}`, '_blank')} />
+frontend/app/[locale]/admin/page.tsx:                                            <Link href={`/shop/${item.shop_id}`}>
+frontend/app/[locale]/admin/help/[...slug]/page.tsx:          <Link href={parentPath}>
+frontend/app/[locale]/admin/help/[...slug]/page.tsx:          <Link href="/admin">
+frontend/app/[locale]/admin/help/page.tsx:                    <Link href="/admin" className="inline-flex items-center text-sm font-medium text-white/60 hover:text-white transition-colors">
+frontend/app/[locale]/admin/help/page.tsx:                    <Link href="/admin/help/flow" className="group relative rounded-xl border border-white/10 bg-white/5 p-8 shadow-sm transition-all hover:bg-white/10 hover:border-white/20 block md:col-span-2">
+frontend/app/[locale]/admin/help/page.tsx:                    <Link href="/admin/help/overview" className="group relative rounded-xl border border-white/10 bg-white/5 p-8 shadow-sm transition-all hover:bg-white/10 block">
+frontend/app/[locale]/admin/help/page.tsx:                    <Link href="/admin/help/qrcodes" className="group relative rounded-xl border border-white/10 bg-white/5 p-8 shadow-sm transition-all hover:bg-white/10 block">
+frontend/app/[locale]/admin/help/page.tsx:                    <Link href="/admin/help/cardorders" className="group relative rounded-xl border border-white/10 bg-white/5 p-8 shadow-sm transition-all hover:bg-white/10 block">
+frontend/app/[locale]/admin/help/page.tsx:                    <Link href="/admin/help/designs" className="group relative rounded-xl border border-white/10 bg-white/5 p-8 shadow-sm transition-all hover:bg-white/10 block">
+frontend/app/[locale]/admin/help/page.tsx:                    <Link href="/admin/help/shops" className="group relative rounded-xl border border-white/10 bg-white/5 p-8 shadow-sm transition-all hover:bg-white/10 block">
+frontend/app/[locale]/admin/help/page.tsx:                    <Link href="/admin/help/tools" className="group relative rounded-xl border border-white/10 bg-white/5 p-8 shadow-sm transition-all hover:bg-white/10 block">
+frontend/app/[locale]/admin/help/page.tsx:                    <Link href="/admin/help/whereisid" className="group relative rounded-xl border border-white/10 bg-white/5 p-8 shadow-sm transition-all hover:bg-white/10 block">
+frontend/app/[locale]/user/editprofile/page.tsx:                    <a key={i} href={part} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline break-all">
+frontend/app/[locale]/user/editprofile/page.tsx:                                                                    window.open(url, '_blank', 'noopener,noreferrer');
+frontend/app/[locale]/user/receivedmemory/page.tsx:                                                                onClick={(e) => { e.stopPropagation(); window.open(`/receive/${item.qr_id}`, '_blank'); }}
+frontend/app/[locale]/user/sentmemory/page.tsx:                                                                onClick={(e) => { e.stopPropagation(); window.open(`/receive/${item.qr_id}`, '_blank'); }}
+frontend/app/[locale]/receive/[qr_id]/page.tsx:                                    onClick={() => step === "PROMOTION" && window.open('https://meishigawarini.com', '_blank')}
+frontend/app/[locale]/receive/[qr_id]/page.tsx:                                                            <a href={`mailto:${gift.shop_email}`} className="text-blue-600 font-medium hover:underline text-sm break-all">
+frontend/app/[locale]/receive/[qr_id]/page.tsx:                                                                        window.open(url, '_blank', 'noopener,noreferrer');
+frontend/app/[locale]/receive/[qr_id]/page.tsx:                                                                <a href={msg.file_url} target="_blank" rel="noopener noreferrer" >
+frontend/app/[locale]/register/page.tsx:                        <Link href="/login">
+frontend/app/[locale]/register/page.tsx:                        {t('hasAccount')} <Link href="/login" className="text-blue-600 hover:underline">{t('loginLink')}</Link>
+frontend/app/[locale]/mfa-setup/page.tsx:                            <Link href="/help/admin">
+frontend/app/[locale]/page.tsx:        <a href="#" className="font-black text-lg tracking-tight hover:opacity-80 transition-opacity">{ts("name")}</a>
+frontend/app/[locale]/page.tsx:          <a href="#howto" className="hidden md:block text-sm text-gray-500 hover:text-black transition-colors">使い方</a>
+frontend/app/[locale]/page.tsx:          <a href="#shops" className="hidden md:block text-sm text-gray-500 hover:text-black transition-colors">ショップ一覧</a>
+frontend/app/[locale]/page.tsx:          <a href="#for-shops" className="hidden md:block text-sm text-gray-500 hover:text-black transition-colors">ショップ開設</a>
+frontend/app/[locale]/page.tsx:          <a href="#howto" className="hover:text-black transition-colors">使い方</a>
+frontend/app/[locale]/page.tsx:          <a href="#shops" className="hover:text-black transition-colors">ショップ一覧</a>
+frontend/app/[locale]/page.tsx:          <a href="#for-shops" className="hover:text-black transition-colors">ショップ開設</a>
+frontend/app/[locale]/login/page.tsx:                                <Link href="/help/admin" className="w-full sm:w-auto">
+frontend/app/[locale]/login/page.tsx:                                <Link href="/admin" className="w-full sm:w-auto">
+frontend/app/[locale]/login/page.tsx:                                <Link href="/shop" className="w-full sm:w-auto">
+frontend/app/[locale]/login/page.tsx:                                    {t('noAccount')} <Link href="/register" className="text-blue-600 hover:underline">{t('signUpLink')}</Link>
+frontend/app/[locale]/login/page.tsx:                                    <Link href="/mfa-setup" className="text-sm text-gray-500 hover:text-blue-600 transition-colors">
+frontend/app/[locale]/help/shop/page.tsx:                    <Link href="/help" className="inline-flex items-center text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+frontend/app/[locale]/help/shop/page.tsx:                    <Link href="/help/shop/flow" className="group relative rounded-xl border border-primary/20 bg-primary/5 p-8 shadow-sm transition-all hover:border-primary/50 hover:shadow-md block md:col-span-2">
+frontend/app/[locale]/help/shop/page.tsx:                    <Link href="/help/shop/atfirst" className="group relative rounded-xl border bg-card p-8 shadow-sm transition-all hover:border-primary/50 hover:shadow-md block">
+frontend/app/[locale]/help/shop/page.tsx:                    <Link href="/help/shop/manage" className="group relative rounded-xl border bg-card p-8 shadow-sm transition-all hover:border-primary/50 hover:shadow-md block">
+frontend/app/[locale]/help/shop/page.tsx:                    <Link href="/help/shop/activate" className="group relative rounded-xl border bg-card p-8 shadow-sm transition-all hover:border-primary/50 hover:shadow-md block">
+frontend/app/[locale]/help/shop/page.tsx:                    <Link href="/help/shop/shipping" className="group relative rounded-xl border bg-card p-8 shadow-sm transition-all hover:border-primary/50 hover:shadow-md block">
+frontend/app/[locale]/help/shop/page.tsx:                    <Link href="/help/shop/card-order" className="group relative rounded-xl border bg-card p-8 shadow-sm transition-all hover:border-primary/50 hover:shadow-md block">
+frontend/app/[locale]/help/shop/page.tsx:                    <Link href="/help/shop/filter" className="group relative rounded-xl border bg-card p-8 shadow-sm transition-all hover:border-primary/50 hover:shadow-md block">
+frontend/app/[locale]/help/[...slug]/page.tsx:            <Link href="/shop" className="mt-4">
+frontend/app/[locale]/help/[...slug]/page.tsx:            <Link href="/admin" className="mt-4">
+frontend/app/[locale]/help/page.tsx:                        <Link href="/help/overview"
+frontend/app/[locale]/help/page.tsx:                        <Link href="/help/receive"
+frontend/app/[locale]/help/page.tsx:                        <Link href="/help/send"
+frontend/app/[locale]/help/page.tsx:                        <Link href="/help/user"
+frontend/app/[locale]/help/page.tsx:                        <Link href="/help/shop"
+frontend/app/[locale]/help/page.tsx:                    <Link href="https://docs.google.com/forms/d/e/1FAIpQLSdsMe9rC_Ua6wyK0hPt6X9KT9ieu3l78u7U4uhpdUdDK023Wg/viewform?usp=publish-editor"
+frontend/app/[locale]/share/[qr_id]/page.tsx:                <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
+frontend/app/[locale]/share/[qr_id]/page.tsx:                        <Link href="/" className="text-emerald-700 hover:underline inline-flex items-center ml-1 underline-offset-4 decoration-emerald-200">
+frontend/app/[locale]/share/[qr_id]/page.tsx:                    <Link href="/" className="block group">
+frontend/content/help/ja/overview/index.md:  <a href="/login" class="group relative inline-flex items-center justify-center px-10 py-4 font-bold text-white transition-all duration-500 bg-gradient-to-r from-emerald-600 via-emerald-400 to-emerald-600 bg-[length:200%_auto] rounded-full shadow-[0_10px_25px_-5px_rgba(16,185,129,0.4)] hover:shadow-[0_20px_40px_-10px_rgba(16,185,129,0.5)] hover:-translate-y-1.5 hover:scale-105 active:scale-95 overflow-hidden no-underline hover:bg-right">
+frontend/components/SiteFooter.tsx:                {/* <a href="/#howto" className="hover:text-black transition-colors">使い方</a>
+frontend/components/SiteFooter.tsx:                <a href="/#shops" className="hover:text-black transition-colors">ショップ一覧</a>
+frontend/components/SiteFooter.tsx:                <a href="/#for-shops" className="hover:text-black transition-colors">ショップ開設</a> */}
+frontend/components/admin/OrderDetailsDialog.tsx:                        <Link href={`/shop/${shopIdToLink}`}>
+frontend/components/ShareDialog.tsx:        window.open(`https://twitter.com/intent/tweet?text=${text}&url=${url}`, '_blank');
+frontend/components/ShareDialog.tsx:        window.open(`https://social-plugins.line.me/lineit/share?url=${url}`, '_blank');
+frontend/components/help/MarkdownRenderer.tsx:          <Link href={href} className="group relative rounded-xl border bg-card p-8 shadow-sm transition-all hover:border-primary/50 hover:shadow-md block h-full">
+frontend/components/help/MarkdownRenderer.tsx:          <Link href={href} className={className}>

@@ -5,7 +5,8 @@
     "failed": "Failed",
     "all": "All",
     "cancel": "Cancel",
-    "unitCard": "cards"
+    "unitCard": "cards",
+    "loading": "Loading..."
   },
   "Site": {
     "name": "Meishigawarini"
@@ -258,6 +259,7 @@
         "front": "Front",
         "back": "Back",
         "designId": "Design ID",
+        "receiverUserId": "Receiver User ID",
         "close": "Close"
       }
     },
@@ -713,6 +715,7 @@
         "pin": "PIN",
         "status": "Status",
         "createdAt": "Created At",
+        "receiverUserId": "Receiver User ID",
         "actions": "Actions",
         "noCodes": "No codes found. Press Refresh to load."
       },

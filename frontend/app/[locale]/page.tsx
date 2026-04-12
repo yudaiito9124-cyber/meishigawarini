@@ -433,7 +433,7 @@ export default function HomePage() {
       </nav >
 
       {/* ━━━ Hero ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-      <section className="flex flex-col items-center justify-center min-h-screen text-center px-6 pt-20">
+      <section className="flex flex-col items-center justify-center h-screen max-h-[1000px] text-center px-6 pt-20">
         <p className="text-xs text-gray-400 uppercase tracking-[0.2em] mb-7 font-medium">
           Asset Transfer Token Card
         </p>

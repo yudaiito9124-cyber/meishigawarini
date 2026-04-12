@@ -82,6 +82,9 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             password_hash = await bcrypt.hash(password, await bcrypt.genSalt(10));
         }
 
+        // 【受取体験の継続】ログイン中のユーザーであれば ID を記録し RECEIVEDLOG に自動追加
+        const userId = getUserId(event);
+
         // ====================================================================
         // 実施フェーズ: アトミックなステータス更新とオーダー作成
         // ====================================================================
@@ -92,12 +95,15 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                         TableName: TABLE_NAME,
                         Key: { PK: `QR#${qr_id}`, SK: 'METADATA' },
                         UpdateExpression: 'SET #status = :used, GSI1_PK = :gsi_pk, GSI1_SK = :now, ts_submitted_at = :now, ts_updated_at = :now' +
-                            (password_hash ? ', password_hash = :ph' : '') + ' REMOVE #fa, #lu',
+                            (password_hash ? ', password_hash = :ph' : '') + 
+                            (userId ? ', receiver_user_id = :rid' : '') +
+                            ' REMOVE #fa, #lu',
                         ConditionExpression: '#status = :active',
                         ExpressionAttributeNames: { '#status': 'status', '#fa': 'failed_attempts', '#lu': 'locked_until' },
                         ExpressionAttributeValues: {
                             ':used': 'USED', ':active': 'ACTIVE', ':gsi_pk': 'QR#USED', ':now': nowIso,
-                            ...(password_hash ? { ':ph': password_hash } : {})
+                            ...(password_hash ? { ':ph': password_hash } : {}),
+                            ...(userId ? { ':rid': userId } : {})
                         }
                     }
                 },
@@ -107,15 +113,14 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                         Item: {
                             PK: `QR#${qr_id}`, SK: 'ORDER',
                             name, address, zip_code, phone, preferred_date, preferred_time, email,
-                            ts_submitted_at: nowIso, ts_updated_at: nowIso
+                            ts_submitted_at: nowIso, ts_updated_at: nowIso,
+                            ...(userId ? { receiver_user_id: userId } : {})
                         }
                     }
                 }
             ]
         }));
 
-        // 【受取体験の継続】ログイン中のユーザーであれば RECEIVEDLOG に自動追加
-        const userId = getUserId(event);
         if (userId) {
             try {
                 await appendToHistory(ddb, TABLE_NAME, userId, 'RECEIVEDLOG', qr_id);
@@ -123,6 +128,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 console.error('Failed to append to RECEIVEDLOG:', e);
             }
         }
+
 
         // ====================================================================
         // 副作用処理 (通知と購読)

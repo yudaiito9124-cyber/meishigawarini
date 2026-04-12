@@ -182,7 +182,8 @@ export function ShopSettingsSection({ shopId }: { shopId: string }) {
                                     htmlImageUrlsToDelete: [...prev.htmlImageUrlsToDelete, url],
                                     htmlImageUrls: prev.htmlImageUrls.filter((_, i) => i !== idx)
                                 }))}
-                                onCopy={(url) => { navigator.clipboard.writeText(url); alert(t('shopSettings.copySuccess')); }}
+                                onCopy={handleCopy}
+                                copiedId={copiedId}
                                 t={t} tr={tr}
                             />
                         </div>
@@ -315,11 +316,12 @@ interface ImageUploadGridProps {
     onUpload: (e: React.ChangeEvent<HTMLInputElement>) => Promise<void>;
     onDelete: (url: string, idx: number) => void;
     onCopy: (url: string) => void;
+    copiedId?: string | null;
     t: (key: string) => string;
     tr: (key: string) => string;
 }
 
-function ImageUploadGrid({ htmlImageUrls, isOpen, setIsOpen, isUploading, onUpload, onDelete, onCopy, t, tr }: ImageUploadGridProps) {
+function ImageUploadGrid({ htmlImageUrls, isOpen, setIsOpen, isUploading, onUpload, onDelete, onCopy, copiedId, t, tr }: ImageUploadGridProps) {
     return (
         <div className="space-y-2 pt-2">
             <Button type="button" variant="ghost" size="sm" onClick={() => setIsOpen(!isOpen)} className="w-full flex justify-between items-center text-gray-500 px-2">
@@ -333,7 +335,9 @@ function ImageUploadGrid({ htmlImageUrls, isOpen, setIsOpen, isUploading, onUplo
                             <div key={index} className="group relative aspect-square bg-white rounded-md border overflow-hidden shadow-sm hover:ring-2 hover:ring-primary/30 transition-all">
                                 <img src={url} alt="" className="w-full h-full object-cover" />
                                 <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                                    <Button type="button" variant="secondary" size="icon" className="h-8 w-8 rounded-full" onClick={() => onCopy(url)}><Copy className="h-4 w-4" /></Button>
+                                    <Button type="button" variant="secondary" size="icon" className="h-8 w-8 rounded-full" onClick={() => onCopy(url)}>
+                                        {copiedId === url ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
+                                    </Button>
                                     <Button type="button" variant="destructive" size="icon" className="h-8 w-8 rounded-full" onClick={() => onDelete(url, index)}><Trash2 className="h-4 w-4" /></Button>
                                 </div>
                             </div>

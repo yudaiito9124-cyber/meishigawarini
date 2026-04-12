@@ -232,9 +232,10 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 function formatOrderDetails(meta: any, order: any): any {
     return {
         qr_id: meta.PK.replace('QR#', ''), product_id: meta.product_id, status: meta.status,
-        recipient_name: order.name || '-', address: order.address || '-',
-        postal_code: order.zipCode || order.postal_code || '',
-        preferred_date: order.preferredDate || '-', preferred_time: order.preferredTime || '-',
+        recipient_name: order.name || order.recipient_name || '-', address: order.address || '-',
+        postal_code: order.zipCode || order.zip_code || order.postal_code || '',
+        preferred_date: order.preferredDate || order.preferred_date || '-', 
+        preferred_time: order.preferredTime || order.preferred_time || '-',
         shipping_info: order, memo_for_users: meta.memo_for_users, memo_for_shop: meta.memo_for_shop,
         tracking_number: order.tracking_number, delivery_company: order.delivery_company,
         ts_created_at: meta.ts_created_at, ts_updated_at: meta.ts_updated_at, ts_linked_at: meta.ts_linked_at,

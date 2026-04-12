@@ -23,12 +23,15 @@ const userPoolClientId = process.env.NEXT_PUBLIC_COGNITO_USER_POOL_CLIENT_ID;
 const cognitoDomain = process.env.NEXT_PUBLIC_COGNITO_DOMAIN;
 
 if (userPoolId && userPoolClientId) {
+    console.log('[Amplify] Configuring with UserPoolId:', userPoolId);
     /**
      * リダイレクトURLの動的決定
      * 開発環境（localhost）やステージング環境など、実行環境のドメインを取得して
      * Cognito Hosted UI からのリダイレクト先を決定します。
      */
     const origin = typeof window !== 'undefined' ? window.location.origin : (process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000');
+    console.log('[Amplify] Dynamic Origin:', origin);
+    
     const signInOrigins = [
         `${origin}/login/`,
         `${origin}/ja/login/`,
@@ -41,26 +44,34 @@ if (userPoolId && userPoolClientId) {
     ];
 
     // Amplify SDK の設定。一度呼び出すと、アプリケーション全体で Auth モジュール等が利用可能になります。
-    Amplify.configure({
-        Auth: {
-            Cognito: {
-                userPoolId: userPoolId,
-                userPoolClientId: userPoolClientId,
-                loginWith: {
-                    oauth: {
-                        domain: cognitoDomain || '',
-                        scopes: ['email', 'openid', 'profile', 'aws.cognito.signin.user.admin'],
-                        redirectSignIn: signInOrigins,
-                        redirectSignOut: signOutOrigins,
-                        responseType: 'code',
+    try {
+        Amplify.configure({
+            Auth: {
+                Cognito: {
+                    userPoolId: userPoolId,
+                    userPoolClientId: userPoolClientId,
+                    loginWith: {
+                        oauth: {
+                            domain: cognitoDomain || '',
+                            scopes: ['email', 'openid', 'profile', 'aws.cognito.signin.user.admin'],
+                            redirectSignIn: signInOrigins,
+                            redirectSignOut: signOutOrigins,
+                            responseType: 'code',
+                        }
                     }
                 }
             }
-        }
-    });
+        });
+        console.log('[Amplify] Configuration successful');
+    } catch (error) {
+        console.error('[Amplify] Configuration failed:', error);
+    }
 } else {
     // 必須の環境変数が不足している場合は警告を表示します。
-    console.warn('Amplify is not configured. Environment variables COGNITO_USER_POOL_ID or COGNITO_CLIENT_ID are missing.');
+    console.warn('[Amplify] Configuration skipped. Missing:', {
+        userPoolId: !!userPoolId,
+        userPoolClientId: !!userPoolClientId
+    });
 }
 
 /**

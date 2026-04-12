@@ -124,7 +124,7 @@ export default function OrderDetailsDialog({
                         </Button>
                     )}
                     {shopIdToLink && (
-                        <Link href={`/shop/${shopIdToLink}`}>
+                        <Link href={`/shop/${shopIdToLink}`} target="_blank" rel="noopener noreferrer">
                             <Button
                                 variant="ghost"
                                 size="icon"
@@ -260,6 +260,9 @@ export default function OrderDetailsDialog({
                                 <InfoRow label={td('productId')} value={order.product_id} icon={Package} copyValue={order.product_id} />
                                 <InfoRow label={td('shopUserId')} value={order.shop_user_id} icon={User} copyValue={order.shop_user_id} />
                                 <InfoRow label={td('senderId')} value={order.sender_user_id} copyValue={order.sender_user_id} />
+                                {order.receiver_user_id && (
+                                    <InfoRow label={td('receiverUserId')} value={order.receiver_user_id} icon={User} copyValue={order.receiver_user_id} />
+                                )}
                                 <InfoRow label={td('expiration')} value={order.expiration_date ? new Date(order.expiration_date).toLocaleString() : td('systemDefault')} icon={Clock} copyValue={order.expiration_date} />
                                 <InfoRow label={td('activateNow')} value={order.activate_now ? td('yes') : td('no')} />
                             </div>

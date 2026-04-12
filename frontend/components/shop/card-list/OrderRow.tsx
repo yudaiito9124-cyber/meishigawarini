@@ -98,12 +98,24 @@ export function OrderRow({
                         <div className="flex-1 overflow-y-auto p-6 space-y-8">
                             {/* Card Preview & Product Section */}
                             <div className="space-y-4">
-                                <div className="flex items-start justify-between">
-                                    <div className="space-y-1">
-                                        <h4 className="text-[10px] font-bold uppercase tracking-wider text-gray-400">{t('orders.productName')}</h4>
-                                        <p className="text-lg font-bold text-gray-900 leading-tight">
-                                            {product?.name || order.product_id || '-'}
-                                        </p>
+                                <div className="flex items-start justify-between gap-4">
+                                    <div className="flex items-start gap-4">
+                                        {product?.image_url && (
+                                            <div className="w-16 h-16 rounded-xl overflow-hidden border border-gray-100 shadow-sm shrink-0 bg-gray-50 flex items-center justify-center">
+                                                <img
+                                                    src={product.image_url}
+                                                    alt={product.name}
+                                                    className="w-full h-full object-contain"
+                                                    crossOrigin="anonymous"
+                                                />
+                                            </div>
+                                        )}
+                                        <div className="space-y-1">
+                                            <h4 className="text-[10px] font-bold uppercase tracking-wider text-gray-400">{t('orders.productName')}</h4>
+                                            <p className="text-lg font-bold text-gray-900 leading-tight">
+                                                {product?.name || order.product_id || '-'}
+                                            </p>
+                                        </div>
                                     </div>
                                     <div className="flex flex-col items-end gap-1">
                                         <h4 className="text-[10px] font-bold uppercase tracking-wider text-gray-400">{t('orders.status')}</h4>
@@ -120,8 +132,8 @@ export function OrderRow({
                                 {order.design_id && (
                                     <div className="grid grid-cols-2 gap-3 mt-4">
                                         {(() => {
-                                            const aspectRatio = getDesignAspectRatio(order.design_id, allowedDesigns, product?.design);
-                                            const images = getDesignImages(order.design_id, allowedDesigns, product?.design);
+                                            const aspectRatio = getDesignAspectRatio(order.design_id, allowedDesigns, order);
+                                            const images = getDesignImages(order.design_id, allowedDesigns, order);
                                             return (
                                                 <>
                                                     <div className="group relative">
@@ -296,7 +308,7 @@ export function OrderRow({
                             )}
 
                             {/* Admin Meta Edit Section */}
-                            <div className="pt-2 border-t border-dashed space-y-4">
+                            <div className="pt-2 border-t space-y-4 border border-gray-200 rounded-2xl p-4 bg-gray-50">
                                 <h4 className="text-xs font-bold text-gray-900 flex items-center gap-2 mb-1">
                                     <div className="p-1 rounded-md bg-gray-100 text-gray-500"><Pencil className="w-3.5 h-3.5" /></div>
                                     {t('orders.updateMeta')}
@@ -320,7 +332,7 @@ export function OrderRow({
                                             defaultValue={order.memo_for_users || ""}
                                             disabled={['COMPLETED', 'EXPIRED', 'BANNED'].includes(order.status)}
                                             placeholder={['COMPLETED', 'EXPIRED', 'BANNED'].includes(order.status) ? t('orders.shipDialog.Completed-state messages cannot be updated') : ""}
-                                            className="text-sm min-h-[80px] rounded-xl border-gray-200 focus:ring-primary/20 resize-none"
+                                            className="text-sm min-h-[80px] rounded-xl border-gray-200 focus:ring-primary/20 resize-none bg-white"
                                         />
                                     </div>
                                     <div className="space-y-1.5">
@@ -329,7 +341,7 @@ export function OrderRow({
                                             id={`m_s-${qrId}`}
                                             name="memo_for_shop"
                                             defaultValue={order.memo_for_shop || ""}
-                                            className="text-sm min-h-[80px] rounded-xl border-gray-200 focus:ring-primary/20 resize-none"
+                                            className="text-sm min-h-[80px] rounded-xl border-gray-200 focus:ring-primary/20 resize-none bg-white"
                                         />
                                     </div>
                                     <Button

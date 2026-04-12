@@ -107,7 +107,10 @@ URLのスラッグ（配列）を解析し、末尾の要素を除去するこ�
 「名刺代わりに」のヘルプページで使用される画像は、AI Agent を利用したオートメーションツールによって自動的に撮影・更新することが可能です。これにより、UI の変更や多言語対応に伴うマニュアルの鮮度維持を効率的に行えます。
 
 ### 6.1 仕組みの概要
-AI Agent (`browser-use` ＋ `Playwright` ＋ `Gemini 2.0 Flash`) が、指示書となる Markdown ファイル（`REF_SCREENSHOT_INSTRUCTIONS.md`）を読み取り、ブラウザ操作を行ってスクリーンショットを取得します。
+AI Agent (`browser-use` ＋ `Playwright` ＋ `Gemini`) が、指示書となる Markdown ファイル（`REF_SCREENSHOT_PLAN.md`）を読み取り、ブラウザ操作を行ってスクリーンショットを取得します。
+
+- **安定した画面取得**: チャンクスクロールによる Lazy Load 対策と、動的なビューポートリサイズにより、ページ全体の精細な WebP 書き出しをサポートしています。
+- **セッションの永続化**: 独自のブラウザプロファイル (`.browser_profile`) を使用し、ログイン状態をタスク間で共有します。
 
 ### 6.2 技術的なセットアップ
 スクリプトの実行には Python 環境が必要です。
@@ -124,13 +127,16 @@ AI Agent (`browser-use` ＋ `Playwright` ＋ `Gemini 2.0 Flash`) が、指示書
 2.  **環境変数の設定**:
     `scripts/.env` ファイルを作成（または編集）し、以下の項目を設定します。
     - `GOOGLE_API_KEY`: Google AI Studio 等から取得した Gemini API キー
-    - `LOGIN_EMAIL`: テストユーザーのメールアドレス（通常は不要、Google認証を利用）
-    - `LOGIN_PASSWORD`: テストユーザーのパスワード（通常は不要、Google認証を利用）
+    - `PLAN_FILENAME`: 指示書のファイル名 (デフォルト: `REF_SCREENSHOT_PLAN.md`)
+    - `BASE_URL`: スクリーンショット対象のベースURL (デフォルト: `http://localhost:3000`)
 
 ### 6.3 運用ワークフロー
+実行は「ログインフェーズ」と「撮影フェーズ」の2段階で自動的に進行します。
 
-1.  **指示書の更新**:
-    `documents/REF_SCREENSHOT_INSTRUCTIONS.md` を編集し、撮影したい画像のパス、対象 URL、操作手順（自然言語で記述可能）をテーブルに追加します。
+1.  **指示書（真実の源泉）の更新**:
+    `documents/REF_SCREENSHOT_PLAN.md` を編集し、撮影したい画像のパス、対象 URL、操作手順（自然言語で記述可能）をテーブルに追加します。
+    - **ルール**: 必ず `<!-- STEPS_START -->` と `<!-- STEPS_END -->` の間に記述してください。
+    - **変数**: `[qr_id_active]` などのプレースホルダーを使用可能です。
 
 2.  **スクリプトの実行**:
     ```bash
@@ -138,19 +144,21 @@ AI Agent (`browser-use` ＋ `Playwright` ＋ `Gemini 2.0 Flash`) が、指示書
     source .venv/bin/activate
     python screenshot_auto_capture.py
     ```
-    実行するとブラウザが自動的に立ち上がり、指示書に従って各画面を撮影していきます。Google 認証などで手動介入が必要な場合は、ブラウザ画面上で操作を完了させてください。
+    実行するとブラウザが自動的に立ち上がり、以下の順序で処理されます：
+    - **Phase 1 (Login)**: 指定されたベースURLのログイン画面へ移動し、認証状態を確保。
+    - **Phase 2 (Capture)**: 指示書に従い、各ボタンのクリックやナビゲーションを行って目的の状態に到達し、フルページ・キャプチャを実行。
 
 3.  **結果の確認**:
     生成された画像は自動的に以下のディレクトリに上書き保存されます。
-    - `public/images/manuals/auto_screenshots/`
+    - `frontend/public/images/manual/auto_screenshots/`
 
-### 6.4 指示書の記載ルール (REF_SCREENSHOT_INSTRUCTIONS.md)
-指示書は Markdown のテーブル形式で記述します。
+### 6.4 指示書の記載ルール (REF_SCREENSHOT_PLAN.md)
+指示書は Markdown のテーブル形式で記述します。詳細は [REF_SCREENSHOT_PLAN.md](./REF_SCREENSHOT_PLAN.md) 自体のコメントを参照してください。
 
-| 画像パス | 対象URL | 撮影状態 / 操作手順 |
+| Path | Navigation & Capture Instruction (LLM Prompt) | Target Filename |
 | :--- | :--- | :--- |
-| `example.webp` | `/path/to/page` | 「保存ボタン」をクリックして、ダイアログが表示されている状態を撮影 |
+| `/user/sendgift` | コピーしたIDを入力して、確認画面が表示されている状態を撮影 | `user_sendgift++STEP=confirm.webp` |
 
-- **画像パス**: `auto_screenshots/` 配下に保存されるファイル名。
-- **対象URL**: ベースURL（localhost:3000等）を除いた相対パス。
-- **操作手順**: AI Agent への命令です。「〇〇をクリックして」「〇〇を待って」など具体的に記載すると精度が向上します。
+- **Path**: 対象URL（相対パス）。
+- **LLM Prompt**: AI Agent への命令。
+- **Target Filename**: 保存されるファイル名。`++` 等を用いた命名規則に従ってください。

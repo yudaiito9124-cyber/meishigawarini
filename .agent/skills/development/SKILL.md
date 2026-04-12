@@ -13,6 +13,7 @@ This skill provides the AI assistant with the necessary instructions to maintain
     *   **File Header**: Every file MUST start with a detailed header comment describing its role, responsibility, and context.
     *   **In-Code Comments**: Use exhaustive comments for functions and complex logic. The code should be self-explanatory such that high-level documentation is not strictly necessary to understand the details.
     *   **Database Operations**: Add exhaustive comments to any code interacting with the database. Specify keys (PK, SK, GSI), the rationale for the query choice, and state transitions.
+    *   **Comment Placement**: NEVER add comments at the end of a line of code. Always use a dedicated line for comments. This is to ensure a clear physical separation between the documentation edits and the original source code.
     *   **The Map vs. The Truth**: Documents represent "The Map" (Architecture/Routing/Examples), while Source Code represents "The Truth" (Exhaustive details).
 2.  **Standardization & Simplification**:
     *   **Reuse Existing Patterns**: Do not reinvent solutions. Always search for and reuse existing utility functions, components, and patterns.

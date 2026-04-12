@@ -12,7 +12,7 @@
  *    ではない場合、一覧ページをスキップして直接ショップ管理画面へ遷移します。
  * 3. 管理者機能: システム管理者 (Administrators) のみ、新規ショップの作成および
  *    初期所有者/店長の設定が可能なダイアログを表示します。
- * 4. 認証保護: `getCurrentUser` によるセッション確認を必須とし、未ログイン時はログイン画面へ戻します。
+ * 4. 認証保護: `AuthGuard` (ShopLayout経由) によるセッション確認を必須とし、未ログイン時はログイン画面へ戻します。
  */
 
 'use client';
@@ -23,7 +23,6 @@ import { useTranslations } from 'next-intl';
 import { useBackendError } from '@/hooks/useBackendError';
 import { fetchAuthSession, getCurrentUser, signOut } from 'aws-amplify/auth';
 import { RefreshCw, ArrowRight, HelpCircle, Camera, Settings, ShoppingBasket, Eye, Plus, Trash2, Copy, ImageIcon, Save, Loader2, Pencil, ChevronDown, Download, Check, QrCode, Package, Truck, CreditCard, Gift, LogOut } from 'lucide-react';
-import { Badge } from "lucide-react";
 import { shopApi } from '@/lib/api/shop';
 import { adminApi } from '@/lib/api/admin';
 import { Button } from '@/components/ui/button';
@@ -84,14 +83,13 @@ export default function ShopListPage() {
     useEffect(() => {
         const init = async () => {
             try {
-                // セッション確認とユーザーIDの保持
+                // セッション確認とユーザーIDの保持 (認証自体は Layout の AuthGuard が保証)
                 const user = await getCurrentUser();
                 setUserId(user.userId);
                 const adminStatus = await checkAuth();
                 await fetchShops(adminStatus);
             } catch (e) {
-                // 未ログイン時はログイン画面へ強制リダイレクト
-                router.push('/login');
+                console.error("Failed to initialize shop hub data:", e);
             }
         };
         init();
@@ -300,4 +298,3 @@ export default function ShopListPage() {
         </div>
     );
 }
-

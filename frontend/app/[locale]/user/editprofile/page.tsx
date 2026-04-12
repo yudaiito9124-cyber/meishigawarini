@@ -24,7 +24,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, Plus, X, Globe, Copy, Trash2, SendHorizontal, Pencil, User, Image as ImageIcon, FileIcon, ChevronDown, Sparkles } from "lucide-react";
+import { Loader2, Plus, X, Globe, Copy, Check, Trash2, SendHorizontal, Pencil, User, Image as ImageIcon, FileIcon, ChevronDown, Sparkles } from "lucide-react";
 import { SiX, SiInstagram, SiYoutube, SiFacebook, SiLine, SiTiktok, SiThreads, SiLinktree, SiEight } from '@icons-pack/react-simple-icons';
 import { cn } from "@/lib/utils";
 import SandboxedHtml from "@/components/SandboxedHtml";
@@ -55,6 +55,7 @@ export default function UserProfilePage() {
     const [showDetailHtmlSection, setShowDetailHtmlSection] = useState(false);
     const [htmlImageUrls, setHtmlImageUrls] = useState<string[]>([]);
     const [deletedHtmlUrls, setDeletedHtmlUrls] = useState<string[]>([]);
+    const [copiedId, setCopiedId] = useState<string | null>(null);
     const containerRef = useRef<HTMLDivElement>(null);
 
     /** プロフィール情報の取得（初期化） */
@@ -485,10 +486,15 @@ export default function UserProfilePage() {
                                                                         className="h-10 w-10 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-full"
                                                                         onClick={() => {
                                                                             navigator.clipboard.writeText(url);
-                                                                            alert(t('senderInfo.urlCopied'));
+                                                                            setCopiedId(url);
+                                                                            setTimeout(() => setCopiedId(null), 2000);
                                                                         }}
                                                                     >
-                                                                        <Copy className="w-4 h-4" />
+                                                                        {copiedId === url ? (
+                                                                            <Check className="w-4 h-4 text-green-500" />
+                                                                        ) : (
+                                                                            <Copy className="w-4 h-4" />
+                                                                        )}
                                                                     </Button>
                                                                     <Button
                                                                         variant="ghost"

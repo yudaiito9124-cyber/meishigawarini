@@ -5,13 +5,10 @@
  *  - ユーザーがギフトを受け取る際に入力する「配送先情報」のテンプレートを管理します。
  *  - 【入力の簡略化（Pre-fill）】
  *    ここで保存された情報は、ギフト受取画面（チェックアウト）の入力フォームに自動補完されるため、リピート受取人の体験を向上させます。
- *  - 【命名規則のブリッジ】
- *    - API・フロントエンド: `snake_case` (例: `zip_code`)
- *    - DynamoDB 内部属性: `camelCase` (例: `zipCode`)
- *    このハンドラーが両者の変換レイヤー（Adapter）として機能します。
- *  - 【属性の保護と自動初期化】
- *    `PK` や `SK` といったシステム属性の不正上書きを防ぐため、許可されたフィールドのみを抽出して更新します。
  *    初回保存時には `ts_created_at` を自動的にセットします。
+ *  - 【統一規格（snake_case）】
+ *    以前は内部属性に `camelCase` を使用していましたが、現在は API および DB 属性ともに `snake_case` で統一されています。
+ *    後方互換性のため、読み取り時には `camelCase` も許容します。
  * @context
  *  - 被贈答者（Receiver）の利便性を高めるための、プロファイル管理の一環です。
  */
@@ -68,15 +65,12 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             const { receiver_info } = body as UserApiSchema['user_receiver_update'];
             if (!receiver_info) return errorResponse(400, 'Missing receiver_info data');
 
-            // 変換レイヤー: API 指定 (snake_case) -> 内部属性 (camelCase)
+            // 変換レイヤー: API 指定 (snake_case) -> 内部属性 (snake_case)
+            // ※以前は zipCode (camelCase) に変換していましたが、現在はそのまま保存します。
             const dbFields: any = { ...receiver_info };
-            if (receiver_info.zip_code !== undefined) {
-                dbFields.zipCode = receiver_info.zip_code;
-                delete dbFields.zip_code;
-            }
 
             // 【セキュリティ】許可されたフィールドのみを抽出（PK/SK などの上書き防止）
-            const allowedFields = ['name', 'zipCode', 'address', 'phone', 'email'];
+            const allowedFields = ['name', 'zip_code', 'zipCode', 'address', 'phone', 'email'];
             const keys = Object.keys(dbFields).filter(k => allowedFields.includes(k));
             
             if (keys.length === 0) return errorResponse(400, 'No valid fields to update');

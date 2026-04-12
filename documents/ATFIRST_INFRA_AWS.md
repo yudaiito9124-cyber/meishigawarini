@@ -113,11 +113,20 @@ sequenceDiagram
 ```
 
 
-### 例：「管理者がQRコードを新規生成する」ときの裏側の動き
-
-1.  **Browser (JavaScript)**: 管理者が画面で「生成」ボタンをクリック。ブラウザが Cognito から取得済みの **IDトークン** をヘッダーに付与し、API Gateway へ `POST` リクエストを送信します。
-2.  **API Gateway (Authorization)**: リクエストを受け取り、**Lambda Authorizer** (`infra/lambda/adminAuthorizer.ts`) を実行。Cognito と連携して「トークンは有効か？」「MFA（多要素認証）は完了しているか？」を厳格にチェックします。
-3.  **Lambda (Trigger)**: 認証が成功すると、ビジネスロジックを担当する Lambda 関数 (`infra/lambda/admin-generate.ts`) が起動されます。
-4.  **Lambda (Logic)**: プログラム内でランダムな UUID（固有ID）を生成し、QRコードに紐付けるデータ構造を組み立てます。
-5.  **DynamoDB (Persistence)**: 組み立てたデータをデータベース（`MeishiGawariniTableV2`）へ保存します。
 6.  **Response**: 処理結果が API Gateway を経由してブラウザに返り、画面上に「生成完了」のメッセージが表示されます。
+
+---
+
+## 3. 主要 AWS リソース一覧 (Physical Resource List)
+
+各環境（検証・本番）で実際に作成されている AWS リソースの物理的な名称・ID の一覧です。
+
+| サービス | 役割 | 論理名 / ID (stg) | 物理名 / ID (prod) |
+| :--- | :--- | :--- | :--- |
+| **DynamoDB** | メインデータベース | `MeishiGawariniTableV2-stg` | `InfraStack-MeishiGawariniTableV218E81B62-17GD6BQFOY8ZG` |
+| **S3** | 商品画像ストレージ | `ProductImageBucket-stg` | `ProductImageBucket` |
+| **Cognito** | ユーザー認証プール | `MeishiGawariniUserPool-stg` | `MeishiGawariniUserPool` |
+| **API Gateway** | API エントリポイント | `MeishiGawarini Service-stg` | `MeishiGawarini Service` |
+
+> [!NOTE]
+> `stg` 等の環境では、物理名に `-stg` などのサフィックスが付与されます。本番環境 (`prod`) の DynamoDB は既存リソースをインポートして利用しているため、固有のランダムな文字列が含まれています。

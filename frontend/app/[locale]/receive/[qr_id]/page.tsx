@@ -257,6 +257,8 @@ export default function ReceivePage() {
     const [htmlImageUrls, setHtmlImageUrls] = useState<string[]>([]);
     /** 詳細HTML編集エリアの表示状態 */
     const [showDetailHtmlSection, setShowDetailHtmlSection] = useState(false);
+    /** コピー完了表示用 ID */
+    const [copiedId, setCopiedId] = useState<string | null>(null);
 
     /**
      * 送り主プロフィールフォームの更新処理

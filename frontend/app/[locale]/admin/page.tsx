@@ -399,7 +399,7 @@ export default function AdminPage() {
                 <div className="flex justify-between items-center flex-wrap gap-4">
                     <h1 className="text-2xl font-bold text-white w-full sm:w-auto text-center sm:text-left">{t('title')}</h1>
                     <div className="flex items-center gap-2 flex-wrap justify-center sm:justify-end w-full sm:w-auto">
-                        <Link href="/admin/help">
+                        <Link href="/admin/help" target="_blank" rel="noopener noreferrer">
                             <Button variant="outline" className="bg-mist-800 border-mist-700 text-mist-300 hover:bg-mist-700 hover:text-white transition-all duration-300">
                                 <HelpCircle className="w-4 h-4 mr-2" />
                                 {t('helpButton') || "Help"}
@@ -1421,7 +1421,7 @@ function QRCodeRow({ item, apiUrl, onGeneratePDF, onRefresh, paperFormat, cardFo
                                                     <Copy className="h-3 w-3" />
                                                 )}
                                             </Button>
-                                            <Link href={`/shop/${item.shop_id}`}>
+                                            <Link href={`/shop/${item.shop_id}`} target="_blank" rel="noopener noreferrer">
                                                 <ExternalLink className="w-3 h-3 text-mist-500 hover:text-mist-900 cursor-pointer shrink-0" />
                                             </Link>
                                         </>
@@ -1509,6 +1509,22 @@ function QRCodeRow({ item, apiUrl, onGeneratePDF, onRefresh, paperFormat, cardFo
                             <div>
                                 <h4 className="text-sm font-semibold text-gray-500">{tShop('orders.recipient')}</h4>
                                 <p>{item.recipient_name || '-'}</p>
+                                {item.receiver_user_id && (
+                                    <div className="mt-2 group/userid">
+                                        <h4 className="text-[10px] font-semibold text-gray-400 uppercase tracking-tighter">{t('table.receiverUserId')}</h4>
+                                        <div className="flex items-center gap-1">
+                                            <p className="text-xs font-mono text-gray-600 truncate">{item.receiver_user_id}</p>
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                className="h-4 w-4 opacity-0 group-hover/userid:opacity-100 transition-all"
+                                                onClick={(e) => { e.stopPropagation(); handleCopy(item.receiver_user_id); }}
+                                            >
+                                                {copiedId === item.receiver_user_id ? <Check className="h-3 w-3 text-green-500" /> : <Copy className="h-3 w-3 text-gray-400" />}
+                                            </Button>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                             <div>
                                 <h4 className="text-sm font-semibold text-gray-500">{tShop('orders.contact')}</h4>

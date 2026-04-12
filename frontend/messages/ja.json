@@ -5,7 +5,8 @@
     "failed": "失敗しました",
     "all": "すべて",
     "cancel": "キャンセル",
-    "unitCard": "枚"
+    "unitCard": "枚",
+    "loading": "読み込み中..."
   },
   "Site": {
     "name": "名刺代わりに。"
@@ -275,6 +276,7 @@
         "front": "表面",
         "back": "裏面",
         "designId": "デザインID",
+        "receiverUserId": "受取人ユーザーID",
         "close": "閉じる"
       }
     },
@@ -808,12 +810,13 @@
       "info": "ステータス: {status} • 件数: {count}  (最大最新50件まで)",
       "table": {
         "qrId": "UUID",
-        "qrIdLabel": "UUID",
+        "qrIdLabel": "ID",
         "pin": "PIN",
         "status": "ステータス",
-        "createdAt": "更新日時",
+        "createdAt": "作成日時",
+        "receiverUserId": "受取人ユーザーID",
         "actions": "操作",
-        "noCodes": "カードが見つかりません。更新ボタンを押してください。"
+        "noCodes": "コードが見つかりません。更新を押して読み込んでください。"
       },
       "ban": {
         "button": "BAN",

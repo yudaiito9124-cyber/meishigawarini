@@ -14,18 +14,11 @@
 
 ---
 
-## 1. 処理の流れとディレクトリ構成
+## 1. 技術導入と全体地図 (Technical Onboarding)
 
-リクエストは常に以下の順序で処理され、各レイヤーでの命名規則や型定義の基準が同期されています。
+システム全体の処理フロー、ディレクトリ構成、および日常の開発ワークフローについては、まず以下の導入ガイドを参照してください。
 
-0.  **Ground Truth / Base Layer** ([`shared/api-types.ts`](../../shared/api-types.ts))
-    - **全ての基準となる型定義**（唯一の真実）です。このファイルの定義を元に、以下の各レイヤーの整合性が保たれます。
-1.  **Frontend API Client** (`frontend/lib/api/*.ts`)
-    - `adminApi`, `shopApi`, `receiveApi` 等のプロキシ経由でメソッドを呼び出します。
-2.  **Infra / CDK** (`infra/lib/constructs/*-api.ts`)
-    - API Gatewayのパス定義と、Lambda関数へのルーティング、権限付与を行います。
-3.  **Lambda Function** (`infra/lambda/*.ts`)
-    - 各エンドポイントに対応した個別のビジネスロジックを実行します。
+👉 **[開発者導入・操作ガイド (ATFIRST_DEVELOPER_GUIDE.md)](./ATFIRST_DEVELOPER_GUIDE.md)**
 
 ---
 
@@ -37,6 +30,11 @@
     - Lambda 関数名やファイル名、フロントエンドの API メソッド名は `snake_case` で統一します。
     - **重要**: アンダースコア（`_`）が URL パスのスラッシュ（`/`）に対応します。
     - 詳細なマッピング規則については **[API Gateway 実装ガイド (SPEC_INFRA_API_GW.md)](./SPEC_INFRA_API_GW.md#4-フラットなアクションベースのルーティング設計)** を参照してください。
+- **変数・属性の命名 (snake_case の統一基準)**:
+    - 原則として、APIペイロードおよびDynamoDB内部属性（Database）の両方で `snake_case` を使用します。
+    - **特記事項 (移行互換性)**:
+        - 過去の経緯により、一部の属性（`zipCode`, `preferredDate`, `preferredTime`）が `camelCase` で保存されている可能性があります。
+        - 読み取りロジック（`shop_orders.ts`, `admin_qr_list.ts` 等）では、これら両方の命名形式を許容する「二重読み込み（Dual-Read）」を実装し、互換性を維持してください。
 
 ---
 
@@ -109,20 +107,28 @@
 
 ### 3.7 マニュアル用画像の自動撮影 (Screenshot Automation)
 製品マニュアルやヘルプページで使用するスクリーンショットの撮影を、AI Agent（Playwright + browser-use）を用いて自動化しています。これにより、UIの変更に追従したマニュアルの更新コストを最小化しています。
+- **詳細設計**: `SPEC_HELP_CMS.md` を参照してください。
+- **実行方法**: `ATFIRST_DEVELOPER_GUIDE.md` のツール索引を参照してください。
 
-- **詳細および操作手順**: `SPEC_HELP_CMS.md` の **[5. スクリーンショットの自動撮影 (Automation)](./SPEC_HELP_CMS.md#5-スクリーンショットの自動撮影-automation)** を参照してください。
-- **実行スクリプト**: `scripts/screenshot_auto_capture.py`
-- **指示書 (Blueprint)**: `documents/REF_SCREENSHOT_INSTRUCTIONS.md`
+### 3.8 テスト戦略 (Testing Strategy)
+
+本プロジェクトでは、コードの品質とデプロイ後の安定性を担保するため、以下のテスト方針を採用しています。
+
+- **単体テスト (Unit Testing)**:
+  - 未実装
+- **静的解析 (Static Analysis)**:
+  - **TypeScript**: `npx tsc --noEmit` をデプロイ前に必ず実行し、型エラーがないことを確認します。
+  - **ESLint**: 未使用
+
+### 3.9 UI 実装パターン (Premium Design Patterns)
+
+- 未定義
 
 ---
 
 ## 4. UI/UX デザイン指針 (Design Principles)
 
-当プロジェクトは、ユーザーに「プレミアムな体験」を提供することを目指しています。
-
-- **プレミアムな質感**: 鮮やかなグラデーション、グラスモフィズム（透過・ぼかし）、微細なアニメーションを活用してください。
-- **一貫性**: カラーパレット（`tailwind.config.js` 定義）、タイポグラフィ、余白のルールを厳守してください。
-- **レスポンシブ**: モバイルファーストで設計し、すべての画面サイズで最適な表示を実現してください。
+基本的にモノトーンとしますが未定義です
 
 ---
 

@@ -46,17 +46,25 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             delete signed.PK;
             delete signed.SK;
 
-            if (signed.card_image_url) {
-                signed.card_image_url = await signUrlIfS3(signed.card_image_url, BUCKET_NAME);
+            // 互換性対応 (Dual-Read): DB 内のキャメルケース属性を優先的に解決
+            const card_image_url = signed.card_image_url || signed.cardImageUrl;
+            const detail_html = signed.detail_html || signed.detailHtml;
+
+            if (card_image_url) {
+                signed.card_image_url = await signUrlIfS3(card_image_url, BUCKET_NAME);
             }
-            if (signed.detail_html) {
-                signed.detail_html = await signUrlsInHtml(signed.detail_html, BUCKET_NAME);
+            if (detail_html) {
+                signed.detail_html = await signUrlsInHtml(detail_html, BUCKET_NAME);
             }
             if (signed.html_image_urls && Array.isArray(signed.html_image_urls)) {
                 signed.html_image_urls = await Promise.all(
                     signed.html_image_urls.map((url: string) => signUrlIfS3(url, BUCKET_NAME))
                 );
             }
+            // その他の変換
+            if (!signed.job_title && signed.jobTitle) signed.job_title = signed.jobTitle;
+            if (!signed.card_image_name && signed.cardImageName) signed.card_image_name = signed.cardImageName;
+
             return signed;
         };
 

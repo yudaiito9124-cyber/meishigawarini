@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { fetchAuthSession, getCurrentUser } from 'aws-amplify/auth';
 import { shopApi } from '@/lib/api/shop';
+import { notFound } from 'next/navigation';
 
 interface ShopContextType {
     shopId: string;
@@ -41,6 +42,7 @@ export function ShopProvider({ children, shopId }: { children: React.ReactNode, 
     const [userId, setUserId] = useState('');
     const [isAdmin, setIsAdmin] = useState(false);
     const [singleShopOwner, setSingleShopOwner] = useState(true);
+    const [isNotFound, setIsNotFound] = useState(false);
 
     const [shopLoading, setShopLoading] = useState(false);
     const [productsLoading, setProductsLoading] = useState(false);
@@ -58,8 +60,13 @@ export function ShopProvider({ children, shopId }: { children: React.ReactNode, 
             ]);
             setShop(shopDetails);
             setSingleShopOwner((shops.shops || []).length <= 1);
-        } catch (e) {
-            // console.error('Failed to fetch shop details', e);
+        } catch (e: any) {
+            console.error('Failed to fetch shop details', e);
+            // 権限がない(403)または存在しない(404)場合は、
+            // ステートを更新してレンダリングフェーズでnotFound()をトリガーします。
+            if (e.status === 403 || e.status === 404) {
+                setIsNotFound(true);
+            }
         } finally {
             setShopLoading(false);
         }
@@ -134,6 +141,11 @@ export function ShopProvider({ children, shopId }: { children: React.ReactNode, 
             fetchUser()
         ]);
     }, [refreshShopDetails, refreshProducts, refreshCardOrders, refreshOrders, fetchUser]);
+
+    // 権限エラーが確定している場合は、このレンダリングフェーズでnotFoundを投げる
+    if (isNotFound) {
+        notFound();
+    }
 
     // Initial load
     useEffect(() => {

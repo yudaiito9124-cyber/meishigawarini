@@ -14,6 +14,8 @@
   プロジェクトで使用している主要AWSサービスの全体図と役割解説。
 - 🔰 **[ATFIRST_AI_ETIQUETTE.md](./ATFIRST_AI_ETIQUETTE.md)**  
   AI アシスタントが遵守すべき「鉄則」と、共同開発の作法。
+- 🔰 **[ATFIRST_DEVELOPER_GUIDE.md](./ATFIRST_DEVELOPER_GUIDE.md)**  
+  開発者に向けた技術的な全体像、日常のワークフロー、ツール索引、および運用保守手順を含む開発者導入ガイド。
 
 ---
 
@@ -33,11 +35,13 @@
 - 📖 **[SPEC_UI_TRANSITIONS.md](./SPEC_UI_TRANSITIONS.md)**  
   画面（URLルーティング）ごとの役割と、ボタン等の操作フロー詳細。
 - 📖 **[SPEC_DEV_STANDARDS.md](./SPEC_DEV_STANDARDS.md)**  
-  命名規則、コーディング規約、型安全（Type Safety）の確保手順。
+  命名規則、コーディング規約、型安全、および設計・品質の基準（技術的な「法律」）。
 - 📖 **[SPEC_HELP_CMS.md](./SPEC_HELP_CMS.md)**  
   フロントエンドのヘルプページ・マニュアルコンテンツの更新・管理方法。
 - ☁️ **[SPEC_INFRA_DYNAMODB.md](./SPEC_INFRA_DYNAMODB.md)**  
   DynamoDBシングルテーブル設計の基本概念とベストプラクティス。
+- 📊 **[UML_DATA_STRUCTURE.md](./UML_DATA_STRUCTURE.md)**  
+  ロール別（User/Shop/QR/Admin）に整理された論理データ構造のUMLクラス図。
 - ☁️ **[SPEC_INFRA_API_GW.md](./SPEC_INFRA_API_GW.md)**  
   API Gateway ルーティング、CORS、Lambda Authorizer の仕組み。
 - ☁️ **[SPEC_INFRA_S3.md](./SPEC_INFRA_S3.md)**  
@@ -70,6 +74,8 @@
 ## 🤖 AI共同開発用スキル
 - 🤖 **[SKILL.md](../.agent/skills/development/SKILL.md)**  
   AI エージェントに対する技術的な「命令（しつけ）」の定義。
+- 🤖 **[REF_SCREENSHOT_PLAN.md](./REF_SCREENSHOT_PLAN.md)**  
+  AI エージェントがスクリーンショットを撮影する際の指示書。
 
 ---
 
@@ -82,7 +88,5 @@
   プロジェクトの主要な変更履歴。
 - 📝 **[minutes.md](../minutes.md)**  
   これまでの開発会議の議事録。
-- 🛝 **[slide.md](../slide.md)**  
-  システムコンセプト、アーキテクチャの視覚資料。
 - 🪄 **[ランディングページ生成用プロンプト](../紹介ページデザイン例/ランディングページ生成用プロンプト.md)**  
   埋め込みHTMLウィジェット（ランディングページ）を AI で生成するための指示書。
