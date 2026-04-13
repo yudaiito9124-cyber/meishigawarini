@@ -15,7 +15,11 @@
 - 🔰 **[ATFIRST_AI_ETIQUETTE.md](./ATFIRST_AI_ETIQUETTE.md)**  
   AI アシスタントが遵守すべき「鉄則」と、共同開発の作法。
 - 🔰 **[ATFIRST_DEVELOPER_GUIDE.md](./ATFIRST_DEVELOPER_GUIDE.md)**  
-  開発者に向けた技術的な全体像、日常のワークフロー、ツール索引、および運用保守手順を含む開発者導入ガイド。
+  【ポータル・共通基準】技術的な全体像、日常のワークフロー、ツール索引、および**プロジェクト共通の技術規約（命名・設計思想）**。
+- 🔰 **[SPEC_HOW_TO_DEVELOP_BACKEND.md](./SPEC_HOW_TO_DEVELOP_BACKEND.md)**  
+  【実践ガイド・BE基準】バックエンド（Lambda/DynamoDB）の実装レシピおよび**バックエンド専用規約**。
+- 🔰 **[SPEC_HOW_TO_DEVELOP_FRONTEND.md](./SPEC_HOW_TO_DEVELOP_FRONTEND.md)**  
+  【実践ガイド・FE基準】フロントエンド（React/UI）の実装レシピおよび**フロントエンド専用規約**。
 
 ---
 
@@ -34,20 +38,19 @@
 
 - 📖 **[SPEC_UI_TRANSITIONS.md](./SPEC_UI_TRANSITIONS.md)**  
   画面（URLルーティング）ごとの役割と、ボタン等の操作フロー詳細。
-- 📖 **[SPEC_DEV_STANDARDS.md](./SPEC_DEV_STANDARDS.md)**  
-  命名規則、コーディング規約、型安全、および設計・品質の基準（技術的な「法律」）。
 - 📖 **[SPEC_HELP_CMS.md](./SPEC_HELP_CMS.md)**  
   フロントエンドのヘルプページ・マニュアルコンテンツの更新・管理方法。
 - ☁️ **[SPEC_INFRA_DYNAMODB.md](./SPEC_INFRA_DYNAMODB.md)**  
   DynamoDBシングルテーブル設計の基本概念とベストプラクティス。
-- 📊 **[UML_DATA_STRUCTURE.md](./UML_DATA_STRUCTURE.md)**  
+- 📊 **[REF_DATA_STRUCTURE.md](./REF_DATA_STRUCTURE.md)**  
   ロール別（User/Shop/QR/Admin）に整理された論理データ構造のUMLクラス図。
-- ☁️ **[SPEC_INFRA_API_GW.md](./SPEC_INFRA_API_GW.md)**  
+- ☁️ **[SPEC_HOW_TO_DEVELOP_API_GW.md](./SPEC_HOW_TO_DEVELOP_API_GW.md)**  
+  API Gateway のリクエスト・レスポンス変換規則と、フラットなルーティング設計の詳細。
   API Gateway ルーティング、CORS、Lambda Authorizer の仕組み。
+- 💬 **[SPEC_UNIFIED_CHAT_PLAYBOOK.md](./SPEC_UNIFIED_CHAT_PLAYBOOK.md)**  
+  Unified Chat の設計思想、実装パターン、編集監査フローをまとめた運用プレイブック。
 - ☁️ **[SPEC_INFRA_S3.md](./SPEC_INFRA_S3.md)**  
   S3 ストレージ管理、Presigned URL、画像標準化プロセスの設計。
-- 💡 **[SPEC_FE_DATA_STATE.md](./SPEC_FE_DATA_STATE.md)**  
-  ShopContext を使用したデータ管理戦略とフロントエンド設計指針。
 - 💡 **[SPEC_SECURITY.md](./SPEC_SECURITY.md)**  
   セキュリティ方針、API Stealth 設計、認証認可の仕様。
 - 💡 **[SPEC_LOGGING.md](./SPEC_LOGGING.md)**  

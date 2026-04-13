@@ -1,4 +1,4 @@
-# UML Data Structure (Role-Based)
+# REF Data Structure (Role-Based)
 
 このドキュメントでは、システムの主要なエンティティ間の関係を、操作の主体（ロール）ごとの視点で可視化しています。
 
@@ -160,6 +160,35 @@ classDiagram
     Card_Order "1" -- "1" QR_Batch : 限定バッチを生成
     QR_Batch "1" -- "*" QR_Master : 複数のQRを包含
 ```
+
+---
+
+## 6. Unified Communication (汎用対話・サポート視点)
+
+QRコードに依存しない、システム管理者（Admin）、ショップ（Shop）、一般ユーザー（User）間の対話構造です。
+
+```mermaid
+classDiagram
+    class Unified_Chat["汎用チャット本体 (Unified Chat)"] {
+        <<PK: CHAT#chat_id, SK: METADATA>>
+        +Array participants [PREFIX#id]
+        +String chat_type
+        +String status
+        +Array messages
+        +String ts_last_message_at
+    }
+
+    class Chat_Membership["チャット参加情報 (Membership)"] {
+        <<PK: USER#id / SHOP#id, SK: CHAT#chat_id>>
+        +String ts_last_message_at
+        +String last_message_text
+        +Number unread_count
+    }
+
+    Unified_Chat "1" -- "*" Chat_Membership : 参加者ごとに紐付けレコードを作成
+    User_Identity "1" -- "*" Chat_Membership : 個人として参加 (USER#)
+    Shop_Metadata "1" -- "*" Chat_Membership : ショップとして参加 (SHOP#)
+```
 ---
 
 ## 5. Overall ER Diagram (全体的な実体関連図)
@@ -187,4 +216,8 @@ erDiagram
     
     CARD_ORDER ||--|| QR_BATCH : "QRコード群を生成"
     QR_BATCH ||--o{ MANAGED_QR : "生成されたQRを包含"
+
+    USER ||--o{ UNIFIED_CHAT_MEMBERSHIP : "参加 (個人/管理者)"
+    SHOP ||--o{ UNIFIED_CHAT_MEMBERSHIP : "参加 (ショップ)"
+    UNIFIED_CHAT_MEMBERSHIP }o--|| UNIFIED_CHAT : "所属"
 ```

@@ -34,8 +34,8 @@ export interface ScannedId {
 /** カード一覧セクションの初期状態 */
 const initialListState = {
     isDetailFiltering: false,       // 詳細フィルタリングパネルの開閉
-    orderStatusFilter: 'ALL',       // ステータスフィルター
-    orderProductFilter: null as string | null, // 商品フィルター
+    orderStatusFilter: [] as string[],       // ステータスの複数選択フィルター（空配列 = ALL）
+    orderProductFilter: [] as string[],      // 商品の複数選択フィルター（空配列 = ALL）
     orderUpdatedFilter: 'ALL',      // 更新日フィルター
     orderExpirationFilter: 'ALL',   // 有効期限フィルター
     orderSubmissionFilter: 'ALL',   // 住所提出状況フィルター

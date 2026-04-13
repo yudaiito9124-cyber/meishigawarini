@@ -20,8 +20,15 @@ import { useTranslations } from 'next-intl';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { UserPen, Send, Inbox, QrCode, LogOut, ChevronDown, Truck, Copy, Check } from 'lucide-react';
 import { signOut, fetchUserAttributes, getCurrentUser } from 'aws-amplify/auth';
+import { userApi } from '@/lib/api/user';
+import { isValidWorkflowPayload } from '@shared/unified-chat-workflows';
+import { UnifiedChatNotifications } from '@/components/chat/UnifiedChatNotifications';
 
 /**
  * ユーザーダッシュボード（マイページ）コンポーネント
@@ -39,6 +46,20 @@ export default function UserDashboardPage() {
     const [copiedId, setCopiedId] = useState<string | null>(null);
     /** スクロール同期用のコンテナ参照 */
     const containerRef = useRef<HTMLDivElement>(null);
+    /** ショップ開設フォームの表示状態 */
+    const [isShopOpenDialogOpen, setIsShopOpenDialogOpen] = useState(false);
+    /** ショップ開設フォーム送信中状態 */
+    const [isSubmittingShopOpen, setIsSubmittingShopOpen] = useState(false);
+    /** ショップ開設フォーム: ショップ名 */
+    const [shopOpenShopName, setShopOpenShopName] = useState('');
+    /** ショップ開設フォーム: 申請者名 */
+    const [shopOpenOwnerName, setShopOpenOwnerName] = useState('');
+    /** ショップ開設フォーム: 備考 */
+    const [shopOpenNotes, setShopOpenNotes] = useState('');
+    /** ショップ開設フォーム: エラー表示 */
+    const [shopOpenError, setShopOpenError] = useState('');
+    /** ショップ開設フォーム: 完了表示 */
+    const [shopOpenSuccess, setShopOpenSuccess] = useState('');
 
     /**
      * IDをクリップボードにコピーし、一時的に成功表示を出します。
@@ -113,19 +134,83 @@ export default function UserDashboardPage() {
     };
 
     /**
-     * 「マイショップを作成」ボタンのアクション。
-     * 確認後、ショップ管理トップへ遷移します。
+     * 「ショップを開設する」ボタン押下時の初期化処理。
+     * 直前のエラー/成功メッセージをクリアして申請ダイアログを開きます。
      */
     const handleCreatesop = async () => {
-        try {
-            if (confirm(t("createMyShopConfirm"))) {
-                router.push("/shop")
-            }
-        } catch (error) {
-            console.error("failed to move to /shop page", error);
+        setShopOpenError('');
+        setShopOpenSuccess('');
+        setIsShopOpenDialogOpen(true);
+    };
+
+    /**
+     * 「ショップを開設する」フォームを送信し、Unified Chat の SHOP_OPENING 申請を作成します。
+     */
+    const handleSubmitShopOpening = async (e: React.FormEvent) => {
+        e.preventDefault();
+
+        if (!userId) {
+            setShopOpenError(t('shopOpenForm.errors.noUserId'));
+            return;
         }
 
-    }
+        if (!shopOpenShopName.trim() || !shopOpenOwnerName.trim()) {
+            setShopOpenError(t('shopOpenForm.errors.required'));
+            return;
+        }
+        if (!userEmail.trim()) {
+            setShopOpenError(t('shopOpenForm.errors.noUserEmail'));
+            return;
+        }
+
+        setIsSubmittingShopOpen(true);
+        setShopOpenError('');
+        setShopOpenSuccess('');
+
+        try {
+            const participantId = `USER#${userId}`;
+            // FORM_SUBMITTED は unified-chat-workflows.ts で型検証される payload です。
+            // ここでは DB に保存する最小スナップショットだけを送信します。
+            const payload = {
+                form_snapshot: {
+                    shop_name: shopOpenShopName.trim(),
+                    owner_name: shopOpenOwnerName.trim(),
+                    contact_email: userEmail.trim(),
+                    notes: shopOpenNotes.trim() || undefined,
+                },
+                submitted_at: new Date().toISOString(),
+            };
+
+            // フロント側でも事前検証し、明らかな不整合 payload を API に送らないようにします。
+            if (!isValidWorkflowPayload('SHOP_OPENING', 'FORM_SUBMITTED', payload)) {
+                setShopOpenError(t('shopOpenForm.errors.invalidPayload'));
+                setIsSubmittingShopOpen(false);
+                return;
+            }
+
+            await userApi.fetch_post('/unified/chat/create', {
+                chat_type: 'SHOP_OPENING',
+                participants: [participantId, 'ADMIN'],
+                initiator_id: participantId,
+                title: 'Shop Opening Request',
+                initial_message: {
+                    type: 'WORKFLOW',
+                    payload_type: 'FORM_SUBMITTED',
+                    payload
+                }
+            });
+
+            setShopOpenSuccess(t('shopOpenForm.success'));
+            setShopOpenShopName('');
+            setShopOpenOwnerName('');
+            setShopOpenNotes('');
+        } catch (error: any) {
+            const message = error?.message || t('shopOpenForm.errors.submitFailed');
+            setShopOpenError(message);
+        } finally {
+            setIsSubmittingShopOpen(false);
+        }
+    };
 
     /**
      * ダッシュボードに表示する各機能カードの定義。
@@ -209,6 +294,37 @@ export default function UserDashboardPage() {
                     </div>
                     {/* 操作ボタン（戻る/ログアウト） */}
                     <div className="flex items-center gap-2">
+                        {/*
+                         * ─── ユーザー向け通知ベルボタン ─────────────────────────────────────────
+                         * UnifiedChatNotifications はショップとユーザー双方で使い回せる共用コンポーネントです。
+                         * ユーザーとして呼び出す際は以下の Props を設定します:
+                         *
+                         *   participantId:
+                         *     "USER#" + userId の形式にします（userId は Cognito の sub 値）。
+                         *     バックエンドはこのIDでDynamoDB GSI2 (CHAT_INBOX#USER#xxx) を検索します。
+                         *
+                         *   apiFetchPost:
+                         *     userApi.fetch_post.bind(userApi) を渡します。
+                         *     ショップAPIではなくユーザーAPIを使うことで、ユーザー認証トークンが
+                         *     リクエストに付与されます。
+                         *
+                         *   translationNamespace:
+                         *     "UserProfilePage" を指定することで、ja.json / en.json の
+                         *     UserProfilePage.notifications.* 以下のテキストが使用されます。
+                         *
+                         *   disabled:
+                         *     userId の取得が完了するまで（空文字の間）ボタンを無効化します。
+                         *     ユーザーIDなしでAPIを呼ぶと 403 エラーになるため、取得完了を待ちます。
+                         * ─────────────────────────────────────────────────────────────────────────
+                         */}
+                        <UnifiedChatNotifications
+                            participantId={`USER#${userId}`}
+                            apiFetchPost={userApi.fetch_post.bind(userApi)}
+                            translationNamespace="UserProfilePage"
+                            buttonVariant="outline"
+                            buttonClassName="rounded-full bg-white/50 backdrop-blur-sm border-gray-200 text-gray-600 hover:text-gray-900 shadow-sm"
+                            disabled={!userId}
+                        />
                         <Button variant="outline" className="rounded-full bg-white/50 backdrop-blur-sm border-gray-200 text-gray-600 hover:text-gray-900 shadow-sm" onClick={() => router.push('/login')}>
                             <ChevronDown className="h-4 w-4 mr-1 rotate-90" /> {t('back')}
                         </Button>
@@ -253,6 +369,86 @@ export default function UserDashboardPage() {
                     {t("createMyShop")}
                 </Button>
             </div>
+
+            <Dialog open={isShopOpenDialogOpen} onOpenChange={setIsShopOpenDialogOpen}>
+                <DialogContent className="sm:max-w-[560px]">
+                    <DialogHeader>
+                        <DialogTitle>{t('shopOpenForm.title')}</DialogTitle>
+                        <DialogDescription>
+                            {t('shopOpenForm.description')}
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <form onSubmit={handleSubmitShopOpening} className="space-y-4">
+                        <div className="space-y-2">
+                            <Label htmlFor="shop-open-name">{t('shopOpenForm.shopNameLabel')}</Label>
+                            <Input
+                                id="shop-open-name"
+                                value={shopOpenShopName}
+                                onChange={(e) => setShopOpenShopName(e.target.value)}
+                                placeholder={t('shopOpenForm.shopNamePlaceholder')}
+                                disabled={isSubmittingShopOpen}
+                            />
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label htmlFor="shop-open-owner">{t('shopOpenForm.ownerNameLabel')}</Label>
+                            <Input
+                                id="shop-open-owner"
+                                value={shopOpenOwnerName}
+                                onChange={(e) => setShopOpenOwnerName(e.target.value)}
+                                placeholder={t('shopOpenForm.ownerNamePlaceholder')}
+                                disabled={isSubmittingShopOpen}
+                            />
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label htmlFor="shop-open-email">{t('shopOpenForm.contactEmailLabel')}</Label>
+                            <Input
+                                id="shop-open-email"
+                                type="email"
+                                value={userEmail}
+                                placeholder={t('shopOpenForm.contactEmailPlaceholder')}
+                                readOnly
+                                disabled
+                            />
+                            <p className="text-xs text-gray-500">{t('shopOpenForm.contactEmailFixed')}</p>
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label htmlFor="shop-open-notes">{t('shopOpenForm.notesLabel')}</Label>
+                            <Textarea
+                                id="shop-open-notes"
+                                value={shopOpenNotes}
+                                onChange={(e) => setShopOpenNotes(e.target.value)}
+                                placeholder={t('shopOpenForm.notesPlaceholder')}
+                                disabled={isSubmittingShopOpen}
+                            />
+                        </div>
+
+                        {shopOpenError && (
+                            <p className="text-sm text-red-600 font-medium">{shopOpenError}</p>
+                        )}
+                        {shopOpenSuccess && (
+                            <p className="text-sm text-green-700 font-medium">{shopOpenSuccess}</p>
+                        )}
+
+                        <DialogFooter>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => setIsShopOpenDialogOpen(false)}
+                                disabled={isSubmittingShopOpen}
+                            >
+                                {t('shopOpenForm.cancel')}
+                            </Button>
+                            <Button type="submit" disabled={isSubmittingShopOpen}>
+                                {isSubmittingShopOpen ? t('shopOpenForm.submitting') : t('shopOpenForm.submit')}
+                            </Button>
+                        </DialogFooter>
+                    </form>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

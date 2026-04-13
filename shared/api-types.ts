@@ -131,3 +131,67 @@ export type UserApiSchema = {
 export type PublicApiSchema = {
     share_get: { qr_id: string };
 };
+
+// ==========================================
+// Unified Chat API (Type Contract)
+// NOTE: 実装側（frontend / infra/lambda/unified_chat.ts）で稼働中のため、
+// ここは設計メモではなく API 入出力型の正本として扱います。
+// ==========================================
+export type UnifiedChatApiSchema = {
+    unified_chat_create: {
+        chat_type: string;
+        participants: string[];
+        initiator_id: string;
+        title?: string;
+        initial_message?: {
+            type?: 'TEXT' | 'IMAGE' | 'FILE' | 'SYSTEM' | 'WORKFLOW';
+            message?: string;
+            payload_type?: string;
+            payload?: Record<string, unknown>;
+        };
+    };
+
+    unified_chat_list: {
+        participant_id: string;
+        chat_type?: string;
+        status?: string;
+        limit?: number;
+        cursor?: string;
+        include_archived?: boolean;
+    };
+
+    unified_chat_get: {
+        chat_id: string;
+    };
+
+    unified_chat_messages_get: {
+        chat_id: string;
+        before_seq?: number;
+        limit?: number;
+    };
+
+    unified_chat_messages_send: {
+        chat_id: string;
+        sender_id: string;
+        type: 'TEXT' | 'IMAGE' | 'FILE' | 'SYSTEM' | 'WORKFLOW';
+        message?: string;
+        payload_type?: string;
+        payload?: Record<string, unknown>;
+        workflow_status?: string;
+        file_url?: string;
+        file_name?: string;
+        file_size?: number;
+    };
+
+    unified_chat_read_mark: {
+        chat_id: string;
+        participant_id: string;
+        last_read_seq: number;
+    };
+
+    unified_chat_status_update: {
+        chat_id: string;
+        next_status: string;
+        expected_version: number;
+    };
+};

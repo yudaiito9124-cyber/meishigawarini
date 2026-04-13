@@ -1,7 +1,16 @@
 'use client';
 
+/**
+ * 受注一覧の絞り込みUIコンポーネント。
+ *
+ * 仕様上の重要点:
+ * - 商品フィルター / ステータスフィルターは複数選択可能
+ * - 選択配列が空の場合は「ALL」と同義
+ * - CSV出力は親コンテキストの filteredOrders を対象に実行
+ */
+
 import React from 'react';
-import { Filter, Plus, Check, Search, Loader2, Table2, RefreshCw } from 'lucide-react';
+import { Filter, Plus, Check, Search, Loader2, Table2, RefreshCw, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
@@ -23,6 +32,8 @@ export function OrderFilter() {
         orderColOptions,
         getDesignAspectRatio,
         getDesignImages,
+        handleExportCSV,
+        filteredOrdersCount,
     } = useCardListContext();
 
     const {
@@ -46,9 +57,11 @@ export function OrderFilter() {
                         size="sm"
                         onClick={() => {
                             if (isDetailFiltering) {
+                                // 詳細フィルターを閉じる時は状態を初期化し、次回開いた時に
+                                // 以前の条件が残って混乱しないようにします。
                                 setList({
-                                    orderProductFilter: null,
-                                    orderStatusFilter: 'ALL',
+                                    orderProductFilter: [],
+                                    orderStatusFilter: [],
                                     orderUpdatedFilter: 'ALL',
                                     orderExpirationFilter: 'ALL',
                                     orderSubmissionFilter: 'ALL',
@@ -77,18 +90,25 @@ export function OrderFilter() {
                             </div>
                             <div className="flex flex-wrap items-start gap-3 border-gray-200 p-2 bg-gray-300 rounded-xl max-h-100 overflow-y-auto w-full">
                                 <Card
-                                    className={`overflow-hidden cursor-pointer transition-all relative flex items-center justify-center bg-gray-50 border-2 h-20 ${orderProductFilter === null ? 'ring-2 ring-primary border-primary' : 'border-dashed border-gray-200 hover:bg-gray-100'}`}
+                                    className={`overflow-hidden cursor-pointer transition-all relative flex items-center justify-center bg-gray-50 border-2 h-20 ${orderProductFilter.length === 0 ? 'ring-2 ring-primary border-primary' : 'border-dashed border-gray-200 hover:bg-gray-100'}`}
                                     style={{ aspectRatio: '84/52' }}
-                                    onClick={() => setList({ orderProductFilter: null })}
+                                    onClick={() => setList({ orderProductFilter: [] })}
                                 >
-                                    <span className={`font-bold text-sm ${orderProductFilter === null ? 'text-primary' : 'text-gray-500'}`}>{tc('all')}</span>
+                                    <span className={`font-bold text-sm ${orderProductFilter.length === 0 ? 'text-primary' : 'text-gray-500'}`}>{tc('all')}</span>
                                 </Card>
                                 {products.map((product) => (
                                     <Card
                                         key={product.product_id}
-                                        className={`overflow-hidden cursor-pointer transition-all relative h-20 ${orderProductFilter === product.product_id ? 'ring-2 ring-offset-2 ring-primary' : 'hover:ring-2 hover:ring-primary/50'}`}
+                                        className={`overflow-hidden cursor-pointer transition-all relative h-20 ${orderProductFilter.includes(product.product_id) ? 'ring-2 ring-offset-2 ring-primary' : 'hover:ring-2 hover:ring-primary/50'}`}
                                         style={{ aspectRatio: getDesignAspectRatio(product.design_id, allowedDesigns, product.design) }}
-                                        onClick={() => setList({ orderProductFilter: orderProductFilter === product.product_id ? null : product.product_id })}
+                                        onClick={() => {
+                                            // 既に選択済みなら除外、未選択なら追加するトグル方式。
+                                            // 単一値ではなく配列で保持することで複数選択を実現します。
+                                            const newFilters = orderProductFilter.includes(product.product_id)
+                                                ? orderProductFilter.filter(id => id !== product.product_id)
+                                                : [...orderProductFilter, product.product_id];
+                                            setList({ orderProductFilter: newFilters });
+                                        }}
                                     >
                                         {getDesignImages(product.design_id, allowedDesigns, product.design).front && (
                                             <img
@@ -119,7 +139,7 @@ export function OrderFilter() {
                                         </div>
 
                                         {/* 選択済みバッジ */}
-                                        {orderProductFilter === product.product_id && (
+                                        {orderProductFilter.includes(product.product_id) && (
                                             <div className="absolute top-2 right-2 flex gap-1">
                                                 <span className="bg-primary text-white rounded-full px-1.5 py-0.5 shadow-md flex items-center justify-center">
                                                     <Check className="w-3 h-3" />
@@ -135,17 +155,31 @@ export function OrderFilter() {
                                 {t('orders.status')}
                             </div>
                             <div className="border-gray-200 flex flex-wrap gap-2 rounded-md p-2 bg-gray-300 justify-center">
-                                {['ALL'].concat(cardStatusList).map((s) => (
-                                    <Button
-                                        key={s.toUpperCase()}
-                                        variant={orderStatusFilter === s.toUpperCase() ? "default" : "secondary"}
-                                        size="sm"
-                                        onClick={() => setList({ orderStatusFilter: s.toUpperCase() === orderStatusFilter ? "ALL" : s.toUpperCase() })}
-                                        className={cn("text-xs border border-3 min-w-25 max-w-30 flex-1", cardStatusCss(s, true, true, true), orderStatusFilter === s.toUpperCase() ? "border-black hover:text-white font-bold" : "hover:" + cardStatusCss(s, true, false, false) + " hover:font-bold")}
-                                    >
-                                        {s === 'ALL' ? tc('all') : st(s)}
-                                    </Button>
-                                ))}
+                                {['ALL'].concat(cardStatusList).map((s) => {
+                                    const isSelected = s === 'ALL' ? orderStatusFilter.length === 0 : orderStatusFilter.includes(s.toUpperCase());
+                                    return (
+                                        <Button
+                                            key={s.toUpperCase()}
+                                            variant={isSelected ? "default" : "secondary"}
+                                            size="sm"
+                                            onClick={() => {
+                                                if (s === 'ALL') {
+                                                    // 空配列 = ALL 扱い
+                                                    setList({ orderStatusFilter: [] });
+                                                } else {
+                                                    const statusVal = s.toUpperCase();
+                                                    const newFilters = orderStatusFilter.includes(statusVal)
+                                                        ? orderStatusFilter.filter(v => v !== statusVal)
+                                                        : [...orderStatusFilter, statusVal];
+                                                    setList({ orderStatusFilter: newFilters });
+                                                }
+                                            }}
+                                            className={cn("text-xs border border-3 min-w-25 max-w-30 flex-1", cardStatusCss(s, true, true, true), isSelected ? "border-black hover:text-white font-bold" : "hover:" + cardStatusCss(s, true, false, false) + " hover:font-bold")}
+                                        >
+                                            {s === 'ALL' ? tc('all') : st(s)}
+                                        </Button>
+                                    );
+                                })}
                             </div>
 
                             {/* 更新日時フィルター */}
@@ -270,11 +304,26 @@ export function OrderFilter() {
                         )}
                     </Button>
 
-                    {/* 更新ボタン */}
-                    <Button variant="ghost" size="sm" onClick={() => fetchSectionData(true)} disabled={subRefreshing}>
-                        <RefreshCw className={`mr-2 h-4 w-4 ${subRefreshing ? 'animate-spin' : ''}`} />
-                        {t('refresh')}
-                    </Button>
+                    <div className="flex items-center gap-2">
+                        {/* CSV出力ボタン */}
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={handleExportCSV}
+                            disabled={subRefreshing || ordersLoading || filteredOrdersCount === 0}
+                            className="text-primary hover:text-primary/80 hover:bg-primary/5"
+                        >
+                            {/* 0件時は無効化して空CSVダウンロードを防止 */}
+                            <Download className="mr-2 h-4 w-4" />
+                            CSV出力
+                        </Button>
+
+                        {/* 更新ボタン */}
+                        <Button variant="ghost" size="sm" onClick={() => fetchSectionData(true)} disabled={subRefreshing}>
+                            <RefreshCw className={`mr-2 h-4 w-4 ${subRefreshing ? 'animate-spin' : ''}`} />
+                            {t('refresh')}
+                        </Button>
+                    </div>
                 </div>
             </div>
         </div>

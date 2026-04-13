@@ -20,7 +20,7 @@ Markdown のパースには `remark` と `rehype` エコシステムを採用し
 1. **メタデータ抽出**: `gray-matter` を使用して、Markdown 先頭の `---` (フロントマター) からタイトルなどの属性を抽出します。
 2. **Markdown パース**: `remark-parse` で Markdown を AST (抽象構文木) に変換します。
 3. **HTML変換**: `remark-rehype` で HTML 用のデータ構造に変換します。
-4. **Reactコンポーネント化**: `rehype-react` を使い、標準の HTML タグ（`h1`, `p`, `img`など）を、プロジェクト独自の React コンポーネント（Shadcn UI や `next/image`）に置き換えてレンダリングします。詳細は [MarkdownRenderer.tsx](file:///Users/yudai/git/meishigawarini/frontend/components/help/MarkdownRenderer.tsx) を参照してください。
+4. **Reactコンポーネント化**: `rehype-react` を使い、標準の HTML タグ（`h1`, `p`, `img`など）を、プロジェクト独自の React コンポーネント（Shadcn UI や `next/image`）に置き換えてレンダリングします。詳細は [MarkdownRenderer.tsx](../frontend/components/help/MarkdownRenderer.tsx) を参照してください。
 
 ---
 
@@ -47,13 +47,13 @@ URLのスラッグ（配列）を解析し、末尾の要素を除去するこ�
 
 ### 画像の配置
 画像は `public/images/manual/` 等に配置し、Markdown 内では絶対パスで指定します。
-- 例: `![キャプション](/images/manual/example.webp)`
+- 例: `![キャプション](../frontend/public/images/manual/example.webp)`
 
 ---
 
 ## 4. コンポーネント・リファレンス (Reference)
 
-[MarkdownRenderer.tsx](file:///Users/yudai/git/meishigawarini/frontend/components/help/MarkdownRenderer.tsx) で定義されている特殊な記法と、そのレンダリング結果の一覧です。
+[MarkdownRenderer.tsx](../frontend/components/help/MarkdownRenderer.tsx) で定義されている特殊な記法と、そのレンダリング結果の一覧です。
 
 | 記法・クラス | レンダリング結果 | 記述例 (Markdown) |
 | :--- | :--- | :--- |
@@ -69,7 +69,8 @@ URLのスラッグ（配列）を解析し、末尾の要素を除去するこ�
 #### 手順書の作成例
 ```markdown
 ### 1 ログインする
-[ログイン画面](/login)へアクセスし、情報を入力します。
+[ログイン画面](../frontend/app/[locale]/login/page.tsx)
+へアクセスし、情報を入力します。
 
 <section class="notice">
 パスワードを忘れた場合は再発行が必要です。
@@ -94,11 +95,11 @@ URLのスラッグ（配列）を解析し、末尾の要素を除去するこ�
 ## 5. 技術メンテナンス
 詳細なスタイル定義やコンポーネントの挙動を調整したい場合は、以下のファイルを直接参照・編集してください。ソースコードには各要素の意図が詳細にコメントされています。
 
-- **レンダリングエンジン**: [MarkdownRenderer.tsx](file:///Users/yudai/git/meishigawarini/frontend/components/help/MarkdownRenderer.tsx)
+- **レンダリングエンジン**: [MarkdownRenderer.tsx](../frontend/components/help/MarkdownRenderer.tsx)
   - 新しい HTML タグのスタイルを定義したり、既存のコンポーネントを差し替えたりできます。
 - **ページ全体の共通レイアウト**: `frontend/app/[locale]/help/[...slug]/page.tsx`
   - 余白、背景色、戻るボタンのスタイルなどを変更できます。
-- **画像コンポーネント**: [HelpImage.tsx](file:///Users/yudai/git/meishigawarini/frontend/components/help/HelpImage.tsx)
+- **画像コンポーネント**: [HelpImage.tsx](../frontend/components/help/HelpImage.tsx)
 - **スタイル定義**: `tailwind.config.js` および各コンポーネントの `className`
 
 ---

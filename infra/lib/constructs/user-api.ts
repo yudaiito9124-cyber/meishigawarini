@@ -85,9 +85,10 @@ export class UserApi extends cdk.NestedStack {
     const user_profile = new nodejs.NodejsFunction(this, 'user_profile', { entry: lampath('user_profile'), ...fnProps });
     const user_history = new nodejs.NodejsFunction(this, 'user_history', { entry: lampath('user_history'), ...fnProps });
     const user_receiver = new nodejs.NodejsFunction(this, 'user_receiver', { entry: lampath('user_receiver'), ...fnProps });
+    const unified_chat = new nodejs.NodejsFunction(this, 'unified_chat', { entry: lampath('unified_chat'), ...fnProps });
 
     // --- Permissions ---
-    [user_profile, user_history, user_receiver].forEach(fn => {
+    [user_profile, user_history, user_receiver, unified_chat].forEach(fn => {
       grantTablePermissions(fn, true);
       bucket.grantRead(fn);
     });
@@ -135,5 +136,36 @@ export class UserApi extends cdk.NestedStack {
     const historyResource = addResourceWithCors(this.userResource, 'history');
     addResourceWithCors(historyResource, 'get').addMethod('POST', new apigateway.LambdaIntegration(user_history), routeOptions);
     addResourceWithCors(historyResource, 'sendgift').addMethod('POST', new apigateway.LambdaIntegration(user_history), routeOptions);
+
+    // /unified/chat
+    // 例外構成: 本プロジェクトの通常ルール（1 Lambda = 1 API）に対して、
+    // unified_chat は1つの Lambda で複数エンドポイントを処理します。
+    // Lambda 内では event.resource の完全一致で分岐する実装に統一しています。
+    const unifiedResource = new apigateway.Resource(this, 'UnifiedTopResource', {
+      parent: api.root,
+      pathPart: 'unified'
+    });
+    unifiedResource.addCorsPreflight({
+      allowOrigins: allowedOrigins,
+      allowMethods: apigateway.Cors.ALL_METHODS,
+      allowHeaders: USER_ALLOW_HEADERS,
+    });
+
+    const chatResource = addResourceWithCors(unifiedResource, 'chat');
+    // create/list/get はチャット単位の操作
+    addResourceWithCors(chatResource, 'create').addMethod('POST', new apigateway.LambdaIntegration(unified_chat), routeOptions);
+    addResourceWithCors(chatResource, 'list').addMethod('POST', new apigateway.LambdaIntegration(unified_chat), routeOptions);
+    addResourceWithCors(chatResource, 'get').addMethod('POST', new apigateway.LambdaIntegration(unified_chat), routeOptions);
+
+    const messagesResource = addResourceWithCors(chatResource, 'messages');
+    // messages/get と messages/send は履歴参照・送信の操作
+    addResourceWithCors(messagesResource, 'get').addMethod('POST', new apigateway.LambdaIntegration(unified_chat), routeOptions);
+    addResourceWithCors(messagesResource, 'send').addMethod('POST', new apigateway.LambdaIntegration(unified_chat), routeOptions);
+
+    const readResource = addResourceWithCors(chatResource, 'read');
+    addResourceWithCors(readResource, 'mark').addMethod('POST', new apigateway.LambdaIntegration(unified_chat), routeOptions);
+
+    const statusResource = addResourceWithCors(chatResource, 'status');
+    addResourceWithCors(statusResource, 'update').addMethod('POST', new apigateway.LambdaIntegration(unified_chat), routeOptions);
   }
 }

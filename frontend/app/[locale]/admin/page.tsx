@@ -55,9 +55,43 @@ import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { Link, useRouter } from '@/i18n/routing';
 import { Textarea } from "@/components/ui/textarea";
+import { isValidWorkflowPayload } from '@shared/unified-chat-workflows';
 
 import { adminApi } from "@/lib/api/admin";
 import OrderDetailsDialog from "@/components/admin/OrderDetailsDialog";
+
+/**
+ * SHOP_OPENING の form_snapshot を厳格に検証する type guard。
+ *
+ * 背景:
+ * - DBには過去バージョン由来の余分なキーや欠損データが混在する可能性があります。
+ * - 管理画面では承認処理時にこのスナップショットをそのまま表示・利用するため、
+ *   予期しない形状を受け入れない方針にしています。
+ */
+function isStrictShopOpeningSnapshot(value: unknown): value is {
+    shop_name: string;
+    owner_name: string;
+    contact_email: string;
+    notes?: string;
+} {
+    if (!value || typeof value !== 'object') {
+        return false;
+    }
+
+    const v = value as Record<string, unknown>;
+    const keys = Object.keys(v);
+    const allowed = ['shop_name', 'owner_name', 'contact_email', 'notes'];
+    if (!keys.every((k) => allowed.includes(k))) {
+        return false;
+    }
+
+    return (
+        typeof v.shop_name === 'string' &&
+        typeof v.owner_name === 'string' &&
+        typeof v.contact_email === 'string' &&
+        (v.notes === undefined || typeof v.notes === 'string')
+    );
+}
 
 /**
  * 管理画面メインコンポーネント
@@ -418,7 +452,7 @@ export default function AdminPage() {
                 </div>
 
 
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-8">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
                     <button
                         onClick={() => setActiveTab("qrcodes")}
                         className={cn(
@@ -478,6 +512,18 @@ export default function AdminPage() {
                     >
                         <Wrench className={cn("w-12 h-12 mb-3", activeTab === "tools" ? "text-mist-900" : "text-mist-400")} />
                         <span className="text-lg font-bold">{t('tabs.tools')}</span>
+                    </button>
+                    <button
+                        onClick={() => setActiveTab("inquiries")}
+                        className={cn(
+                            "flex flex-col items-center justify-center p-6 rounded-2xl border-2 transition-all duration-200 cursor-pointer shadow-sm hover:shadow-md",
+                            activeTab === "inquiries"
+                                ? "bg-white border-white text-mist-900 ring-2 ring-mist-700 ring-offset-2 ring-offset-mist-900"
+                                : "bg-mist-800 border-mist-700 text-mist-300 hover:border-mist-600 hover:bg-mist-700/50"
+                        )}
+                    >
+                        <HelpCircle className={cn("w-12 h-12 mb-3", activeTab === "inquiries" ? "text-mist-900" : "text-mist-400")} />
+                        <span className="text-lg font-bold">{t('tabs.inquiries')}</span>
                     </button>
                 </div>
 
@@ -979,6 +1025,15 @@ export default function AdminPage() {
 
 
 
+                {activeTab === "inquiries" && (
+                    <div className="grid grid-cols-1 gap-6 animate-in fade-in slide-in-from-bottom-2 duration-300 items-start">
+                        <ShopOpeningInquirySection dbCardDesigns={dbCardDesigns} />
+                    </div>
+                )}
+
+
+
+
 
                 {/* 
                  * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -1013,6 +1068,409 @@ export default function AdminPage() {
 
             </div>
         </div>
+    );
+}
+
+/**
+ * ショップ開設申請（SHOP_OPENING）を管理者が審査する専用セクション。
+ *
+ * 役割:
+ * - ADMIN 参加者として unified_chat/list を取得し、審査待ち案件を一覧表示
+ * - 詳細ダイアログで申請内容・履歴を確認
+ * - 承認時: ショップ作成 + デザイン紐付け + ADMIN_DECISION 送信 + RESOLVED 化
+ * - 却下時: ADMIN_DECISION(REJECTED) 送信 + RESOLVED 化
+ */
+function ShopOpeningInquirySection({ dbCardDesigns }: { dbCardDesigns: any[] }) {
+    const t = useTranslations('AdminPage');
+    const [loading, setLoading] = useState(false);
+    const [requests, setRequests] = useState<any[]>([]);
+    const [open, setOpen] = useState(false);
+    const [selected, setSelected] = useState<any>(null);
+    const [selectedMeta, setSelectedMeta] = useState<any>(null);
+    const [selectedMessages, setSelectedMessages] = useState<any[]>([]);
+    const [actionLoading, setActionLoading] = useState(false);
+    const [approveDesignId, setApproveDesignId] = useState('');
+    const [rejectReason, setRejectReason] = useState('');
+    const [adminMemo, setAdminMemo] = useState('');
+    const isDecisionLocked = !!selectedMeta && selectedMeta.status !== 'OPEN';
+
+    /**
+     * 申請フォームのスナップショットを取得します。
+     *
+     * 参照優先順:
+     * 1. chat meta に保持された shop_opening_form_snapshot
+     * 2. FORM_SUBMITTED メッセージ payload の form_snapshot
+     *
+     * 理由:
+     * - 既存データ移行中でも管理画面表示を安定させるため、複数の保存位置を許容します。
+     */
+    const selectedFormSnapshot = useMemo(() => {
+        const metaSnapshot = selectedMeta?.shop_opening_form_snapshot;
+        if (isStrictShopOpeningSnapshot(metaSnapshot)) {
+            return metaSnapshot;
+        }
+
+        for (const message of selectedMessages) {
+            if (message?.payload_type !== 'FORM_SUBMITTED') {
+                continue;
+            }
+
+            if (isValidWorkflowPayload('SHOP_OPENING', 'FORM_SUBMITTED', message.payload)) {
+                return message.payload.form_snapshot;
+            }
+        }
+        return null;
+    }, [selectedMessages, selectedMeta]);
+
+    /**
+     * 審査対象一覧を取得します。
+     * ADMIN を participant_id として絞ることで、管理者向け受信箱のみを対象にします。
+     */
+    const fetchRequests = async () => {
+        setLoading(true);
+        try {
+            const data = await adminApi.fetch_post('/unified/chat/list', {
+                participant_id: 'ADMIN',
+                chat_type: 'SHOP_OPENING',
+                include_archived: false,
+                limit: 100,
+            });
+            setRequests(data.items || []);
+        } catch (e) {
+            console.error('failed to fetch shop opening inquiries', e);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchRequests();
+    }, []);
+
+    /**
+     * 一覧行クリック時に詳細ダイアログを開き、meta/messages を並列取得します。
+     * messages は新しい順で返るため reverse して古い順表示に揃えます。
+     */
+    const openDetails = async (item: any) => {
+        setOpen(true);
+        setSelected(item);
+        setSelectedMeta(null);
+        setSelectedMessages([]);
+        setApproveDesignId('');
+        setRejectReason('');
+        setAdminMemo('');
+
+        try {
+            const [chatRes, msgRes] = await Promise.all([
+                adminApi.fetch_post('/unified/chat/get', { chat_id: item.chat_id }),
+                adminApi.fetch_post('/unified/chat/messages/get', { chat_id: item.chat_id, limit: 200 }),
+            ]);
+            setSelectedMeta(chatRes.chat || null);
+            setSelectedMessages((msgRes.messages || []).slice().reverse());
+        } catch (e) {
+            console.error('failed to load inquiry details', e);
+        }
+    };
+
+    /**
+     * 承認処理のトランザクション手順（アプリケーション層）:
+     * 1. admin_shop_create でショップを発行
+     * 2. admin_shop_carddesign_link_update で初期デザインを付与
+     * 3. unified_chat/messages/send で ADMIN_DECISION(APPROVED) を送信
+     * 4. unified_chat/status/update でチャットを RESOLVED に更新
+     *
+     * 途中失敗時は catch で即通知し、UIは actionLoading を解除します。
+     */
+    const handleApprove = async () => {
+        if (isDecisionLocked) {
+            alert(t('inquiries.errors.decisionLocked'));
+            return;
+        }
+        if (!selectedMeta?.initiator_id?.startsWith('USER#')) {
+            alert(t('inquiries.errors.invalidInitiator'));
+            return;
+        }
+        if (!approveDesignId) {
+            alert(t('inquiries.errors.designRequired'));
+            return;
+        }
+
+        setActionLoading(true);
+        try {
+            const ownerId = selectedMeta.initiator_id.replace('USER#', '');
+            const shopName = selectedFormSnapshot?.shop_name || t('inquiries.defaultShopName');
+
+            const created = await adminApi.admin_shop_create({
+                owner_id: ownerId,
+                name: shopName,
+            });
+
+            await adminApi.admin_shop_carddesign_link_update({
+                shop_id: created.shop_id,
+                card_designs: [approveDesignId],
+            });
+
+            const reviewedAt = new Date().toISOString();
+            await adminApi.fetch_post('/unified/chat/messages/send', {
+                chat_id: selectedMeta.chat_id,
+                sender_id: 'ADMIN',
+                type: 'WORKFLOW',
+                message: t('inquiries.decision.approvedMessage'),
+                payload_type: 'ADMIN_DECISION',
+                workflow_status: 'APPROVED',
+                payload: {
+                    approved: true,
+                    reason: adminMemo || undefined,
+                    reviewer_id: 'ADMIN',
+                    reviewed_at: reviewedAt,
+                    linked_shop_id: created.shop_id,
+                    default_design_id: approveDesignId,
+                },
+            });
+
+            const latestChat = await adminApi.fetch_post('/unified/chat/get', {
+                chat_id: selectedMeta.chat_id,
+            });
+            const latestVersion = latestChat?.chat?.version;
+            if (typeof latestVersion !== 'number') {
+                throw new Error('latest chat version is missing');
+            }
+
+            await adminApi.fetch_post('/unified/chat/status/update', {
+                chat_id: selectedMeta.chat_id,
+                next_status: 'RESOLVED',
+                expected_version: latestVersion,
+            });
+
+            await fetchRequests();
+            setOpen(false);
+        } catch (e: any) {
+            console.error('approval failed', e);
+            const detail = e?.message || e?.error || e?.statusText || '';
+            alert(detail ? `${t('inquiries.errors.approveFailed')}\n${detail}` : t('inquiries.errors.approveFailed'));
+        } finally {
+            setActionLoading(false);
+        }
+    };
+
+    /**
+     * 却下処理:
+     * - ADMIN_DECISION(REJECTED) メッセージを送信
+     * - チャットステータスを RESOLVED に更新
+     */
+    const handleReject = async () => {
+        if (isDecisionLocked) {
+            alert(t('inquiries.errors.decisionLocked'));
+            return;
+        }
+        if (!rejectReason.trim()) {
+            alert(t('inquiries.errors.rejectReasonRequired'));
+            return;
+        }
+        if (!selectedMeta) return;
+
+        setActionLoading(true);
+        try {
+            const reviewedAt = new Date().toISOString();
+
+            await adminApi.fetch_post('/unified/chat/messages/send', {
+                chat_id: selectedMeta.chat_id,
+                sender_id: 'ADMIN',
+                type: 'WORKFLOW',
+                message: t('inquiries.decision.rejectedMessage'),
+                payload_type: 'ADMIN_DECISION',
+                workflow_status: 'REJECTED',
+                payload: {
+                    approved: false,
+                    reason: rejectReason.trim(),
+                    reviewer_id: 'ADMIN',
+                    reviewed_at: reviewedAt,
+                },
+            });
+
+            const latestChat = await adminApi.fetch_post('/unified/chat/get', {
+                chat_id: selectedMeta.chat_id,
+            });
+            const latestVersion = latestChat?.chat?.version;
+            if (typeof latestVersion !== 'number') {
+                throw new Error('latest chat version is missing');
+            }
+
+            await adminApi.fetch_post('/unified/chat/status/update', {
+                chat_id: selectedMeta.chat_id,
+                next_status: 'RESOLVED',
+                expected_version: latestVersion,
+            });
+
+            await fetchRequests();
+            setOpen(false);
+        } catch (e: any) {
+            console.error('rejection failed', e);
+            const detail = e?.message || e?.error || e?.statusText || '';
+            alert(detail ? `${t('inquiries.errors.rejectFailed')}\n${detail}` : t('inquiries.errors.rejectFailed'));
+        } finally {
+            setActionLoading(false);
+        }
+    };
+
+    return (
+        <Card className="w-full">
+            <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                    <CardTitle>{t('inquiries.title')}</CardTitle>
+                    <CardDescription>{t('inquiries.description')}</CardDescription>
+                </div>
+                <Button variant="outline" onClick={fetchRequests} disabled={loading}>
+                    {loading ? t('inquiries.loading') : t('inquiries.refresh')}
+                </Button>
+            </CardHeader>
+            <CardContent>
+                <Table wrapperClassName="max-h-[65vh] overflow-auto">
+                    <TableHeader className="sticky top-0 bg-white z-10">
+                        <TableRow>
+                            <TableHead>{t('inquiries.table.updatedAt')}</TableHead>
+                            <TableHead>{t('inquiries.table.chatId')}</TableHead>
+                            <TableHead>{t('inquiries.table.status')}</TableHead>
+                            <TableHead>{t('inquiries.table.unread')}</TableHead>
+                            <TableHead>{t('inquiries.table.preview')}</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {requests.length === 0 ? (
+                            <TableRow>
+                                <TableCell colSpan={5} className="text-center text-gray-500">
+                                    {t('inquiries.empty')}
+                                </TableCell>
+                            </TableRow>
+                        ) : (
+                            requests.map((item: any) => (
+                                <TableRow key={item.chat_id} className="cursor-pointer hover:bg-gray-50" onClick={() => openDetails(item)}>
+                                    <TableCell>{item.ts_last_message_at ? new Date(item.ts_last_message_at).toLocaleString() : '-'}</TableCell>
+                                    <TableCell className="font-mono text-xs">{item.chat_id}</TableCell>
+                                    <TableCell>{item.status || '-'}</TableCell>
+                                    <TableCell>{item.unread_count_cache ?? 0}</TableCell>
+                                    <TableCell className="max-w-[420px] truncate">{item.last_message_text || '-'}</TableCell>
+                                </TableRow>
+                            ))
+                        )}
+                    </TableBody>
+                </Table>
+            </CardContent>
+
+            <Dialog open={open} onOpenChange={setOpen}>
+                <DialogContent className="max-w-5xl max-h-[90vh] overflow-hidden p-0 flex flex-col">
+                    <DialogHeader className="border-b p-6">
+                        <DialogTitle>{t('inquiries.detail.title')}</DialogTitle>
+                        <DialogDescription>{selectedMeta?.chat_id || ''}</DialogDescription>
+                    </DialogHeader>
+
+                    <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>{t('inquiries.detail.requestInfo')}</CardTitle>
+                            </CardHeader>
+                            <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                                <div><span className="text-gray-500">{t('inquiries.detail.initiator')}:</span> {selectedMeta?.initiator_id || '-'}</div>
+                                <div><span className="text-gray-500">{t('inquiries.detail.chatStatus')}:</span> {selectedMeta?.status || '-'}</div>
+                                <div><span className="text-gray-500">{t('inquiries.detail.shopName')}:</span> {selectedFormSnapshot?.shop_name || '-'}</div>
+                                <div><span className="text-gray-500">{t('inquiries.detail.ownerName')}:</span> {selectedFormSnapshot?.owner_name || '-'}</div>
+                                <div><span className="text-gray-500">{t('inquiries.detail.contactEmail')}:</span> {selectedFormSnapshot?.contact_email || '-'}</div>
+                                <div><span className="text-gray-500">{t('inquiries.detail.notes')}:</span> {selectedFormSnapshot?.notes || '-'}</div>
+                            </CardContent>
+                        </Card>
+
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>{t('inquiries.detail.approvalTitle')}</CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                                {isDecisionLocked && (
+                                    <p className="text-sm font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
+                                        {t('inquiries.detail.decisionLocked')}
+                                    </p>
+                                )}
+                                <div className="space-y-2">
+                                    <Label>{t('inquiries.detail.defaultDesign')}</Label>
+                                    <select
+                                        className="w-full rounded-md p-2 text-sm border border-gray-200 shadow-sm text-black bg-white"
+                                        value={approveDesignId}
+                                        onChange={(e) => setApproveDesignId(e.target.value)}
+                                        disabled={actionLoading || isDecisionLocked}
+                                    >
+                                        <option value="">{t('inquiries.detail.selectDesign')}</option>
+                                        {dbCardDesigns.map((d: any) => (
+                                            <option key={d.design_id} value={d.design_id}>{d.name || d.design_id}</option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                <div className="space-y-2">
+                                    <Label>{t('inquiries.detail.adminMemo')}</Label>
+                                    <Textarea
+                                        value={adminMemo}
+                                        onChange={(e) => setAdminMemo(e.target.value)}
+                                        placeholder={t('inquiries.detail.adminMemoPlaceholder')}
+                                        disabled={actionLoading || isDecisionLocked}
+                                    />
+                                </div>
+
+                                <Button onClick={handleApprove} disabled={actionLoading || isDecisionLocked} className="w-full md:w-auto">
+                                    {actionLoading ? t('inquiries.detail.processing') : t('inquiries.detail.approve')}
+                                </Button>
+                            </CardContent>
+                        </Card>
+
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>{t('inquiries.detail.rejectTitle')}</CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-3">
+                                <Label>{t('inquiries.detail.rejectReason')}</Label>
+                                <Textarea
+                                    value={rejectReason}
+                                    onChange={(e) => setRejectReason(e.target.value)}
+                                    placeholder={t('inquiries.detail.rejectReasonPlaceholder')}
+                                    disabled={actionLoading || isDecisionLocked}
+                                />
+                                <Button variant="destructive" onClick={handleReject} disabled={actionLoading || isDecisionLocked}>
+                                    {actionLoading ? t('inquiries.detail.processing') : t('inquiries.detail.reject')}
+                                </Button>
+                            </CardContent>
+                        </Card>
+
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>{t('inquiries.detail.messageHistory')}</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="space-y-2 max-h-[300px] overflow-y-auto">
+                                    {selectedMessages.length === 0 ? (
+                                        <p className="text-sm text-gray-500">{t('inquiries.detail.noMessages')}</p>
+                                    ) : (
+                                        selectedMessages.map((msg: any) => (
+                                            <div key={msg.message_id || `${msg.seq}`} className="border rounded-md p-2 text-sm">
+                                                <div className="flex justify-between text-xs text-gray-500 mb-1">
+                                                    <span>{msg.sender_id || '-'}</span>
+                                                    <span>{msg.ts_created_at ? new Date(msg.ts_created_at).toLocaleString() : '-'}</span>
+                                                </div>
+                                                <div className="font-medium">{msg.message || '-'}</div>
+                                                {msg.payload_type && (
+                                                    <pre className="mt-1 text-xs whitespace-pre-wrap text-gray-600">{JSON.stringify(msg.payload, null, 2)}</pre>
+                                                )}
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </div>
+
+                    <DialogFooter className="border-t p-4">
+                        <Button variant="outline" onClick={() => setOpen(false)}>{t('inquiries.detail.close')}</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+        </Card>
     );
 }
 

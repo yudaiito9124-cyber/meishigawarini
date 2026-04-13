@@ -120,6 +120,8 @@ export default function ShopListPage() {
             if (shopList.length === 1 && !checkAdmin) {
                 const shopId = shopList[0].id;
                 router.replace(`/shop/${shopId}`);
+            } else if (shopList.length === 0 && !checkAdmin) {
+                router.replace('/login');
             }
         } catch (e) {
             // 取得失敗時の処理（必要に応じてアラート等を追加可）

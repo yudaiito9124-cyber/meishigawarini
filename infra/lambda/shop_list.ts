@@ -64,29 +64,30 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                     }
                 }));
                 roles = ['SHOP_MANAGER']; ownerShopIds = legacyIds;
-            } else if (!noCreate) {
-                // 【Default Shop Creation】
-                // 本システムに初めて訪れた加盟店ユーザーに対し、空のデフォルトショップを用意します。
-                const newShopId = generateId();
-                const now = new Date().toISOString();
+            } 
+            // else if (!noCreate) {
+            //     // 【Default Shop Creation】
+            //     // 本システムに初めて訪れた加盟店ユーザーに対し、空のデフォルトショップを用意します。
+            //     const newShopId = generateId();
+            //     const now = new Date().toISOString();
                 
-                await ddb.send(new PutCommand({
-                    TableName: TABLE_NAME,
-                    Item: {
-                        PK: `SHOP#${newShopId}`, SK: 'METADATA',
-                        name: "My Default Shop", owner_id: userId,
-                        GSI2_PK: `USER#${userId}`, GSI2_SK: now, ts_created_at: now
-                    }
-                }));
-                await ddb.send(new PutCommand({
-                    TableName: TABLE_NAME,
-                    Item: {
-                        PK: `USER#${userId}`, SK: 'SHOP',
-                        roles: ['SHOP_MANAGER'], owner_shop_ids: [newShopId], gm_shop_ids: [], ts_created_at: now
-                    }
-                }));
-                roles = ['SHOP_MANAGER']; ownerShopIds = [newShopId];
-            }
+            //     await ddb.send(new PutCommand({
+            //         TableName: TABLE_NAME,
+            //         Item: {
+            //             PK: `SHOP#${newShopId}`, SK: 'METADATA',
+            //             name: "My Default Shop", owner_id: userId,
+            //             GSI2_PK: `USER#${userId}`, GSI2_SK: now, ts_created_at: now
+            //         }
+            //     }));
+            //     await ddb.send(new PutCommand({
+            //         TableName: TABLE_NAME,
+            //         Item: {
+            //             PK: `USER#${userId}`, SK: 'SHOP',
+            //             roles: ['SHOP_MANAGER'], owner_shop_ids: [newShopId], gm_shop_ids: [], ts_created_at: now
+            //         }
+            //     }));
+            //     roles = ['SHOP_MANAGER']; ownerShopIds = [newShopId];
+            // }
         }
 
         const allShopIds = Array.from(new Set([...ownerShopIds, ...gmShopIds]));

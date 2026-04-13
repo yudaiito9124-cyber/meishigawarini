@@ -6,6 +6,8 @@ import { useTranslations } from 'next-intl';
 import { useRouter } from '@/i18n/routing';
 import { signOut } from 'aws-amplify/auth';
 import { Button } from '@/components/ui/button';
+import { shopApi } from '@/lib/api/shop';
+import { UnifiedChatNotifications } from '@/components/chat/UnifiedChatNotifications';
 
 interface ShopHeaderProps {
     shopId: string;
@@ -84,6 +86,32 @@ export function ShopHeader({
                 </div>
 
                 <div className="flex items-center space-x-2">
+                    {/*
+                     * ─── ショップ向け通知ベルボタン ───────────────────────────────────────────
+                     * UnifiedChatNotifications はショップとユーザー双方で使い回せる共用コンポーネントです。
+                     * ショップとして呼び出す際は以下の Props を設定します:
+                     *
+                     *   participantId:
+                     *     "SHOP#" + shopId の形式にします。
+                     *     バックエンドはこのIDでDynamoDB GSI2 (CHAT_INBOX#SHOP#xxx) を検索します。
+                     *
+                     *   apiFetchPost:
+                     *     shopApi.fetch_post.bind(shopApi) を渡します。
+                     *     .bind() によって this コンテキストを固定し、
+                     *     呼び出し時に Cognito ショップ認証トークンが付与されます。
+                     *
+                     *   translationNamespace:
+                     *     "ShopPage" を指定することで、ja.json / en.json の
+                     *     ShopPage.notifications.* 以下のテキストが使用されます。
+                     * ─────────────────────────────────────────────────────────────────────────
+                     */}
+                    <UnifiedChatNotifications
+                        participantId={`SHOP#${shopId}`}
+                        apiFetchPost={shopApi.fetch_post.bind(shopApi)}
+                        translationNamespace="ShopPage"
+                        buttonClassName="text-mist-500 hover:text-mist-800 relative"
+                    />
+
                     <ShopSettingsSection
                         shopId={shopId}
                     />

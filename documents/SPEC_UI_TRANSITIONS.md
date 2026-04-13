@@ -226,5 +226,5 @@ QR コードをスキャンしたエンドユーザーがアクセスするペ�
 
 ---
 **関連資料**:
-- [運用フロー (ATFIRST_OPERATION_FLOW.md)](/documents/ATFIRST_OPERATION_FLOW.md)
-- [データベーススキーマ (REF_DB_SCHEMA.md)](/documents/REF_DB_SCHEMA.md)
+- **[運用フロー (ATFIRST_OPERATION_FLOW.md)](./ATFIRST_OPERATION_FLOW.md)**  
+- **[データベーススキーマ (REF_DB_SCHEMA.md)](./REF_DB_SCHEMA.md)**

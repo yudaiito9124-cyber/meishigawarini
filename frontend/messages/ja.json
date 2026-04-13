@@ -77,6 +77,67 @@
     "userEmail": "メールアドレス",
     "createMyShop": "ショップを開設する",
     "createMyShopConfirm": "本当にショップを開設しますか？これは、「名刺がわりに」で商品を販売したい場合に必要な手続きです。ギフトを渡したり、受け取ったりする場合は不要です。",
+    "notifications": {
+      "button": "通知",
+      "title": "チャット通知一覧",
+      "description": "このユーザーに紐づくチャット状態の一覧です。行をクリックすると詳細を表示します。",
+      "listTitle": "通知一覧",
+      "detailTitle": "通知詳細",
+      "selectPrompt": "一覧からチャットを選択してください。",
+      "refresh": "更新",
+      "loading": "読み込み中...",
+      "empty": "表示できるチャットはありません。",
+      "noMessages": "メッセージはありません。",
+      "table": {
+        "updatedAt": "最終更新",
+        "type": "種別",
+        "status": "状態",
+        "unread": "未読"
+      },
+      "detail": {
+        "chatId": "Chat ID",
+        "type": "種別",
+        "status": "状態",
+        "updatedAt": "最終更新"
+      },
+      "decision": {
+        "label": "審査結果",
+        "result": "判定",
+        "approved": "承認",
+        "rejected": "却下",
+        "resolved": "審査完了",
+        "pending": "審査中",
+        "reviewedAt": "審査日時",
+        "reason": "理由",
+        "linkedShopId": "連携ショップID",
+        "openShop": "ショップを開く",
+        "defaultDesignId": "初期カードデザインID"
+      }
+    },
+    "shopOpenForm": {
+      "title": "ショップ開設 認証フォーム",
+      "description": "内容を送信すると、運営側との申請チャット（SHOP_OPENING）が作成されます。",
+      "shopNameLabel": "ショップ名",
+      "shopNamePlaceholder": "例: 山田青果店",
+      "ownerNameLabel": "申請者名",
+      "ownerNamePlaceholder": "例: 山田 太郎",
+      "contactEmailLabel": "連絡先メールアドレス",
+      "contactEmailPlaceholder": "例: info@example.com",
+      "contactEmailFixed": "連絡先メールアドレスはログイン中ユーザーのメールに固定されます。",
+      "notesLabel": "備考",
+      "notesPlaceholder": "補足事項があれば記載してください。",
+      "submit": "送信する",
+      "submitting": "送信中...",
+      "cancel": "キャンセル",
+      "success": "申請を送信しました。運営側の確認をお待ちください。",
+      "errors": {
+        "required": "必須項目を入力してください。",
+        "noUserId": "ユーザー情報の取得に失敗しました。再読み込みしてからお試しください。",
+        "noUserEmail": "ユーザーのメールアドレスを取得できませんでした。再読み込みしてからお試しください。",
+        "invalidPayload": "申請データ形式が不正です。入力内容を確認して再度お試しください。",
+        "submitFailed": "申請の送信に失敗しました。時間をおいて再度お試しください。"
+      }
+    },
     "saving": "保存中...",
     "details": "詳細",
     "opencard": "カードを開く",
@@ -218,6 +279,43 @@
       "shipping": "カード・受注管理",
       "products": "商品登録",
       "orderCard": "カード発注"
+    },
+    "notifications": {
+      "button": "通知",
+      "title": "チャット通知一覧",
+      "description": "このショップに紐づくチャット状態の一覧です。行をクリックすると詳細を表示します。",
+      "listTitle": "通知一覧",
+      "detailTitle": "通知詳細",
+      "selectPrompt": "一覧からチャットを選択してください。",
+      "refresh": "更新",
+      "loading": "読み込み中...",
+      "empty": "表示できるチャットはありません。",
+      "noMessages": "メッセージはありません。",
+      "table": {
+        "updatedAt": "最終更新",
+        "type": "種別",
+        "status": "状態",
+        "unread": "未読"
+      },
+      "detail": {
+        "chatId": "Chat ID",
+        "type": "種別",
+        "status": "状態",
+        "updatedAt": "最終更新"
+      },
+      "decision": {
+        "label": "審査結果",
+        "result": "判定",
+        "approved": "承認",
+        "rejected": "却下",
+        "resolved": "審査完了",
+        "pending": "審査中",
+        "reviewedAt": "審査日時",
+        "reason": "理由",
+        "linkedShopId": "連携ショップID",
+        "openShop": "ショップを開く",
+        "defaultDesignId": "初期カードデザインID"
+      }
     },
     "cardOrder": {
       "title": "カードの発注",
@@ -739,8 +837,67 @@
       "qrcodes": "カード一覧",
       "shops": "ショップ管理",
       "cardorders": "カード印刷",
+      "inquiries": "問い合わせ",
       "tools": "ツール",
       "designs": "デザイン設定"
+    },
+    "inquiries": {
+      "title": "ショップ開設要求一覧",
+      "description": "ユーザーから送信された SHOP_OPENING 申請を確認し、承認・却下を行います。",
+      "refresh": "更新",
+      "loading": "読み込み中...",
+      "empty": "現在、受信中のショップ開設要求はありません。",
+      "defaultShopName": "新規ショップ",
+      "table": {
+        "updatedAt": "最終更新",
+        "chatId": "Chat ID",
+        "status": "状態",
+        "unread": "未読件数",
+        "preview": "最新内容"
+      },
+      "offerings": {
+        "productSales": "商品販売機能",
+        "cardPrinting": "カード印刷機能",
+        "supportChat": "問い合わせチャット"
+      },
+      "decision": {
+        "approvedMessage": "ショップ開設申請を承認しました。",
+        "rejectedMessage": "ショップ開設申請を却下しました。"
+      },
+      "errors": {
+        "invalidInitiator": "申請者情報が不正です。",
+        "designRequired": "承認時はデフォルトカードデザインを選択してください。",
+        "decisionLocked": "この申請はすでに処理済みのため、これ以上操作できません。",
+        "approveFailed": "承認処理に失敗しました。",
+        "rejectReasonRequired": "却下理由を入力してください。",
+        "rejectFailed": "却下処理に失敗しました。"
+      },
+      "detail": {
+        "title": "問い合わせ詳細",
+        "requestInfo": "申請情報",
+        "initiator": "申請者",
+        "chatStatus": "チャット状態",
+        "shopName": "ショップ名",
+        "ownerName": "申請者名",
+        "contactEmail": "連絡先メール",
+        "notes": "備考",
+        "approvalTitle": "承認処理",
+        "decisionLocked": "この申請はすでに処理済みです。承認・却下の再実行はできません。",
+        "defaultDesign": "デフォルトカードデザイン",
+        "selectDesign": "デザインを選択してください",
+        "offeringsTitle": "提供内容の選択",
+        "adminMemo": "管理者メモ（任意）",
+        "adminMemoPlaceholder": "承認時の補足メモを入力",
+        "approve": "承認してショップを作成",
+        "rejectTitle": "却下処理",
+        "rejectReason": "却下理由",
+        "rejectReasonPlaceholder": "却下理由を記載してください",
+        "reject": "却下する",
+        "processing": "処理中...",
+        "messageHistory": "メッセージ履歴",
+        "noMessages": "メッセージはありません。",
+        "close": "閉じる"
+      }
     },
     "AdminNeed2FA": "管理者は2段階認証が必要です",
     "generate": {

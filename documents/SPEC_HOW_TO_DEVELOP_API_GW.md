@@ -11,7 +11,19 @@
 フロントエンドからバックエンドまで、リクエストがどのファイルをどの順序で通過していくのか、また型定義の「正解 (Ground Truth)」がどこにあるのかを可視化します。
 編集するファイルを探し出すときの参考にしてください。
 
-### 1. API 全体のファイル整合性と処理フロー
+### ０. API 処理フローとファイルの対応（外観）
+リクエストは常に以下の流れに従って処理されます。
+
+0.  **Ground Truth** ([`shared/api-types.ts`](../shared/api-types.ts))
+    - **全ての基準となる型定義**。このファイルの定義を元に、各レイヤーの整合性が保たれます。
+1.  **Frontend API Client** (`frontend/lib/api/*.ts`)
+    - 各種プロキシ経由でバックエンドを呼び出します。
+2.  **Infra / CDK** (`infra/lib/constructs/*-api.ts`)
+    - API Gateway のパス定義と Lambda へのルーティングを行います。
+3.  **Lambda Function** (`infra/lambda/*.ts`)
+    - 各エンドポイントに対応した個別のビジネスロジックを実行します。
+
+### 1. API 処理フローとファイルの対応（詳細）
 
 ##### A. ファイル横断シーケンス図
 ```mermaid
@@ -218,8 +230,6 @@ return {
     user_id: "USER#abc"
   }
 };
-
-// (バックエンド Lambda 側) event からの取得例
 const shopId = event.requestContext.authorizer.shop_id;
 ```
 
@@ -471,9 +481,64 @@ addResourceWithCors(productsResource, 'update').addMethod('POST', integration, r
 ```
 
 ---
-
 ## 第三部：リファレンス (References)
 
+#### ⚠️ 例外構成：1つのLambdaで複数エンドポイントを処理する場合のルーティング注意事項
+
+このプロジェクトの原則は **「1 Lambda = 1 API エンドポイント」** ですが、`unified_chat.ts` のように
+1つの Lambda が複数エンドポイント（`/create`, `/list`, `/get`, `/messages/get` など）を処理する
+例外的な構成を取る場合があります。このような構成では、Lambda 内部のパス判定に細心の注意が必要です。
+
+> [!WARNING]
+> **`endsWith()` / `includes()` などの部分一致によるルーティングは絶対に使用しないでください。**
+>
+> **実際に発生した障害（2026年4月）の事例：**
+> ```typescript
+> // ❌ 問題のあったコード（部分一致）
+> // path.endsWith('/get') は "/unified/chat/messages/get" にもマッチしてしまう!
+> else if (path.endsWith('/get')) {
+>     action = 'get';               // /messages/get もここで捕捉されてしまう
+> } else if (path.endsWith('/messages/get')) {
+>     action = 'messages_get';      // ← 永遠に到達しないコード
+> }
+>
+> // ✅ 修正後（=== による完全一致）
+> // event.resource に API Gateway が設定する完全パスと完全一致で判定する
+> if (path === '/unified/chat/messages/get') {
+>     action = 'messages_get';      // 具体的なパスを先に判定
+> } else if (path === '/unified/chat/get') {
+>     action = 'get';
+> }
+> ```
+>
+> この障害により `/unified/chat/messages/get` への全リクエストが `getChat()` として処理され、
+> チャットメッセージが取得できない状態になりました。その結果、フロントエンドでは審査結果が
+> 全件「審査中」と表示され続けるという不具合が本番環境で発生しました。
+
+**なぜ `event.resource` の完全一致が安全なのか：**
+
+| フィールド | 内容 | 利用推奨 |
+|-----------|------|---------|
+| `event.resource` | API Gateway が設定する「定義されたパスパターン」。パスパラメータは `{id}` のままプレースホルダー表記になる | ✅ **完全一致判定に使用** |
+| `event.path` | 実際のリクエストパス。パスパラメータは実値に置換されている | ⚠️ パスパラメータがある場合は resource と異なる |
+
+```typescript
+// ✅ 推奨パターン：event.resource で完全一致させる
+const path = event.resource || event.path || '';
+
+if (path === '/unified/chat/messages/get') {
+  action = 'messages_get';   // 具体的なパスを先に
+} else if (path === '/unified/chat/get') {
+  action = 'get';
+} else if (path === '/unified/chat/list') {
+  action = 'list';
+}
+// ・完全一致なので本来は順序不問だが、可読性のために具体的（長い）パスを先に書くことを推奨
+```
+
+参照: [infra/lambda/unified_chat.ts](../infra/lambda/unified_chat.ts)
+
+---
 詳細な情報やコードへのクイックアクセス。
 
 ### 9. 実装詳細：フロントエンドとインフラの連携定義

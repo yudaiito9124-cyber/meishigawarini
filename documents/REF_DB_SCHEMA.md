@@ -3,10 +3,11 @@
 本プロジェクト（名刺がわりに）では、AWS CDKを使用して構築された **Amazon DynamoDB** (テーブル名: `MeishiGawariniTableV2`) のシングルテーブルデザインが採用されています。様々な種類のデータが、`PK` (パーティションキー) と `SK` (ソートキー)、および2つのGSI (グローバルセカンダリインデックス) を活用して一つのテーブルに格納されています。
 
 以下に、データベース内に存在するデータの種類（エンティティ）と、各項目についての一覧表をまとめます。
-論理的な関係性については [UML_DATA_STRUCTURE.md](./UML_DATA_STRUCTURE.md) を参照してください。
+論理的な関係性については 👉 **[データ構造 (REF_DATA_STRUCTURE.md)](./REF_DATA_STRUCTURE.md)**  
+を参照してください。
 
 
-\# 使用しているデータテーブル内には古い規格のデータも含まれていますので、こことは異なる要素が含まれる可能性があります．
+# 使用しているデータテーブル内には古い規格のデータも含まれていますので、こことは異なる要素が含まれる可能性があります．
 
 ## 1. データの種類（エンティティ一覧）
 
@@ -21,10 +22,11 @@
 | **[Shop Metadata (ショップ情報)](#26-shop-ショップ情報)** | `SHOP#{shop_id}` | `METADATA` |
 | **[Shop Product (商品情報)](#27-product-商品情報)** | `SHOP#{shop_id}` | `PRODUCT#{product_id}` |
 | **[QR Metadata (QRコード及び注文ステータス)](#28-qr-metadata-qrコード及び注文ステータス)** | `QR#{uuid}` | `METADATA` |
-| **[QR Order (受取人入力の配送先情報)](#29-order-受取人による配送先注文詳細)** | `QR#{uuid}` | `ORDER` |
+| **[QR Order (受取人入力の配送先注文詳細)](#29-order-受取人による配送先注文詳細)** | `QR#{uuid}` | `ORDER` |
 | **[QR Chat (チャット履歴)](#210-chat-チャット履歴)** | `QR#{uuid}` | `CHAT` |
 | **[Card Design (カードデザイン情報)](#211-card-design-metadata-カードデザイン)** | `CARD_DESIGN#METADATA` | `design_id` |
 | **[Card Order (カード発注情報)](#212-card-order-カード発注情報)** | `CARD_ORDER#{shop_id}` | `ORDER#{order_id}` |
+| **[Unified Chat (汎用チャット)](#213-unified-chat-汎用チャット)** | `CHAT#{chat_id}` / `USER#{id}` / `SHOP#{id}` / `ADMIN` | `META` / `MSG#{seq}` / `CHAT#{chat_id}` |
 | **[QR Batch (一括生成バッチデータ)](#214-qr-batch-一括生成バッチデータ)** | `QR_BATCH#{batch_id}` | `METADATA#{ts_created_at}` |
 
 
@@ -234,7 +236,6 @@ QRコードのライフサイクルや注文ステータス、商品との紐付
 | `total_size_bytes` | Number | チャットに添付されたファイルの累計サイズ (100MB制限用) |
 | `messages` | Array<Object> | メッセージ履歴。形式: `[{ id, role, username, message, type, file_url, file_size, ts_created_at }]` |
 
-
 ### 2.11 Card Design Metadata (カードデザイン)
 カードのデザイン（背景画像、QR・PIN・UUIDの配置等）を保持します。
 
@@ -292,6 +293,154 @@ QRコードのライフサイクルや注文ステータス、商品との紐付
 | `GSI2_PK` | String | `CARD_ORDER#{order_id}` （逆引き用） |
 | `GSI2_SK` | String | ソートキー |
 
+### 2.13 Unified Chat (汎用チャット)
+システム管理者、ショップ、ユーザー間での汎用的なコミュニケーション（サポート、商談等）を保持します。QRコードとは独立して運用されます。
+
+#### 2.13.0 設計方針（理想構成）
+- **メッセージは必ず分離保存**: 400KB制限・同時更新競合・履歴ページングの問題を回避するため、`MSG#{seq}` の独立レコードにします。
+- **未読はカーソル方式**: 参加者ごとに `last_read_seq` を持ち、`未読件数 = last_message_seq - last_read_seq` で算出します。
+- **一覧表示は参加者レコードを正本化**: 1ユーザー/1ショップごとのチャット一覧は `PK = USER#/SHOP#/ADMIN` 直下に保持し、最終メッセージ情報を非正規化します。
+- **GSI1/GSI2は既存2本を前提**: テーブル全体制約を維持しつつ、チャット用プレフィックスで共存させます。
+
+#### 2.13.1 Chat Metadata (チャット本体)
+チャットの基本情報・参加者・最新状態のみを保持します（本文履歴は保持しません）。
+
+| 属性名 | 型 | 説明 |
+| --- | --- | --- |
+| `PK` | String | `CHAT#{chat_id}` （UUID形式） |
+| `SK` | String | 常に固定値 `META` |
+| `chat_id` | String | チャットID（UUID） |
+| `participants` | Array<String> | 参加者のプレフィックス付きIDリスト (例: `USER#{user_id}`, `SHOP#{shop_id}`, `ADMIN`)。<br>※**一番最初の要素はチャットを開始した主体のID**です。 |
+| `initiator_id` | String | 開始主体（`participants[0]` を明示保持） |
+| `chat_type` | String | チャット種別 (`MISC`, `USER_SUPPORT`, `SHOP_OPENING`, `SHOP_DESIGN`, `SHOP_SUPPORT`, `AUTH_EMAIL_VERIFICATION`) |
+| `status` | String | チャット状態 (`OPEN`, `RESOLVED`, `CLOSED`) |
+| `ts_created_at` | String | 作成日時 (ISO 8601) |
+| `ts_updated_at` | String | 更新日時 (ISO 8601) |
+| `ts_last_message_at` | String | 最終メッセージ送信日時 (ソート用・ISO 8601) |
+| `last_message_id` | String | 最終メッセージID |
+| `last_message_seq` | Number | 最終メッセージ連番（未読計算の基準） |
+| `last_message_text` | String | 最終メッセージのプレビューテキスト |
+| `version` | Number | 楽観ロック用バージョン |
+| `GSI1_PK` | String | `CHAT_TYPE#{chat_type}#{status}#{shard}` （管理者の種別別一覧用） |
+| `GSI1_SK` | String | `TS#{ts_last_message_at}#CHAT#{chat_id}` |
+
+`shard` は `00` 〜 `15` の固定分散値（`chat_id` ハッシュ由来）を推奨します。管理者画面ではまず `chat_type` ごとに一覧を分け、その中で `status` を絞り込む前提です。これにより「ショップ開設申請一覧」「カードデザイン申請一覧」「問い合わせ一覧」などを別画面として自然に扱えます。
+
+**shard の実装ルール（現行）**
+
+- 目的:
+  - `chat_type + status` が同じ案件を単一パーティションに集中させないための分散キーです。
+  - 管理者一覧の高トラフィック時にホットパーティション化を避けます。
+- 計算:
+  - `chat_id` 文字列ハッシュを取り、`mod 16` で `00`〜`15` を割り当てます。
+  - 実装は `infra/lambda/unified_chat.ts` の `calcShard(chatId)` を参照してください。
+- 書き込み:
+  - Meta 作成・更新時に `GSI1_PK = CHAT_TYPE#{chat_type}#{status}#{shard}` を保存します。
+- 読み込み（管理者一覧）:
+  - 1回の Query では 1 shard しか読めないため、`00`〜`15` を並列 Query して統合します。
+- 運用上の注意:
+  - shard 数を変更すると既存データとの整合性が崩れるため、途中変更は移行計画なしでは行いません。
+
+#### 2.13.2 Chat Membership (参加者ごとの状態・一覧管理)
+特定のユーザーやショップに関連するチャットを効率よく一覧表示し、未読状態を正確に管理するためのレコードです。`participants` に含まれる各主体ごとに作成されます。
+
+| 属性名 | 型 | 説明 |
+| --- | --- | --- |
+| `PK` | String | `USER#{user_id}` / `SHOP#{shop_id}` / `ADMIN` |
+| `SK` | String | `CHAT#{chat_id}` |
+| `chat_id` | String | チャットID |
+| `participant_id` | String | このレコードの主体ID（`PK` と同値） |
+| `joined_at` | String | 参加日時 |
+| `last_read_seq` | Number | 既読済みの最大メッセージ連番 |
+| `ts_last_read_at` | String | 最終既読日時 |
+| `ts_last_message_at` | String | 最終メッセージ送信日時 (ソート用) |
+| `last_message_text` | String | プレビューテキスト (一覧表示用) |
+| `unread_count_cache` | Number | 一覧高速化用キャッシュ（正本は `last_message_seq - last_read_seq`） |
+| `is_muted` | Boolean | 通知ミュート状態 |
+| `is_archived` | Boolean | アーカイブ状態 |
+| `GSI2_PK` | String | `CHAT_INBOX#{participant_id}` （参加者ごとの最新順一覧取得用） |
+| `GSI2_SK` | String | `TS#{reverse_epoch_ms}#CHAT#{chat_id}` （降順実現用） |
+
+`reverse_epoch_ms = 9999999999999 - epoch_ms(ts_last_message_at)` を使用すると、`ScanIndexForward=true` のまま最新順を取得できます。
+
+#### 2.13.3 Chat Message (メッセージ本体)
+メッセージ本文・添付情報を1件1レコードで保持します。
+
+| 属性名 | 型 | 説明 |
+| --- | --- | --- |
+| `PK` | String | `CHAT#{chat_id}` |
+| `SK` | String | `MSG#{seq}`（ゼロ埋め連番、例: `MSG#000000012345`） |
+| `message_id` | String | メッセージID（UUID/ULID） |
+| `seq` | Number | チャット内単調増加連番 |
+| `sender_id` | String | 送信主体 (`USER#...` / `SHOP#...` / `ADMIN`) |
+| `role` | String | 表示用ロール (`USER`, `SHOP`, `ADMIN`, `SYSTEM`) |
+| `username` | String | 表示名スナップショット |
+| `message` | String | テキスト本文 |
+| `type` | String | `TEXT`, `IMAGE`, `FILE`, `SYSTEM` |
+| `payload_type` | String | ワークフローイベント種別（例: `FORM_SUBMITTED`, `ADMIN_DECISION`, `VERIFICATION_COMPLETED`） |
+| `payload` | Map | イベントごとの構造化データ（型は `shared/unified-chat-workflows.ts` のレジストリで定義） |
+| `workflow_status` | String | ワークフローステータス（例: `DRAFT`, `IN_REVIEW`, `APPROVED`, `PENDING`, `VERIFIED`） |
+| `file_url` | String | 添付URL（任意） |
+| `file_name` | String | 添付ファイル名（任意） |
+| `file_size` | Number | 添付サイズ（任意） |
+| `is_deleted` | Boolean | 論理削除フラグ |
+| `edited_at` | String | 編集日時（任意） |
+| `ts_created_at` | String | 送信日時 |
+
+#### 2.13.4 代表的アクセスパターンとキー利用
+| ユースケース | 取得方法 |
+| --- | --- |
+| チャット詳細を開く | `GetItem(PK=CHAT#{chat_id}, SK=META)` |
+| メッセージ最新50件 | `Query(PK=CHAT#{chat_id}, begins_with(SK, 'MSG#'))` + `ScanIndexForward=false` + `Limit=50` |
+| 参加者の受信箱一覧 | `Query(Index=GSI2, GSI2_PK=CHAT_INBOX#{participant_id})` |
+| 管理者の SHOP_OPENING 一覧 | `Query(Index=GSI1, GSI1_PK=CHAT_TYPE#SHOP_OPENING#{status}#{shard})` をシャード分並列実行 |
+
+#### 2.13.5 書き込み整合性ルール（推奨）
+- メッセージ送信時は `TransactWrite` で以下を同時更新します。
+  1. `Chat Message` を1件追加
+  2. `Chat Metadata` の `last_message_seq`, `last_message_text`, `ts_last_message_at`, `ts_updated_at` を更新
+  3. 全参加者の `Chat Membership` の一覧用属性（`ts_last_message_at`, `last_message_text`, `GSI2_SK`）を更新
+- `chat_type` は作成後に変更しない前提です。管理者一覧の主軸インデックスが `chat_type` 先頭のため、種別変更は別チャット作成で扱う方が安全です。
+- 既読更新時は対象参加者の `last_read_seq` のみ更新し、未読件数は原則計算値を正本とします。
+
+#### 2.13.6 型安全な拡張方式（機械的追加ルール）
+- チャット業務ワークフローは `shared/unified-chat-workflows.ts` の `WORKFLOW_REGISTRY` を正本とします。
+- 新しい認証機能や申請機能を追加するときは、以下の1セットを同じキー配下に追加します。
+  1. `chatType`（例: `AUTH_PHONE_VERIFICATION`）
+  2. `statuses`（状態列挙）
+  3. `events`（イベント名 -> `validate(payload)` + `nextStatuses`）
+- `WorkflowChatType` / `WorkflowEventType` / `WorkflowPayload` / `WorkflowStatus` はレジストリから自動導出されるため、API側と画面側で同じ型が強制されます。
+- 受信payload検証は `isValidWorkflowPayload` もしくは `assertValidWorkflowPayload` を必須利用し、`chat_type + payload_type` に一致しない構造を即時Rejectします。
+- 遷移検証は `canTransitionTo` で行い、未定義遷移（例: `PENDING -> APPROVED`）を実行時に拒否します。
+
+#### 2.13.7 API 設計（デプロイ済みの現行仕様）
+
+| ユースケース | 推奨エンドポイント (`POST`) | 主な必須入力 | 主な検証・整合ルール |
+| --- | --- | --- | --- |
+| チャット作成 | `/unified/chat/create` | `chat_type`, `participants`, `initiator_id` | `chat_type` はレジストリ定義値のみ許可。`participants[0]` と `initiator_id` を一致させる。 |
+| 参加者受信箱一覧 | `/unified/chat/list` | `participant_id`, `chat_type?`, `status?`, `limit?`, `cursor?` | `participant_id` 主体で取得し、管理者画面は `chat_type` 先頭で絞る。 |
+| メッセージ履歴取得 | `/unified/chat/messages/get` | `chat_id`, `before_seq?`, `limit?` | `limit` 上限を固定（例: 200）。`before_seq` 指定時は過去方向ページング。 |
+| メッセージ送信 | `/unified/chat/messages/send` | `chat_id`, `sender_id`, `type`, `message?`, `payload_type?`, `payload?` | `payload` がある場合は `assertValidWorkflowPayload` を必須実行。送信処理は `TransactWrite` で整合更新。 |
+| 既読更新 | `/unified/chat/read/mark` | `chat_id`, `participant_id`, `last_read_seq` | `last_read_seq <= last_message_seq` を必須保証。違反は 400。 |
+| ステータス更新 | `/unified/chat/status/update` | `chat_id`, `next_status`, `expected_version` | 楽観ロック `version` 一致必須。不一致時は 409。 |
+
+#### 2.13.8 新チャットタイプ追加時に API 側で必ず変更する箇所
+以下の順に変更すると、型安全を維持したまま機械的に拡張できます。
+
+1. `shared/unified-chat-workflows.ts`
+  - `payload` 型、`validate` 関数、`WORKFLOW_REGISTRY` の `chatType` ブロックを追加
+2. `shared/api-types.ts`
+  - `UnifiedChatApiSchema` の入出力型に新 `chat_type`/`payload_type` が自動反映されることを確認
+3. Lambda ハンドラ（実装時）
+  - 受信時に `assertValidWorkflowPayload(chat_type, payload_type, payload)` を呼ぶ
+  - 状態変更時に `canTransitionTo(chat_type, payload_type, next_status)` を呼ぶ
+4. 管理者一覧 API（実装時）
+  - `chat_type` タブ/分類追加と `GSI1_PK=CHAT_TYPE#{chat_type}#{status}#{shard}` の取得導線追加
+5. ドキュメント
+  - 本章（2.13）および `REF_API_ENDPOINTS.md` の Unified Chat セクションを同時更新
+
+---
+
 ### 2.14 QR Batch (一括生成バッチデータ)
 QRコードを一括生成した際のメタデータと、生成された全QRコードのペア（IDとPIN）を保持します。PDF/CSVの再生成や、一括管理に使用されます。
 
@@ -320,7 +469,7 @@ QRコードや商品のライフサイクルにおけるステータスの詳細
 
 ## 4. 関連ドキュメント (Related Documentation)
 
-- **[UML_DATA_STRUCTURE.md](./UML_DATA_STRUCTURE.md)**  
+- 👉 **[データ構造 (REF_DATA_STRUCTURE.md)](./REF_DATA_STRUCTURE.md)**  
   エンティティ間の論理的な関係性（Role-Based）を可視化したUMLクラス図・ER図。
 - **[SPEC_INFRA_DYNAMODB.md](./SPEC_INFRA_DYNAMODB.md)**  
   DynamoDBシングルテーブル設計の基本概念、インデックス活用の詳細、および設計思想。

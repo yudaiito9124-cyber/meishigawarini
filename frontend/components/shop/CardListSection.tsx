@@ -1,6 +1,16 @@
 'use client';
 
+/**
+ * カード一覧セクション（ショップ画面）のメインコンポーネント。
+ *
+ * 役割:
+ * - 受注データを多条件で絞り込み、任意列で表示
+ * - 列ソート、メタ情報更新、CSV出力を提供
+ * - サブコンポーネント（OrderFilter / OrderRow）へ Context で操作関数を供給
+ */
+
 import React, { createContext, useContext, useMemo } from 'react';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { RefreshCw, ArrowUp, ArrowDown, QrCode, Package, SlidersHorizontal, Plus as PlusIcon, User, Truck, Clock, Pencil, MessageCircleWarning, Mail, Phone, Hash, Calendar, CheckCircle2, XCircle, Link2, Zap, AlertCircle } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -31,6 +41,8 @@ interface CardListContextType {
     statusCss: (status: string) => string;
     getDesignAspectRatio: typeof getDesignAspectRatio;
     getDesignImages: typeof getDesignImages;
+    handleExportCSV: () => void;
+    filteredOrdersCount: number;
 }
 
 const CardListContext = createContext<CardListContextType | null>(null);
@@ -112,13 +124,13 @@ export function CardListSection({ shopId }: { shopId: string }) {
     const st = useTranslations('Status');
     const { translateError } = useBackendError();
 
-    const { products, orders, ordersLoading, refreshOrders, refreshProducts, refreshShopDetails } = useShop();
+    const { shop, products, orders, ordersLoading, refreshOrders, refreshProducts, refreshShopDetails } = useShop();
     const {
         orderStatusFilter, orderProductFilter,
         orderUpdatedFilter, orderExpirationFilter,
         orderSubmissionFilter, orderPreferredDateFilter,
         searchQrId, visibleOrderColumns,
-        orderSortConfig,
+        orderSortConfig, subRefreshing,
         set: setList
     } = useCardListUI();
 
@@ -150,6 +162,14 @@ export function CardListSection({ shopId }: { shopId: string }) {
     const orderColGroups = useMemo(() => getOrderColGroups(t, ts), [t, ts]);
     const orderColOptions = useMemo(() => orderColGroups.flatMap(g => g.columns), [orderColGroups]);
 
+    /**
+     * フィルタリング + ソート済みの表示対象受注一覧。
+     *
+     * ポイント:
+     * - status/product は「複数選択配列」方式（空配列は ALL 扱い）
+     * - 日付系フィルターはローカル日付基準で判定
+     * - ソート未指定時は業務優先（status優先 + 更新日時降順）
+     */
     const filteredOrders = useMemo(() => {
         const now = new Date();
         const getLocalYYYYMMDD = (d: Date) => {
@@ -159,7 +179,7 @@ export function CardListSection({ shopId }: { shopId: string }) {
             return `${y}-${m}-${day}`;
         };
         const todayStr = getLocalYYYYMMDD(now);
-        
+
         const isToday = (d?: string) => {
             if (!d) return false;
             const date = new Date(d);
@@ -187,8 +207,8 @@ export function CardListSection({ shopId }: { shopId: string }) {
         };
 
         return orders
-            .filter(o => orderStatusFilter === 'ALL' || o.status === orderStatusFilter)
-            .filter(o => !orderProductFilter || o.product_id === orderProductFilter)
+            .filter(o => orderStatusFilter.length === 0 || orderStatusFilter.includes(o.status))
+            .filter(o => orderProductFilter.length === 0 || orderProductFilter.includes(o.product_id))
             .filter(o => !searchQrId || (o.id || o.qr_id)?.includes(searchQrId))
             .filter(o => {
                 if (orderUpdatedFilter === 'ALL') return true;
@@ -257,12 +277,20 @@ export function CardListSection({ shopId }: { shopId: string }) {
             });
     }, [orders, orderStatusFilter, orderProductFilter, searchQrId, orderSortConfig, orderUpdatedFilter, orderExpirationFilter, orderSubmissionFilter, orderPreferredDateFilter]);
 
+    /**
+     * ヘッダークリック時のソート切替。
+     * 同じキーを連続クリックした場合は asc -> desc をトグルします。
+     */
     const handleOrderSort = (key: string) => {
         let direction: 'asc' | 'desc' = 'asc';
         if (orderSortConfig && orderSortConfig.key === key && orderSortConfig.direction === 'asc') direction = 'desc';
         setList({ orderSortConfig: { key, direction } });
     };
 
+    /**
+     * 列キーに応じてセル描画内容を返します。
+     * 日付列・ステータス列・配送情報列で表示形式を個別最適化しています。
+     */
     const getOrderCellContent = (order: Order, colKey: string) => {
         const product = products.find(p => p.product_id === order.product_id);
         const qrId = order.id || order.qr_id?.replace('QR#', '');
@@ -296,6 +324,90 @@ export function CardListSection({ shopId }: { shopId: string }) {
         }
     };
 
+    /**
+     * 現在の絞り込み結果を CSV で出力します。
+     *
+     * 仕様:
+     * - 「現在表示中の列」だけをヘッダー/行に出力
+     * - Excel 文字化け対策として UTF-8 BOM を付与
+     * - ファイル名に shop 名 + タイムスタンプを含める
+     */
+    const handleExportCSV = () => {
+        if (!shop || filteredOrders.length === 0) return;
+
+        // 1. Prepare Headers (only visible columns)
+        const visibleCols = orderColOptions.filter(col => visibleOrderColumns.includes(col.key));
+        const headers = visibleCols.map(col => `"${col.label.replace(/"/g, '""')}"`).join(',');
+
+        // 2. Prepare Rows
+        const rows = filteredOrders.map(order => {
+            return visibleCols.map(col => {
+                let value = "";
+                const product = products.find(p => p.product_id === order.product_id);
+                
+                switch (col.key) {
+                    case 'ts_updated_at':
+                    case 'ts_created_at':
+                    case 'ts_submitted_at':
+                    case 'ts_shipped_at':
+                    case 'ts_completed_at':
+                    case 'ts_linked_at':
+                    case 'ts_activated_at':
+                    case 'ts_expired_at':
+                    case 'ts_banned_at':
+                        const dateVal = order[col.key];
+                        value = dateVal ? new Date(dateVal).toLocaleString() : "-";
+                        break;
+                    case 'qr_id':
+                        value = order.id || order.qr_id?.replace('QR#', '');
+                        break;
+                    case 'product_id':
+                        value = product?.name || order.product_id;
+                        break;
+                    case 'status':
+                        value = st(order.status.toLowerCase());
+                        break;
+                    case 'email':
+                        value = order.shipping_info?.email || "-";
+                        break;
+                    case 'phone':
+                        value = order.shipping_info?.phone || "-";
+                        break;
+                    default:
+                        value = order[col.key] || "-";
+                        break;
+                }
+                return `"${String(value).replace(/"/g, '""')}"`;
+            }).join(',');
+        });
+
+        const csvContent = [headers, ...rows].join('\n');
+        // BOM を付与して日本語環境の表計算ソフトでの文字化けを防止します。
+        const bom = '\uFEFF';
+        const blob = new Blob([bom + csvContent], { type: 'text/csv;charset=utf-8;' });
+        
+        // 3. Filename
+        const now = new Date();
+        const timestamp = now.getFullYear() +
+            String(now.getMonth() + 1).padStart(2, '0') +
+            String(now.getDate()).padStart(2, '0') + '_' +
+            String(now.getHours()).padStart(2, '0') +
+            String(now.getMinutes()).padStart(2, '0') +
+            String(now.getSeconds()).padStart(2, '0');
+        
+        const filename = `cards_${shop.name}_${timestamp}.csv`;
+
+        // 4. Trigger Download
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+        link.setAttribute('href', url);
+        link.setAttribute('download', filename);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
     const value = {
         fetchSectionData,
         orderColGroups,
@@ -304,7 +416,9 @@ export function CardListSection({ shopId }: { shopId: string }) {
         handleUpdateOrderMeta,
         statusCss: cardStatusCss,
         getDesignAspectRatio,
-        getDesignImages
+        getDesignImages,
+        handleExportCSV,
+        filteredOrdersCount: filteredOrders.length
     };
 
     return (
@@ -317,6 +431,21 @@ export function CardListSection({ shopId }: { shopId: string }) {
                     </CardHeader>
                     <CardContent className="p-4 w-full">
                         <OrderFilter />
+
+                        {/* 絞り込み件数表示 (目立つようにテーブルの上に配置) */}
+                        <div className="flex items-baseline gap-2 px-1 mb-3 mt-1">
+                            <span className="text-sm font-medium text-gray-500">
+                                {(orderStatusFilter.length > 0 || orderProductFilter.length > 0 || searchQrId.trim() !== "" || orderUpdatedFilter !== "ALL" || orderExpirationFilter !== "ALL" || orderSubmissionFilter !== "ALL" || orderPreferredDateFilter !== "ALL")
+                                    ? "絞り込み結果"
+                                    : "全件"
+                                }:
+                            </span>
+                            <span className="text-2xl font-black text-primary animate-in fade-in zoom-in duration-300 items-len">
+                                {filteredOrders.length}
+                            </span>
+                            <span className="text-sm font-medium text-gray-500">件</span>
+                        </div>
+
                         <Table wrapperStyle={{ maxHeight: 'calc(100vh - 200px)', minHeight: '300px' }}>
                             <TableHeader className="sticky top-0 bg-white z-10 drop-shadow-sm">
                                 <TableRow>

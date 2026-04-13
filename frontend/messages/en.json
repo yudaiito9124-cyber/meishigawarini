@@ -71,6 +71,67 @@
     "userEmail": "Email Address",
     "createMyShop": "Open a Shop",
     "createMyShopConfirm": "Do you really want to open a shop? This is required only if you want to sell products. It is not needed for sending or receiving gifts.",
+    "notifications": {
+      "button": "Notifications",
+      "title": "Chat Notifications",
+      "description": "A list of chat states linked to this user. Click a row to view details.",
+      "listTitle": "Notification List",
+      "detailTitle": "Notification Detail",
+      "selectPrompt": "Select a chat from the list.",
+      "refresh": "Refresh",
+      "loading": "Loading...",
+      "empty": "No chats are available.",
+      "noMessages": "No messages.",
+      "table": {
+        "updatedAt": "Updated At",
+        "type": "Type",
+        "status": "Status",
+        "unread": "Unread"
+      },
+      "detail": {
+        "chatId": "Chat ID",
+        "type": "Type",
+        "status": "Status",
+        "updatedAt": "Updated At"
+      },
+      "decision": {
+        "label": "Review Result",
+        "result": "Decision",
+        "approved": "Approved",
+        "rejected": "Rejected",
+        "resolved": "Review Completed",
+        "pending": "In Review",
+        "reviewedAt": "Reviewed At",
+        "reason": "Reason",
+        "linkedShopId": "Linked Shop ID",
+        "openShop": "Open Shop",
+        "defaultDesignId": "Default Design ID"
+      }
+    },
+    "shopOpenForm": {
+      "title": "Shop Opening Verification Form",
+      "description": "Submitting this form will create a SHOP_OPENING application chat with the operations team.",
+      "shopNameLabel": "Shop Name",
+      "shopNamePlaceholder": "e.g. Yamada Fresh Market",
+      "ownerNameLabel": "Applicant Name",
+      "ownerNamePlaceholder": "e.g. Taro Yamada",
+      "contactEmailLabel": "Contact Email",
+      "contactEmailPlaceholder": "e.g. info@example.com",
+      "contactEmailFixed": "Contact email is fixed to the logged-in user's email address.",
+      "notesLabel": "Notes",
+      "notesPlaceholder": "Add any additional information if needed.",
+      "submit": "Submit",
+      "submitting": "Submitting...",
+      "cancel": "Cancel",
+      "success": "Your application has been submitted. Please wait for review.",
+      "errors": {
+        "required": "Please fill in the required fields.",
+        "noUserId": "Failed to get user information. Please reload and try again.",
+        "noUserEmail": "Failed to get the user's email address. Please reload and try again.",
+        "invalidPayload": "Invalid application payload format. Please check your input and try again.",
+        "submitFailed": "Failed to submit the application. Please try again later."
+      }
+    },
     "deliverySettings": "Default Delivery Address",
     "deliverySettingsDesc": "Set your default delivery information for receiving gifts.",
     "saving": "Saving...",
@@ -209,6 +270,43 @@
       "shipping": "Orders",
       "products": "Products",
       "orderCard": "Order Cards"
+    },
+    "notifications": {
+      "button": "Notifications",
+      "title": "Chat Notifications",
+      "description": "A list of chat states linked to this shop. Click a row to view details.",
+      "listTitle": "Notification List",
+      "detailTitle": "Notification Detail",
+      "selectPrompt": "Select a chat from the list.",
+      "refresh": "Refresh",
+      "loading": "Loading...",
+      "empty": "No chats are available.",
+      "noMessages": "No messages.",
+      "table": {
+        "updatedAt": "Updated At",
+        "type": "Type",
+        "status": "Status",
+        "unread": "Unread"
+      },
+      "detail": {
+        "chatId": "Chat ID",
+        "type": "Type",
+        "status": "Status",
+        "updatedAt": "Updated At"
+      },
+      "decision": {
+        "label": "Review Result",
+        "result": "Decision",
+        "approved": "Approved",
+        "rejected": "Rejected",
+        "resolved": "Review Completed",
+        "pending": "In Review",
+        "reviewedAt": "Reviewed At",
+        "reason": "Reason",
+        "linkedShopId": "Linked Shop ID",
+        "openShop": "Open Shop",
+        "defaultDesignId": "Default Design ID"
+      }
     },
     "cardOrder": {
       "title": "Order Cards",
@@ -642,9 +740,68 @@
     "tabs": {
       "qrcodes": "QR Codes",
       "shops": "Shop Management",
+      "inquiries": "Inquiries",
       "tools": "Tools",
       "cardorders": "Card Orders",
       "designs": "Design Settings"
+    },
+    "inquiries": {
+      "title": "Shop Opening Requests",
+      "description": "Review SHOP_OPENING requests sent by users and decide approval or rejection.",
+      "refresh": "Refresh",
+      "loading": "Loading...",
+      "empty": "There are no shop opening requests at the moment.",
+      "defaultShopName": "New Shop",
+      "table": {
+        "updatedAt": "Updated At",
+        "chatId": "Chat ID",
+        "status": "Status",
+        "unread": "Unread",
+        "preview": "Latest Message"
+      },
+      "offerings": {
+        "productSales": "Product Sales",
+        "cardPrinting": "Card Printing",
+        "supportChat": "Support Chat"
+      },
+      "decision": {
+        "approvedMessage": "The shop opening request has been approved.",
+        "rejectedMessage": "The shop opening request has been rejected."
+      },
+      "errors": {
+        "invalidInitiator": "Invalid applicant information.",
+        "designRequired": "Please select a default card design when approving.",
+        "decisionLocked": "This request has already been processed and can no longer be changed.",
+        "approveFailed": "Failed to approve the request.",
+        "rejectReasonRequired": "Please enter a rejection reason.",
+        "rejectFailed": "Failed to reject the request."
+      },
+      "detail": {
+        "title": "Inquiry Details",
+        "requestInfo": "Request Information",
+        "initiator": "Applicant",
+        "chatStatus": "Chat Status",
+        "shopName": "Shop Name",
+        "ownerName": "Applicant Name",
+        "contactEmail": "Contact Email",
+        "notes": "Notes",
+        "approvalTitle": "Approval",
+        "decisionLocked": "This request has already been processed. Approval or rejection cannot be run again.",
+        "defaultDesign": "Default Card Design",
+        "selectDesign": "Select a design",
+        "offeringsTitle": "Select What to Provide",
+        "adminMemo": "Admin Memo (Optional)",
+        "adminMemoPlaceholder": "Add memo for approval handling",
+        "approve": "Approve and Create Shop",
+        "rejectTitle": "Rejection",
+        "rejectReason": "Rejection Reason",
+        "rejectReasonPlaceholder": "Describe why this request is rejected",
+        "reject": "Reject",
+        "processing": "Processing...",
+        "messageHistory": "Message History",
+        "noMessages": "No messages.",
+        "close": "Close"
+      }
     },
     "AdminNeed2FA": "Admin Required 2FA",
     "generate": {
