@@ -47,6 +47,7 @@ import { fetchAuthSession, getCurrentUser } from "aws-amplify/auth";
 import { userApi } from "@/lib/api/user";
 import { ShareDialog } from "@/components/ShareDialog";
 import { useBackendError } from "@/hooks/useBackendError";
+import { isValidPhone, isValidZip, sanitizePhoneForInput, sanitizeZipForInput } from "@/lib/validation/contact";
 
 
 const NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || "";
@@ -494,16 +495,12 @@ export default function ReceivePage() {
             return;
         }
 
-        // 郵便番号・電話番号の桁数厳密チェック
-        const zipDigits = zip_code.replace(/\D/g, '').length;
-        const phoneDigits = phone.replace(/\D/g, '').length;
-
-        if (zipDigits !== 7) {
+        if (!isValidZip(zip_code)) {
             alert(t('errors.invalidZip'));
             return;
         }
 
-        if (phoneDigits < 10 || phoneDigits > 11) {
+        if (!isValidPhone(phone)) {
             alert(t('errors.invalidPhone'));
             return;
         }
@@ -988,63 +985,11 @@ export default function ReceivePage() {
     };
 
     const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        // 入力された生の文字列
-        let rawValue = e.target.value;
-
-        // 1. まず全角を半角に変換（数字・ハイフン類）
-        let converted = rawValue
-            .replace(/[０-９]/g, (s) => String.fromCharCode(s.charCodeAt(0) - 0xFEE0))
-            .replace(/[ー‐―－]/g, "-");
-
-        // 2. 数字とハイフン以外を「除外」して、有効な文字だけを抽出
-        // これにより、既存の数字を保持しつつ、新しく入った不正な文字だけを弾きます
-        let filtered = converted.replace(/[^0-9-]/g, "");
-
-        // 3. ハイフンの数を制限（最大2つまで）
-        const parts = filtered.split("-");
-        if (parts.length > 3) {
-            // 3つ目以降のハイフンは結合して消す
-            filtered = parts.slice(0, 3).join("-") + parts.slice(3).join("");
-        }
-
-        // 4. 数字の合計文字数を制限（最大11文字まで）
-        const digitsOnly = filtered.replace(/-/g, "");
-        if (digitsOnly.length > 11) {
-            // 11文字を超えた場合は、入力を反映させない（以前の状態をキープ）
-            return;
-        }
-
-        setPhone(filtered);
+        setPhone((prev) => sanitizePhoneForInput(e.target.value, prev));
     };
 
     const handleZipCodeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        // 入力された生の文字列
-        let rawValue = e.target.value;
-
-        // 1. まず全角を半角に変換（数字・ハイフン類）
-        let converted = rawValue
-            .replace(/[０-９]/g, (s) => String.fromCharCode(s.charCodeAt(0) - 0xFEE0))
-            .replace(/[ー‐―－]/g, "-");
-
-        // 2. 数字とハイフン以外を「除外」して、有効な文字だけを抽出
-        // これにより、既存の数字を保持しつつ、新しく入った不正な文字だけを弾きます
-        let filtered = converted.replace(/[^0-9-]/g, "");
-
-        // 3. ハイフンの数を制限（最大2つまで）
-        const parts = filtered.split("-");
-        if (parts.length > 2) {
-            // 3つ目以降のハイフンは結合して消す
-            filtered = parts.slice(0, 2).join("-") + parts.slice(3).join("");
-        }
-
-        // 4. 数字の合計文字数を制限（最大11文字まで）
-        const digitsOnly = filtered.replace(/-/g, "");
-        if (digitsOnly.length > 7) {
-            // 11文字を超えた場合は、入力を反映させない（以前の状態をキープ）
-            return;
-        }
-
-        setZipCode(filtered);
+        setZipCode((prev) => sanitizeZipForInput(e.target.value, prev));
     };
 
     useEffect(() => {

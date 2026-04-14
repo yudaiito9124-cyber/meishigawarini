@@ -153,12 +153,14 @@ export function OrderCardSection({ shopId }: { shopId: string }) {
                                                 </p>
                                             </div>
                                             {selectedOrderProduct.image_url && (
-                                                <div className="flex justify-center h-48 sm:h-64 animate-in zoom-in fade-in duration-700">
-                                                    <img 
-                                                        src={selectedOrderProduct.image_url} 
-                                                        alt={selectedOrderProduct.name} 
-                                                        className="h-full w-auto object-contain rounded-2xl border-2 border-white shadow-lg bg-white" 
-                                                    />
+                                                <div className="flex justify-center animate-in zoom-in fade-in duration-700">
+                                                    <div className="inline-flex items-center justify-center rounded-2xl border-2 border-white shadow-lg bg-white overflow-hidden">
+                                                        <img
+                                                            src={selectedOrderProduct.image_url}
+                                                            alt={selectedOrderProduct.name}
+                                                            className="block max-h-48 sm:max-h-64 max-w-full w-auto h-auto object-contain"
+                                                        />
+                                                    </div>
                                                 </div>
                                             )}
                                         </div>
@@ -170,7 +172,7 @@ export function OrderCardSection({ shopId }: { shopId: string }) {
                                                     <div className="relative rounded-2xl border-4 border-white shadow-2xl overflow-hidden group ring-1 ring-gray-200/50"
                                                         style={{ aspectRatio: getDesignAspectRatio(selectedOrderProduct.design_id, [], selectedOrderProduct.design) }}>
                                                         <img src={getDesignImages(selectedOrderProduct.design_id, [], selectedOrderProduct.design).front}
-                                                            className="w-full h-full object-fill select-none transition-transform duration-700 group-hover:scale-105" draggable={false} crossOrigin="anonymous" />
+                                                            className="w-full h-full object-fill select-none" draggable={false} crossOrigin="anonymous" />
                                                         <div className="absolute top-3 left-3 px-3 py-1 bg-black/60 backdrop-blur-md text-[10px] font-black text-white rounded-full uppercase tracking-widest shadow-lg">{t('frontView')}</div>
                                                     </div>
                                                 </div>
@@ -178,7 +180,7 @@ export function OrderCardSection({ shopId }: { shopId: string }) {
                                                     <div className="relative rounded-2xl border-4 border-white shadow-2xl overflow-hidden group ring-1 ring-gray-200/50"
                                                         style={{ aspectRatio: getDesignAspectRatio(selectedOrderProduct.design_id, [], selectedOrderProduct.design) }}>
                                                         <img src={getDesignImages(selectedOrderProduct.design_id, [], selectedOrderProduct.design).back}
-                                                            className="w-full h-full object-fill select-none transition-transform duration-700 group-hover:scale-105" draggable={false} crossOrigin="anonymous" />
+                                                            className="w-full h-full object-fill select-none" draggable={false} crossOrigin="anonymous" />
                                                         <div className="absolute top-3 left-3 px-3 py-1 bg-black/60 backdrop-blur-md text-[10px] font-black text-white rounded-full uppercase tracking-widest shadow-lg">{t('backView')}</div>
                                                     </div>
                                                 </div>

@@ -194,7 +194,8 @@ export function ProductsSection({
                     body: resizedBlob
                 });
                 if (!s3Res.ok) throw new Error('Failed to upload image to S3');
-                imageUrl = viewUrl;
+                // DBには期限付きURLではなく永続URLを保存する
+                imageUrl = publicUrl;
             }
 
             if (editingProduct && !isDuplicateMode) {

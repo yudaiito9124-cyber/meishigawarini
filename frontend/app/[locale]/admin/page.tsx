@@ -1092,6 +1092,8 @@ function ShopOpeningInquirySection({ dbCardDesigns }: { dbCardDesigns: any[] }) 
     const [approveDesignId, setApproveDesignId] = useState('');
     const [rejectReason, setRejectReason] = useState('');
     const [adminMemo, setAdminMemo] = useState('');
+    const [replyMessage, setReplyMessage] = useState('');
+    const [replyLoading, setReplyLoading] = useState(false);
     const isDecisionLocked = !!selectedMeta && selectedMeta.status !== 'OPEN';
 
     /**
@@ -1143,6 +1145,15 @@ function ShopOpeningInquirySection({ dbCardDesigns }: { dbCardDesigns: any[] }) 
         }
     };
 
+    const loadInquiryDetails = async (chatId: string) => {
+        const [chatRes, msgRes] = await Promise.all([
+            adminApi.fetch_post('/unified/chat/get', { chat_id: chatId }),
+            adminApi.fetch_post('/unified/chat/messages/get', { chat_id: chatId, limit: 200 }),
+        ]);
+        setSelectedMeta(chatRes.chat || null);
+        setSelectedMessages((msgRes.messages || []).slice().reverse());
+    };
+
     useEffect(() => {
         fetchRequests();
     }, []);
@@ -1159,16 +1170,41 @@ function ShopOpeningInquirySection({ dbCardDesigns }: { dbCardDesigns: any[] }) 
         setApproveDesignId('');
         setRejectReason('');
         setAdminMemo('');
+        setReplyMessage('');
 
         try {
-            const [chatRes, msgRes] = await Promise.all([
-                adminApi.fetch_post('/unified/chat/get', { chat_id: item.chat_id }),
-                adminApi.fetch_post('/unified/chat/messages/get', { chat_id: item.chat_id, limit: 200 }),
-            ]);
-            setSelectedMeta(chatRes.chat || null);
-            setSelectedMessages((msgRes.messages || []).slice().reverse());
+            await loadInquiryDetails(item.chat_id);
         } catch (e) {
             console.error('failed to load inquiry details', e);
+        }
+    };
+
+    const handleSendReply = async () => {
+        const message = replyMessage.trim();
+        if (!selectedMeta?.chat_id || !message || replyLoading || isDecisionLocked) {
+            return;
+        }
+
+        setReplyLoading(true);
+        try {
+            await adminApi.fetch_post('/unified/chat/messages/send', {
+                chat_id: selectedMeta.chat_id,
+                sender_id: 'ADMIN',
+                type: 'TEXT',
+                message,
+            });
+
+            setReplyMessage('');
+            await Promise.all([
+                loadInquiryDetails(selectedMeta.chat_id),
+                fetchRequests(),
+            ]);
+        } catch (e: any) {
+            console.error('failed to send inquiry reply', e);
+            const detail = e?.message || e?.error || e?.statusText || '';
+            alert(detail ? `${t('inquiries.detail.sendFailed')}\n${detail}` : t('inquiries.detail.sendFailed'));
+        } finally {
+            setReplyLoading(false);
         }
     };
 
@@ -1461,6 +1497,33 @@ function ShopOpeningInquirySection({ dbCardDesigns }: { dbCardDesigns: any[] }) 
                                         ))
                                     )}
                                 </div>
+                            </CardContent>
+                        </Card>
+
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>{t('inquiries.detail.replyTitle')}</CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-3">
+                                {isDecisionLocked ? (
+                                    <p className="text-sm text-gray-500">{t('inquiries.detail.chatClosed')}</p>
+                                ) : (
+                                    <>
+                                        <Textarea
+                                            value={replyMessage}
+                                            onChange={(e) => setReplyMessage(e.target.value)}
+                                            placeholder={t('inquiries.detail.messagePlaceholder')}
+                                            disabled={replyLoading || actionLoading}
+                                            rows={4}
+                                        />
+                                        <Button
+                                            onClick={handleSendReply}
+                                            disabled={replyLoading || actionLoading || !replyMessage.trim()}
+                                        >
+                                            {replyLoading ? t('inquiries.detail.sending') : t('inquiries.detail.send')}
+                                        </Button>
+                                    </>
+                                )}
                             </CardContent>
                         </Card>
                     </div>

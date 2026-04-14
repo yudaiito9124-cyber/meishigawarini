@@ -72,7 +72,7 @@
     "createMyShop": "Open a Shop",
     "createMyShopConfirm": "Do you really want to open a shop? This is required only if you want to sell products. It is not needed for sending or receiving gifts.",
     "notifications": {
-      "button": "Notifications",
+      "button": "Application/Chat",
       "title": "Chat Notifications",
       "description": "A list of chat states linked to this user. Click a row to view details.",
       "listTitle": "Notification List",
@@ -82,6 +82,10 @@
       "loading": "Loading...",
       "empty": "No chats are available.",
       "noMessages": "No messages.",
+      "prevPage": "Prev",
+      "nextPage": "Next",
+      "pageOf": "page",
+      "loadOlderMessages": "Load older messages",
       "table": {
         "updatedAt": "Updated At",
         "type": "Type",
@@ -106,11 +110,38 @@
         "linkedShopId": "Linked Shop ID",
         "openShop": "Open Shop",
         "defaultDesignId": "Default Design ID"
-      }
+      },
+      "formSubmitted": {
+        "title": "Application Details",
+        "shopName": "Shop Name",
+        "ownerName": "Applicant Name",
+        "contactEmail": "Contact Email",
+        "notes": "Notes",
+        "submittedAt": "Submitted At",
+        "rawJson": "Show JSON"
+      },
+      "messagePlaceholder": "Type a message... (Enter to send, Shift+Enter for newline)",
+      "sendButton": "Send",
+      "youLabel": "You",
+      "adminLabel": "Operations",
+      "chatClosed": "This chat is closed and no longer accepts messages.",
+      "createNew": "Create New Chat",
+      "createDescription": "Create a new chat.",
+      "chatType": "Chat Type",
+      "chatTypeOptions": {
+        "shopOpening": "Shop Opening",
+        "general": "General"
+      },
+      "initialMessage": "Initial Message (Optional)",
+      "initialMessagePlaceholder": "Type a message...",
+      "cancel": "Cancel",
+      "create": "Create"
     },
     "shopOpenForm": {
       "title": "Shop Opening Verification Form",
       "description": "Submitting this form will create a SHOP_OPENING application chat with the operations team.",
+      "chatTitle": "Shop Opening Request",
+      "submittedMessage": "Shop opening request has been submitted.",
       "shopNameLabel": "Shop Name",
       "shopNamePlaceholder": "e.g. Yamada Fresh Market",
       "ownerNameLabel": "Applicant Name",
@@ -272,7 +303,7 @@
       "orderCard": "Order Cards"
     },
     "notifications": {
-      "button": "Notifications",
+      "button": "Application/Chat",
       "title": "Chat Notifications",
       "description": "A list of chat states linked to this shop. Click a row to view details.",
       "listTitle": "Notification List",
@@ -282,6 +313,10 @@
       "loading": "Loading...",
       "empty": "No chats are available.",
       "noMessages": "No messages.",
+      "prevPage": "Prev",
+      "nextPage": "Next",
+      "pageOf": "page",
+      "loadOlderMessages": "Load older messages",
       "table": {
         "updatedAt": "Updated At",
         "type": "Type",
@@ -306,6 +341,57 @@
         "linkedShopId": "Linked Shop ID",
         "openShop": "Open Shop",
         "defaultDesignId": "Default Design ID"
+      },
+      "formSubmitted": {
+        "title": "Application Details",
+        "shopName": "Shop Name",
+        "ownerName": "Applicant Name",
+        "contactEmail": "Contact Email",
+        "notes": "Notes",
+        "submittedAt": "Submitted At",
+        "rawJson": "Show JSON"
+      },
+      "messagePlaceholder": "Type a message... (Enter to send, Shift+Enter for newline)",
+      "sendButton": "Send",
+      "youLabel": "You",
+      "adminLabel": "Operations",
+      "chatClosed": "This chat is closed and no longer accepts messages.",
+      "createNew": "Create New Chat",
+      "createDescription": "Create a new chat.",
+      "chatType": "Chat Type",
+      "chatTypeOptions": {
+        "shopOpening": "Shop Opening",
+        "general": "General"
+      },
+      "initialMessage": "Initial Message (Optional)",
+      "initialMessagePlaceholder": "Type a message...",
+      "cancel": "Cancel",
+      "create": "Create"
+    },
+    "shopOpenForm": {
+      "title": "Shop Opening Verification Form",
+      "description": "Submitting this form will create a SHOP_OPENING application chat with the operations team.",
+      "chatTitle": "Shop Opening Request",
+      "submittedMessage": "Shop opening request has been submitted.",
+      "shopNameLabel": "Shop Name",
+      "shopNamePlaceholder": "e.g. Yamada Fresh Market",
+      "ownerNameLabel": "Applicant Name",
+      "ownerNamePlaceholder": "e.g. Taro Yamada",
+      "contactEmailLabel": "Contact Email",
+      "contactEmailPlaceholder": "e.g. info@example.com",
+      "contactEmailFixed": "Contact email is fixed to the logged-in user's email address.",
+      "notesLabel": "Notes",
+      "notesPlaceholder": "Add any additional information if needed.",
+      "submit": "Submit",
+      "submitting": "Submitting...",
+      "cancel": "Cancel",
+      "success": "Your application has been submitted. Please wait for review.",
+      "errors": {
+        "required": "Please fill in the required fields.",
+        "noUserId": "Failed to get user information. Please reload and try again.",
+        "noUserEmail": "Failed to get the user's email address. Please reload and try again.",
+        "invalidPayload": "Invalid application payload format. Please check your input and try again.",
+        "submitFailed": "Failed to submit the application. Please try again later."
       }
     },
     "cardOrder": {
@@ -323,6 +409,12 @@
       "confirmDesc": "Are you sure you want to order {quantity} cards for {product} with the design shown below?",
       "link": "Linked to card",
       "product": "Product",
+      "deliveryAddressTitle": "Delivery Address",
+      "deliveryPostalCode": "Postal Code",
+      "deliveryAddress": "Address",
+      "deliveryPhone": "Phone Number",
+      "confirmDeliveryAddress": "Deliver to this address",
+      "deliveryAddressMissing": "Delivery address is not configured. Please set postal code, address, and phone number in Shop Settings.",
       "card front": "Card Front Design",
       "card back": "Card Back Design",
       "historyTitle": "Order History",
@@ -509,6 +601,12 @@
       "ownerEmail": "Owner Email",
       "managerEmails": "Manager Emails",
       "name": "Shop Name",
+      "shopPostalCode": "Card Delivery Postal Code",
+      "shopPostalCodePlaceholder": "010-XXXX",
+      "shopAddress": "Card Delivery Address",
+      "shopAddressPlaceholder": "1-1 Meishigawarini St., Akita",
+      "shopPhone": "Card Delivery Phone Number",
+      "shopPhonePlaceholder": "090-XXXX-XXXX",
       "detailHtml": "Shop Description (HTML)",
       "detailHtmlPlaceholder": "Enter description in HTML format...",
       "submit": "Save Shop Settings",
@@ -800,6 +898,12 @@
         "processing": "Processing...",
         "messageHistory": "Message History",
         "noMessages": "No messages.",
+        "replyTitle": "Admin Reply",
+        "messagePlaceholder": "Enter a message for the applicant...",
+        "send": "Send Message",
+        "sending": "Sending...",
+        "chatClosed": "This request has already been processed, so no additional messages can be sent.",
+        "sendFailed": "Failed to send the message.",
         "close": "Close"
       }
     },

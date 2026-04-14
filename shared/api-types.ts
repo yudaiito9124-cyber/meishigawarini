@@ -61,7 +61,17 @@ export type AdminApiSchema = {
 export type ShopApiSchema = {
     shop_list: { no_create?: boolean };
     shop_details_get: { shop_id: string };
-    shop_details_update: { shop_id: string; name?: string; description?: string; detail_html?: string; html_image_urls?: string[]; deleted_html_image_urls?: string[] };
+    shop_details_update: {
+        shop_id: string;
+        name?: string;
+        description?: string;
+        detail_html?: string;
+        html_image_urls?: string[];
+        deleted_html_image_urls?: string[];
+        shop_postal_code?: string;
+        shop_address?: string;
+        shop_phone?: string;
+    };
     shop_admins: { shop_id: string };
     shop_delete_images: { shop_id: string; keys?: string[]; urls?: string[] };
     shop_orders_list: { shop_id: string; qr_id?: string };

@@ -106,7 +106,9 @@ export function OrderRow({
                                                     src={product.image_url}
                                                     alt={product.name}
                                                     className="w-full h-full object-contain"
-                                                    crossOrigin="anonymous"
+                                                    onError={(e) => {
+                                                        (e.currentTarget as HTMLImageElement).style.display = 'none';
+                                                    }}
                                                 />
                                             </div>
                                         )}
@@ -147,7 +149,6 @@ export function OrderRow({
                                                                 alt="Front"
                                                                 className="w-full h-full object-fill select-none"
                                                                 draggable={false}
-                                                                crossOrigin="anonymous"
                                                             />
                                                         </div>
                                                     </div>
@@ -162,7 +163,6 @@ export function OrderRow({
                                                                 alt="Back"
                                                                 className="w-full h-full object-fill select-none"
                                                                 draggable={false}
-                                                                crossOrigin="anonymous"
                                                             />
                                                         </div>
                                                     </div>

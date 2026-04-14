@@ -20,14 +20,9 @@ import { useTranslations } from 'next-intl';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { UserPen, Send, Inbox, QrCode, LogOut, ChevronDown, Truck, Copy, Check } from 'lucide-react';
 import { signOut, fetchUserAttributes, getCurrentUser } from 'aws-amplify/auth';
 import { userApi } from '@/lib/api/user';
-import { isValidWorkflowPayload } from '@shared/unified-chat-workflows';
 import { UnifiedChatNotifications } from '@/components/chat/UnifiedChatNotifications';
 
 /**
@@ -46,20 +41,8 @@ export default function UserDashboardPage() {
     const [copiedId, setCopiedId] = useState<string | null>(null);
     /** スクロール同期用のコンテナ参照 */
     const containerRef = useRef<HTMLDivElement>(null);
-    /** ショップ開設フォームの表示状態 */
-    const [isShopOpenDialogOpen, setIsShopOpenDialogOpen] = useState(false);
-    /** ショップ開設フォーム送信中状態 */
-    const [isSubmittingShopOpen, setIsSubmittingShopOpen] = useState(false);
-    /** ショップ開設フォーム: ショップ名 */
-    const [shopOpenShopName, setShopOpenShopName] = useState('');
-    /** ショップ開設フォーム: 申請者名 */
-    const [shopOpenOwnerName, setShopOpenOwnerName] = useState('');
-    /** ショップ開設フォーム: 備考 */
-    const [shopOpenNotes, setShopOpenNotes] = useState('');
-    /** ショップ開設フォーム: エラー表示 */
-    const [shopOpenError, setShopOpenError] = useState('');
-    /** ショップ開設フォーム: 完了表示 */
-    const [shopOpenSuccess, setShopOpenSuccess] = useState('');
+    /** 通知コンポーネントの制御ハンドル */
+    const chatNotificationsRef = useRef<{ openShopOpeningForm: (email: string) => void } | null>(null);
 
     /**
      * IDをクリップボードにコピーし、一時的に成功表示を出します。
@@ -135,81 +118,11 @@ export default function UserDashboardPage() {
 
     /**
      * 「ショップを開設する」ボタン押下時の初期化処理。
-     * 直前のエラー/成功メッセージをクリアして申請ダイアログを開きます。
+     * Unified Chat の新規作成ダイアログ（SHOP_OPENINGフォーム）を開きます。
      */
     const handleCreatesop = async () => {
-        setShopOpenError('');
-        setShopOpenSuccess('');
-        setIsShopOpenDialogOpen(true);
-    };
-
-    /**
-     * 「ショップを開設する」フォームを送信し、Unified Chat の SHOP_OPENING 申請を作成します。
-     */
-    const handleSubmitShopOpening = async (e: React.FormEvent) => {
-        e.preventDefault();
-
-        if (!userId) {
-            setShopOpenError(t('shopOpenForm.errors.noUserId'));
-            return;
-        }
-
-        if (!shopOpenShopName.trim() || !shopOpenOwnerName.trim()) {
-            setShopOpenError(t('shopOpenForm.errors.required'));
-            return;
-        }
-        if (!userEmail.trim()) {
-            setShopOpenError(t('shopOpenForm.errors.noUserEmail'));
-            return;
-        }
-
-        setIsSubmittingShopOpen(true);
-        setShopOpenError('');
-        setShopOpenSuccess('');
-
-        try {
-            const participantId = `USER#${userId}`;
-            // FORM_SUBMITTED は unified-chat-workflows.ts で型検証される payload です。
-            // ここでは DB に保存する最小スナップショットだけを送信します。
-            const payload = {
-                form_snapshot: {
-                    shop_name: shopOpenShopName.trim(),
-                    owner_name: shopOpenOwnerName.trim(),
-                    contact_email: userEmail.trim(),
-                    notes: shopOpenNotes.trim() || undefined,
-                },
-                submitted_at: new Date().toISOString(),
-            };
-
-            // フロント側でも事前検証し、明らかな不整合 payload を API に送らないようにします。
-            if (!isValidWorkflowPayload('SHOP_OPENING', 'FORM_SUBMITTED', payload)) {
-                setShopOpenError(t('shopOpenForm.errors.invalidPayload'));
-                setIsSubmittingShopOpen(false);
-                return;
-            }
-
-            await userApi.fetch_post('/unified/chat/create', {
-                chat_type: 'SHOP_OPENING',
-                participants: [participantId, 'ADMIN'],
-                initiator_id: participantId,
-                title: 'Shop Opening Request',
-                initial_message: {
-                    type: 'WORKFLOW',
-                    payload_type: 'FORM_SUBMITTED',
-                    payload
-                }
-            });
-
-            setShopOpenSuccess(t('shopOpenForm.success'));
-            setShopOpenShopName('');
-            setShopOpenOwnerName('');
-            setShopOpenNotes('');
-        } catch (error: any) {
-            const message = error?.message || t('shopOpenForm.errors.submitFailed');
-            setShopOpenError(message);
-        } finally {
-            setIsSubmittingShopOpen(false);
-        }
+        if (!userEmail.trim()) return;
+        chatNotificationsRef.current?.openShopOpeningForm(userEmail);
     };
 
     /**
@@ -273,7 +186,7 @@ export default function UserDashboardPage() {
                         <div className="flex flex-col gap-1.5">
                             <div className="flex items-center gap-2">
                                 <span className="inline-block w-2h-2 rounded-full bg-blue-500 animate-pulse" />
-                                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">{t('userId')} : {userId ? userId : "..."}</p>
+                                <p className="text-[10px] text-gray-400 font-bold tracking-widest">{t('userId')} : {userId ? userId : "..."}</p>
                                 {userId && (
                                     <Button
                                         variant="ghost"
@@ -289,7 +202,7 @@ export default function UserDashboardPage() {
                                     </Button>
                                 )}
                             </div>
-                            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest ml-2">{t('userEmail')} : {userEmail ? userEmail : "..."}</p>
+                            <p className="text-[10px] text-gray-400 font-bold tracking-widest ml-2">{t('userEmail')} : {userEmail ? userEmail : "..."}</p>
                         </div>
                     </div>
                     {/* 操作ボタン（戻る/ログアウト） */}
@@ -318,9 +231,11 @@ export default function UserDashboardPage() {
                          * ─────────────────────────────────────────────────────────────────────────
                          */}
                         <UnifiedChatNotifications
+                            ref={chatNotificationsRef}
                             participantId={`USER#${userId}`}
                             apiFetchPost={userApi.fetch_post.bind(userApi)}
                             translationNamespace="UserProfilePage"
+                            currentUserEmail={userEmail}
                             buttonVariant="outline"
                             buttonClassName="rounded-full bg-white/50 backdrop-blur-sm border-gray-200 text-gray-600 hover:text-gray-900 shadow-sm"
                             disabled={!userId}
@@ -370,85 +285,6 @@ export default function UserDashboardPage() {
                 </Button>
             </div>
 
-            <Dialog open={isShopOpenDialogOpen} onOpenChange={setIsShopOpenDialogOpen}>
-                <DialogContent className="sm:max-w-[560px]">
-                    <DialogHeader>
-                        <DialogTitle>{t('shopOpenForm.title')}</DialogTitle>
-                        <DialogDescription>
-                            {t('shopOpenForm.description')}
-                        </DialogDescription>
-                    </DialogHeader>
-
-                    <form onSubmit={handleSubmitShopOpening} className="space-y-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="shop-open-name">{t('shopOpenForm.shopNameLabel')}</Label>
-                            <Input
-                                id="shop-open-name"
-                                value={shopOpenShopName}
-                                onChange={(e) => setShopOpenShopName(e.target.value)}
-                                placeholder={t('shopOpenForm.shopNamePlaceholder')}
-                                disabled={isSubmittingShopOpen}
-                            />
-                        </div>
-
-                        <div className="space-y-2">
-                            <Label htmlFor="shop-open-owner">{t('shopOpenForm.ownerNameLabel')}</Label>
-                            <Input
-                                id="shop-open-owner"
-                                value={shopOpenOwnerName}
-                                onChange={(e) => setShopOpenOwnerName(e.target.value)}
-                                placeholder={t('shopOpenForm.ownerNamePlaceholder')}
-                                disabled={isSubmittingShopOpen}
-                            />
-                        </div>
-
-                        <div className="space-y-2">
-                            <Label htmlFor="shop-open-email">{t('shopOpenForm.contactEmailLabel')}</Label>
-                            <Input
-                                id="shop-open-email"
-                                type="email"
-                                value={userEmail}
-                                placeholder={t('shopOpenForm.contactEmailPlaceholder')}
-                                readOnly
-                                disabled
-                            />
-                            <p className="text-xs text-gray-500">{t('shopOpenForm.contactEmailFixed')}</p>
-                        </div>
-
-                        <div className="space-y-2">
-                            <Label htmlFor="shop-open-notes">{t('shopOpenForm.notesLabel')}</Label>
-                            <Textarea
-                                id="shop-open-notes"
-                                value={shopOpenNotes}
-                                onChange={(e) => setShopOpenNotes(e.target.value)}
-                                placeholder={t('shopOpenForm.notesPlaceholder')}
-                                disabled={isSubmittingShopOpen}
-                            />
-                        </div>
-
-                        {shopOpenError && (
-                            <p className="text-sm text-red-600 font-medium">{shopOpenError}</p>
-                        )}
-                        {shopOpenSuccess && (
-                            <p className="text-sm text-green-700 font-medium">{shopOpenSuccess}</p>
-                        )}
-
-                        <DialogFooter>
-                            <Button
-                                type="button"
-                                variant="outline"
-                                onClick={() => setIsShopOpenDialogOpen(false)}
-                                disabled={isSubmittingShopOpen}
-                            >
-                                {t('shopOpenForm.cancel')}
-                            </Button>
-                            <Button type="submit" disabled={isSubmittingShopOpen}>
-                                {isSubmittingShopOpen ? t('shopOpenForm.submitting') : t('shopOpenForm.submit')}
-                            </Button>
-                        </DialogFooter>
-                    </form>
-                </DialogContent>
-            </Dialog>
         </div>
     );
 }

@@ -102,7 +102,15 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         // 目的: プロフィール更新、および「使われなくなった画像」の自動削除。
         // --------------------------------------------------------------------
         if (action === 'update') {
-            const { name, detail_html, html_image_urls, deleted_html_image_urls } = body as ShopApiSchema['shop_details_update'];
+            const {
+                name,
+                detail_html,
+                html_image_urls,
+                deleted_html_image_urls,
+                shop_postal_code,
+                shop_address,
+                shop_phone
+            } = body as ShopApiSchema['shop_details_update'];
             const updateExpr: string[] = ['ts_updated_at = :now'];
             const attrNames: any = {};
             const attrValues: any = { ':now': new Date().toISOString() };
@@ -110,6 +118,9 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             if (name !== undefined) { updateExpr.push('#name = :name'); attrNames['#name'] = 'name'; attrValues[':name'] = name; }
             // 保存前に署名を除去（DB には純粋な S3 Key のみを格納する方針）
             if (detail_html !== undefined) { updateExpr.push('detail_html = :html'); attrValues[':html'] = stripSignaturesInHtml(detail_html, BUCKET_NAME); }
+            if (shop_postal_code !== undefined) { updateExpr.push('shop_postal_code = :shop_postal_code'); attrValues[':shop_postal_code'] = shop_postal_code; }
+            if (shop_address !== undefined) { updateExpr.push('shop_address = :shop_address'); attrValues[':shop_address'] = shop_address; }
+            if (shop_phone !== undefined) { updateExpr.push('shop_phone = :shop_phone'); attrValues[':shop_phone'] = shop_phone; }
 
             // 画像 URL リストの同期と物理削除処理
             if (html_image_urls !== undefined) {

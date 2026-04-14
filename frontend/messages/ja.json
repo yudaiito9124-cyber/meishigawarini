@@ -78,7 +78,7 @@
     "createMyShop": "ショップを開設する",
     "createMyShopConfirm": "本当にショップを開設しますか？これは、「名刺がわりに」で商品を販売したい場合に必要な手続きです。ギフトを渡したり、受け取ったりする場合は不要です。",
     "notifications": {
-      "button": "通知",
+      "button": "申請・チャット",
       "title": "チャット通知一覧",
       "description": "このユーザーに紐づくチャット状態の一覧です。行をクリックすると詳細を表示します。",
       "listTitle": "通知一覧",
@@ -88,6 +88,10 @@
       "loading": "読み込み中...",
       "empty": "表示できるチャットはありません。",
       "noMessages": "メッセージはありません。",
+      "prevPage": "前へ",
+      "nextPage": "次へ",
+      "pageOf": "ページ",
+      "loadOlderMessages": "過去のメッセージを読む",
       "table": {
         "updatedAt": "最終更新",
         "type": "種別",
@@ -112,11 +116,38 @@
         "linkedShopId": "連携ショップID",
         "openShop": "ショップを開く",
         "defaultDesignId": "初期カードデザインID"
-      }
+      },
+      "formSubmitted": {
+        "title": "申請内容",
+        "shopName": "ショップ名",
+        "ownerName": "申請者名",
+        "contactEmail": "連絡先メール",
+        "notes": "備考",
+        "submittedAt": "申請日時",
+        "rawJson": "JSONを表示"
+      },
+      "messagePlaceholder": "メッセージを入力... (Enterで送信、Shift+Enterで改行)",
+      "sendButton": "送信",
+      "youLabel": "あなた",
+      "adminLabel": "運営",
+      "chatClosed": "このチャットは既に完了しているため、メッセージは送信できません。",
+      "createNew": "新規チャット作成",
+      "createDescription": "新規チャットを作成します。",
+      "chatType": "チャットタイプ",
+      "chatTypeOptions": {
+        "shopOpening": "ショップ開設",
+        "general": "一般"
+      },
+      "initialMessage": "初期メッセージ（オプション）",
+      "initialMessagePlaceholder": "メッセージを入力...",
+      "cancel": "キャンセル",
+      "create": "作成"
     },
     "shopOpenForm": {
       "title": "ショップ開設 認証フォーム",
       "description": "内容を送信すると、運営側との申請チャット（SHOP_OPENING）が作成されます。",
+      "chatTitle": "ショップ開設申請",
+      "submittedMessage": "ショップ開設申請を申請しました",
       "shopNameLabel": "ショップ名",
       "shopNamePlaceholder": "例: 山田青果店",
       "ownerNameLabel": "申請者名",
@@ -281,7 +312,7 @@
       "orderCard": "カード発注"
     },
     "notifications": {
-      "button": "通知",
+      "button": "申請・チャット",
       "title": "チャット通知一覧",
       "description": "このショップに紐づくチャット状態の一覧です。行をクリックすると詳細を表示します。",
       "listTitle": "通知一覧",
@@ -291,6 +322,10 @@
       "loading": "読み込み中...",
       "empty": "表示できるチャットはありません。",
       "noMessages": "メッセージはありません。",
+      "prevPage": "前へ",
+      "nextPage": "次へ",
+      "pageOf": "ページ",
+      "loadOlderMessages": "過去のメッセージを読む",
       "table": {
         "updatedAt": "最終更新",
         "type": "種別",
@@ -315,6 +350,57 @@
         "linkedShopId": "連携ショップID",
         "openShop": "ショップを開く",
         "defaultDesignId": "初期カードデザインID"
+      },
+      "formSubmitted": {
+        "title": "申請内容",
+        "shopName": "ショップ名",
+        "ownerName": "申請者名",
+        "contactEmail": "連絡先メール",
+        "notes": "備考",
+        "submittedAt": "申請日時",
+        "rawJson": "JSONを表示"
+      },
+      "messagePlaceholder": "メッセージを入力... (Enterで送信、Shift+Enterで改行)",
+      "sendButton": "送信",
+      "youLabel": "あなた",
+      "adminLabel": "運営",
+      "chatClosed": "このチャットは既に完了しているため、メッセージは送信できません。",
+      "createNew": "新規チャット作成",
+      "createDescription": "新規チャットを作成します。",
+      "chatType": "チャットタイプ",
+      "chatTypeOptions": {
+        "shopOpening": "ショップ開設",
+        "general": "一般"
+      },
+      "initialMessage": "初期メッセージ（オプション）",
+      "initialMessagePlaceholder": "メッセージを入力...",
+      "cancel": "キャンセル",
+      "create": "作成"
+    },
+    "shopOpenForm": {
+      "title": "ショップ開設 認証フォーム",
+      "description": "内容を送信すると、運営側との申請チャット（SHOP_OPENING）が作成されます。",
+      "chatTitle": "ショップ開設申請",
+      "submittedMessage": "ショップ開設申請を申請しました",
+      "shopNameLabel": "ショップ名",
+      "shopNamePlaceholder": "例: 山田青果店",
+      "ownerNameLabel": "申請者名",
+      "ownerNamePlaceholder": "例: 山田 太郎",
+      "contactEmailLabel": "連絡先メールアドレス",
+      "contactEmailPlaceholder": "例: info@example.com",
+      "contactEmailFixed": "連絡先メールアドレスはログイン中ユーザーのメールに固定されます。",
+      "notesLabel": "備考",
+      "notesPlaceholder": "補足事項があれば記載してください。",
+      "submit": "送信する",
+      "submitting": "送信中...",
+      "cancel": "キャンセル",
+      "success": "申請を送信しました。運営側の確認をお待ちください。",
+      "errors": {
+        "required": "必須項目を入力してください。",
+        "noUserId": "ユーザー情報の取得に失敗しました。再読み込みしてからお試しください。",
+        "noUserEmail": "ユーザーのメールアドレスを取得できませんでした。再読み込みしてからお試しください。",
+        "invalidPayload": "申請データ形式が不正です。入力内容を確認して再度お試しください。",
+        "submitFailed": "申請の送信に失敗しました。時間をおいて再度お試しください。"
       }
     },
     "cardOrder": {
@@ -332,6 +418,12 @@
       "confirmDesc": "{product} 用のカードを以下のデザインで {quantity} 枚発注します。よろしいですか？",
       "link": "専用に設定",
       "product": "商品",
+      "deliveryAddressTitle": "お届け先住所",
+      "deliveryPostalCode": "郵便番号",
+      "deliveryAddress": "住所",
+      "deliveryPhone": "電話番号",
+      "confirmDeliveryAddress": "発注したカードは、ショップの設定画面で設定した、上記の住所に配送されることを理解しました",
+      "deliveryAddressMissing": "お届け先住所が未設定です。設定画面で郵便番号・住所・電話番号を設定してください。",
       "card front": "カード表面デザイン",
       "card back": "カード裏面デザイン",
       "historyTitle": "発注履歴",
@@ -575,6 +667,12 @@
       "ownerEmail": "オーナーのメールアドレス",
       "managerEmails": "管理者のメールアドレス",
       "name": "ショップ名",
+      "shopPostalCode": "ショップ・カード配送先の郵便番号",
+      "shopPostalCodePlaceholder": "010-XXXX等(ハイフンなしでも可)",
+      "shopAddress": "ショップ・カード配送先の住所",
+      "shopAddressPlaceholder": "秋田県秋田市名刺代わりに町1-1",
+      "shopPhone": "ショップ・カード配送先の電話番号",
+      "shopPhonePlaceholder": "090-XXXX-XXXX等(ハイフンなしでも可)",
       "detailHtml": "ショップ紹介(HTML)",
       "detailHtmlPlaceholder": "HTML(CSS)形式で入力してください(googlemap,youtube埋め込み可能です)。書き方がわからない場合は生成AI用のプロンプトファイルも用意しております。右上のボタンからダウンロードし、参考にするホームページのURLや作成したいイメージとともに生成AIに渡してください。",
       "submit": "保存",
@@ -896,6 +994,12 @@
         "processing": "処理中...",
         "messageHistory": "メッセージ履歴",
         "noMessages": "メッセージはありません。",
+        "replyTitle": "管理者返信",
+        "messagePlaceholder": "申請者へメッセージを入力してください...",
+        "send": "メッセージを送信",
+        "sending": "送信中...",
+        "chatClosed": "この申請は処理済みのため、追加メッセージは送信できません。",
+        "sendFailed": "メッセージの送信に失敗しました。",
         "close": "閉じる"
       }
     },

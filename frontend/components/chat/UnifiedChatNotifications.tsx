@@ -15,17 +15,22 @@
  */
 
 import React, { useEffect, useMemo, useState } from 'react';
-// ベルアイコン（lucide-react はアイコンライブラリ）
-import { Bell } from 'lucide-react';
+// チャットアイコン（lucide-react はアイコンライブラリ）
+import { MessageCircle } from 'lucide-react';
 // next-intl の翻訳フック（テキストを ja.json / en.json から取得します）
 import { useTranslations } from 'next-intl';
 // i18n対応のLinkコンポーネント（URLに言語プレフィックスを自動付与します）
 import { Link } from '@/i18n/routing';
 // 共通UIコンポーネント（shadcn/ui ライブラリ）
 import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { useImperativeHandle } from 'react';
+import { isValidWorkflowPayload } from '@shared/unified-chat-workflows';
 
 /**
  * チャット一覧の各行に対応する型定義。
@@ -49,6 +54,7 @@ type ChatMessage = {
     message_id?: string;           // メッセージの一意なID
     seq?: number;                  // チャット内のメッセージ連番（既読管理に使用）
     sender_id?: string;            // 送信者ID（例: "ADMIN", "USER#xxx", "SHOP#xxx"）
+    username?: string;             // 表示用ユーザー名（保存済みの場合）
     ts_created_at?: string;        // メッセージ作成日時
     message?: string;              // メッセージ本文
     payload_type?: string;         // WORKFLOWメッセージの種別（例: "ADMIN_DECISION"）
@@ -112,6 +118,8 @@ interface UnifiedChatNotificationsProps {
     buttonVariant?: 'default' | 'outline' | 'ghost' | 'link' | 'secondary' | 'destructive';
     /** true の場合はボタンを無効化します（ユーザーIDが未取得の間など） */
     disabled?: boolean;
+    /** ログイン中ユーザーのメールアドレス（SHOP_OPENINGフォームの固定表示に利用） */
+    currentUserEmail?: string;
 }
 
 /**
@@ -131,14 +139,18 @@ interface UnifiedChatNotificationsProps {
  *     translationNamespace="UserProfilePage"
  *   />
  */
-export function UnifiedChatNotifications({
+export const UnifiedChatNotifications = React.forwardRef<
+    { openShopOpeningForm: (email: string) => void },
+    UnifiedChatNotificationsProps
+>(({
     participantId,
     apiFetchPost,
     translationNamespace,
     buttonClassName,
     buttonVariant = 'ghost',
     disabled = false,
-}: UnifiedChatNotificationsProps) {
+    currentUserEmail,
+}, ref) => {
     // 指定されたネームスペースの翻訳関数。t('notifications.button') のように使用します。
     const t = useTranslations(translationNamespace);
 
@@ -158,120 +170,149 @@ export function UnifiedChatNotifications({
     const [selectedMessages, setSelectedMessages] = useState<ChatMessage[]>([]);
     /** チャット詳細の取得中フラグ */
     const [detailLoading, setDetailLoading] = useState(false);
+    /** チャット一覧のページサイズ（選択可能: 5 / 10 / 25 / 50） */
+    const [chatPageSize, setChatPageSize] = useState<number>(10);
+    /** ページごとのカーソル配列。index = ページ番号（0始まり）、値 = そのページを取得する際に使うカーソル */
+    const [chatPageCursors, setChatPageCursors] = useState<(string | null)[]>([null]);
+    /** 現在表示しているページ番号（0始まり） */
+    const [chatPageIdx, setChatPageIdx] = useState<number>(0);
+    /** 次のページが存在するか */
+    const [chatHasNext, setChatHasNext] = useState(false);
+    /** メッセージ一覧のページサイズ（選択可能: 10 / 20 / 50 / 100） */
+    const [msgPageSize, setMsgPageSize] = useState<number>(20);
+    /** メッセージ一覧にさらに過去があるか */
+    const [msgHasOlder, setMsgHasOlder] = useState(false);
+    /** 過去メッセージ読み込み中フラグ */
+    const [olderMsgLoading, setOlderMsgLoading] = useState(false);
+    /** メッセージ入力テキスト */
+    const [inputMessage, setInputMessage] = useState('');
+    /** メッセージ送信中フラグ */
+    const [sendingMessage, setSendingMessage] = useState(false);
 
-    // ─── 審査証拠メッセージの検出 ───────────────────────────────────────────
+    // ─── 新規チャット作成用ステート ────────────────────────────────────────────
+    /** 新規チャット作成ダイアログの開閉状態 */
+    const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+    /** 新規チャット作成フォームのデータ */
+    const [createFormData, setCreateFormData] = useState<{
+        chat_type: string;
+        initial_message?: string;
+    }>({ chat_type: 'SHOP_OPENING', initial_message: '' });
+    /** チャット作成中フラグ */
+    const [creatingChat, setCreatingChat] = useState(false);
+
+    // ─── ショップ開設フォーム用ステート ─────────────────────────────────────────
+    /** ショップ開設フォーム: ショップ名 */
+    const [shopOpenShopName, setShopOpenShopName] = useState('');
+    /** ショップ開設フォーム: 申請者名 */
+    const [shopOpenOwnerName, setShopOpenOwnerName] = useState('');
+    /** ショップ開設フォーム: 備考 */
+    const [shopOpenNotes, setShopOpenNotes] = useState('');
+    /** ショップ開設フォーム: エラー表示 */
+    const [shopOpenError, setShopOpenError] = useState('');
+    /** ショップ開設フォーム用のメールアドレス（ログイン中メールで固定表示） */
+    const [userEmail, setUserEmail] = useState('');
+
+    // ─── 審査判定（単一ルール） ─────────────────────────────────────────────
     /**
-     * メッセージ一覧の中から「審査結果が含まれているメッセージ」を探します。
-     * 新しいメッセージ（後ろ）から順番に探し、最初に見つかったものを返します。
-     *
-     * 審査証拠とみなす条件（いずれかに該当すれば証拠とみなす）:
-     *   1. workflow_status が "APPROVED" または "REJECTED"
-     *   2. payload.approved が true または false（ブール値）
-     *   3. payload.linked_shop_id または payload.shop_id が文字列として存在
-     *
-     * 【なぜ payload_type === 'ADMIN_DECISION' で絞り込まないのか】
-     *   古いデータや特定の保存経路ではこのフィールドが欠落している場合があるため、
-     *   payload_type には依存せず、審査の証拠となるフィールドの有無で判定しています。
+     * 審査結果は「最新の ADMIN_DECISION メッセージ」だけを根拠にします。
+     * payload.approved が true/false のどちらかなら確定、なければ未判定として扱います。
      */
-    const decisionEvidence = useMemo(() => {
+    const adminDecisionMessage = useMemo(() => {
         for (let i = selectedMessages.length - 1; i >= 0; i -= 1) {
             const message = selectedMessages[i];
-
-            // 判定1: workflow_status フィールドが承認/却下を示している場合
-            const wf = (message?.workflow_status || '').toUpperCase();
-            if (wf === 'APPROVED' || wf === 'REJECTED') {
-                return message;
-            }
-
-            // 判定2: payload.approved が明示的に boolean 値で設定されている場合
-            if (message?.payload?.approved === true || message?.payload?.approved === false) {
-                return message;
-            }
-
-            // 判定3: 承認時に紐付けられたショップIDが存在する場合
-            const maybeShopId = message?.payload?.linked_shop_id || message?.payload?.shop_id;
-            if (typeof maybeShopId === 'string' && maybeShopId.trim()) {
+            if (message?.payload_type === 'ADMIN_DECISION') {
                 return message;
             }
         }
-        // 審査証拠が見つからない = まだ審査されていない
         return null;
     }, [selectedMessages]);
 
-    // ─── 審査結果ステータスの判定 ────────────────────────────────────────────
-    /**
-     * 審査証拠メッセージとチャットメタデータから最終的な審査結果を文字列で返します。
-     *
-     * 返り値:
-     *   'APPROVED'  ... 承認された
-     *   'REJECTED'  ... 却下された
-     *   'RESOLVED'  ... チャットが解決済みだが、具体的な判定内容が読み取れない場合
-     *   'PENDING'   ... まだ審査されていない（デフォルト）
-     *
-     * 優先順位:
-     *   1. workflow_status フィールド（最も信頼性が高い）
-     *   2. payload.approved フィールド
-     *   3. チャット全体の status（RESOLVED / CLOSED）
-     *   4. PENDING（デフォルト）
-     */
     const decisionStatus = useMemo(() => {
-        // 優先度1: workflow_status が明示的に設定されている場合はそれを使用
-        const wf = (decisionEvidence?.workflow_status || '').toUpperCase();
-        if (wf === 'APPROVED') return 'APPROVED';
-        if (wf === 'REJECTED') return 'REJECTED';
-
-        // 優先度2: payload.approved（boolean）から判定
-        if (decisionEvidence?.payload?.approved === true) return 'APPROVED';
-        if (decisionEvidence?.payload?.approved === false) return 'REJECTED';
-
-        // 優先度3: チャット自体が解決済みステータスの場合はその旨を表示
-        // （個別メッセージに審査フィールドがない古いデータへのフォールバック）
-        const metaStatus = (selectedChat?.status || '').toUpperCase();
-        if (metaStatus === 'RESOLVED' || metaStatus === 'CLOSED') return 'RESOLVED';
-
-        // デフォルト: 審査証拠が見つからない = まだ審査中
+        if (adminDecisionMessage?.payload?.approved === true) return 'APPROVED';
+        if (adminDecisionMessage?.payload?.approved === false) return 'REJECTED';
         return 'PENDING';
-    }, [decisionEvidence, selectedChat]);
+    }, [adminDecisionMessage]);
 
-    // ─── 紐付けられたショップIDの抽出 ────────────────────────────────────────
     /**
-     * 承認時に作成されたショップのIDを3段階で探します。
-     *
-     * 探索順序:
-     *   1. 審査証拠メッセージ（decisionEvidence）の payload から直接取得
-     *   2. 全メッセージをスキャンして linked_shop_id / shop_id を探す
-     *   3. チャットの participants 配列から "SHOP#" プレフィックスを探す
-     *
-     * 取得できた場合は "SHOP#" プレフィックスを除去した純粋なIDを返します。
-     * 取得できなかった場合は空文字 '' を返します。
+     * 紐付けショップIDも同じ ADMIN_DECISION メッセージだけから取得します。
      */
     const linkedShopId = useMemo(() => {
-        // 探索1: 審査証拠メッセージのペイロードから直接取得（最も確実）
-        const direct = decisionEvidence?.payload?.linked_shop_id || decisionEvidence?.payload?.shop_id;
-        if (typeof direct === 'string' && direct.trim()) {
-            // "SHOP#xxx" 形式のプレフィックスを除去して純粋なIDだけを返す
-            return direct.trim().replace(/^SHOP#/, '');
+        const raw = adminDecisionMessage?.payload?.linked_shop_id || adminDecisionMessage?.payload?.shop_id;
+        if (typeof raw === 'string' && raw.trim()) {
+            return raw.trim().replace(/^SHOP#/, '');
         }
-
-        // 探索2: 全メッセージをスキャン（審査証拠ではないメッセージにIDが含まれる場合）
-        for (let i = selectedMessages.length - 1; i >= 0; i -= 1) {
-            const payload = selectedMessages[i]?.payload;
-            const candidate = payload?.linked_shop_id || payload?.shop_id;
-            if (typeof candidate === 'string' && candidate.trim()) {
-                return candidate.trim().replace(/^SHOP#/, '');
-            }
-        }
-
-        // 探索3: チャットのparticipants配列から "SHOP#" で始まるIDを探す
-        // （メッセージにIDが記録されていない場合の最終フォールバック）
-        const participantShopId = selectedChat?.participants?.find((p) => typeof p === 'string' && p.startsWith('SHOP#'));
-        if (participantShopId) {
-            return participantShopId.replace(/^SHOP#/, '');
-        }
-
-        // どこにもショップIDが見つからない場合は空文字を返す
         return '';
-    }, [decisionEvidence, selectedMessages, selectedChat]);
+    }, [adminDecisionMessage]);
+
+    /**
+     * 送信者名の表示ルール:
+     * - 自分の発言: 「あなた」
+     * - 相手の発言: username があればそれを優先
+     * - ADMIN のみ固定ラベル
+     * - それ以外は sender_id を最後のフォールバックとして表示
+     */
+    const getSenderDisplayName = (message: ChatMessage): string => {
+        const senderId = message.sender_id || '';
+        if (senderId && senderId === participantId) {
+            return t('notifications.youLabel');
+        }
+        if (senderId === 'ADMIN' || senderId.startsWith('ADMIN#')) {
+            return t('notifications.adminLabel');
+        }
+        if (message.username && message.username.trim()) {
+            return message.username.trim();
+        }
+        return senderId || '-';
+    };
+
+    const renderWorkflowPayload = (message: ChatMessage): React.ReactNode => {
+        if (!message.payload_type) return null;
+
+        if (message.payload_type === 'FORM_SUBMITTED') {
+            const formSnapshot = message.payload && typeof message.payload === 'object'
+                ? (message.payload as any).form_snapshot
+                : null;
+            const submittedAt = message.payload && typeof message.payload === 'object'
+                ? (message.payload as any).submitted_at
+                : null;
+
+            return (
+                <div className="mt-2 rounded-md border bg-gray-50 p-2 text-xs text-gray-700 space-y-1">
+                    <div className="font-semibold text-gray-800">{t('notifications.formSubmitted.title')}</div>
+                    <div>
+                        <span className="text-gray-500">{t('notifications.formSubmitted.shopName')}:</span>{' '}
+                        {formSnapshot?.shop_name || '-'}
+                    </div>
+                    <div>
+                        <span className="text-gray-500">{t('notifications.formSubmitted.ownerName')}:</span>{' '}
+                        {formSnapshot?.owner_name || '-'}
+                    </div>
+                    <div>
+                        <span className="text-gray-500">{t('notifications.formSubmitted.contactEmail')}:</span>{' '}
+                        {formSnapshot?.contact_email || '-'}
+                    </div>
+                    <div>
+                        <span className="text-gray-500">{t('notifications.formSubmitted.notes')}:</span>{' '}
+                        {formSnapshot?.notes || '-'}
+                    </div>
+                    <div>
+                        <span className="text-gray-500">{t('notifications.formSubmitted.submittedAt')}:</span>{' '}
+                        {submittedAt ? new Date(submittedAt).toLocaleString() : '-'}
+                    </div>
+                    <details>
+                        <summary className="cursor-pointer text-gray-500">{t('notifications.formSubmitted.rawJson')}</summary>
+                        <pre className="mt-1 whitespace-pre-wrap break-all text-[11px] text-gray-600">
+                            {JSON.stringify(message.payload, null, 2)}
+                        </pre>
+                    </details>
+                </div>
+            );
+        }
+
+        return (
+            <div className="mt-1 text-xs text-gray-500">{message.payload_type}</div>
+        );
+    };
 
     // ─── 未読件数の合計 ───────────────────────────────────────────────────────
     /**
@@ -281,26 +322,96 @@ export function UnifiedChatNotifications({
      */
     const unreadTotal = useMemo(() => chats.reduce((sum, chat) => sum + (chat.unread_count_cache ?? 0), 0), [chats]);
 
+    /**
+     * 完了ステータス（APPROVED / REJECTED / CANCELLED / RESOLVED / CLOSED）かどうか。
+     * チャットが封じられている間はメッセージ入力欄を非表示にします。
+     */
+    const TERMINAL_STATUSES = new Set(['APPROVED', 'REJECTED', 'CANCELLED', 'RESOLVED', 'CLOSED']);
+    const isChatClosed = useMemo(
+        () => TERMINAL_STATUSES.has((selectedChat?.status || '').toUpperCase()),
+        [selectedChat],
+    );
+
+    // 呼び出し元から渡されたログイン中メールをフォーム表示用stateへ同期
+    useEffect(() => {
+        setUserEmail(currentUserEmail || '');
+    }, [currentUserEmail]);
+
     // ─── チャット一覧の取得 ───────────────────────────────────────────────────
     /**
      * /unified/chat/list APIを呼び出してチャット一覧を取得します。
      * participantId に対応する全チャット（最大100件）を取得し、state に保存します。
      * ダイアログを開いたとき・更新ボタンを押したときに呼ばれます。
      */
-    const fetchNotifications = async () => {
+    /**
+     * 指定ページ番号のチャット一覧を取得してリストを置き換えます。
+     * @param idx 取得するページのインデックス（0始まり）
+     * @param cursors 最新のカーソル配列（state 遅延を避けるため引数で渡す）
+     */
+    const fetchPage = async (idx: number, cursors: (string | null)[] = chatPageCursors) => {
         setNotificationLoading(true);
         try {
-            const response = await apiFetchPost('/unified/chat/list', {
+            const body: Record<string, any> = {
                 participant_id: participantId,
-                include_archived: false, // アーカイブ済みは除外
-                limit: 100,
+                include_archived: false,
+                limit: chatPageSize,
+            };
+            const cursor = cursors[idx] ?? null;
+            if (cursor) body.cursor = cursor;
+            const response = await apiFetchPost('/unified/chat/list', body);
+            const items: ChatListItem[] = response.items || [];
+            const nextCursor: string | null = response.cursor ?? null;
+            setChats(items);
+            setChatPageIdx(idx);
+            // 次ページのカーソルを配列に記録（ページサイズ変更後は上書き）
+            setChatPageCursors((prev) => {
+                const updated = [...prev];
+                updated[idx] = cursor;
+                if (nextCursor) updated[idx + 1] = nextCursor;
+                else updated.splice(idx + 1); // 次ページ不在なら以降を削除
+                return updated;
             });
-            // API レスポンスの items 配列を state にセット（なければ空配列）
-            setChats(response.items || []);
+            setChatHasNext(!!nextCursor);
         } catch (e) {
             console.error('Failed to fetch notifications', e);
         } finally {
             setNotificationLoading(false);
+        }
+    };
+
+    /** ダイアログを開いたとき・更新ボタンを押したときに1ページ目から取り直す */
+    const fetchNotifications = () => {
+        const fresh: (string | null)[] = [null];
+        setChatPageCursors(fresh);
+        setChatPageIdx(0);
+        setChatHasNext(false);
+        fetchPage(0, fresh);
+    };
+
+    // ─── 過去メッセージの追加読み込み ────────────────────────────────────────
+    /**
+     * 現在表示中のメッセージより古い履歴を before_seq で遡って取得し、先頭に追記します。
+     * 「いつくかの件数を選択できる」msgPageSize をそのまま limit に使います。
+     */
+    const loadOlderMessages = async () => {
+        if (!selectedChatId || selectedMessages.length === 0) return;
+        setOlderMsgLoading(true);
+        try {
+            const oldestSeq = selectedMessages[0]?.seq;
+            const res = await apiFetchPost('/unified/chat/messages/get', {
+                chat_id: selectedChatId,
+                limit: msgPageSize,
+                ...(typeof oldestSeq === 'number' ? { before_seq: oldestSeq } : {}),
+            });
+            // APIは新しい順で返るため reverse() して古い順に揃えてから先頭に追加
+            const older: ChatMessage[] = (res.messages || []).slice().reverse();
+            // 取得件数が limit と同じなら、さらに過去が存在する可能性がある
+            setMsgHasOlder(older.length === msgPageSize);
+            setSelectedMessages((prev) => [...older, ...prev]);
+        } catch (e) {
+            console.error('Failed to load older messages', e);
+        } finally {
+            setOlderMsgLoading(false);
         }
     };
 
@@ -315,6 +426,8 @@ export function UnifiedChatNotifications({
      * @param chatId 選択されたチャットのID
      */
     const openChatDetail = async (chatId: string) => {
+        // チャットを切り替えるとき入力をリセット
+        setInputMessage('');
         // 選択中チャットIDを即座に更新（右パネルのローディング表示に使用）
         setSelectedChatId(chatId);
         setDetailLoading(true);
@@ -322,7 +435,7 @@ export function UnifiedChatNotifications({
             // チャットメタとメッセージ一覧を並列で取得（Promise.all で同時リクエスト）
             const [chatRes, messagesRes] = await Promise.all([
                 apiFetchPost('/unified/chat/get', { chat_id: chatId }),
-                apiFetchPost('/unified/chat/messages/get', { chat_id: chatId, limit: 200 }),
+                apiFetchPost('/unified/chat/messages/get', { chat_id: chatId, limit: msgPageSize }),
             ]);
 
             // チャットメタデータを state にセット
@@ -330,7 +443,10 @@ export function UnifiedChatNotifications({
 
             // メッセージはAPIからは「新しい順（降順）」で返ってくるため、
             // .reverse() で「古い順（昇順）」にしてから表示します
-            setSelectedMessages((messagesRes.messages || []).slice().reverse());
+            const reversed: ChatMessage[] = (messagesRes.messages || []).slice().reverse();
+            setSelectedMessages(reversed);
+            // 取得件数が limit と同じなら、さらに過去が存在する可能性がある
+            setMsgHasOlder(reversed.length === msgPageSize);
 
             // ─── 既読処理 ────────────────────────────────────────────────────
             // 未読数が1件以上あり、最終メッセージ連番が取得できた場合のみ既読APIを呼ぶ
@@ -372,8 +488,175 @@ export function UnifiedChatNotifications({
             setSelectedChatId(null);
             setSelectedChat(null);
             setSelectedMessages([]);
+            setMsgHasOlder(false);
+                    setInputMessage('');
         }
     }, [isOpen]);
+
+    // チャット一覧のページサイズが変わったらカーソル履歴をリセットして1ページ目から取り直す
+    useEffect(() => {
+        if (!isOpen) return;
+        const fresh: (string | null)[] = [null];
+        setChatPageCursors(fresh);
+        setChatPageIdx(0);
+        setChatHasNext(false);
+        setChats([]);
+        fetchPage(0, fresh);
+    }, [chatPageSize]);
+
+    // ─── 新規チャット作成 ────────────────────────────────────────────────────
+    /**
+     * 新規チャットを作成します。
+     * /unified/chat/create APIを呼び出し、chat_type・participants・initiator_id を送信します。
+     * 作成完了後はチャット一覧をリロードしてダイアログを閉じます。
+     */
+    const createNewChat = async (overridePayload?: Record<string, any>) => {
+        if (!createFormData.chat_type || creatingChat) return;
+        setCreatingChat(true);
+        try {
+            const payload: Record<string, any> = overridePayload || {
+                chat_type: createFormData.chat_type,
+                participants: [participantId, 'ADMIN'],
+                initiator_id: participantId,
+            };
+            
+            // overridePayload がない場合は initial_message を追加
+            if (!overridePayload && createFormData.initial_message?.trim()) {
+                payload.initial_message = {
+                    type: 'TEXT',
+                    message: createFormData.initial_message.trim(),
+                };
+            }
+            const res = await apiFetchPost('/unified/chat/create', payload);
+            console.log('Created chat:', res.chat_id);
+            // 作成成功後はダイアログを閉じてチャット一覧をリロード
+            setIsCreateDialogOpen(false);
+            setCreateFormData({ chat_type: 'GENERAL', initial_message: '' });
+            setShopOpenShopName('');
+            setShopOpenOwnerName('');
+            setShopOpenNotes('');
+            setShopOpenError('');
+            fetchNotifications();
+        } catch (e) {
+            console.error('Failed to create chat', e);
+            alert('チャット作成に失敗しました');
+        } finally {
+            setCreatingChat(false);
+        }
+    };
+
+    // ─── ショップ開設フォーム送信 ─────────────────────────────────────────────
+    /**
+     * ショップ開設フォームを送信し、SHOP_OPENING チャットを作成します。
+     */
+    const handleSubmitShopOpening = async (e: React.FormEvent) => {
+        e.preventDefault();
+
+        if (!shopOpenShopName.trim() || !shopOpenOwnerName.trim()) {
+            setShopOpenError(t('shopOpenForm.errors.required'));
+            return;
+        }
+        if (!userEmail.trim()) {
+            setShopOpenError(t('shopOpenForm.errors.noUserEmail'));
+            return;
+        }
+
+        setShopOpenError('');
+        try {
+            const payload = {
+                form_snapshot: {
+                    shop_name: shopOpenShopName.trim(),
+                    owner_name: shopOpenOwnerName.trim(),
+                    contact_email: userEmail.trim(),
+                    notes: shopOpenNotes.trim() || undefined,
+                },
+                submitted_at: new Date().toISOString(),
+            };
+
+            // フロント側でも事前検証
+            if (!isValidWorkflowPayload('SHOP_OPENING', 'FORM_SUBMITTED', payload)) {
+                setShopOpenError(t('shopOpenForm.errors.invalidPayload'));
+                return;
+            }
+
+            await createNewChat({
+                chat_type: 'SHOP_OPENING',
+                participants: [participantId, 'ADMIN'],
+                initiator_id: participantId,
+                initial_message: {
+                    type: 'WORKFLOW',
+                    message: t('shopOpenForm.submittedMessage'),
+                    payload_type: 'FORM_SUBMITTED',
+                    payload,
+                }
+            });
+        } catch (error: any) {
+            const message = error?.message || t('shopOpenForm.errors.submitFailed');
+            setShopOpenError(message);
+        }
+    };
+
+    // ─── imperative handle: 外部からショップ開設ダイアログを制御 ────────────────
+    useImperativeHandle(ref, () => ({
+        openShopOpeningForm: (email: string) => {
+            setUserEmail(email || currentUserEmail || '');
+            setShopOpenShopName('');
+            setShopOpenOwnerName('');
+            setShopOpenNotes('');
+            setShopOpenError('');
+            setCreateFormData({ chat_type: 'SHOP_OPENING', initial_message: '' });
+            setIsCreateDialogOpen(true);
+        }
+    }), [currentUserEmail]);
+
+    // ─── フリーテキスト送信 ──────────────────────────────────────────────────
+    /**
+     * 開いているチャットに TEXT タイプのメッセージを送信します。
+     * 送信後はメッセージ一覧をリロードし、入力欄をクリアします。
+     */
+    const sendFreeText = async () => {
+        const text = inputMessage.trim();
+        if (!text || !selectedChatId || sendingMessage) return;
+        setSendingMessage(true);
+        try {
+            await apiFetchPost('/unified/chat/messages/send', {
+                chat_id: selectedChatId,
+                sender_id: participantId,
+                type: 'TEXT',
+                message: text,
+            });
+            setInputMessage('');
+            // 送信後に最新メッセージを再取得（msgPageSize 分だけ）
+            const res = await apiFetchPost('/unified/chat/messages/get', {
+                chat_id: selectedChatId,
+                limit: msgPageSize,
+            });
+            const reversed: ChatMessage[] = (res.messages || []).slice().reverse();
+            setSelectedMessages(reversed);
+            setMsgHasOlder(reversed.length === msgPageSize);
+            // チャット一覧側の最終更新日時も楽観的に更新
+            setChats((prev) =>
+                prev.map((c) =>
+                    c.chat_id === selectedChatId
+                        ? { ...c, ts_last_message_at: new Date().toISOString() }
+                        : c,
+                ),
+            );
+        } catch (e) {
+            console.error('Failed to send message', e);
+        } finally {
+            setSendingMessage(false);
+        }
+    };
+
+    // メッセージのページサイズが変わったら現在のチャットを取り直す
+    useEffect(() => {
+        if (selectedChatId && isOpen) {
+            setMsgHasOlder(false);
+            setSelectedMessages([]);
+            openChatDetail(selectedChatId);
+        }
+    }, [msgPageSize]);
 
     return (
         <>
@@ -387,8 +670,8 @@ export function UnifiedChatNotifications({
                 onClick={() => setIsOpen(true)}
                 disabled={disabled}
             >
-                {/* ベルアイコン */}
-                <Bell className="w-5 h-5 mr-2" />
+                {/* チャットアイコン */}
+                <MessageCircle className="w-5 h-5 mr-2" />
                 {/* 翻訳テキスト（例: "通知"） */}
                 {t('notifications.button')}
                 {/* 未読バッジ: unreadTotal が 0 より大きい場合のみ表示 */}
@@ -411,7 +694,7 @@ export function UnifiedChatNotifications({
                 高さ: 画面高さの90%以内（max-h-[90vh]）に収め、内部をスクロール可能にします。
             ─────────────────────────────────────────────────────────────────────── */}
             <Dialog open={isOpen} onOpenChange={setIsOpen}>
-                <DialogContent className="w-[98vw] max-w-[98vw] sm:max-w-[96vw] lg:max-w-[92vw] xl:max-w-[1600px] max-h-[90vh] overflow-hidden flex flex-col">
+                <DialogContent className="w-[98vw] max-w-[98vw] sm:max-w-[96vw] lg:max-w-[92vw] xl:max-w-[1600px] h-[90vh] max-h-[90vh] overflow-hidden flex flex-col">
                     <DialogHeader>
                         <DialogTitle>{t('notifications.title')}</DialogTitle>
                         <DialogDescription>{t('notifications.description')}</DialogDescription>
@@ -419,18 +702,47 @@ export function UnifiedChatNotifications({
 
                     {/* 2カラムグリッド: 左=チャット一覧、右=チャット詳細
                         モバイルでは1カラム（grid-cols-1）、PCでは2カラム（lg:grid-cols-2）に切替 */}
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 flex-1 overflow-hidden">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 flex-1 overflow-hidden min-h-0">
 
                         {/* ─── 左パネル: チャット一覧 ────────────────────────────── */}
-                        <Card className="overflow-hidden flex flex-col">
-                            <CardHeader className="flex flex-row items-center justify-between">
-                                <CardTitle>{t('notifications.listTitle')}</CardTitle>
-                                {/* 更新ボタン: 最新のチャット一覧を再取得します */}
-                                <Button variant="outline" size="sm" onClick={fetchNotifications} disabled={notificationLoading}>
-                                    {notificationLoading ? t('notifications.loading') : t('notifications.refresh')}
-                                </Button>
+                        <Card className="overflow-hidden flex flex-col min-h-0">
+                            <CardHeader className="flex flex-col gap-2 pb-2">
+                                <div className="flex flex-row items-center justify-between">
+                                    <CardTitle>{t('notifications.listTitle')}</CardTitle>
+                                    {/* 更新ボタン: カーソルをリセットして先頭から取り直します */}
+                                    <Button variant="outline" size="sm" onClick={fetchNotifications} disabled={notificationLoading}>
+                                        {notificationLoading ? t('notifications.loading') : t('notifications.refresh')}
+                                    </Button>
+                                </div>
+
+                                {/* 新規チャット作成ボタン（大きめ・独立配置） */}
+                                <div>
+                                    <Button
+                                        className="w-full h-12 text-base font-semibold"
+                                        onClick={() => {
+                                            setCreateFormData({ chat_type: 'GENERAL', initial_message: '' });
+                                            setShopOpenError('');
+                                            setIsCreateDialogOpen(true);
+                                        }}
+                                    >
+                                        {t('notifications.createNew')}
+                                    </Button>
+                                </div>
+                                {/* チャット一覧のページサイズ選択 */}
+                                <div className="flex items-center gap-1">
+                                    <span className="text-xs text-gray-500 mr-1">件数:</span>
+                                    {([5, 10, 25, 50] as const).map((s) => (
+                                        <button
+                                            key={s}
+                                            onClick={() => setChatPageSize(s)}
+                                            className={`px-2 py-0.5 text-xs rounded border ${chatPageSize === s ? 'bg-gray-700 text-white border-gray-700' : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'}`}
+                                        >
+                                            {s}
+                                        </button>
+                                    ))}
+                                </div>
                             </CardHeader>
-                            <CardContent className="overflow-auto">
+                            <CardContent className="overflow-auto min-h-0">
                                 <Table>
                                     <TableHeader>
                                         <TableRow>
@@ -454,7 +766,7 @@ export function UnifiedChatNotifications({
                                             chats.map((chat) => (
                                                 <TableRow
                                                     key={chat.chat_id}
-                                                    className="cursor-pointer hover:bg-gray-50"
+                                                    className={`cursor-pointer hover:bg-gray-50 ${selectedChatId === chat.chat_id ? 'bg-blue-50 ring-1 ring-blue-200' : ''}`}
                                                     onClick={() => openChatDetail(chat.chat_id)}
                                                 >
                                                     {/* 最終更新日時: ISO文字列をロケール形式に変換 */}
@@ -468,15 +780,33 @@ export function UnifiedChatNotifications({
                                         )}
                                     </TableBody>
                                 </Table>
+                                {/* 前ページ / 次ページのナビゲーション */}
+                                <div className="mt-3 flex items-center justify-between">
+                                    <Button
+                                        variant="outline" size="sm"
+                                        onClick={() => fetchPage(chatPageIdx - 1)}
+                                        disabled={notificationLoading || chatPageIdx === 0}
+                                    >
+                                        {t('notifications.prevPage')}
+                                    </Button>
+                                    <span className="text-xs text-gray-500">{chatPageIdx + 1} {t('notifications.pageOf')}</span>
+                                    <Button
+                                        variant="outline" size="sm"
+                                        onClick={() => fetchPage(chatPageIdx + 1)}
+                                        disabled={notificationLoading || !chatHasNext}
+                                    >
+                                        {t('notifications.nextPage')}
+                                    </Button>
+                                </div>
                             </CardContent>
                         </Card>
 
                         {/* ─── 右パネル: チャット詳細 ────────────────────────────── */}
-                        <Card className="overflow-hidden flex flex-col">
+                        <Card className="overflow-hidden flex flex-col min-h-0">
                             <CardHeader>
                                 <CardTitle>{t('notifications.detailTitle')}</CardTitle>
                             </CardHeader>
-                            <CardContent className="overflow-auto space-y-4">
+                            <CardContent className="flex flex-col overflow-hidden min-h-0 space-y-4">
                                 {/* 未選択状態: チャットを選ぶよう促す */}
                                 {!selectedChatId ? (
                                     <p className="text-sm text-gray-500">{t('notifications.selectPrompt')}</p>
@@ -494,7 +824,7 @@ export function UnifiedChatNotifications({
                                         </div>
 
                                         {/* ─── 審査結果サマリーパネル（アンバー色のボックス） ────────
-                                            decisionStatus・decisionEvidence・linkedShopId をもとに
+                                            decisionStatus・adminDecisionMessage・linkedShopId をもとに
                                             審査の結論を分かりやすくまとめて表示します。
                                         ──────────────────────────────────────────────────── */}
                                         <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm space-y-1">
@@ -503,25 +833,25 @@ export function UnifiedChatNotifications({
                                             {/* 審査結果: APPROVED/REJECTED/RESOLVED/PENDING を日本語で表示 */}
                                             <div>
                                                 <span className="text-gray-500">{t('notifications.decision.result')}:</span>{' '}
-                                                {decisionStatus === 'APPROVED'
-                                                    ? t('notifications.decision.approved')
-                                                    : decisionStatus === 'REJECTED'
-                                                        ? t('notifications.decision.rejected')
-                                                        : decisionStatus === 'RESOLVED'
-                                                            ? t('notifications.decision.resolved')
-                                                        : t('notifications.decision.pending')}
+                                                <span className={decisionStatus === 'APPROVED' ? 'font-bold text-green-700' : decisionStatus === 'REJECTED' ? 'font-bold text-red-700' : ''}>
+                                                    {decisionStatus === 'APPROVED'
+                                                        ? t('notifications.decision.approved')
+                                                        : decisionStatus === 'REJECTED'
+                                                            ? t('notifications.decision.rejected')
+                                                            : t('notifications.decision.pending')}
+                                                </span>
                                             </div>
 
                                             {/* 審査日時: reviewed_at フィールドが存在する場合のみ有効な値を表示 */}
                                             <div>
                                                 <span className="text-gray-500">{t('notifications.decision.reviewedAt')}:</span>{' '}
-                                                {decisionEvidence?.payload?.reviewed_at ? new Date(decisionEvidence.payload.reviewed_at).toLocaleString() : '-'}
+                                                {adminDecisionMessage?.payload?.reviewed_at ? new Date(adminDecisionMessage.payload.reviewed_at).toLocaleString() : '-'}
                                             </div>
 
                                             {/* 審査コメント（却下理由など） */}
                                             <div>
                                                 <span className="text-gray-500">{t('notifications.decision.reason')}:</span>{' '}
-                                                {decisionEvidence?.payload?.reason || '-'}
+                                                {adminDecisionMessage?.payload?.reason || '-'}
                                             </div>
 
                                             {/* 紐付けられたショップIDが存在する場合のみ表示
@@ -539,10 +869,10 @@ export function UnifiedChatNotifications({
                                             )}
 
                                             {/* デフォルトデザインIDが存在する場合のみ表示 */}
-                                            {decisionEvidence?.payload?.default_design_id && (
+                                            {adminDecisionMessage?.payload?.default_design_id && (
                                                 <div>
                                                     <span className="text-gray-500">{t('notifications.decision.defaultDesignId')}:</span>{' '}
-                                                    {decisionEvidence.payload.default_design_id}
+                                                    {adminDecisionMessage.payload.default_design_id}
                                                 </div>
                                             )}
                                         </div>
@@ -551,28 +881,74 @@ export function UnifiedChatNotifications({
                                             チャット内の全メッセージを古い順（昇順）で表示します。
                                             各メッセージには送信者・日時・本文・ペイロード種別を表示します。
                                         ──────────────────────────────────────────────────── */}
-                                        <div className="space-y-2">
+                                        {/* メッセージページサイズ選択 */}
+                                        <div className="flex items-center gap-1">
+                                            <span className="text-xs text-gray-500 mr-1">取得件数:</span>
+                                            {([10, 20, 50, 100] as const).map((s) => (
+                                                <button
+                                                    key={s}
+                                                    onClick={() => setMsgPageSize(s)}
+                                                    className={`px-2 py-0.5 text-xs rounded border ${msgPageSize === s ? 'bg-gray-700 text-white border-gray-700' : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'}`}
+                                                >
+                                                    {s}
+                                                </button>
+                                            ))}
+                                        </div>
+                                        {/* 過去メッセージ読み込みボタン: さらに古い履歴がある場合のみ表示 */}
+                                        {msgHasOlder && (
+                                            <div className="flex justify-center">
+                                                <Button variant="outline" size="sm" onClick={loadOlderMessages} disabled={olderMsgLoading}>
+                                                    {olderMsgLoading ? t('notifications.loading') : t('notifications.loadOlderMessages')}
+                                                </Button>
+                                            </div>
+                                        )}
+                                        <div className="space-y-2 flex-1 min-h-0 overflow-y-auto pr-1">
                                             {selectedMessages.length === 0 ? (
                                                 <p className="text-sm text-gray-500">{t('notifications.noMessages')}</p>
                                             ) : (
                                                 selectedMessages.map((message) => (
-                                                    // key: message_id を優先、なければ連番 seq を使用
                                                     <div key={message.message_id || `${message.seq}`} className="rounded-md border p-3 text-sm">
-                                                        {/* メッセージヘッダー: 送信者ID と 日時 */}
                                                         <div className="mb-1 flex justify-between text-xs text-gray-500">
-                                                            <span>{message.sender_id || '-'}</span>
+                                                            <span>{getSenderDisplayName(message)}</span>
                                                             <span>{message.ts_created_at ? new Date(message.ts_created_at).toLocaleString() : '-'}</span>
                                                         </div>
-                                                        {/* メッセージ本文 */}
-                                                        <div className="font-medium break-words">{message.message || '-'}</div>
-                                                        {/* ワークフロー種別（例: "ADMIN_DECISION"）が存在する場合のみ表示 */}
-                                                        {message.payload_type && (
-                                                            <div className="mt-1 text-xs text-gray-500">{message.payload_type}</div>
-                                                        )}
+                                                        <div className="font-medium whitespace-pre-wrap break-words">{message.message || '-'}</div>
+                                                        {renderWorkflowPayload(message)}
                                                     </div>
                                                 ))
                                             )}
                                         </div>
+
+                                        {isChatClosed ? (
+                                            <p className="text-xs text-center text-gray-400 border rounded-md py-2">
+                                                {t('notifications.chatClosed')}
+                                            </p>
+                                        ) : (
+                                            <div className="flex flex-col gap-2">
+                                                <Textarea
+                                                    value={inputMessage}
+                                                    onChange={(e) => setInputMessage(e.target.value)}
+                                                    onKeyDown={(e) => {
+                                                        if (e.key === 'Enter' && !e.shiftKey) {
+                                                            e.preventDefault();
+                                                            sendFreeText();
+                                                        }
+                                                    }}
+                                                    placeholder={t('notifications.messagePlaceholder')}
+                                                    rows={3}
+                                                    disabled={sendingMessage}
+                                                    className="resize-none"
+                                                />
+                                                <Button
+                                                    className="self-end"
+                                                    size="sm"
+                                                    onClick={sendFreeText}
+                                                    disabled={sendingMessage || !inputMessage.trim()}
+                                                >
+                                                    {sendingMessage ? t('notifications.loading') : t('notifications.sendButton')}
+                                                </Button>
+                                            </div>
+                                        )}
                                     </>
                                 )}
                             </CardContent>
@@ -580,6 +956,158 @@ export function UnifiedChatNotifications({
                     </div>
                 </DialogContent>
             </Dialog>
+
+            {/* ─── 新規チャット作成ダイアログ ─────────────────────────────────────────
+                ユーザーが新規チャット作成ボタンを押したときに表示されます。
+                チャットタイプに応じて異なるフォームを表示します。
+            ────────────────────────────────────────────────────────────────── */}
+            <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+                <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+                    <DialogHeader>
+                        <DialogTitle>{t('notifications.createNew')}</DialogTitle>
+                    </DialogHeader>
+
+                    <div className="space-y-4">
+                        <div>
+                            <label className="block text-sm font-medium mb-1">
+                                {t('notifications.chatType')}
+                            </label>
+                            <select
+                                value={createFormData.chat_type}
+                                onChange={(e) =>
+                                    setCreateFormData((prev) => ({
+                                        ...prev,
+                                        chat_type: e.target.value,
+                                    }))
+                                }
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                            >
+                                <option value="SHOP_OPENING">{t('notifications.chatTypeOptions.shopOpening')}</option>
+                                <option value="GENERAL">{t('notifications.chatTypeOptions.general')}</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    {createFormData.chat_type === 'SHOP_OPENING' ? (
+                        // ─── ショップ開設フォーム ────────────────────────────────────
+                        <form onSubmit={handleSubmitShopOpening} className="space-y-4">
+                            <div className="space-y-2">
+                                <Label htmlFor="shop-open-name">{t('shopOpenForm.shopNameLabel')}</Label>
+                                <Input
+                                    id="shop-open-name"
+                                    value={shopOpenShopName}
+                                    onChange={(e) => setShopOpenShopName(e.target.value)}
+                                    placeholder={t('shopOpenForm.shopNamePlaceholder')}
+                                    disabled={creatingChat}
+                                />
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label htmlFor="shop-open-owner">{t('shopOpenForm.ownerNameLabel')}</Label>
+                                <Input
+                                    id="shop-open-owner"
+                                    value={shopOpenOwnerName}
+                                    onChange={(e) => setShopOpenOwnerName(e.target.value)}
+                                    placeholder={t('shopOpenForm.ownerNamePlaceholder')}
+                                    disabled={creatingChat}
+                                />
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label htmlFor="shop-open-email">{t('shopOpenForm.contactEmailLabel')}</Label>
+                                <Input
+                                    id="shop-open-email"
+                                    type="email"
+                                    value={userEmail}
+                                    placeholder={t('shopOpenForm.contactEmailPlaceholder')}
+                                    readOnly
+                                    disabled
+                                />
+                                <p className="text-xs text-gray-500">
+                                    {userEmail.trim() ? t('shopOpenForm.contactEmailFixed') : t('shopOpenForm.contactEmailPlaceholder')}
+                                </p>
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label htmlFor="shop-open-notes">{t('shopOpenForm.notesLabel')}</Label>
+                                <Textarea
+                                    id="shop-open-notes"
+                                    value={shopOpenNotes}
+                                    onChange={(e) => setShopOpenNotes(e.target.value)}
+                                    placeholder={t('shopOpenForm.notesPlaceholder')}
+                                    disabled={creatingChat}
+                                    rows={3}
+                                    className="resize-none"
+                                />
+                            </div>
+
+                            {shopOpenError && (
+                                <p className="text-sm text-red-600 font-medium">{shopOpenError}</p>
+                            )}
+
+                            <div className="flex justify-end gap-2 pt-4">
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={() => {
+                                        setIsCreateDialogOpen(false);
+                                        setCreateFormData({ chat_type: 'GENERAL', initial_message: '' });
+                                    }}
+                                    disabled={creatingChat}
+                                >
+                                    {t('notifications.cancel')}
+                                </Button>
+                                <Button
+                                    type="submit"
+                                    disabled={creatingChat}
+                                >
+                                    {creatingChat ? t('notifications.loading') : t('shopOpenForm.submit')}
+                                </Button>
+                            </div>
+                        </form>
+                    ) : (
+                        // ─── 汎用フォーム（テキストメッセージ） ─────────────────────
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium mb-1">
+                                    {t('notifications.initialMessage')}
+                                </label>
+                                <Textarea
+                                    value={createFormData.initial_message}
+                                    onChange={(e) =>
+                                        setCreateFormData((prev) => ({
+                                            ...prev,
+                                            initial_message: e.target.value,
+                                        }))
+                                    }
+                                    placeholder={t('notifications.initialMessagePlaceholder')}
+                                    rows={3}
+                                    className="resize-none"
+                                />
+                            </div>
+
+                            <div className="flex justify-end gap-2">
+                                <Button
+                                    variant="outline"
+                                    onClick={() => {
+                                        setIsCreateDialogOpen(false);
+                                        setCreateFormData({ chat_type: 'GENERAL', initial_message: '' });
+                                    }}
+                                >
+                                    {t('notifications.cancel')}
+                                </Button>
+                                <Button
+                                    onClick={createNewChat}
+                                    disabled={creatingChat || !createFormData.chat_type}
+                                >
+                                    {creatingChat ? t('notifications.loading') : t('notifications.create')}
+                                </Button>
+                            </div>
+                        </div>
+                    )}
+                </DialogContent>
+            </Dialog>
         </>
     );
-}
+});
+

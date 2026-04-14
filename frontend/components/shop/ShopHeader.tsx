@@ -1,10 +1,10 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { RefreshCw, Copy, Check, ChevronDown, LogOut } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useRouter } from '@/i18n/routing';
-import { signOut } from 'aws-amplify/auth';
+import { fetchUserAttributes, signOut } from 'aws-amplify/auth';
 import { Button } from '@/components/ui/button';
 import { shopApi } from '@/lib/api/shop';
 import { UnifiedChatNotifications } from '@/components/chat/UnifiedChatNotifications';
@@ -48,6 +48,19 @@ export function ShopHeader({
     };
 
     const [isCopied, setIsCopied] = useState(false);
+    const [currentUserEmail, setCurrentUserEmail] = useState('');
+
+    useEffect(() => {
+        const loadUserEmail = async () => {
+            try {
+                const attrs = await fetchUserAttributes();
+                setCurrentUserEmail(attrs.email || '');
+            } catch {
+                setCurrentUserEmail('');
+            }
+        };
+        loadUserEmail();
+    }, []);
 
     const handleCopyId = () => {
         navigator.clipboard.writeText(shopId).then(() => {
@@ -109,6 +122,7 @@ export function ShopHeader({
                         participantId={`SHOP#${shopId}`}
                         apiFetchPost={shopApi.fetch_post.bind(shopApi)}
                         translationNamespace="ShopPage"
+                        currentUserEmail={currentUserEmail}
                         buttonClassName="text-mist-500 hover:text-mist-800 relative"
                     />
 

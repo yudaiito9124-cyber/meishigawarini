@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Settings, ShoppingBasket, Eye, Plus, Trash2, Copy, Check, ImageIcon, Save, Loader2, ChevronDown, Download } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { shopApi } from '@/lib/api/shop';
@@ -15,11 +15,14 @@ import { resizeImage } from "@/lib/image-utils";
 import { useShop } from '@/context/ShopContext';
 import { useSettingsUI } from '@/store/useShopStore';
 import { useBackendError } from '@/hooks/useBackendError';
+import { isValidPhone, isValidZip, sanitizePhoneForInput, sanitizeZipForInput } from '@/lib/validation/contact';
 
 export function ShopSettingsSection({ shopId }: { shopId: string }) {
     const t = useTranslations('ShopPage');
     const tr = useTranslations('ReceivePage');
     const { translateError } = useBackendError();
+    const [shopPostalCode, setShopPostalCode] = useState('');
+    const [shopPhone, setShopPhone] = useState('');
 
     const { shop, userId, refreshShopDetails } = useShop();
     const {
@@ -34,6 +37,8 @@ export function ShopSettingsSection({ shopId }: { shopId: string }) {
 
     useEffect(() => {
         if (shop && isSettingsOpen) {
+            setShopPostalCode(shop.shop_postal_code || '');
+            setShopPhone(shop.shop_phone || '');
             setSettings({
                 htmlImageUrls: shop.html_image_urls || [],
                 debouncedPreviewHtml: shop.detail_html || '',
@@ -108,12 +113,26 @@ export function ShopSettingsSection({ shopId }: { shopId: string }) {
         e.preventDefault();
         const form = e.target as HTMLFormElement;
         const formData = new FormData(form);
+
+        if (shopPostalCode && !isValidZip(shopPostalCode)) {
+            alert(tr('errors.invalidZip'));
+            return;
+        }
+
+        if (shopPhone && !isValidPhone(shopPhone)) {
+            alert(tr('errors.invalidPhone'));
+            return;
+        }
+
         setSettings({ isSettingUploading: true });
 
         try {
             await shopApi.shop_details_update({
                 shop_id: shopId,
                 name: (formData.get('shop_name') as string),
+                shop_postal_code: shopPostalCode,
+                shop_address: (formData.get('shop_address') as string),
+                shop_phone: shopPhone,
                 detail_html: (formData.get('shop_detail_html') as string),
                 html_image_urls: htmlImageUrls,
                 deleted_html_image_urls: htmlImageUrlsToDelete
@@ -161,6 +180,39 @@ export function ShopSettingsSection({ shopId }: { shopId: string }) {
                     <div className="space-y-2">
                         <Label htmlFor="shop_name">{t('shopSettings.name')}</Label>
                         <Input id="shop_name" name="shop_name" defaultValue={shop?.name} required />
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div className="space-y-2">
+                            <Label htmlFor="shop_postal_code">{t('shopSettings.shopPostalCode')}</Label>
+                            <Input
+                                id="shop_postal_code"
+                                name="shop_postal_code"
+                                value={shopPostalCode}
+                                onChange={(e) => setShopPostalCode((prev) => sanitizeZipForInput(e.target.value, prev))}
+                                placeholder={t('shopSettings.shopPostalCodePlaceholder')}
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="shop_phone">{t('shopSettings.shopPhone')}</Label>
+                            <Input
+                                id="shop_phone"
+                                name="shop_phone"
+                                value={shopPhone}
+                                onChange={(e) => setShopPhone((prev) => sanitizePhoneForInput(e.target.value, prev))}
+                                placeholder={t('shopSettings.shopPhonePlaceholder')}
+                            />
+                        </div>
+                    </div>
+
+                    <div className="space-y-2">
+                        <Label htmlFor="shop_address">{t('shopSettings.shopAddress')}</Label>
+                        <Input
+                            id="shop_address"
+                            name="shop_address"
+                            defaultValue={shop?.shop_address || ''}
+                            placeholder={t('shopSettings.shopAddressPlaceholder')}
+                        />
                     </div>
 
                     {isSettingShowHTML ? (
@@ -272,7 +324,7 @@ function HtmlEditor({ shopDetailRef, defaultHtml, debouncedPreviewHtml, onUpdate
     return (
         <div className="space-y-2">
             <Label htmlFor="shop_detail_html">{t('shopSettings.detailHtml')}</Label>
-            <div className="border rounded-md overflow-hidden bg-gray-50/30 min-h-[400px] h-[calc(95vh-500px)] flex flex-col lg:flex-row">
+            <div className="border rounded-md overflow-hidden bg-gray-50/30 min-h-[400px] h-[calc(95vh-700px)] flex flex-col lg:flex-row">
                 <div className="flex-1 flex flex-col min-h-0 border-b lg:border-b-0 lg:border-r bg-white">
                     <div className="px-3 py-2 bg-gray-50 border-b flex justify-between items-center">
                         <span className="text-xs font-bold text-gray-600 uppercase tracking-wider">{t('shopSettings.sourcecode')}</span>
@@ -287,12 +339,12 @@ function HtmlEditor({ shopDetailRef, defaultHtml, debouncedPreviewHtml, onUpdate
                     </div>
                     <textarea ref={shopDetailRef} id="shop_detail_html" name="shop_detail_html" defaultValue={defaultHtml} className="flex-1 w-full p-4 text-sm font-mono focus-visible:outline-none resize-none overflow-y-auto" placeholder={t('shopSettings.detailHtmlPlaceholder')} />
                 </div>
-                <div className="flex-1 flex flex-col min-h-0 bg-gray-50/50">
+                <div className="flex-1 flex flex-col min-h-0 bg-gray-50/50 max-w-2xl">
                     <div className="px-3 py-2 bg-gray-50 border-b flex justify-between items-center">
                         <span className="text-xs font-bold text-gray-600 uppercase tracking-wider">{t('shopSettings.preview')}</span>
                     </div>
                     <div className="flex-1 overflow-y-auto p-4 flex flex-col items-center">
-                        <Card className="w-full mt-10 max-w-full bg-white p-4">
+                        <Card className="w-full mt-10 bg-white p-4">
                             <div className="flex flex-col items-center gap-2 mb-4">
                                 <div className="flex items-center gap-2 text-lg font-bold"><ShoppingBasket className="w-5 h-5" />{tr('shopinfo')}</div>
                                 <div className="text-xs text-gray-500">{tr('shopinfo_description')}</div>

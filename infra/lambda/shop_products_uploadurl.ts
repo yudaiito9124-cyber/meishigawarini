@@ -43,7 +43,8 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         const ext = filename.split('.').pop() || 'bin';
         
         // S3キーの構築 logic (HEAD~2 互換)
-        let key = `shop/${shopId}/products/${productId || 'undefined'}/${id}.${ext}`;
+        // productId 未確定（新規作成前）の画像は一時プレフィックスへ保存
+        let key = `shop/${shopId}/products/${productId || '_tmp'}/${id}.${ext}`;
         if (folder === 'shopcontent') {
             key = `shop/${shopId}/shopcontent/${filename}`;
         }
