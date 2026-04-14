@@ -822,7 +822,7 @@ export const UnifiedChatNotifications = React.forwardRef<
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 min-h-0 items-start">
 
                         {/* ─── 左パネル: チャット一覧 ────────────────────────────── */}
-                        <Card className="overflow-hidden flex flex-col min-h-[36rem] max-h-[96rem]">
+                        <Card className="overflow-hidden flex flex-col h-[67rem]">
                             <CardHeader className="flex flex-col gap-3 pb-3 border-b bg-gray-50/60">
                                 <div className="flex flex-row items-center justify-between">
                                     <CardTitle>{t('notifications.listTitle')}</CardTitle>
@@ -906,7 +906,7 @@ export const UnifiedChatNotifications = React.forwardRef<
                         </Card>
 
                         {/* ─── 右パネル: チャット詳細 ────────────────────────────── */}
-                        <Card className="overflow-hidden flex flex-col min-h-[72rem] max-h-[96rem]">
+                        <Card className="overflow-hidden flex flex-col h-[67rem]">
                             <CardHeader>
                                 <CardTitle>{t('notifications.detailTitle')}</CardTitle>
                             </CardHeader>

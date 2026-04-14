@@ -369,6 +369,9 @@
         "rawJson": "JSONを表示"
       },
       "messagePlaceholder": "メッセージを入力... (Enterで送信、Shift+Enterで改行)",
+      "attachFile": "ファイル添付",
+      "fileTooLarge": "ファイルサイズは10MB以下にしてください",
+      "uploading": "アップロード中...",
       "sendButton": "送信",
       "youLabel": "あなた",
       "adminLabel": "運営",

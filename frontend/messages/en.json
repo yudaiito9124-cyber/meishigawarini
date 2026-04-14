@@ -360,6 +360,9 @@
         "rawJson": "Show JSON"
       },
       "messagePlaceholder": "Type a message... (Enter to send, Shift+Enter for newline)",
+      "attachFile": "📎 Attach File",
+      "fileTooLarge": "File size must be 10MB or smaller",
+      "uploading": "Uploading...",
       "sendButton": "Send",
       "youLabel": "You",
       "adminLabel": "Operations",
