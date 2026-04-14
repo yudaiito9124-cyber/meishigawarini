@@ -41,6 +41,15 @@ export function ProductsSection({
 
     const allowedDesigns = shop?.allowed_designs || [];
 
+    const getDesignId = (design: any): string => {
+        if (!design) return '';
+        return String(design.design_id || design.id || design.SK || '');
+    };
+
+    const getDefaultDesignId = (): string => {
+        return allowedDesigns.map((d: any) => getDesignId(d)).find((id: string) => !!id) || '';
+    };
+
     const [isAddProductDialogOpen, setIsAddProductDialogOpen] = useState(false);
     const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
     const [editingProduct, setEditingProduct] = useState<any | null>(null);
@@ -93,17 +102,36 @@ export function ProductsSection({
         }
     }, [isImportDialogOpen, shopId]);
 
+    useEffect(() => {
+        if (!isAddProductDialogOpen) return;
+        if (editingProduct || isDuplicateMode) return;
+        if (selectedDesignId) return;
+
+        const defaultDesignId = getDefaultDesignId();
+        if (defaultDesignId) {
+            setSelectedDesignId(defaultDesignId);
+        }
+    }, [isAddProductDialogOpen, editingProduct, isDuplicateMode, selectedDesignId, allowedDesigns]);
+
     const handleOpenEditDialog = (product: any) => {
         setEditingProduct(product);
         setIsDuplicateMode(false);
-        setSelectedDesignId(product.design_id || (product.design?.design_id) || '');
+        setSelectedDesignId(
+            product.design_id ||
+            getDesignId(product.design) ||
+            ''
+        );
         setIsAddProductDialogOpen(true);
     };
 
     const handleOpenDuplicateDialog = (product: any) => {
         setEditingProduct(product);
         setIsDuplicateMode(true);
-        setSelectedDesignId(product.design_id || (product.design?.design_id) || '');
+        setSelectedDesignId(
+            product.design_id ||
+            getDesignId(product.design) ||
+            ''
+        );
         setIsAddProductDialogOpen(true);
     };
 
@@ -172,6 +200,46 @@ export function ProductsSection({
         const form = e.target as HTMLFormElement;
         const formData = new FormData(form);
         const file = formData.get('image') as File;
+        const name = (formData.get('name') as string) || '';
+        const description = (formData.get('description') as string) || '';
+        const price = Number(formData.get('price'));
+        const validDays = Number(formData.get('valid_days'));
+
+        if (!name.trim()) {
+            alert('商品名は必須です');
+            setIsCreatingProduct(false);
+            return;
+        }
+        if (isNaN(price) || price < 0) {
+            alert('価格は0以上の数値で入力してください');
+            setIsCreatingProduct(false);
+            return;
+        }
+        if (isNaN(validDays) || validDays < 1) {
+            alert('有効期間は1以上の数値で入力してください');
+            setIsCreatingProduct(false);
+            return;
+        }
+
+        const formatApiError = (error: unknown): string => {
+            if (!error) return '';
+            if (typeof error === 'string') return error;
+            if (error instanceof Error) return error.message;
+            if (typeof error === 'object') {
+                const errObj = error as { message?: unknown; detail?: unknown; status?: unknown };
+                const message = typeof errObj.message === 'string' ? errObj.message : '';
+                const detail = typeof errObj.detail === 'string' ? errObj.detail : '';
+                const translated = translateError(message, detail);
+                if (translated) return translated;
+                if (message) return detail ? `${message} (${detail})` : message;
+                try {
+                    return JSON.stringify(error);
+                } catch {
+                    return 'Unknown error';
+                }
+            }
+            return String(error);
+        };
 
         try {
             let imageUrl = editingProduct?.image_url;
@@ -186,7 +254,6 @@ export function ProductsSection({
 
                 const uploadUrl = resData.uploadUrl;
                 const publicUrl = resData.publicUrl || resData.fileUrl;
-                const viewUrl = resData.viewUrl || publicUrl;
 
                 const s3Res = await fetch(uploadUrl, {
                     method: 'PUT',
@@ -202,10 +269,10 @@ export function ProductsSection({
                 await shopApi.shop_products_update({
                     shop_id: shopId,
                     product_id: editingProduct.product_id,
-                    name: formData.get('name') as string,
-                    description: formData.get('description') as string,
-                    price: Number(formData.get('price')),
-                    valid_days: Number(formData.get('valid_days')),
+                    name,
+                    description,
+                    price,
+                    valid_days: validDays,
                     image_url: imageUrl,
                     design_id: selectedDesignId,
                 });
@@ -213,10 +280,10 @@ export function ProductsSection({
             } else {
                 await shopApi.shop_products_create({
                     shop_id: shopId,
-                    name: formData.get('name') as string,
-                    description: formData.get('description') as string,
-                    price: Number(formData.get('price')),
-                    valid_days: Number(formData.get('valid_days')),
+                    name,
+                    description,
+                    price,
+                    valid_days: validDays,
                     image_url: imageUrl || 'https://placehold.co/1280x720?text=No+Image',
                     design_id: selectedDesignId,
                 });
@@ -230,7 +297,13 @@ export function ProductsSection({
             setIsAddProductDialogOpen(false);
             fetchProducts();
         } catch (err) {
-            alert(editingProduct && !isDuplicateMode ? t('editProduct.error') : t('addProduct.error'));
+            const errorMsg = formatApiError(err);
+            const isEdit = editingProduct && !isDuplicateMode;
+            alert(
+                (isEdit ? t('editProduct.error') : t('addProduct.error')) +
+                (errorMsg ? `\n\n詳細: ${errorMsg}` : '')
+            );
+            console.error('Product operation failed:', err);
         } finally {
             setIsCreatingProduct(false);
         }
@@ -315,7 +388,7 @@ export function ProductsSection({
                                             onClick={() => {
                                                 setEditingProduct(null);
                                                 setIsDuplicateMode(false);
-                                                setSelectedDesignId('');
+                                                setSelectedDesignId(getDefaultDesignId());
                                             }}
                                         >
                                             <div className="flex flex-col items-center gap-1 text-gray-400 group-hover:text-primary">
@@ -426,11 +499,13 @@ export function ProductsSection({
                                                             )}
                                                         </div>
                                                         <div className="flex flex-wrap items-start gap-3 max-h-[300px] overflow-y-auto p-1">
-                                                            {allowedDesigns?.map((design: any) => (
+                                                            {allowedDesigns?.map((design: any) => {
+                                                                const designId = getDesignId(design);
+                                                                return (
                                                                 <div
-                                                                    key={`${design.design_id}`}
-                                                                    onClick={() => setSelectedDesignId(design.design_id)}
-                                                                    className={`group relative h-24 rounded-lg border-2 overflow-hidden cursor-pointer transition-all hover:shadow-md ${selectedDesignId === design.design_id
+                                                                    key={designId || `${design.name || 'unknown-design'}`}
+                                                                    onClick={() => designId && setSelectedDesignId(designId)}
+                                                                    className={`group relative h-24 rounded-lg border-2 overflow-hidden cursor-pointer transition-all hover:shadow-md ${selectedDesignId === designId
                                                                         ? 'border-green-500 ring-2 ring-green-500/20 shadow-lg'
                                                                         : 'border-gray-100 hover:border-primary/30'
                                                                         }`}
@@ -442,7 +517,7 @@ export function ProductsSection({
                                                                         className="w-full h-full object-fill"
                                                                         crossOrigin="anonymous"
                                                                     />
-                                                                    <div className={`absolute bottom-0 left-0 right-0 bg-black/60 p-1.5 transition-all duration-300 ${selectedDesignId === design.design_id ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
+                                                                    <div className={`absolute bottom-0 left-0 right-0 bg-black/60 p-1.5 transition-all duration-300 ${selectedDesignId === designId ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
                                                                         <p className="text-[10px] text-white truncate text-center font-bold">
                                                                             {design.name || '-'}
                                                                         </p>
@@ -452,7 +527,7 @@ export function ProductsSection({
                                                                             </p>
                                                                         )}
                                                                     </div>
-                                                                    {selectedDesignId === design.design_id && (
+                                                                    {selectedDesignId === designId && (
                                                                         <div className="absolute top-0 right-0">
                                                                             <div className="bg-green-500 text-white text-[9px] font-bold px-2 py-0.5 rounded-bl shadow-sm flex items-center gap-1">
                                                                                 <Check className="w-2.5 h-2.5" />
@@ -460,7 +535,8 @@ export function ProductsSection({
                                                                         </div>
                                                                     )}
                                                                 </div>
-                                                            ))}
+                                                                );
+                                                            })}
                                                         </div>
                                                     </div>
 

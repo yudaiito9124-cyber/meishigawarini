@@ -10,7 +10,7 @@
 Unified Chat は、単なる 1 機能ではなく「複数業務ワークフローを同じ土台で実装する」ための
 共通プラットフォームです。
 
-- 現在実装済みの代表: `SHOP_OPENING`（ショップ開設申請）
+- 現在実装済みの代表: `SHOP_OPENING`（ショップ開設申請）, `USER_SUPPORT` / `SHOP_SUPPORT`（運営との一般問い合わせ）
 - 同じ基盤で追加可能: 認証連携系、ショップ支援系、問い合わせ系
 
 ### 1.1 プラットフォーム化の構造
@@ -18,14 +18,11 @@ Unified Chat は、単なる 1 機能ではなく「複数業務ワークフロ�
 ```mermaid
 flowchart TD
       A[Unified Chat Platform] --> B[chat_type: SHOP_OPENING]
-      A --> C[chat_type: AUTH_EMAIL_VERIFICATION]
+      A --> H[chat_type: USER_SUPPORT]
       A --> D[chat_type: FUTURE_WORKFLOW_X]
 
       B --> B1[FORM_SUBMITTED]
       B --> B2[ADMIN_DECISION]
-
-      C --> C1[VERIFICATION_REQUESTED]
-      C --> C2[VERIFICATION_COMPLETED]
 
       A --> E[Shared Storage Model]
       A --> F[Shared Authorization Model]
@@ -233,18 +230,33 @@ sequenceDiagram
 
 ### 5.1 ユーザーが申請する（SHOP_OPENING）
 
-1. `/user` でフォーム入力
-2. `/unified/chat/create`（初期 `FORM_SUBMITTED`）
-3. Meta + Membership(USER/ADMIN) + Message が作成される
+1. `/user` の「申請・チャット」を開く
+2. 「ショップ開設申請」ボタンからフォーム入力
+3. `/unified/chat/create`（初期 `FORM_SUBMITTED`）
+4. Meta + Membership(USER/ADMIN) + Message が作成される
 
-### 5.2 管理者が審査する
+### 5.2 ユーザーが運営へ一般問い合わせする（USER_SUPPORT）
+
+1. `/user` の「申請・チャット」を開く
+2. 「運営とチャット」ボタンから初期メッセージ入力
+3. `/unified/chat/create`（`chat_type=USER_SUPPORT`）
+4. Meta + Membership(USER/ADMIN) + Message が作成される
+
+### 5.3 ショップが運営へ問い合わせする（SHOP_SUPPORT）
+
+1. ショップ管理画面ヘッダーの「申請・チャット」を開く
+2. 「運営とチャット」ボタンから初期メッセージ入力
+3. `/unified/chat/create`（`chat_type=SHOP_SUPPORT`）
+4. Meta + Membership(SHOP/ADMIN) + Message が作成される
+
+### 5.4 管理者が審査する
 
 1. `/admin` 問い合わせタブで `participant_id=ADMIN` 一覧取得
 2. 対象チャット詳細を取得
 3. 承認/却下を `messages/send` で送信
-4. `status/update` で `RESOLVED` 化
+4. `status/update` で `APPROVED` または `REJECTED` に更新
 
-### 5.3 ユーザー/ショップが通知を見る
+### 5.5 ユーザー/ショップが通知を見る
 
 1. 共用通知コンポーネントが `list` を取得
 2. チャット選択で `get + messages/get`

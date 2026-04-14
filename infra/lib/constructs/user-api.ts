@@ -97,6 +97,9 @@ export class UserApi extends cdk.NestedStack {
     bucket.grantPut(user_profile);
     bucket.grantDelete(user_profile);
 
+    // Unified chat attachment upload (presigned PUT) requires PutObject permission
+    bucket.grantPut(unified_chat);
+
     /**
      * ルーティングの構築
      * `/user/*` 配下のリソースを定義します。
@@ -167,5 +170,9 @@ export class UserApi extends cdk.NestedStack {
 
     const statusResource = addResourceWithCors(chatResource, 'status');
     addResourceWithCors(statusResource, 'update').addMethod('POST', new apigateway.LambdaIntegration(unified_chat), routeOptions);
+
+    // uploadurl/get は添付ファイルのPresigned URL発行
+    const uploadurlResource = addResourceWithCors(chatResource, 'uploadurl');
+    addResourceWithCors(uploadurlResource, 'get').addMethod('POST', new apigateway.LambdaIntegration(unified_chat), routeOptions);
   }
 }

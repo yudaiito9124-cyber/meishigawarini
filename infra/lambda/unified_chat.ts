@@ -16,11 +16,14 @@ import {
     TransactWriteCommand,
     UpdateCommand,
 } from '@aws-sdk/lib-dynamodb';
-import { ddb, TABLE_NAME } from './share/db';
+import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import { ddb, TABLE_NAME, BUCKET_NAME } from './share/db';
 import { checkShopOwnerOrGM } from './share/shop-auth';
 import { getAction, getUserId } from './utils/request';
 import { generateId } from './utils/id';
 import { successResponse, errorResponse } from './utils/response';
+import { getPublicUrl, signUrlIfS3, stripSignature } from './utils/s3';
 import { UnifiedChatApiSchema } from '@shared/api-types';
 import {
     assertValidWorkflowPayload,
@@ -56,6 +59,10 @@ type ChatMeta = {
 
 const MAX_PAGE_SIZE = 200;
 const DEFAULT_PAGE_SIZE = 50;
+
+// S3 アップロード関連の定数
+const s3 = new S3Client({});
+const FILE_SIZE_LIMIT_MB = 10; // 10MB
 
 /** ISO8601文字列をエポックミリ秒へ変換します。 */
 // ISO文字列をミリ秒に変換（reverse sort key 計算で使用）
@@ -117,6 +124,24 @@ function makePreview(message?: string, payloadType?: string): string {
     return '(no text)';
 }
 
+/** sender_id を DB保存用の標準ラベルへ変換します。 */
+function toStandardSenderLabel(senderId?: string): string {
+    const id = String(senderId || '').trim();
+    if (!id) return '-';
+
+    if (id === 'ADMIN' || id.startsWith('ADMIN#')) {
+        return 'ADMIN';
+    }
+
+    const m = id.match(/^(USER|SHOP)#(.+)$/i);
+    if (!m) return id;
+
+    const kind = m[1].toUpperCase();
+    const suffix = m[2].replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+    if (!suffix) return `${kind}-UNKNOWN`;
+    return `${kind}-${suffix}`;
+}
+
 /** base64 cursor を DynamoDB ExclusiveStartKey へ復元します。 */
 function parseCursor(cursor?: string): Record<string, unknown> | undefined {
     if (!cursor) return undefined;
@@ -155,6 +180,17 @@ async function createChat(body: UnifiedChatApiSchema['unified_chat_create'], cal
         return errorResponse(400, `Unsupported chat_type: ${body.chat_type}`);
     }
 
+    const workflow = WORKFLOW_REGISTRY[body.chat_type as keyof typeof WORKFLOW_REGISTRY];
+    const initialStatus = workflow.initialStatus;
+
+    const isSupportChatType = body.chat_type === 'USER_SUPPORT' || body.chat_type === 'SHOP_SUPPORT';
+    if (isSupportChatType) {
+        const expectedSupportType = body.initiator_id.startsWith('SHOP#') ? 'SHOP_SUPPORT' : 'USER_SUPPORT';
+        if (body.chat_type !== expectedSupportType) {
+            return errorResponse(400, `invalid chat_type for initiator: expected ${expectedSupportType}`);
+        }
+    }
+
     // USER#起票時は、認証済み caller と initiator の一致を強制
     // なりすましで別ユーザー名義のチャットを作れないようにする
     if (body.initiator_id.startsWith('USER#') && callerUserId) {
@@ -165,7 +201,6 @@ async function createChat(body: UnifiedChatApiSchema['unified_chat_create'], cal
     }
 
     const shard = calcShard(chat_id);
-    const callerDisplayName = getAuthorizerDisplayName(event);
     const meta: ChatMeta = {
         PK: toChatPk(chat_id),
         SK: 'META',
@@ -173,7 +208,7 @@ async function createChat(body: UnifiedChatApiSchema['unified_chat_create'], cal
         participants,
         initiator_id: body.initiator_id,
         chat_type: body.chat_type,
-        status: 'OPEN',
+        status: initialStatus,
         ts_created_at: now,
         ts_updated_at: now,
         ts_last_message_at: now,
@@ -181,7 +216,7 @@ async function createChat(body: UnifiedChatApiSchema['unified_chat_create'], cal
         last_message_seq: 0,
         last_message_text: '',
         version: 1,
-        GSI1_PK: buildGsi1Pk(body.chat_type, 'OPEN', shard),
+        GSI1_PK: buildGsi1Pk(body.chat_type, initialStatus, shard),
         GSI1_SK: `TS#${now}#CHAT#${chat_id}`,
     };
 
@@ -215,7 +250,7 @@ async function createChat(body: UnifiedChatApiSchema['unified_chat_create'], cal
                     is_muted: false,
                     is_archived: false,
                     chat_type: body.chat_type,
-                    status: 'OPEN',
+                    status: initialStatus,
                     GSI2_PK: `CHAT_INBOX#${participantId}`,
                     GSI2_SK: `TS#${toReverseEpochMs(now)}#CHAT#${chat_id}`,
                 },
@@ -262,7 +297,7 @@ async function createChat(body: UnifiedChatApiSchema['unified_chat_create'], cal
                     seq,
                     sender_id: body.initiator_id,
                     role: body.initiator_id.split('#')[0] || 'USER',
-                    username: callerDisplayName || body.initiator_id,
+                    username: toStandardSenderLabel(body.initiator_id),
                     message: body.initial_message.message || '',
                     type: body.initial_message.type || 'TEXT',
                     payload_type: body.initial_message.payload_type,
@@ -292,7 +327,7 @@ async function createChat(body: UnifiedChatApiSchema['unified_chat_create'], cal
 
     await ddb.send(new TransactWriteCommand({ TransactItems: transactItems }));
 
-    return successResponse({ chat_id, status: 'OPEN', participants });
+    return successResponse({ chat_id, status: initialStatus, participants });
 }
 
 /** Authorizer context から Cognito グループ配列を安全に抽出します。 */
@@ -321,16 +356,6 @@ function isAdminGroups(groups: string[]): boolean {
 function getCallerParticipantId(userId?: string): string | null {
     if (!userId) return null;
     return `USER#${userId}`;
-}
-
-/** Authorizer 情報から表示名（username優先）を抽出します。 */
-function getAuthorizerDisplayName(event?: any): string | undefined {
-    const authorizer = event?.requestContext?.authorizer;
-    const username = authorizer?.username || authorizer?.claims?.['cognito:username'];
-    if (typeof username === 'string' && username.trim()) return username.trim();
-    const email = authorizer?.email || authorizer?.claims?.email;
-    if (typeof email === 'string' && email.trim()) return email.trim();
-    return undefined;
 }
 
 /**
@@ -497,7 +522,13 @@ async function getMessages(body: UnifiedChatApiSchema['unified_chat_messages_get
         ScanIndexForward: false,
     }));
 
-    return successResponse({ messages: res.Items || [] });
+    // 添付ファイルの file_url を署名付き URL に変換する（receive_chat.ts と同じパターン）
+    const items = res.Items || [];
+    for (const item of items) {
+        if (item.file_url) item.file_url = await signUrlIfS3(item.file_url, BUCKET_NAME);
+    }
+
+    return successResponse({ messages: items });
 }
 
 /**
@@ -536,7 +567,6 @@ async function sendMessage(body: UnifiedChatApiSchema['unified_chat_messages_sen
     const seq = (meta.last_message_seq || 0) + 1;
     const msgId = generateId();
     const preview = makePreview(body.message, body.payload_type);
-    const callerDisplayName = getAuthorizerDisplayName(event);
 
     let workflowStatus = body.workflow_status;
     if (body.type === 'WORKFLOW') {
@@ -593,13 +623,13 @@ async function sendMessage(body: UnifiedChatApiSchema['unified_chat_messages_sen
                     seq,
                     sender_id: body.sender_id,
                     role: body.sender_id.split('#')[0] || 'USER',
-                    username: callerDisplayName || body.sender_id,
+                    username: toStandardSenderLabel(body.sender_id),
                     message: body.message || '',
                     type: body.type,
                     payload_type: body.payload_type,
                     payload: body.payload,
                     workflow_status: workflowStatus,
-                    file_url: body.file_url,
+                    file_url: body.file_url ? stripSignature(body.file_url) : undefined,
                     file_name: body.file_name,
                     file_size: body.file_size,
                     ts_created_at: now,
@@ -755,6 +785,17 @@ async function updateStatus(body: UnifiedChatApiSchema['unified_chat_status_upda
         return errorResponse(404, 'chat not found');
     }
 
+    // chat_type ごとの許可ステータスを強制し、不正値への更新を防止
+    const workflow = WORKFLOW_REGISTRY[meta.chat_type as keyof typeof WORKFLOW_REGISTRY];
+    if (!workflow) {
+        return errorResponse(400, `Unsupported chat_type: ${meta.chat_type}`);
+    }
+    const normalizedNextStatus = String(body.next_status || '').toUpperCase();
+    const allowedStatuses = workflow.statuses.map((status) => String(status).toUpperCase());
+    if (!allowedStatuses.includes(normalizedNextStatus)) {
+        return errorResponse(400, `invalid next_status for ${meta.chat_type}: ${body.next_status}`);
+    }
+
     const now = new Date().toISOString();
     const shard = calcShard(meta.chat_id);
 
@@ -774,9 +815,9 @@ async function updateStatus(body: UnifiedChatApiSchema['unified_chat_status_upda
                     '#status': 'status',
                 },
                 ExpressionAttributeValues: {
-                    ':status': body.next_status,
+                    ':status': normalizedNextStatus,
                     ':ts': now,
-                    ':gsi1pk': buildGsi1Pk(meta.chat_type, body.next_status, shard),
+                    ':gsi1pk': buildGsi1Pk(meta.chat_type, normalizedNextStatus, shard),
                     ':gsi1sk': `TS#${meta.ts_last_message_at}#CHAT#${meta.chat_id}`,
                     ':expectedVersion': body.expected_version,
                     ':nextVersion': body.expected_version + 1,
@@ -795,7 +836,7 @@ async function updateStatus(body: UnifiedChatApiSchema['unified_chat_status_upda
                     '#status': 'status',
                 },
                 ExpressionAttributeValues: {
-                    ':status': body.next_status,
+                    ':status': normalizedNextStatus,
                     ':ts': now,
                 },
             },
@@ -804,7 +845,62 @@ async function updateStatus(body: UnifiedChatApiSchema['unified_chat_status_upda
 
     await ddb.send(new TransactWriteCommand({ TransactItems: transactItems }));
 
-    return successResponse({ ok: true, next_status: body.next_status });
+    return successResponse({ ok: true, next_status: normalizedNextStatus });
+}
+
+/**
+ * チャット用ファイルアップロード用のPresigned URLを生成します。
+ * - chat_id から chat Meta を取得
+ * - 参加者認証を行う
+ * - ファイルサイズをチェック
+ * - S3 署名付きURLを生成
+ */
+async function uploadUrl(body: UnifiedChatApiSchema['unified_chat_uploadurl_get'], callerUserId?: string, groups: string[] = [], event?: any) {
+    if (!body.chat_id || !body.filename || !body.content_type) {
+        return errorResponse(400, 'chat_id, filename, content_type are required');
+    }
+
+    const fileSize = body.file_size || 0;
+    if (fileSize > FILE_SIZE_LIMIT_MB * 1024 * 1024) {
+        return errorResponse(413, `File size exceeds ${FILE_SIZE_LIMIT_MB}MB limit`);
+    }
+
+    // チャットメタを取得
+    const metaRes = await ddb.send(new GetCommand({
+        TableName: TABLE_NAME,
+        Key: { PK: toChatPk(body.chat_id), SK: 'META' },
+    }));
+
+    const meta = metaRes.Item as ChatMeta | undefined;
+    if (!meta) {
+        return errorResponse(404, 'chat not found');
+    }
+
+    // チャット参加者であるか確認
+    if (!(await canAccessChat(meta, callerUserId, groups, event))) {
+        return errorResponse(403, 'forbidden');
+    }
+
+    // S3 のキーを生成 (CHAT#chat_id/file_id.ext)
+    const fileId = generateId();
+    const ext = body.filename.split('.').pop() || 'bin';
+    const key = `unified-chat/${body.chat_id}/${fileId}.${ext}`;
+
+    // Presigned URL を生成
+    const command = new PutObjectCommand({
+        Bucket: BUCKET_NAME,
+        Key: key,
+        ContentType: body.content_type,
+    });
+
+    const uploadUrl_val = await getSignedUrl(s3, command, { expiresIn: 3600 });
+    const fileUrl = getPublicUrl(BUCKET_NAME, key);
+
+    return successResponse({
+        uploadUrl: uploadUrl_val,
+        fileUrl,
+        key,
+    });
 }
 
 /**
@@ -882,6 +978,9 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         } else if (path === '/unified/chat/status/update') {
             // チャットのステータスを変更します（例: OPEN → RESOLVED）。
             action = 'status_update';
+        } else if (path === '/unified/chat/uploadurl/get') {
+            // ファイルアップロード用のPresigned URLを生成します。
+            action = 'uploadurl';
         } else {
             // 上記のいずれにもマッチしない場合は、リクエストボディの action フィールドを参照します。
             // 主に開発・デバッグ時の後方互換目的のフォールバックです。
@@ -927,6 +1026,10 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         if (action === 'status_update') {
             // ステータス更新: チャットの status フィールドを楽観的ロック（version）付きで変更します。
             return await updateStatus(body as UnifiedChatApiSchema['unified_chat_status_update'], groups);
+        }
+        if (action === 'uploadurl') {
+            // ファイルアップロード: Presigned URL を生成します。
+            return await uploadUrl(body as UnifiedChatApiSchema['unified_chat_uploadurl_get'], callerUserId, groups, event);
         }
 
         // どのアクションにも該当しないリクエストは 404 を返します。

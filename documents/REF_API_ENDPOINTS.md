@@ -143,6 +143,10 @@
 	- ショップ管理画面ヘッダー: [`frontend/components/shop/ShopHeader.tsx`](../frontend/components/shop/ShopHeader.tsx)（`participantId="SHOP#xxx"`）
 	- ユーザーマイページ: [`frontend/app/[locale]/user/page.tsx`](../frontend/app/%5Blocale%5D/user/page.tsx)（`participantId="USER#xxx"`）
 
+- **作成導線（現行）**:
+	- `運営とチャット` ボタン: 起票者が `USER#...` なら `chat_type=USER_SUPPORT`、`SHOP#...` なら `chat_type=SHOP_SUPPORT` で新規チャット作成
+	- `ショップ開設申請` ボタン: `chat_type=SHOP_OPENING` の申請フォーム送信
+
 ### 実装上の制約
 
 > [!NOTE]

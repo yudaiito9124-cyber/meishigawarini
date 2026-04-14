@@ -251,11 +251,25 @@ export function ProductCard({
                                     <Button variant="outline" size="sm" onClick={() => handleToggleStatus(product.product_id, product.status)} disabled={togglingProductId === product.product_id}>
                                         {togglingProductId === product.product_id ? t('linkQr.processing') : (product.status === 'ACTIVE' ? t('product.stop') : t('product.activate'))}
                                     </Button>
-                                    <Button variant="outline" size="sm" onClick={() => handleOpenDuplicateDialog(product)}>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => {
+                                            setOpen(false);
+                                            handleOpenDuplicateDialog(product);
+                                        }}
+                                    >
                                         <Copy className="w-4 h-4 mr-1" />
                                         {t('productDetails.duplicate')}
                                     </Button>
-                                    <Button variant="outline" size="sm" onClick={() => handleOpenEditDialog(product)}>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => {
+                                            setOpen(false);
+                                            handleOpenEditDialog(product);
+                                        }}
+                                    >
                                         <Pencil className="w-4 h-4 mr-1" />
                                         {t('productDetails.edit')}
                                     </Button>

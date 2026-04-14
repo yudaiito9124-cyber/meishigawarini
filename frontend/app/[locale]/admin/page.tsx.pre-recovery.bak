@@ -58,10 +58,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { isValidWorkflowPayload } from '@shared/unified-chat-workflows';
 
 import { adminApi } from "@/lib/api/admin";
-import { uploadChatFile, ChatFileData } from '@/lib/uploadChatFile';
-import { getDisplayMessage } from '@/lib/chatMessage';
-import { toDisplayParticipantId } from '@/lib/chatId';
-import ChatAttachment from '@/components/chat/ChatAttachment';
 import OrderDetailsDialog from "@/components/admin/OrderDetailsDialog";
 
 /**
@@ -1011,20 +1007,18 @@ export default function AdminPage() {
                  * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
                  */}
                 {activeTab === "shops" && (
-                    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 items-start">
-                            {/* ショップのメタデータ管理 (NEW) */}
-                            <AdminShopCardDesignLinkSection apiUrl={NEXT_PUBLIC_API_URL} dbCardDesigns={dbCardDesigns} />
+                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 animate-in fade-in slide-in-from-bottom-2 duration-300 items-start">
+                        {/* ショップのメタデータ管理 (NEW) */}
+                        <AdminShopCardDesignLinkSection apiUrl={NEXT_PUBLIC_API_URL} dbCardDesigns={dbCardDesigns} />
 
-                            {/* ショップの新規作成 (NEW) */}
-                            <AdminShopCreationSection apiUrl={NEXT_PUBLIC_API_URL} />
+                        {/* ショップの新規作成 (NEW) */}
+                        <AdminShopCreationSection apiUrl={NEXT_PUBLIC_API_URL} />
 
-                            {/* ショップオーナーの変更 (NEW) */}
-                            <ShopOwnerChangeSection apiUrl={NEXT_PUBLIC_API_URL} />
+                        {/* ショップオーナーの変更 (NEW) */}
+                        <ShopOwnerChangeSection apiUrl={NEXT_PUBLIC_API_URL} />
 
-                            {/* ショップ管理者の紐づけ (NEW) */}
-                            <ManagerLinkingSection apiUrl={NEXT_PUBLIC_API_URL} />
-                        </div>
+                        {/* ショップ管理者の紐づけ (NEW) */}
+                        <ManagerLinkingSection apiUrl={NEXT_PUBLIC_API_URL} />
                     </div>
                 )}
 
@@ -1033,7 +1027,7 @@ export default function AdminPage() {
 
                 {activeTab === "inquiries" && (
                     <div className="grid grid-cols-1 gap-6 animate-in fade-in slide-in-from-bottom-2 duration-300 items-start">
-                        <AdminInquiryChatSection dbCardDesigns={dbCardDesigns} />
+                        <ShopOpeningInquirySection dbCardDesigns={dbCardDesigns} />
                     </div>
                 )}
 
@@ -1078,1004 +1072,13 @@ export default function AdminPage() {
 }
 
 /**
- * 管理者向けの問い合わせチャット画面。
- * 一覧と詳細を同一画面で表示し、ADMIN 参加者としてメッセージの閲覧・返信を行います。
- */
-function AdminInquiryChatSection({ dbCardDesigns }: { dbCardDesigns: any[] }) {
-    const t = useTranslations('AdminPage');
-    const [notificationLoading, setNotificationLoading] = useState(false);
-    const [statusUpdating, setStatusUpdating] = useState(false);
-    const [detailLoading, setDetailLoading] = useState(false);
-    const [chats, setChats] = useState<any[]>([]);
-    const [pastChats, setPastChats] = useState<any[]>([]);
-    const [pastCarry, setPastCarry] = useState<any[]>([]);
-    const [pastLoading, setPastLoading] = useState(false);
-    const [pastCursor, setPastCursor] = useState<string | null>(null);
-    const [pastHasNext, setPastHasNext] = useState(false);
-    const [showPastChats, setShowPastChats] = useState(false);
-    const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
-    const [selectedChat, setSelectedChat] = useState<any | null>(null);
-    const [selectedMessages, setSelectedMessages] = useState<any[]>([]);
-    const [inputMessage, setInputMessage] = useState('');
-    const [sendingMessage, setSendingMessage] = useState(false);
-    const [selectedFile, setSelectedFile] = useState<File | null>(null);
-    const [uploading, setUploading] = useState(false);
-    const [chatPageSize, setChatPageSize] = useState<number>(10);
-    const [chatPageCursors, setChatPageCursors] = useState<(string | null)[]>([null]);
-    const [chatPageIdx, setChatPageIdx] = useState<number>(0);
-    const [chatHasNext, setChatHasNext] = useState(false);
-    const [shopOpenDialogOpen, setShopOpenDialogOpen] = useState(false);
-    const [approveDesignId, setApproveDesignId] = useState('');
-    const [rejectReason, setRejectReason] = useState('');
-    const [adminMemo, setAdminMemo] = useState('');
-    const [shopOpenActionLoading, setShopOpenActionLoading] = useState(false);
-    const TERMINAL_STATUSES = useMemo(() => new Set(['APPROVED', 'REJECTED', 'CANCELLED', 'RESOLVED', 'CLOSED']), []);
-
-    const getChatTypeLabel = (chatType?: string): string => {
-        if (!chatType) return '-';
-        const labels: Record<string, string> = {
-            SHOP_OPENING: 'ショップ開設申請',
-            USER_SUPPORT: '一般問い合わせ',
-            SHOP_SUPPORT: 'ショップ運営サポート',
-            SHOP_DESIGN: 'ショップデザイン相談',
-            MISC: 'その他',
-        };
-        return labels[chatType] || chatType;
-    };
-
-    const getStatusLabel = (status?: string): string => {
-        if (!status) return '-';
-        const labels: Record<string, string> = {
-            OPEN: t('inquiryChat.statuses.open'),
-            RESOLVED: t('inquiryChat.statuses.resolved'),
-            CLOSED: t('inquiryChat.statuses.closed'),
-            DRAFT: t('inquiryChat.statuses.draft'),
-            SUBMITTED: t('inquiryChat.statuses.submitted'),
-            IN_REVIEW: t('inquiryChat.statuses.inReview'),
-            APPROVED: t('inquiryChat.statuses.approved'),
-            REJECTED: t('inquiryChat.statuses.rejected'),
-            CANCELLED: t('inquiryChat.statuses.cancelled'),
-            PENDING: t('inquiryChat.statuses.pending'),
-            VERIFIED: t('inquiryChat.statuses.verified'),
-            EXPIRED: t('inquiryChat.statuses.expired'),
-            FAILED: t('inquiryChat.statuses.failed'),
-        };
-        return labels[status] || status;
-    };
-
-    const selectedParticipantIds = useMemo(() => {
-        return Array.isArray(selectedChat?.participants) ? selectedChat.participants : [];
-    }, [selectedChat]);
-
-    const getSenderDisplayName = (message: any): string => {
-        const senderId = message?.sender_id || '';
-        if (senderId === 'ADMIN' || senderId.startsWith('ADMIN#')) {
-            return t('inquiryChat.adminLabel');
-        }
-        return toDisplayParticipantId(senderId);
-    };
-
-    const normalizeStatus = (status?: string) => String(status || '').toUpperCase();
-
-    const isTerminalStatus = (status?: string) => TERMINAL_STATUSES.has(normalizeStatus(status));
-
-    const isSupportChatType = (chatType?: string) => {
-        return ['USER_SUPPORT', 'SHOP_SUPPORT', 'SHOP_DESIGN', 'MISC'].includes(String(chatType || '').toUpperCase());
-    };
-
-    const getAvailableTransitions = (chat: any): string[] => {
-        const status = normalizeStatus(chat?.status);
-        const chatType = String(chat?.chat_type || '').toUpperCase();
-
-        if (isSupportChatType(chatType)) {
-            if (status === 'OPEN') return ['RESOLVED', 'CANCELLED'];
-            if (status === 'RESOLVED') return ['CLOSED', 'OPEN'];
-            return [];
-        }
-
-        if (chatType === 'SHOP_OPENING') {
-            if (status === 'DRAFT' || status === 'SUBMITTED') return ['IN_REVIEW', 'CANCELLED'];
-            if (status === 'IN_REVIEW') return ['CANCELLED'];
-            return [];
-        }
-
-        return [];
-    };
-
-    const getTransitionLabel = (status: string) => {
-        const labels: Record<string, string> = {
-            OPEN: t('inquiryChat.actions.reopen'),
-            RESOLVED: t('inquiryChat.actions.complete'),
-            CLOSED: t('inquiryChat.actions.close'),
-            CANCELLED: t('inquiryChat.actions.cancel'),
-            IN_REVIEW: t('inquiryChat.actions.startReview'),
-        };
-        return labels[status] || status;
-    };
-
-    const fetchFilteredChunk = async (
-        mode: 'active' | 'past',
-        startCursor: string | null,
-        takeCount: number,
-    ) => {
-        const collected: any[] = [];
-        let cursor = startCursor;
-        let hasNext = false;
-
-        for (let i = 0; i < 20; i += 1) {
-            const response = await adminApi.fetch_post('/unified/chat/list', {
-                participant_id: 'ADMIN',
-                include_archived: false,
-                limit: takeCount,
-                ...(cursor ? { cursor } : {}),
-            });
-
-            const items: any[] = response.items || [];
-            const filtered = items.filter((chat) => {
-                const terminal = isTerminalStatus(chat?.status);
-                return mode === 'active' ? !terminal : terminal;
-            });
-
-            if (filtered.length > 0) {
-                collected.push(...filtered);
-            }
-
-            cursor = response.cursor ?? null;
-            hasNext = !!cursor;
-            if (!hasNext || collected.length >= takeCount) {
-                break;
-            }
-        }
-
-        return {
-            items: collected.slice(0, takeCount),
-            nextCursor: cursor,
-            hasNext,
-        };
-    };
-
-    const fetchPage = async (idx: number, cursors: (string | null)[] = chatPageCursors) => {
-        setNotificationLoading(true);
-        try {
-            const cursor = cursors[idx] ?? null;
-
-            const response = await fetchFilteredChunk('active', cursor, chatPageSize);
-            setChats(response.items);
-            setChatPageIdx(idx);
-            setChatPageCursors((prev) => {
-                const updated = [...prev];
-                updated[idx] = cursor;
-                if (response.nextCursor) updated[idx + 1] = response.nextCursor;
-                else updated.splice(idx + 1);
-                return updated;
-            });
-            setChatHasNext(!!response.nextCursor && response.hasNext);
-        } catch (e) {
-            console.error('Failed to fetch admin inquiry chats', e);
-        } finally {
-            setNotificationLoading(false);
-        }
-    };
-
-    const fetchNotifications = () => {
-        const fresh: (string | null)[] = [null];
-        setChatPageCursors(fresh);
-        setChatPageIdx(0);
-        setChatHasNext(false);
-        setShowPastChats(false);
-        setPastChats([]);
-        setPastCarry([]);
-        setPastCursor(null);
-        setPastHasNext(false);
-        setSelectedChatId(null);
-        setSelectedChat(null);
-        setSelectedMessages([]);
-        fetchPage(0, fresh);
-    };
-
-    const handleFetchPastChats = async () => {
-        setPastLoading(true);
-        try {
-            const targetCount = chatPageSize;
-            const collected: any[] = [];
-            const carry = [...pastCarry];
-
-            while (carry.length > 0 && collected.length < targetCount) {
-                const item = carry.shift();
-                if (item) collected.push(item);
-            }
-
-            let cursor = showPastChats ? pastCursor : null;
-            let hasNext = !!cursor;
-            const apiLimit = Math.max(50, targetCount * 5);
-
-            for (let i = 0; i < 100 && collected.length < targetCount; i += 1) {
-                const response = await adminApi.fetch_post('/unified/chat/list', {
-                    participant_id: 'ADMIN',
-                    include_archived: false,
-                    limit: apiLimit,
-                    ...(cursor ? { cursor } : {}),
-                });
-
-                const items: any[] = response.items || [];
-                const filtered = items.filter((chat) => isTerminalStatus(chat?.status));
-
-                for (const chat of filtered) {
-                    if (collected.length < targetCount) {
-                        collected.push(chat);
-                    } else {
-                        carry.push(chat);
-                    }
-                }
-
-                cursor = response.cursor ?? null;
-                hasNext = !!cursor;
-                if (!hasNext) {
-                    break;
-                }
-            }
-
-            setShowPastChats(true);
-            setPastChats((prev) => {
-                const base = showPastChats ? prev : [];
-                const seen = new Set(base.map((chat) => String(chat?.chat_id || '')));
-                const merged = [...base];
-                for (const chat of collected) {
-                    const chatId = String(chat?.chat_id || '');
-                    if (!chatId || seen.has(chatId)) {
-                        continue;
-                    }
-                    seen.add(chatId);
-                    merged.push(chat);
-                }
-                return merged;
-            });
-            setPastCarry(carry);
-            setPastCursor(cursor);
-            setPastHasNext(carry.length > 0 || hasNext);
-        } catch (e) {
-            console.error('Failed to fetch past chats', e);
-        } finally {
-            setPastLoading(false);
-        }
-    };
-
-    const fetchAllMessages = async (chatId: string): Promise<any[]> => {
-        const pageLimit = 100;
-        let beforeSeq: number | undefined = undefined;
-        const allDesc: any[] = [];
-
-        for (let i = 0; i < 200; i += 1) {
-            const res = await adminApi.fetch_post('/unified/chat/messages/get', {
-                chat_id: chatId,
-                limit: pageLimit,
-                ...(typeof beforeSeq === 'number' ? { before_seq: beforeSeq } : {}),
-            });
-
-            const batch: any[] = Array.isArray(res?.messages) ? res.messages : [];
-            if (batch.length === 0) break;
-            allDesc.push(...batch);
-
-            const seqs = batch.map((m) => m.seq).filter((v): v is number => typeof v === 'number');
-            if (seqs.length === 0) break;
-            const oldestSeq = Math.min(...seqs);
-            if (oldestSeq <= 1 || batch.length < pageLimit) break;
-            beforeSeq = oldestSeq;
-        }
-
-        const seen = new Set<string>();
-        const dedupedDesc = allDesc.filter((m) => {
-            const key = `${m.seq ?? ''}:${m.message_id ?? ''}`;
-            if (seen.has(key)) return false;
-            seen.add(key);
-            return true;
-        });
-
-        return dedupedDesc.slice().reverse();
-    };
-
-    const openChatDetail = async (chatId: string) => {
-        setInputMessage('');
-        setSelectedChatId(chatId);
-        setDetailLoading(true);
-        try {
-            const [chatRes, messagesRes] = await Promise.all([
-                adminApi.fetch_post('/unified/chat/get', { chat_id: chatId }),
-                fetchAllMessages(chatId),
-            ]);
-
-            setSelectedChat(chatRes.chat || null);
-            setSelectedMessages(messagesRes);
-
-            const unreadBefore = chats.find((chat) => chat.chat_id === chatId)?.unread_count_cache ?? 0;
-            const lastMessageSeq = chatRes?.chat?.last_message_seq;
-            if (unreadBefore > 0 && typeof lastMessageSeq === 'number') {
-                await adminApi.fetch_post('/unified/chat/read/mark', {
-                    chat_id: chatId,
-                    participant_id: 'ADMIN',
-                    last_read_seq: lastMessageSeq,
-                });
-                setChats((prev) => prev.map((chat) => (
-                    chat.chat_id === chatId ? { ...chat, unread_count_cache: 0 } : chat
-                )));
-            }
-        } catch (e) {
-            console.error('Failed to fetch chat detail', e);
-        } finally {
-            setDetailLoading(false);
-        }
-    };
-
-    const sendFreeText = async () => {
-        const text = inputMessage.trim();
-        const hasFile = !!selectedFile;
-        if ((!text && !hasFile) || !selectedChatId || sendingMessage || uploading) return;
-        setSendingMessage(true);
-        try {
-            let fileData: ChatFileData | null = null;
-
-            if (selectedFile) {
-                setUploading(true);
-                try {
-                    fileData = await uploadChatFile(adminApi.fetch_post.bind(adminApi), selectedChatId, selectedFile);
-                } finally {
-                    setUploading(false);
-                }
-            }
-
-            await adminApi.fetch_post('/unified/chat/messages/send', {
-                chat_id: selectedChatId,
-                sender_id: 'ADMIN',
-                type: fileData ? 'FILE' : 'TEXT',
-                message: text || '',
-                ...fileData,
-            });
-
-            setInputMessage('');
-            setSelectedFile(null);
-            const allMessages = await fetchAllMessages(selectedChatId);
-            setSelectedMessages(allMessages);
-            setChats((prev) =>
-                prev.map((c) =>
-                    c.chat_id === selectedChatId
-                        ? { ...c, ts_last_message_at: new Date().toISOString() }
-                        : c,
-                ),
-            );
-        } catch (e) {
-            console.error('Failed to send message', e);
-            alert(t('inquiryChat.sendFailed'));
-        } finally {
-            setSendingMessage(false);
-        }
-    };
-
-    const handleUpdateChatStatus = async (nextStatus: string) => {
-        if (!selectedChat?.chat_id || typeof selectedChat?.version !== 'number' || statusUpdating) {
-            return;
-        }
-
-        setStatusUpdating(true);
-        try {
-            await adminApi.fetch_post('/unified/chat/status/update', {
-                chat_id: selectedChat.chat_id,
-                next_status: nextStatus,
-                expected_version: selectedChat.version,
-            });
-
-            const [chatRes, activeRes] = await Promise.all([
-                adminApi.fetch_post('/unified/chat/get', { chat_id: selectedChat.chat_id }),
-                fetchFilteredChunk('active', chatPageCursors[chatPageIdx] ?? null, chatPageSize),
-            ]);
-
-            setSelectedChat(chatRes.chat || null);
-            setChats(activeRes.items);
-            setChatHasNext(!!activeRes.nextCursor && activeRes.hasNext);
-
-            if (isTerminalStatus(chatRes?.chat?.status)) {
-                setSelectedChatId(null);
-                setSelectedChat(null);
-                setSelectedMessages([]);
-                setInputMessage('');
-            }
-        } catch (e) {
-            console.error('Failed to update chat status', e);
-            alert(t('inquiryChat.updateFailed'));
-        } finally {
-            setStatusUpdating(false);
-        }
-    };
-
-    const isChatClosed = isTerminalStatus(selectedChat?.status);
-    const availableTransitions = useMemo(() => getAvailableTransitions(selectedChat), [selectedChat]);
-    const isShopOpeningSelected = String(selectedChat?.chat_type || '').toUpperCase() === 'SHOP_OPENING';
-
-    const editableStatuses = useMemo(() => new Set(['OPEN', 'DRAFT', 'SUBMITTED', 'IN_REVIEW']), []);
-    const isShopOpeningDecisionLocked = useMemo(() => {
-        if (!isShopOpeningSelected) return true;
-        return !editableStatuses.has(String(selectedChat?.status || '').toUpperCase());
-    }, [editableStatuses, isShopOpeningSelected, selectedChat]);
-
-    const selectedFormSnapshot = useMemo(() => {
-        const metaSnapshot = selectedChat?.shop_opening_form_snapshot;
-        if (isStrictShopOpeningSnapshot(metaSnapshot)) {
-            return metaSnapshot;
-        }
-
-        for (const message of selectedMessages) {
-            if (message?.payload_type !== 'FORM_SUBMITTED') {
-                continue;
-            }
-            if (isValidWorkflowPayload('SHOP_OPENING', 'FORM_SUBMITTED', message.payload)) {
-                return message.payload.form_snapshot;
-            }
-        }
-        return null;
-    }, [selectedChat, selectedMessages]);
-
-    const handleShopOpeningApprove = async () => {
-        if (!selectedChat?.chat_id || !selectedChat?.initiator_id?.startsWith('USER#')) {
-            alert(t('inquiries.errors.invalidInitiator'));
-            return;
-        }
-        if (isShopOpeningDecisionLocked) {
-            alert(t('inquiries.errors.decisionLocked'));
-            return;
-        }
-        if (!approveDesignId) {
-            alert(t('inquiries.errors.designRequired'));
-            return;
-        }
-
-        setShopOpenActionLoading(true);
-        try {
-            const ownerId = selectedChat.initiator_id.replace('USER#', '');
-            const shopName = selectedFormSnapshot?.shop_name || t('inquiries.defaultShopName');
-
-            const created = await adminApi.admin_shop_create({
-                owner_id: ownerId,
-                name: shopName,
-            });
-
-            await adminApi.admin_shop_carddesign_link_update({
-                shop_id: created.shop_id,
-                card_designs: [approveDesignId],
-            });
-
-            const reviewedAt = new Date().toISOString();
-            await adminApi.fetch_post('/unified/chat/messages/send', {
-                chat_id: selectedChat.chat_id,
-                sender_id: 'ADMIN',
-                type: 'WORKFLOW',
-                message: t('inquiries.decision.approvedMessage'),
-                payload_type: 'ADMIN_DECISION',
-                workflow_status: 'APPROVED',
-                payload: {
-                    approved: true,
-                    reason: adminMemo || undefined,
-                    reviewer_id: 'ADMIN',
-                    reviewed_at: reviewedAt,
-                    linked_shop_id: created.shop_id,
-                    default_design_id: approveDesignId,
-                },
-            });
-
-            const latestChat = await adminApi.fetch_post('/unified/chat/get', {
-                chat_id: selectedChat.chat_id,
-            });
-            const latestVersion = latestChat?.chat?.version;
-            if (typeof latestVersion !== 'number') {
-                throw new Error('latest chat version is missing');
-            }
-
-            await adminApi.fetch_post('/unified/chat/status/update', {
-                chat_id: selectedChat.chat_id,
-                next_status: 'APPROVED',
-                expected_version: latestVersion,
-            });
-
-            setShopOpenDialogOpen(false);
-            setApproveDesignId('');
-            setRejectReason('');
-            setAdminMemo('');
-            await fetchNotifications();
-        } catch (e: any) {
-            console.error('approval failed', e);
-            const detail = e?.message || e?.error || e?.statusText || '';
-            alert(detail ? `${t('inquiries.errors.approveFailed')}\n${detail}` : t('inquiries.errors.approveFailed'));
-        } finally {
-            setShopOpenActionLoading(false);
-        }
-    };
-
-    const handleShopOpeningReject = async () => {
-        if (!selectedChat?.chat_id) {
-            return;
-        }
-        if (isShopOpeningDecisionLocked) {
-            alert(t('inquiries.errors.decisionLocked'));
-            return;
-        }
-        if (!rejectReason.trim()) {
-            alert(t('inquiries.errors.rejectReasonRequired'));
-            return;
-        }
-
-        setShopOpenActionLoading(true);
-        try {
-            const reviewedAt = new Date().toISOString();
-
-            await adminApi.fetch_post('/unified/chat/messages/send', {
-                chat_id: selectedChat.chat_id,
-                sender_id: 'ADMIN',
-                type: 'WORKFLOW',
-                message: t('inquiries.decision.rejectedMessage'),
-                payload_type: 'ADMIN_DECISION',
-                workflow_status: 'REJECTED',
-                payload: {
-                    approved: false,
-                    reason: rejectReason.trim(),
-                    reviewer_id: 'ADMIN',
-                    reviewed_at: reviewedAt,
-                },
-            });
-
-            const latestChat = await adminApi.fetch_post('/unified/chat/get', {
-                chat_id: selectedChat.chat_id,
-            });
-            const latestVersion = latestChat?.chat?.version;
-            if (typeof latestVersion !== 'number') {
-                throw new Error('latest chat version is missing');
-            }
-
-            await adminApi.fetch_post('/unified/chat/status/update', {
-                chat_id: selectedChat.chat_id,
-                next_status: 'REJECTED',
-                expected_version: latestVersion,
-            });
-
-            setShopOpenDialogOpen(false);
-            setApproveDesignId('');
-            setRejectReason('');
-            setAdminMemo('');
-            await fetchNotifications();
-        } catch (e: any) {
-            console.error('rejection failed', e);
-            const detail = e?.message || e?.error || e?.statusText || '';
-            alert(detail ? `${t('inquiries.errors.rejectFailed')}\n${detail}` : t('inquiries.errors.rejectFailed'));
-        } finally {
-            setShopOpenActionLoading(false);
-        }
-    };
-
-    useEffect(() => {
-        fetchNotifications();
-    }, []);
-
-    useEffect(() => {
-        const fresh: (string | null)[] = [null];
-        setChatPageCursors(fresh);
-        setChatPageIdx(0);
-        setChatHasNext(false);
-        setChats([]);
-        setShowPastChats(false);
-        setPastChats([]);
-        setPastCarry([]);
-        setPastCursor(null);
-        setPastHasNext(false);
-        fetchPage(0, fresh);
-    }, [chatPageSize]);
-
-    return (
-        <Card className="flex flex-col min-h-[70vh]">
-            <CardHeader className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between border-b bg-gray-50/60">
-                <div>
-                    <CardTitle>{t('inquiryChat.title')}</CardTitle>
-                    <CardDescription>{t('inquiryChat.description')}</CardDescription>
-                </div>
-                <div className="flex items-center gap-2">
-                    <Button variant="outline" size="sm" onClick={fetchNotifications} disabled={notificationLoading}>
-                        {notificationLoading ? t('inquiryChat.loading') : t('inquiryChat.refresh')}
-                    </Button>
-                            <Button variant="outline" size="sm" onClick={handleFetchPastChats} disabled={pastLoading}>
-                                {pastLoading
-                                    ? t('inquiryChat.loading')
-                                    : showPastChats
-                                        ? t('inquiryChat.fetchMorePast')
-                                        : t('inquiryChat.showPast')}
-                            </Button>
-                </div>
-            </CardHeader>
-
-            <CardContent
-                className="grid grid-cols-1 xl:grid-cols-2 gap-6 flex-1 min-h-0 p-6 overflow-y-auto xl:grid-rows-1"
-                style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}
-            >
-                <Card className="flex flex-col h-[67rem]">
-                    <CardHeader className="pb-3 border-b bg-gray-50/60">
-                        <div className="flex items-center gap-2">
-                            <CardTitle>{t('inquiryChat.listTitle')}</CardTitle>
-                        </div>
-                        <div className="flex items-center gap-1">
-                            <span className="text-xs text-gray-500 mr-1">{t('inquiryChat.pageSize')}:</span>
-                            {([5, 10, 25, 50] as const).map((s) => (
-                                <button
-                                    type="button"
-                                    key={s}
-                                    onClick={() => setChatPageSize(s)}
-                                    className={`px-2 py-0.5 text-xs rounded border ${chatPageSize === s ? 'text-white' : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'}`}
-                                    style={chatPageSize === s ? { backgroundColor: '#374151', borderColor: '#374151', color: '#ffffff' } : undefined}
-                                >
-                                    {s}
-                                </button>
-                            ))}
-                        </div>
-                    </CardHeader>
-                    <CardContent className="overflow-auto min-h-0 flex-1">
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>{t('inquiryChat.table.updatedAt')}</TableHead>
-                                    <TableHead>{t('inquiryChat.table.type')}</TableHead>
-                                    <TableHead>{t('inquiryChat.table.status')}</TableHead>
-                                    <TableHead>{t('inquiryChat.table.unread')}</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {chats.length === 0 ? (
-                                    <TableRow>
-                                        <TableCell colSpan={4} className="text-center text-gray-500">
-                                            {t('inquiryChat.empty')}
-                                        </TableCell>
-                                    </TableRow>
-                                ) : (
-                                    chats.map((chat) => (
-                                        <TableRow
-                                            key={chat.chat_id}
-                                            className={`cursor-pointer hover:bg-gray-50 ${selectedChatId === chat.chat_id ? 'bg-blue-50 ring-1 ring-blue-200' : ''}`}
-                                            onClick={() => openChatDetail(chat.chat_id)}
-                                        >
-                                            <TableCell>{chat.ts_last_message_at ? new Date(chat.ts_last_message_at).toLocaleString() : '-'}</TableCell>
-                                            <TableCell>{getChatTypeLabel(chat.chat_type)}</TableCell>
-                                            <TableCell>{getStatusLabel(chat.status)}</TableCell>
-                                            <TableCell>{chat.unread_count_cache ?? 0}</TableCell>
-                                        </TableRow>
-                                    ))
-                                )}
-                            </TableBody>
-                        </Table>
-                        <div className="mt-3 flex items-center justify-between">
-                            <Button
-                                variant="outline" size="sm"
-                                onClick={() => fetchPage(chatPageIdx - 1)}
-                                disabled={notificationLoading || chatPageIdx === 0}
-                            >
-                                {t('inquiryChat.prevPage')}
-                            </Button>
-                            <span className="text-xs text-gray-500">{chatPageIdx + 1} {t('inquiryChat.pageOf')}</span>
-                            <Button
-                                variant="outline" size="sm"
-                                onClick={() => fetchPage(chatPageIdx + 1)}
-                                disabled={notificationLoading || !chatHasNext}
-                            >
-                                {t('inquiryChat.nextPage')}
-                            </Button>
-                        </div>
-
-                        {showPastChats && (
-                            <div className="mt-6 border-t pt-4 space-y-3">
-                                <div className="flex items-center justify-between">
-                                    <p className="text-sm font-semibold text-gray-700">{t('inquiryChat.pastTitle')}</p>
-                                    <Button variant="outline" size="sm" onClick={handleFetchPastChats} disabled={pastLoading || !pastHasNext}>
-                                        {pastLoading ? t('inquiryChat.loading') : t('inquiryChat.fetchMorePast')}
-                                    </Button>
-                                </div>
-                                {pastChats.length === 0 ? (
-                                    <p className="text-xs text-gray-500">{t('inquiryChat.pastEmpty')}</p>
-                                ) : (
-                                    <Table>
-                                        <TableHeader>
-                                            <TableRow>
-                                                <TableHead>{t('inquiryChat.table.updatedAt')}</TableHead>
-                                                <TableHead>{t('inquiryChat.table.type')}</TableHead>
-                                                <TableHead>{t('inquiryChat.table.status')}</TableHead>
-                                                <TableHead>{t('inquiryChat.table.unread')}</TableHead>
-                                            </TableRow>
-                                        </TableHeader>
-                                        <TableBody>
-                                            {pastChats.map((chat) => (
-                                                <TableRow
-                                                    key={`past-${chat.chat_id}-${chat.ts_last_message_at || ''}`}
-                                                    className={`cursor-pointer hover:bg-gray-50 ${selectedChatId === chat.chat_id ? 'bg-blue-50 ring-1 ring-blue-200' : ''}`}
-                                                    onClick={() => openChatDetail(chat.chat_id)}
-                                                >
-                                                    <TableCell>{chat.ts_last_message_at ? new Date(chat.ts_last_message_at).toLocaleString() : '-'}</TableCell>
-                                                    <TableCell>{getChatTypeLabel(chat.chat_type)}</TableCell>
-                                                    <TableCell>{getStatusLabel(chat.status)}</TableCell>
-                                                    <TableCell>{chat.unread_count_cache ?? 0}</TableCell>
-                                                </TableRow>
-                                            ))}
-                                        </TableBody>
-                                    </Table>
-                                )}
-                            </div>
-                        )}
-                    </CardContent>
-                </Card>
-
-                <Card className="overflow-hidden flex flex-col h-[67rem]">
-                    <CardHeader>
-                        <CardTitle>{t('inquiryChat.detailTitle')}</CardTitle>
-                    </CardHeader>
-                    <CardContent className="flex flex-col flex-1 min-h-0 space-y-4">
-                        {!selectedChatId ? (
-                            <p className="text-sm text-gray-500">{t('inquiryChat.selectPrompt')}</p>
-                        ) : detailLoading ? (
-                            <p className="text-sm text-gray-500">{t('inquiryChat.loading')}</p>
-                        ) : (
-                            <>
-                                <div className="space-y-1 text-sm">
-                                    <div><span className="text-gray-500">{t('inquiryChat.detail.chatId')}:</span> {selectedChat?.chat_id || '-'}</div>
-                                    <div><span className="text-gray-500">{t('inquiryChat.detail.type')}:</span> {getChatTypeLabel(selectedChat?.chat_type)}</div>
-                                    <div><span className="text-gray-500">{t('inquiryChat.detail.status')}:</span> {getStatusLabel(selectedChat?.status)}</div>
-                                    <div><span className="text-gray-500">{t('inquiryChat.detail.updatedAt')}:</span> {selectedChat?.ts_last_message_at ? new Date(selectedChat.ts_last_message_at).toLocaleString() : '-'}</div>
-                                    <div className="pt-1">
-                                        <span className="text-gray-500">参加者:</span>
-                                        <div className="mt-1 space-y-1">
-                                            {selectedParticipantIds.length === 0 ? (
-                                                <div className="text-xs text-gray-500">-</div>
-                                            ) : (
-                                                selectedParticipantIds.map((id: string) => {
-                                                    return (
-                                                        <div key={id} className="text-xs text-gray-700 break-all">
-                                                                {toDisplayParticipantId(id)}
-                                                        </div>
-                                                    );
-                                                })
-                                            )}
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {isShopOpeningSelected && (
-                                    <Card className="border-amber-300 bg-amber-50">
-                                        <CardHeader className="pb-3">
-                                            <CardTitle className="text-base">{t('inquiries.title')}</CardTitle>
-                                            <CardDescription>{t('inquiries.description')}</CardDescription>
-                                        </CardHeader>
-                                        <CardContent className="space-y-2 text-sm">
-                                            <div><span className="text-gray-500">{t('inquiries.detail.initiator')}:</span> {selectedChat?.initiator_id || '-'}</div>
-                                            <div><span className="text-gray-500">{t('inquiries.detail.shopName')}:</span> {selectedFormSnapshot?.shop_name || '-'}</div>
-                                            <div><span className="text-gray-500">{t('inquiries.detail.ownerName')}:</span> {selectedFormSnapshot?.owner_name || '-'}</div>
-                                            <div><span className="text-gray-500">{t('inquiries.detail.contactEmail')}:</span> {selectedFormSnapshot?.contact_email || '-'}</div>
-                                            <div className="min-w-0">
-                                                <span className="text-gray-500">{t('inquiries.detail.notes')}:</span>{' '}
-                                                <span className="whitespace-pre-wrap break-all">{selectedFormSnapshot?.notes || '-'}</span>
-                                            </div>
-                                            <Button
-                                                className="mt-2"
-                                                size="sm"
-                                                onClick={() => setShopOpenDialogOpen(true)}
-                                            >
-                                                {t('inquiryChat.shopOpeningActions')}
-                                            </Button>
-                                        </CardContent>
-                                    </Card>
-                                )}
-
-                                {!isShopOpeningSelected && availableTransitions.length > 0 && (
-                                    <div className="flex flex-wrap gap-2">
-                                        {availableTransitions.map((nextStatus) => (
-                                            <Button
-                                                key={nextStatus}
-                                                variant="outline"
-                                                size="sm"
-                                                disabled={statusUpdating}
-                                                onClick={() => handleUpdateChatStatus(nextStatus)}
-                                            >
-                                                {statusUpdating ? t('inquiryChat.updating') : getTransitionLabel(nextStatus)}
-                                            </Button>
-                                        ))}
-                                    </div>
-                                )}
-
-                                <div
-                                    className="space-y-2 flex-1 min-h-0 max-h-[45vh] overflow-y-auto pr-1 overscroll-contain xl:max-h-none"
-                                    style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}
-                                >
-                                    {selectedMessages.length === 0 ? (
-                                        <p className="text-sm text-gray-500">{t('inquiryChat.noMessages')}</p>
-                                    ) : (
-                                        selectedMessages.map((message) => (
-                                            <div key={message.message_id || `${message.seq}`} className="rounded-md border p-3 text-sm">
-                                                <div className="mb-1 flex justify-between text-xs text-gray-500">
-                                                    <span>{getSenderDisplayName(message)}</span>
-                                                    <span>{message.ts_created_at ? new Date(message.ts_created_at).toLocaleString() : '-'}</span>
-                                                </div>
-                                                <div className="font-medium whitespace-pre-wrap break-words">{getDisplayMessage(message.message, (message as any).file_url)}</div>
-                                                {(message as any).file_url && (
-                                                    <ChatAttachment
-                                                        fileUrl={(message as any).file_url}
-                                                        fileName={(message as any).file_name}
-                                                        fileSize={(message as any).file_size}
-                                                    />
-                                                )}
-                                                {message.payload_type && (
-                                                    <div className="mt-1 text-xs text-gray-500">{message.payload_type}</div>
-                                                )}
-                                            </div>
-                                        ))
-                                    )}
-                                </div>
-
-                                {isChatClosed ? (
-                                    <p className="text-xs text-center text-gray-400 border rounded-md py-2">
-                                        {t('inquiryChat.chatClosed')}
-                                    </p>
-                                ) : (
-                                    <div className="flex flex-col gap-2">
-                                        <Textarea
-                                            value={inputMessage}
-                                            onChange={(e) => setInputMessage(e.target.value)}
-                                            placeholder={t('inquiryChat.messagePlaceholder')}
-                                            rows={3}
-                                            disabled={sendingMessage || uploading}
-                                            className="resize-none"
-                                        />
-                                        {selectedFile && (
-                                            <div className="flex items-center justify-between rounded-md border bg-slate-50 p-2 text-xs">
-                                                <span className="truncate">{selectedFile.name}</span>
-                                                <Button
-                                                    type="button"
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    onClick={() => setSelectedFile(null)}
-                                                    disabled={sendingMessage || uploading}
-                                                >
-                                                    {t('cancel')}
-                                                </Button>
-                                            </div>
-                                        )}
-                                        <input
-                                            id="adminInquiryFile"
-                                            type="file"
-                                            className="hidden"
-                                            onChange={(e) => {
-                                                const file = e.target.files?.[0];
-                                                if (!file) return;
-                                                if (file.size > 10 * 1024 * 1024) {
-                                                    alert(t('inquiryChat.fileTooLarge'));
-                                                    e.currentTarget.value = '';
-                                                    return;
-                                                }
-                                                setSelectedFile(file);
-                                                e.currentTarget.value = '';
-                                            }}
-                                        />
-                                        <Button
-                                            type="button"
-                                            variant="outline"
-                                            size="sm"
-                                            onClick={() => document.getElementById('adminInquiryFile')?.click()}
-                                            disabled={sendingMessage || uploading}
-                                        >
-                                            {t('inquiryChat.attachFile')}
-                                        </Button>
-                                        <Button
-                                            className="self-end"
-                                            size="sm"
-                                            onClick={sendFreeText}
-                                            disabled={sendingMessage || uploading || (!inputMessage.trim() && !selectedFile)}
-                                        >
-                                            {uploading ? t('inquiryChat.uploading') : sendingMessage ? t('inquiryChat.sending') : t('inquiryChat.send')}
-                                        </Button>
-                                    </div>
-                                )}
-                            </>
-                        )}
-                    </CardContent>
-                </Card>
-            </CardContent>
-
-            <Dialog open={shopOpenDialogOpen} onOpenChange={setShopOpenDialogOpen}>
-                <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-                    <DialogHeader>
-                        <DialogTitle>{t('inquiries.detail.title')}</DialogTitle>
-                        <DialogDescription>{selectedChat?.chat_id || ''}</DialogDescription>
-                    </DialogHeader>
-
-                    <div className="space-y-4">
-                        {isShopOpeningDecisionLocked && (
-                            <p className="text-sm font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
-                                {t('inquiries.detail.decisionLocked')}
-                            </p>
-                        )}
-
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>{t('inquiries.detail.requestInfo')}</CardTitle>
-                            </CardHeader>
-                            <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-                                <div><span className="text-gray-500">{t('inquiries.detail.initiator')}:</span> {selectedChat?.initiator_id || '-'}</div>
-                                <div><span className="text-gray-500">{t('inquiries.detail.chatStatus')}:</span> {selectedChat?.status || '-'}</div>
-                                <div><span className="text-gray-500">{t('inquiries.detail.shopName')}:</span> {selectedFormSnapshot?.shop_name || '-'}</div>
-                                <div><span className="text-gray-500">{t('inquiries.detail.ownerName')}:</span> {selectedFormSnapshot?.owner_name || '-'}</div>
-                                <div className="min-w-0 break-all"><span className="text-gray-500">{t('inquiries.detail.contactEmail')}:</span> {selectedFormSnapshot?.contact_email || '-'}</div>
-                                <div className="md:col-span-2 min-w-0">
-                                    <span className="text-gray-500">{t('inquiries.detail.notes')}:</span>{' '}
-                                    <span className="whitespace-pre-wrap break-all">{selectedFormSnapshot?.notes || '-'}</span>
-                                </div>
-                            </CardContent>
-                        </Card>
-
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>{t('inquiries.detail.approvalTitle')}</CardTitle>
-                            </CardHeader>
-                            <CardContent className="space-y-4">
-                                <div className="space-y-2">
-                                    <Label>{t('inquiries.detail.defaultDesign')}</Label>
-                                    <select
-                                        className="w-full rounded-md p-2 text-sm border border-gray-200 shadow-sm text-black bg-white"
-                                        value={approveDesignId}
-                                        onChange={(e) => setApproveDesignId(e.target.value)}
-                                        disabled={shopOpenActionLoading || isShopOpeningDecisionLocked}
-                                    >
-                                        <option value="">{t('inquiries.detail.selectDesign')}</option>
-                                        {dbCardDesigns.map((d: any) => (
-                                            <option key={d.design_id} value={d.design_id}>{d.name || d.design_id}</option>
-                                        ))}
-                                    </select>
-                                </div>
-
-                                <div className="space-y-2">
-                                    <Label>{t('inquiries.detail.adminMemo')}</Label>
-                                    <Textarea
-                                        value={adminMemo}
-                                        onChange={(e) => setAdminMemo(e.target.value)}
-                                        placeholder={t('inquiries.detail.adminMemoPlaceholder')}
-                                        disabled={shopOpenActionLoading || isShopOpeningDecisionLocked}
-                                    />
-                                </div>
-
-                                <Button onClick={handleShopOpeningApprove} disabled={shopOpenActionLoading || isShopOpeningDecisionLocked}>
-                                    {shopOpenActionLoading ? t('inquiries.detail.processing') : t('inquiries.detail.approve')}
-                                </Button>
-                            </CardContent>
-                        </Card>
-
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>{t('inquiries.detail.rejectTitle')}</CardTitle>
-                            </CardHeader>
-                            <CardContent className="space-y-3">
-                                <Label>{t('inquiries.detail.rejectReason')}</Label>
-                                <Textarea
-                                    value={rejectReason}
-                                    onChange={(e) => setRejectReason(e.target.value)}
-                                    placeholder={t('inquiries.detail.rejectReasonPlaceholder')}
-                                    disabled={shopOpenActionLoading || isShopOpeningDecisionLocked}
-                                />
-                                <Button variant="destructive" onClick={handleShopOpeningReject} disabled={shopOpenActionLoading || isShopOpeningDecisionLocked}>
-                                    {shopOpenActionLoading ? t('inquiries.detail.processing') : t('inquiries.detail.reject')}
-                                </Button>
-                            </CardContent>
-                        </Card>
-                    </div>
-                </DialogContent>
-            </Dialog>
-        </Card>
-    );
-}
-
-/**
  * ショップ開設申請（SHOP_OPENING）を管理者が審査する専用セクション。
  *
  * 役割:
  * - ADMIN 参加者として unified_chat/list を取得し、審査待ち案件を一覧表示
  * - 詳細ダイアログで申請内容・履歴を確認
- * - 承認時: ショップ作成 + デザイン紐付け + ADMIN_DECISION 送信 + APPROVED 化
- * - 却下時: ADMIN_DECISION(REJECTED) 送信 + REJECTED 化
+ * - 承認時: ショップ作成 + デザイン紐付け + ADMIN_DECISION 送信 + RESOLVED 化
+ * - 却下時: ADMIN_DECISION(REJECTED) 送信 + RESOLVED 化
  */
 function ShopOpeningInquirySection({ dbCardDesigns }: { dbCardDesigns: any[] }) {
     const t = useTranslations('AdminPage');
@@ -2093,8 +1096,7 @@ function ShopOpeningInquirySection({ dbCardDesigns }: { dbCardDesigns: any[] }) 
     const [replyLoading, setReplyLoading] = useState(false);
     const [replyFile, setReplyFile] = useState<File | null>(null);
     const [replyUploading, setReplyUploading] = useState(false);
-    const editableStatuses = new Set(['OPEN', 'DRAFT', 'SUBMITTED', 'IN_REVIEW']);
-    const isDecisionLocked = !!selectedMeta && !editableStatuses.has(String(selectedMeta.status || '').toUpperCase());
+    const isDecisionLocked = !!selectedMeta && selectedMeta.status !== 'OPEN';
 
     /**
      * 申請フォームのスナップショットを取得します。
@@ -2123,18 +1125,6 @@ function ShopOpeningInquirySection({ dbCardDesigns }: { dbCardDesigns: any[] }) 
         }
         return null;
     }, [selectedMessages, selectedMeta]);
-
-    const selectedParticipantIds = useMemo(() => {
-        return Array.isArray(selectedMeta?.participants) ? selectedMeta.participants : [];
-    }, [selectedMeta]);
-
-    const getSenderDisplayName = (message: any): string => {
-        const senderId = String(message?.sender_id || '');
-        if (senderId.startsWith('ADMIN')) {
-            return t('inquiryChat.adminLabel');
-        }
-        return toDisplayParticipantId(senderId);
-    };
 
     /**
      * 審査対象一覧を取得します。
@@ -2201,12 +1191,33 @@ function ShopOpeningInquirySection({ dbCardDesigns }: { dbCardDesigns: any[] }) 
 
         setReplyLoading(true);
         try {
-            let fileData: ChatFileData | null = null;
+            let fileData: { file_url: string; file_name: string; file_size: number } | null = null;
 
             if (replyFile) {
                 setReplyUploading(true);
                 try {
-                    fileData = await uploadChatFile(adminApi.fetch_post.bind(adminApi), selectedMeta.chat_id, replyFile);
+                    const uploadRes = await adminApi.fetch_post('/unified/chat/uploadurl/get', {
+                        chat_id: selectedMeta.chat_id,
+                        filename: replyFile.name,
+                        content_type: replyFile.type || 'application/octet-stream',
+                        file_size: replyFile.size,
+                    });
+
+                    const putRes = await fetch(uploadRes.uploadUrl, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': replyFile.type || 'application/octet-stream' },
+                        body: replyFile,
+                    });
+
+                    if (!putRes.ok) {
+                        throw new Error('S3 upload failed');
+                    }
+
+                    fileData = {
+                        file_url: uploadRes.fileUrl,
+                        file_name: replyFile.name,
+                        file_size: replyFile.size,
+                    };
                 } finally {
                     setReplyUploading(false);
                 }
@@ -2216,7 +1227,7 @@ function ShopOpeningInquirySection({ dbCardDesigns }: { dbCardDesigns: any[] }) 
                 chat_id: selectedMeta.chat_id,
                 sender_id: 'ADMIN',
                 type: fileData ? 'FILE' : 'TEXT',
-                message: message || '',
+                message: message || (fileData ? `[File: ${fileData.file_name}]` : ''),
                 ...fileData,
             });
 
@@ -2240,7 +1251,7 @@ function ShopOpeningInquirySection({ dbCardDesigns }: { dbCardDesigns: any[] }) 
      * 1. admin_shop_create でショップを発行
      * 2. admin_shop_carddesign_link_update で初期デザインを付与
      * 3. unified_chat/messages/send で ADMIN_DECISION(APPROVED) を送信
-        * 4. unified_chat/status/update でチャットを APPROVED に更新
+     * 4. unified_chat/status/update でチャットを RESOLVED に更新
      *
      * 途中失敗時は catch で即通知し、UIは actionLoading を解除します。
      */
@@ -2301,7 +1312,7 @@ function ShopOpeningInquirySection({ dbCardDesigns }: { dbCardDesigns: any[] }) 
 
             await adminApi.fetch_post('/unified/chat/status/update', {
                 chat_id: selectedMeta.chat_id,
-                next_status: 'APPROVED',
+                next_status: 'RESOLVED',
                 expected_version: latestVersion,
             });
 
@@ -2319,7 +1330,7 @@ function ShopOpeningInquirySection({ dbCardDesigns }: { dbCardDesigns: any[] }) 
     /**
      * 却下処理:
      * - ADMIN_DECISION(REJECTED) メッセージを送信
-        * - チャットステータスを REJECTED に更新
+     * - チャットステータスを RESOLVED に更新
      */
     const handleReject = async () => {
         if (isDecisionLocked) {
@@ -2361,7 +1372,7 @@ function ShopOpeningInquirySection({ dbCardDesigns }: { dbCardDesigns: any[] }) 
 
             await adminApi.fetch_post('/unified/chat/status/update', {
                 chat_id: selectedMeta.chat_id,
-                next_status: 'REJECTED',
+                next_status: 'RESOLVED',
                 expected_version: latestVersion,
             });
 
@@ -2427,10 +1438,7 @@ function ShopOpeningInquirySection({ dbCardDesigns }: { dbCardDesigns: any[] }) 
                         <DialogDescription>{selectedMeta?.chat_id || ''}</DialogDescription>
                     </DialogHeader>
 
-                    <div
-                        className="flex-1 min-h-0 overflow-y-auto p-6 space-y-6 overscroll-contain"
-                        style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}
-                    >
+                    <div className="flex-1 overflow-y-auto p-6 space-y-6">
                         <Card>
                             <CardHeader>
                                 <CardTitle>{t('inquiries.detail.requestInfo')}</CardTitle>
@@ -2442,22 +1450,6 @@ function ShopOpeningInquirySection({ dbCardDesigns }: { dbCardDesigns: any[] }) 
                                 <div><span className="text-gray-500">{t('inquiries.detail.ownerName')}:</span> {selectedFormSnapshot?.owner_name || '-'}</div>
                                 <div><span className="text-gray-500">{t('inquiries.detail.contactEmail')}:</span> {selectedFormSnapshot?.contact_email || '-'}</div>
                                 <div><span className="text-gray-500">{t('inquiries.detail.notes')}:</span> {selectedFormSnapshot?.notes || '-'}</div>
-                                <div className="md:col-span-2">
-                                    <span className="text-gray-500">参加者:</span>
-                                    <div className="mt-1 space-y-1">
-                                        {selectedParticipantIds.length === 0 ? (
-                                            <div className="text-xs text-gray-500">-</div>
-                                        ) : (
-                                            selectedParticipantIds.map((id: string) => {
-                                                return (
-                                                    <div key={id} className="text-xs text-gray-700 break-all">
-                                                        {toDisplayParticipantId(id)}
-                                                    </div>
-                                                );
-                                            })
-                                        )}
-                                    </div>
-                                </div>
                             </CardContent>
                         </Card>
 
@@ -2525,26 +1517,29 @@ function ShopOpeningInquirySection({ dbCardDesigns }: { dbCardDesigns: any[] }) 
                                 <CardTitle>{t('inquiries.detail.messageHistory')}</CardTitle>
                             </CardHeader>
                             <CardContent>
-                                <div
-                                    className="space-y-2 max-h-[300px] overflow-y-auto overscroll-contain"
-                                    style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}
-                                >
+                                <div className="space-y-2 max-h-[300px] overflow-y-auto">
                                     {selectedMessages.length === 0 ? (
                                         <p className="text-sm text-gray-500">{t('inquiries.detail.noMessages')}</p>
                                     ) : (
                                         selectedMessages.map((msg: any) => (
                                             <div key={msg.message_id || `${msg.seq}`} className="border rounded-md p-2 text-sm">
                                                 <div className="flex justify-between text-xs text-gray-500 mb-1">
-                                                    <span>{getSenderDisplayName(msg)}</span>
+                                                    <span>{msg.sender_id || '-'}</span>
                                                     <span>{msg.ts_created_at ? new Date(msg.ts_created_at).toLocaleString() : '-'}</span>
                                                 </div>
-                                                <div className="font-medium">{getDisplayMessage(msg.message, msg.file_url)}</div>
+                                                <div className="font-medium">{msg.message || '-'}</div>
                                                 {msg.file_url && (
-                                                    <ChatAttachment
-                                                        fileUrl={msg.file_url}
-                                                        fileName={msg.file_name}
-                                                        fileSize={msg.file_size}
-                                                    />
+                                                    <div className="mt-2">
+                                                        <a
+                                                            href={msg.file_url}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className="text-xs text-blue-600 hover:underline"
+                                                            download={msg.file_name}
+                                                        >
+                                                            {msg.file_name || 'Attached file'}
+                                                        </a>
+                                                    </div>
                                                 )}
                                                 {msg.payload_type && (
                                                     <pre className="mt-1 text-xs whitespace-pre-wrap text-gray-600">{JSON.stringify(msg.payload, null, 2)}</pre>
@@ -2594,7 +1589,7 @@ function ShopOpeningInquirySection({ dbCardDesigns }: { dbCardDesigns: any[] }) 
                                                 const file = e.target.files?.[0];
                                                 if (!file) return;
                                                 if (file.size > 10 * 1024 * 1024) {
-                                                    alert(t('inquiryChat.fileTooLarge'));
+                                                    alert('ファイルサイズは10MB以下にしてください。');
                                                     e.currentTarget.value = '';
                                                     return;
                                                 }
@@ -2608,13 +1603,13 @@ function ShopOpeningInquirySection({ dbCardDesigns }: { dbCardDesigns: any[] }) 
                                             onClick={() => document.getElementById('shopOpeningReplyFile')?.click()}
                                             disabled={replyLoading || replyUploading || actionLoading}
                                         >
-                                            {t('inquiryChat.attachFile')}
+                                            ファイルを添付
                                         </Button>
                                         <Button
                                             onClick={handleSendReply}
                                             disabled={replyLoading || replyUploading || actionLoading || (!replyMessage.trim() && !replyFile)}
                                         >
-                                            {replyUploading ? t('inquiryChat.uploading') : replyLoading ? t('inquiries.detail.sending') : t('inquiries.detail.send')}
+                                            {replyUploading ? 'アップロード中...' : replyLoading ? t('inquiries.detail.sending') : t('inquiries.detail.send')}
                                         </Button>
                                     </>
                                 )}
@@ -3618,7 +2613,7 @@ function DumpCard({
 
 /**
  * ショップ管理者（マネージャー）の紐付けセクション。
- * 複数のユーザーIDと複数ショップIDを指定して一括で紐付け・紐付け解除が可能です 。
+ * 複数のユーザーIDと複数ショップIDを指定して一括で紐付け・紐付け解除が可能です。
  */
 function ManagerLinkingSection({ apiUrl }: { apiUrl: string }) {
     const t = useTranslations('AdminPage');

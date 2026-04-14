@@ -162,22 +162,23 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             if (currentRes.Item.status === 'DELETED') return errorResponse(400, 'Cannot update a deleted product');
 
             const updateExpr: string[] = ['ts_updated_at = :now'];
-            const attrNames: Record<string, string> = { '#status': 'status' };
+            const attrNames: Record<string, string> = {};
             const attrValues: Record<string, any> = { ':now': new Date().toISOString() };
 
-            if (status) {
-                if (!['ACTIVE', 'STOPPED'].includes(status)) return errorResponse(400, 'Invalid status');
-                updateExpr.push('#status = :status, GSI1_PK = :gsi_pk, GSI1_SK = :now');
-                attrValues[':status'] = status;
-                attrValues[':gsi_pk'] = `PRODUCT#${status}`;
-            }
-            if (name) { updateExpr.push('#name = :name'); attrNames['#name'] = 'name'; attrValues[':name'] = name; }
-            if (description !== undefined) { updateExpr.push('description = :desc'); attrValues[':desc'] = description; }
-            // 保存前に S3 パスから署名（QueryString）を除去
-            if (image_url !== undefined) { updateExpr.push('image_url = :img'); attrValues[':img'] = stripSignature(image_url); }
-            if (price !== undefined) { updateExpr.push('price = :price'); attrValues[':price'] = price; }
-            if (valid_days !== undefined) { updateExpr.push('valid_days = :vd'); attrValues[':vd'] = Math.min(valid_days, 180); }
-            if (detail_html !== undefined) { updateExpr.push('detail_html = :html'); attrValues[':html'] = stripSignaturesInHtml(detail_html, BUCKET_NAME); }
+                if (status) {
+                    if (!['ACTIVE', 'STOPPED'].includes(status)) return errorResponse(400, 'Invalid status');
+                    updateExpr.push('#status = :status, GSI1_PK = :gsi_pk, GSI1_SK = :now');
+                    attrValues[':status'] = status;
+                    attrValues[':gsi_pk'] = `PRODUCT#${status}`;
+                }
+                // 注: 全フィールドで undefined チェック統一（name も truthy チェックから undefined チェックに変更）
+                if (name !== undefined) { updateExpr.push('#name = :name'); attrNames['#name'] = 'name'; attrValues[':name'] = name; }
+                if (description !== undefined) { updateExpr.push('description = :desc'); attrValues[':desc'] = description; }
+                // 保存前に S3 パスから署名（QueryString）を除去
+                if (image_url !== undefined) { updateExpr.push('image_url = :img'); attrValues[':img'] = stripSignature(image_url); }
+                if (price !== undefined) { updateExpr.push('price = :price'); attrValues[':price'] = price; }
+                if (valid_days !== undefined) { updateExpr.push('valid_days = :vd'); attrValues[':vd'] = Math.min(valid_days, 180); }
+                if (detail_html !== undefined) { updateExpr.push('detail_html = :html'); attrValues[':html'] = stripSignaturesInHtml(detail_html, BUCKET_NAME); }
             
             if (design_id) {
                 const isSystemDesign = !!getSystemDesign(design_id);
@@ -191,7 +192,8 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 TableName: TABLE_NAME,
                 Key: { PK: `SHOP#${shopId}`, SK: `PRODUCT#${product_id}` },
                 UpdateExpression: 'SET ' + updateExpr.join(', '),
-                ExpressionAttributeNames: attrNames, ExpressionAttributeValues: attrValues
+                ExpressionAttributeNames: Object.keys(attrNames).length > 0 ? attrNames : undefined,
+                ExpressionAttributeValues: attrValues
             }));
             return successResponse({ message: 'Product updated' });
         }

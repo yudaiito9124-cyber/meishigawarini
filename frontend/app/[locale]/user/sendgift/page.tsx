@@ -23,7 +23,7 @@ import { useParams, useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Loader2, QrCode, ScanLine, X, ChevronDown, CheckCircle2 } from "lucide-react";
+import { Loader2, QrCode, ScanLine, X, ChevronDown, CheckCircle2, AlertTriangle } from "lucide-react";
 import QRScanner from "@/components/ui/qr-scanner";
 import { userApi } from "@/lib/api/user";
 
@@ -58,8 +58,34 @@ export default function SendGiftPage() {
     const [isConfirming, setIsConfirming] = useState(false);
     /** 処理完了件数（進捗表示用） */
     const [completedCount, setCompletedCount] = useState(0);
+    /** プロフィール読み込み中フラグ */
+    const [isProfileLoading, setIsProfileLoading] = useState(true);
+    /** プロフィール登録済みフラグ（最低限の情報があるか） */
+    const [isProfileRegistered, setIsProfileRegistered] = useState(true);
     /** 背景同期用のコンテナ参照 */
     const containerRef = useRef<HTMLDivElement>(null);
+
+    /** プロフィールが実質的に未登録かを判定 */
+    const hasProfileMinimum = (profile: any) => {
+        if (!profile || typeof profile !== "object") return false;
+
+        const requiredCandidateKeys = [
+            "name",
+            "company",
+            "job_title",
+            "department",
+            "email",
+            "phone",
+            "address",
+            "card_image_url",
+            "detail_html",
+        ];
+
+        return requiredCandidateKeys.some((key) => {
+            const val = profile[key];
+            return typeof val === "string" && val.trim().length > 0;
+        });
+    };
 
     /**
      * 入力文字列（URLまたは生ID）からQR IDを抽出し、リストに追加します。
@@ -152,6 +178,23 @@ export default function SendGiftPage() {
         handleUrl(scannedUrl);
     };
 
+    /** 初回表示時にプロフィール登録状態を取得 */
+    useEffect(() => {
+        const fetchProfileStatus = async () => {
+            setIsProfileLoading(true);
+            try {
+                const data = await userApi.user_profile_get({});
+                setIsProfileRegistered(hasProfileMinimum(data?.profile));
+            } catch {
+                setIsProfileRegistered(false);
+            } finally {
+                setIsProfileLoading(false);
+            }
+        };
+
+        fetchProfileStatus();
+    }, []);
+
     /** ページ背景色とbody/htmlの背景色を同期させます */
     useEffect(() => {
         // ページの状態に応じてbodyの背景を同期させ、オーバースクロール時の白見えを防ぐ
@@ -201,6 +244,29 @@ export default function SendGiftPage() {
                     </div>
                 </CardHeader>
                 <CardContent className="p-8 space-y-8">
+                    {!isProfileLoading && !isProfileRegistered && (
+                        <div className="rounded-2xl border-2 border-orange-500 bg-orange-100 p-5 space-y-4 animate-in fade-in slide-in-from-top-2 duration-500 shadow-md">
+                            <div className="flex items-start gap-3">
+                                <div className="mt-0.5 relative shrink-0">
+                                    <span className="absolute inset-0 rounded-full bg-orange-400/60 blur-[2px] animate-ping" />
+                                    <div className="relative w-10 h-10 rounded-full bg-orange-500 border-2 border-orange-700 flex items-center justify-center shadow-md  animate-pulse">
+                                        <AlertTriangle className="w-6 h-6 text-white" />
+                                    </div>
+                                </div>
+                                <div className="space-y-1">
+                                    <p className="text-sm font-black text-orange-950">{t('bulkScan.profileSetupTitle')}</p>
+                                    <p className="text-xs text-orange-900 leading-relaxed font-semibold">{t('bulkScan.profileSetupDesc')}</p>
+                                </div>
+                            </div>
+                            <Button
+                                onClick={() => window.open('/user/editprofile', '_blank', 'noopener,noreferrer')}
+                                className="w-full rounded-xl h-12 bg-orange-600 hover:bg-orange-700 text-white font-black border-2 border-orange-800 shadow-lg ring-2 ring-orange-300/90"
+                            >
+                                {t('bulkScan.profileSetupAction')}
+                            </Button>
+                        </div>
+                    )}
+
                     {successMsg || bulkResults.length > 0 ? (
                         <div className="space-y-6 animate-in zoom-in-95 duration-500">
                             <div className="flex flex-col items-center justify-center text-center">
@@ -255,7 +321,18 @@ export default function SendGiftPage() {
                                 </p>
                                 <div className="text-[10px] text-gray-400 space-y-1">
                                     <p>{t('bulkScan.undoNotice')}</p>
-                                    <p className="underline cursor-pointer" onClick={() => router.push('/user/profile')}>{t('bulkScan.checkProfileLink')}</p>
+                                    {isProfileRegistered ? (
+                                        <p className="underline cursor-pointer" onClick={() => window.open('/user/editprofile', '_blank', 'noopener,noreferrer')}>
+                                            {t('bulkScan.checkProfileLink')}
+                                        </p>
+                                    ) : (
+                                        <Button
+                                            onClick={() => window.open('/user/editprofile', '_blank', 'noopener,noreferrer')}
+                                            className="h-9 mt-1 px-4 rounded-full text-xs font-black bg-orange-600 hover:bg-orange-700 text-white border-2 border-orange-800 shadow-md ring-2 ring-orange-300/90"
+                                        >
+                                            {t('bulkScan.profileSetupAction')}
+                                        </Button>
+                                    )}
                                 </div>
                             </div>
 

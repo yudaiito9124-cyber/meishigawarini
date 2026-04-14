@@ -192,50 +192,6 @@ function isShopOpeningAdminDecisionPayload(value: unknown): value is ShopOpening
     );
 }
 
-// --------------------------------------------------
-// AUTH_EMAIL_VERIFICATION workflow payloads (example for future auth expansion)
-// --------------------------------------------------
-//
-// 認証系ワークフローの追加例です。
-// 今後 AUTH_PHONE_VERIFICATION などを追加する場合は、このブロックを雛形として
-// payload 型 + validate 関数を定義し、下の WORKFLOW_REGISTRY に登録してください。
-
-export type AuthEmailVerificationRequestedPayload = {
-    email: string;
-    requested_at: string;
-};
-
-export type AuthEmailVerificationCompletedPayload = {
-    email: string;
-    verified_at: string;
-    verifier: 'LINK' | 'OTP';
-};
-
-function isAuthEmailVerificationRequestedPayload(value: unknown): value is AuthEmailVerificationRequestedPayload {
-    return (
-        isRecord(value) &&
-        hasOnlyKeys(value, ['email', 'requested_at']) &&
-        isString(value.email) &&
-        isString(value.requested_at)
-    );
-}
-
-function isAuthEmailVerificationCompletedPayload(value: unknown): value is AuthEmailVerificationCompletedPayload {
-    if (!isRecord(value)) {
-        return false;
-    }
-
-    if (!hasOnlyKeys(value, ['email', 'verified_at', 'verifier'])) {
-        return false;
-    }
-
-    return (
-        isString(value.email) &&
-        isString(value.verified_at) &&
-        (value.verifier === 'LINK' || value.verifier === 'OTP')
-    );
-}
-
 export const WORKFLOW_REGISTRY = defineWorkflowRegistry({
     // -------------------------------------------------------------------------
     // 追加手順の最重要ポイント:
@@ -276,20 +232,29 @@ export const WORKFLOW_REGISTRY = defineWorkflowRegistry({
             }
         }
     },
-    AUTH_EMAIL_VERIFICATION: {
-        chatType: 'AUTH_EMAIL_VERIFICATION',
-        initialStatus: 'PENDING',
-        statuses: ['PENDING', 'VERIFIED', 'EXPIRED', 'FAILED'],
-        events: {
-            VERIFICATION_REQUESTED: {
-                validate: isAuthEmailVerificationRequestedPayload,
-                nextStatuses: ['PENDING']
-            },
-            VERIFICATION_COMPLETED: {
-                validate: isAuthEmailVerificationCompletedPayload,
-                nextStatuses: ['VERIFIED']
-            }
-        }
+    USER_SUPPORT: {
+        chatType: 'USER_SUPPORT',
+        initialStatus: 'OPEN',
+        statuses: ['OPEN', 'RESOLVED', 'CLOSED', 'CANCELLED'],
+        events: {}
+    },
+    SHOP_SUPPORT: {
+        chatType: 'SHOP_SUPPORT',
+        initialStatus: 'OPEN',
+        statuses: ['OPEN', 'RESOLVED', 'CLOSED', 'CANCELLED'],
+        events: {}
+    },
+    SHOP_DESIGN: {
+        chatType: 'SHOP_DESIGN',
+        initialStatus: 'OPEN',
+        statuses: ['OPEN', 'RESOLVED', 'CLOSED', 'CANCELLED'],
+        events: {}
+    },
+    MISC: {
+        chatType: 'MISC',
+        initialStatus: 'OPEN',
+        statuses: ['OPEN', 'RESOLVED', 'CLOSED', 'CANCELLED'],
+        events: {}
     }
 } as const);
 

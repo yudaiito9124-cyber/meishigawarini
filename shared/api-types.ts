@@ -204,4 +204,11 @@ export type UnifiedChatApiSchema = {
         next_status: string;
         expected_version: number;
     };
+
+    unified_chat_uploadurl_get: {
+        chat_id: string;
+        filename: string;
+        content_type: string;
+        file_size: number;
+    };
 };

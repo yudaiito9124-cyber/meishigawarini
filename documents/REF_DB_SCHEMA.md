@@ -312,8 +312,8 @@ QRコードのライフサイクルや注文ステータス、商品との紐付
 | `chat_id` | String | チャットID（UUID） |
 | `participants` | Array<String> | 参加者のプレフィックス付きIDリスト (例: `USER#{user_id}`, `SHOP#{shop_id}`, `ADMIN`)。<br>※**一番最初の要素はチャットを開始した主体のID**です。 |
 | `initiator_id` | String | 開始主体（`participants[0]` を明示保持） |
-| `chat_type` | String | チャット種別 (`MISC`, `USER_SUPPORT`, `SHOP_OPENING`, `SHOP_DESIGN`, `SHOP_SUPPORT`, `AUTH_EMAIL_VERIFICATION`) |
-| `status` | String | チャット状態 (`OPEN`, `RESOLVED`, `CLOSED`) |
+| `chat_type` | String | チャット種別 (`MISC`, `USER_SUPPORT`, `SHOP_OPENING`, `SHOP_DESIGN`, `SHOP_SUPPORT`) |
+| `status` | String | チャット状態。`SHOP_OPENING` は (`DRAFT`, `SUBMITTED`, `IN_REVIEW`, `APPROVED`, `REJECTED`, `CANCELLED`)、`USER_SUPPORT` / `SHOP_SUPPORT` / `SHOP_DESIGN` / `MISC` は (`OPEN`, `RESOLVED`, `CLOSED`, `CANCELLED`) |
 | `ts_created_at` | String | 作成日時 (ISO 8601) |
 | `ts_updated_at` | String | 更新日時 (ISO 8601) |
 | `ts_last_message_at` | String | 最終メッセージ送信日時 (ソート用・ISO 8601) |
@@ -379,7 +379,7 @@ QRコードのライフサイクルや注文ステータス、商品との紐付
 | `type` | String | `TEXT`, `IMAGE`, `FILE`, `SYSTEM` |
 | `payload_type` | String | ワークフローイベント種別（例: `FORM_SUBMITTED`, `ADMIN_DECISION`, `VERIFICATION_COMPLETED`） |
 | `payload` | Map | イベントごとの構造化データ（型は `shared/unified-chat-workflows.ts` のレジストリで定義） |
-| `workflow_status` | String | ワークフローステータス（例: `DRAFT`, `IN_REVIEW`, `APPROVED`, `PENDING`, `VERIFIED`） |
+| `workflow_status` | String | ワークフローステータス（例: `DRAFT`, `SUBMITTED`, `IN_REVIEW`, `APPROVED`, `REJECTED`） |
 | `file_url` | String | 添付URL（任意） |
 | `file_name` | String | 添付ファイル名（任意） |
 | `file_size` | Number | 添付サイズ（任意） |
@@ -405,19 +405,19 @@ QRコードのライフサイクルや注文ステータス、商品との紐付
 
 #### 2.13.6 型安全な拡張方式（機械的追加ルール）
 - チャット業務ワークフローは `shared/unified-chat-workflows.ts` の `WORKFLOW_REGISTRY` を正本とします。
-- 新しい認証機能や申請機能を追加するときは、以下の1セットを同じキー配下に追加します。
-  1. `chatType`（例: `AUTH_PHONE_VERIFICATION`）
+- 新しいサポート機能や申請機能を追加するときは、以下の1セットを同じキー配下に追加します。
+  1. `chatType`（例: `SHOP_BILLING_SUPPORT`）
   2. `statuses`（状態列挙）
   3. `events`（イベント名 -> `validate(payload)` + `nextStatuses`）
 - `WorkflowChatType` / `WorkflowEventType` / `WorkflowPayload` / `WorkflowStatus` はレジストリから自動導出されるため、API側と画面側で同じ型が強制されます。
 - 受信payload検証は `isValidWorkflowPayload` もしくは `assertValidWorkflowPayload` を必須利用し、`chat_type + payload_type` に一致しない構造を即時Rejectします。
-- 遷移検証は `canTransitionTo` で行い、未定義遷移（例: `PENDING -> APPROVED`）を実行時に拒否します。
+- 遷移検証は `canTransitionTo` で行い、未定義遷移（例: `SUBMITTED -> APPROVED` をイベント定義なしで実行すること）を実行時に拒否します。
 
 #### 2.13.7 API 設計（デプロイ済みの現行仕様）
 
 | ユースケース | 推奨エンドポイント (`POST`) | 主な必須入力 | 主な検証・整合ルール |
 | --- | --- | --- | --- |
-| チャット作成 | `/unified/chat/create` | `chat_type`, `participants`, `initiator_id` | `chat_type` はレジストリ定義値のみ許可。`participants[0]` と `initiator_id` を一致させる。 |
+| チャット作成 | `/unified/chat/create` | `chat_type`, `participants`, `initiator_id` | `chat_type` はレジストリ定義値のみ許可。`participants[0]` と `initiator_id` を一致させる。`USER_SUPPORT` は `USER#...` 起票、`SHOP_SUPPORT` は `SHOP#...` 起票のみ許可。 |
 | 参加者受信箱一覧 | `/unified/chat/list` | `participant_id`, `chat_type?`, `status?`, `limit?`, `cursor?` | `participant_id` 主体で取得し、管理者画面は `chat_type` 先頭で絞る。 |
 | メッセージ履歴取得 | `/unified/chat/messages/get` | `chat_id`, `before_seq?`, `limit?` | `limit` 上限を固定（例: 200）。`before_seq` 指定時は過去方向ページング。 |
 | メッセージ送信 | `/unified/chat/messages/send` | `chat_id`, `sender_id`, `type`, `message?`, `payload_type?`, `payload?` | `payload` がある場合は `assertValidWorkflowPayload` を必須実行。送信処理は `TransactWrite` で整合更新。 |
