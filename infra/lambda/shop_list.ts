@@ -110,7 +110,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         return successResponse({ shops: shopList, roles, owner_shop_ids: ownerShopIds, gm_shop_ids: gmShopIds });
 
     } catch (error: any) {
-        console.error('Shop list error:', error);
+        // console.error('Shop list error:', error);
         return errorResponse(500, 'Internal Server Error', error.message);
     }
 };

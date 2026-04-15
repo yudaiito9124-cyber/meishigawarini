@@ -222,6 +222,18 @@ export const UnifiedChatNotifications = React.forwardRef<
     /** ショップ開設フォーム用のメールアドレス（ログイン中メールで固定表示） */
     const [userEmail, setUserEmail] = useState('');
 
+    // ─── カードデザインフォーム用ステート ─────────────────────────────────────
+    /** カードデザインフォーム: デザイン確定フラグ */
+    const [cardDesignReady, setCardDesignReady] = useState(false);
+    /** カードデザインフォーム: 参考URL */
+    const [cardDesignReferenceUrls, setCardDesignReferenceUrls] = useState('');
+    /** カードデザインフォーム: その他要望 */
+    const [cardDesignNotes, setCardDesignNotes] = useState('');
+    /** カードデザインフォーム: エラー表示 */
+    const [cardDesignError, setCardDesignError] = useState('');
+    /** カードデザインフォーム用のメールアドレス（ショップ情報から取得） */
+    const [shopContactEmail, setShopContactEmail] = useState('');
+
     // ─── 審査判定（単一ルール） ─────────────────────────────────────────────
     /**
      * 審査結果は「最新の ADMIN_DECISION メッセージ」だけを根拠にします。
@@ -286,6 +298,7 @@ export const UnifiedChatNotifications = React.forwardRef<
             USER_SUPPORT: '一般問い合わせ',
             SHOP_SUPPORT: 'ショップ運営サポート',
             SHOP_DESIGN: 'ショップデザイン相談',
+            CARD_DESIGN: 'カードデザイン追加申請',
             MISC: 'その他',
         };
         return labels[chatType] || chatType;
@@ -378,11 +391,24 @@ export const UnifiedChatNotifications = React.forwardRef<
         [selectedChat],
     );
     const canSubmitShopOpening = participantId.startsWith('USER#');
+    /** CARD_DESIGN 申請ボタンを表示するかどうか（SHOP# だけ利用可能） */
+    const canSubmitCardDesign = participantId.startsWith('SHOP#');
 
     // 呼び出し元から渡されたログイン中メールをフォーム表示用stateへ同期
     useEffect(() => {
         setUserEmail(currentUserEmail || '');
     }, [currentUserEmail]);
+
+    // ショップの連絡先メールを参加者IDから取得試行
+    useEffect(() => {
+        if (!participantId.startsWith('SHOP#')) return;
+        apiFetchPost('/shop/details/get', { shop_id: participantId.replace('SHOP#', '') })
+            .then((res: any) => {
+                const email = res?.shop?.email || res?.shop?.contact_email || '';
+                if (email) setShopContactEmail(email);
+            })
+            .catch(() => {});
+    }, [participantId]);
 
     // ─── チャット一覧の取得 ───────────────────────────────────────────────────
     /**
@@ -581,7 +607,7 @@ export const UnifiedChatNotifications = React.forwardRef<
                 };
             }
             const res = await apiFetchPost('/unified/chat/create', payload);
-            console.log('Created chat:', res.chat_id);
+            // console.log('Created chat:', res.chat_id);
             // 作成成功後はダイアログを閉じてチャット一覧をリロード
             setIsCreateDialogOpen(false);
             setCreateFormData({ chat_type: defaultSupportChatType, initial_message: '' });
@@ -589,6 +615,10 @@ export const UnifiedChatNotifications = React.forwardRef<
             setShopOpenOwnerName('');
             setShopOpenNotes('');
             setShopOpenError('');
+            setCardDesignReady(false);
+            setCardDesignReferenceUrls('');
+            setCardDesignNotes('');
+            setCardDesignError('');
             fetchNotifications();
         } catch (e) {
             console.error('Failed to create chat', e);
@@ -647,6 +677,58 @@ export const UnifiedChatNotifications = React.forwardRef<
         } catch (error: any) {
             const message = error?.message || t('shopOpenForm.errors.submitFailed');
             setShopOpenError(message);
+        }
+    };
+
+    // ─── カードデザイン申請フォーム送信 ──────────────────────────────────────
+    /**
+     * カードデザイン申請フォームを送信し、CARD_DESIGN チャットを作成します。
+     */
+    const handleSubmitCardDesign = async (e: React.FormEvent) => {
+        e.preventDefault();
+
+        const contactEmail = shopContactEmail.trim() || currentUserEmail?.trim() || '';
+        if (!contactEmail) {
+            setCardDesignError(t('cardDesignForm.errors.noContactEmail'));
+            return;
+        }
+
+        setCardDesignError('');
+        try {
+            const payload = {
+                form_snapshot: {
+                    design_ready: cardDesignReady,
+                    reference_urls: cardDesignReferenceUrls.trim() || undefined,
+                    notes: cardDesignNotes.trim() || undefined,
+                    contact_email: contactEmail,
+                },
+                submitted_at: new Date().toISOString(),
+            };
+
+            if (!isValidWorkflowPayload('CARD_DESIGN', 'FORM_SUBMITTED', payload)) {
+                setCardDesignError(t('cardDesignForm.errors.invalidPayload'));
+                return;
+            }
+
+            await createNewChat({
+                chat_type: 'CARD_DESIGN',
+                participants: [participantId, 'ADMIN'],
+                initiator_id: participantId,
+                initial_message: {
+                    type: 'WORKFLOW',
+                    message: t('cardDesignForm.submittedMessage'),
+                    payload_type: 'FORM_SUBMITTED',
+                    payload,
+                },
+            });
+
+            setCardDesignReady(false);
+            setCardDesignReferenceUrls('');
+            setCardDesignNotes('');
+            setCardDesignError('');
+        } catch (error: any) {
+            const message = error?.message || t('cardDesignForm.errors.submitFailed');
+            setCardDesignError(message);
         }
     };
 
@@ -813,6 +895,22 @@ export const UnifiedChatNotifications = React.forwardRef<
                                 }}
                             >
                                 {t('notifications.createShopOpening')}
+                            </Button>
+                        )}
+                        {canSubmitCardDesign && (
+                            <Button
+                                variant="outline"
+                                className="h-11 px-6 text-base font-semibold"
+                                onClick={() => {
+                                    setCreateFormData({ chat_type: 'CARD_DESIGN', initial_message: '' });
+                                    setCardDesignReady(false);
+                                    setCardDesignReferenceUrls('');
+                                    setCardDesignNotes('');
+                                    setCardDesignError('');
+                                    setIsCreateDialogOpen(true);
+                                }}
+                            >
+                                {t('notifications.createCardDesign')}
                             </Button>
                         )}
                     </div>
@@ -1077,8 +1175,8 @@ export const UnifiedChatNotifications = React.forwardRef<
                                                         onChange={(e) => {
                                                             const file = e.target.files?.[0];
                                                             if (file) {
-                                                                if (file.size > 10 * 1024 * 1024) {
-                                                                    alert(t('notifications.fileTooLarge') || 'File size exceeds 10MB');
+                                                                if (file.size > 30 * 1024 * 1024) {
+                                                                    alert(t('notifications.fileTooLarge') || 'File size exceeds 30MB');
                                                                 } else {
                                                                     setSelectedFile(file);
                                                                 }
@@ -1130,7 +1228,9 @@ export const UnifiedChatNotifications = React.forwardRef<
                         <DialogTitle>
                             {createFormData.chat_type === 'SHOP_OPENING'
                                 ? t('notifications.createShopOpening')
-                                : t('notifications.createGeneral')}
+                                : createFormData.chat_type === 'CARD_DESIGN'
+                                    ? t('notifications.createCardDesign')
+                                    : t('notifications.createGeneral')}
                         </DialogTitle>
                     </DialogHeader>
 
@@ -1208,6 +1308,100 @@ export const UnifiedChatNotifications = React.forwardRef<
                                     disabled={creatingChat}
                                 >
                                     {creatingChat ? t('notifications.loading') : t('shopOpenForm.submit')}
+                                </Button>
+                            </div>
+                        </form>
+                    ) : createFormData.chat_type === 'CARD_DESIGN' ? (
+                        // ─── カードデザイン申請フォーム ──────────────────────────────
+                        <form onSubmit={handleSubmitCardDesign} className="space-y-4">
+                            <p className="text-sm text-gray-600">{t('cardDesignForm.description')}</p>
+
+                            <div className="space-y-2">
+                                <Label>{t('cardDesignForm.designReadyLabel')}</Label>
+                                <div className="flex flex-col gap-2">
+                                    <label className="flex items-center gap-2 cursor-pointer">
+                                        <input
+                                            type="radio"
+                                            name="card-design-ready"
+                                            checked={!cardDesignReady}
+                                            onChange={() => setCardDesignReady(false)}
+                                            disabled={creatingChat}
+                                        />
+                                        <span className="text-sm">{t('cardDesignForm.designReadyNo')}</span>
+                                    </label>
+                                    <label className="flex items-center gap-2 cursor-pointer">
+                                        <input
+                                            type="radio"
+                                            name="card-design-ready"
+                                            checked={cardDesignReady}
+                                            onChange={() => setCardDesignReady(true)}
+                                            disabled={creatingChat}
+                                        />
+                                        <span className="text-sm">{t('cardDesignForm.designReadyYes')}</span>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <div className="rounded-md bg-blue-50 border border-blue-200 p-3 text-xs text-blue-700">
+                                {t('cardDesignForm.imageUploadNote')}
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label htmlFor="card-design-urls">{t('cardDesignForm.referenceUrlsLabel')}</Label>
+                                <Textarea
+                                    id="card-design-urls"
+                                    value={cardDesignReferenceUrls}
+                                    onChange={(e) => setCardDesignReferenceUrls(e.target.value)}
+                                    placeholder={t('cardDesignForm.referenceUrlsPlaceholder')}
+                                    disabled={creatingChat}
+                                    rows={3}
+                                    className="resize-none"
+                                />
+                                <p className="text-xs text-gray-500">{t('cardDesignForm.referenceUrlsHint')}</p>
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label htmlFor="card-design-notes">{t('cardDesignForm.notesLabel')}</Label>
+                                <Textarea
+                                    id="card-design-notes"
+                                    value={cardDesignNotes}
+                                    onChange={(e) => setCardDesignNotes(e.target.value)}
+                                    placeholder={t('cardDesignForm.notesPlaceholder')}
+                                    disabled={creatingChat}
+                                    rows={4}
+                                    className="resize-none"
+                                />
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label>{t('cardDesignForm.contactEmailLabel')}</Label>
+                                <Input
+                                    type="email"
+                                    value={shopContactEmail || currentUserEmail || ''}
+                                    readOnly
+                                    disabled
+                                />
+                                <p className="text-xs text-gray-500">{t('cardDesignForm.contactEmailFixed')}</p>
+                            </div>
+
+                            {cardDesignError && (
+                                <p className="text-sm text-red-600 font-medium">{cardDesignError}</p>
+                            )}
+
+                            <div className="flex justify-end gap-2 pt-4">
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={() => {
+                                        setIsCreateDialogOpen(false);
+                                        setCreateFormData({ chat_type: defaultSupportChatType, initial_message: '' });
+                                    }}
+                                    disabled={creatingChat}
+                                >
+                                    {t('cardDesignForm.cancel')}
+                                </Button>
+                                <Button type="submit" disabled={creatingChat}>
+                                    {creatingChat ? t('notifications.loading') : t('cardDesignForm.submit')}
                                 </Button>
                             </div>
                         </form>

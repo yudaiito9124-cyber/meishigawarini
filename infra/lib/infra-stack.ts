@@ -330,6 +330,7 @@ export class InfraStack extends cdk.Stack {
      */
     const commonProps = {
       handler: 'handler',
+      runtime: lambda.Runtime.NODEJS_LATEST,
       environment: { // 環境変数の受け渡し
         TABLE_NAME: table.tableName,
         DEFAULT_VALID_DAYS: DEFAULT_VALID_DAYS,

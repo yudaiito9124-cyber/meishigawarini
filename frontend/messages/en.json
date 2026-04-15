@@ -96,7 +96,13 @@
         "chatId": "Chat ID",
         "type": "Type",
         "status": "Status",
-        "updatedAt": "Updated At"
+        "updatedAt": "Updated At",
+        "requestInfo": "Request Information",
+        "decisionLocked": "This request has already been processed and can no longer be changed.",
+        "designReady": "Design Ready",
+        "referenceUrls": "Reference URLs",
+        "yes": "Yes",
+        "no": "No"
       },
       "decision": {
         "label": "Review Result",
@@ -361,7 +367,7 @@
       },
       "messagePlaceholder": "Type a message... (Enter to send, Shift+Enter for newline)",
       "attachFile": "📎 Attach File",
-      "fileTooLarge": "File size must be 10MB or smaller",
+      "fileTooLarge": "File size must be 30MB or smaller",
       "uploading": "Uploading...",
       "sendButton": "Send",
       "youLabel": "You",
@@ -369,6 +375,7 @@
       "chatClosed": "This chat is closed and no longer accepts messages.",
       "createGeneral": "Chat with Operations",
       "createShopOpening": "Shop Opening Request",
+      "createCardDesign": "Card Design Request",
       "createNew": "Create New Chat",
       "createDescription": "Create a new chat.",
       "chatType": "Chat Type",
@@ -405,6 +412,30 @@
         "noUserEmail": "Failed to get the user's email address. Please reload and try again.",
         "invalidPayload": "Invalid application payload format. Please check your input and try again.",
         "submitFailed": "Failed to submit the application. Please try again later."
+      }
+    },
+    "cardDesignForm": {
+      "title": "Card Design Request",
+      "description": "Submitting this form will create a CARD_DESIGN chat with the operations team. After submission, please upload front/back design images or reference images as chat attachments.",
+      "submittedMessage": "Card design request has been submitted.",
+      "designReadyLabel": "Do you already have a design ready?",
+      "designReadyYes": "Yes (front and back designs are confirmed)",
+      "designReadyNo": "No (I would like to consult based on my requirements)",
+      "imageUploadNote": "Please upload front/back design images or reference images as chat attachments after starting the chat (max 30MB each).",
+      "referenceUrlsLabel": "Reference site URLs (Optional)",
+      "referenceUrlsPlaceholder": "e.g.\nhttps://example.com/design1\nhttps://example.com/design2",
+      "referenceUrlsHint": "Enter multiple URLs on separate lines.",
+      "notesLabel": "Other requests (Optional)",
+      "notesPlaceholder": "Describe colors, fonts, atmosphere, text to include, etc.",
+      "contactEmailLabel": "Contact Email",
+      "contactEmailFixed": "Contact email is fixed to the shop's contact email address.",
+      "submit": "Submit Request",
+      "submitting": "Submitting...",
+      "cancel": "Cancel",
+      "errors": {
+        "noContactEmail": "Could not retrieve the shop's contact email. Please reload and try again.",
+        "invalidPayload": "Invalid application payload. Please check your input and try again.",
+        "submitFailed": "Failed to submit the request. Please try again later."
       }
     },
     "cardOrder": {
@@ -946,29 +977,42 @@
       "sending": "Sending...",
       "updating": "Updating...",
       "attachFile": "📎 Attach File",
-      "fileTooLarge": "File size must be 10MB or smaller",
+      "fileTooLarge": "File size must be 30MB or smaller",
       "uploading": "Uploading...",
+      "noFormSnapshot": "No form snapshot was found.",
       "shopOpeningActions": "Review Shop Opening Request",
+      "cardDesignActions": "Complete Card Design",
+      "cardDesignMemoLabel": "Comment (Optional)",
+      "cardDesignMemoPlaceholder": "Enter a comment for the completion.",
+      "cardDesignComplete": "Mark Design Complete",
       "sendFailed": "Failed to send the message.",
       "updateFailed": "Failed to update chat status.",
+      "detail": {
+        "designReady": "Design Ready",
+        "referenceUrls": "Reference URLs",
+        "yes": "Yes",
+        "no": "No",
+        "requestInfo": "Request Information",
+        "decisionLocked": "This request has already been processed. Approval or rejection cannot be run again.",
+        "chatId": "Chat ID",
+        "type": "Type",
+        "status": "Status",
+        "updatedAt": "Updated At"
+      },
       "actions": {
         "complete": "Mark Completed",
         "close": "Close Chat",
         "cancel": "Cancel Chat",
         "reopen": "Reopen",
-        "startReview": "Start Review"
+        "startReview": "Start Review",
+        "startDesign": "Start Design Work",
+        "completeDesign": "Mark Complete"
       },
       "table": {
         "updatedAt": "Updated At",
         "type": "Type",
         "status": "Status",
         "unread": "Unread"
-      },
-      "detail": {
-        "chatId": "Chat ID",
-        "type": "Type",
-        "status": "Status",
-        "updatedAt": "Updated At"
       },
       "statuses": {
         "open": "Open",
@@ -977,6 +1021,8 @@
         "draft": "Draft",
         "submitted": "Submitted",
         "inReview": "In Review",
+        "inDesign": "In Design",
+        "completed": "Completed",
         "approved": "Approved",
         "rejected": "Rejected",
         "cancelled": "Cancelled",

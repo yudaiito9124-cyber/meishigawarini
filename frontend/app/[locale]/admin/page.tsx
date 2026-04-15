@@ -506,18 +506,6 @@ export default function AdminPage() {
                         <span className="text-lg font-bold">{t('tabs.shops')}</span>
                     </button>
                     <button
-                        onClick={() => setActiveTab("tools")}
-                        className={cn(
-                            "flex flex-col items-center justify-center p-6 rounded-2xl border-2 transition-all duration-200 cursor-pointer shadow-sm hover:shadow-md",
-                            activeTab === "tools"
-                                ? "bg-white border-white text-mist-900 ring-2 ring-mist-700 ring-offset-2 ring-offset-mist-900"
-                                : "bg-mist-800 border-mist-700 text-mist-300 hover:border-mist-600 hover:bg-mist-700/50"
-                        )}
-                    >
-                        <Wrench className={cn("w-12 h-12 mb-3", activeTab === "tools" ? "text-mist-900" : "text-mist-400")} />
-                        <span className="text-lg font-bold">{t('tabs.tools')}</span>
-                    </button>
-                    <button
                         onClick={() => setActiveTab("inquiries")}
                         className={cn(
                             "flex flex-col items-center justify-center p-6 rounded-2xl border-2 transition-all duration-200 cursor-pointer shadow-sm hover:shadow-md",
@@ -528,6 +516,18 @@ export default function AdminPage() {
                     >
                         <HelpCircle className={cn("w-12 h-12 mb-3", activeTab === "inquiries" ? "text-mist-900" : "text-mist-400")} />
                         <span className="text-lg font-bold">{t('tabs.inquiries')}</span>
+                    </button>
+                    <button
+                        onClick={() => setActiveTab("tools")}
+                        className={cn(
+                            "flex flex-col items-center justify-center p-6 rounded-2xl border-2 transition-all duration-200 cursor-pointer shadow-sm hover:shadow-md",
+                            activeTab === "tools"
+                                ? "bg-white border-white text-mist-900 ring-2 ring-mist-700 ring-offset-2 ring-offset-mist-900"
+                                : "bg-mist-800 border-mist-700 text-mist-300 hover:border-mist-600 hover:bg-mist-700/50"
+                        )}
+                    >
+                        <Wrench className={cn("w-12 h-12 mb-3", activeTab === "tools" ? "text-mist-900" : "text-mist-400")} />
+                        <span className="text-lg font-bold">{t('tabs.tools')}</span>
                     </button>
                 </div>
 
@@ -1031,6 +1031,11 @@ export default function AdminPage() {
 
 
 
+                {/* 
+                 * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                 * ─── 問い合わせ (Inquiries) ─────────────────────────────────────────
+                 * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                 */}
                 {activeTab === "inquiries" && (
                     <div className="grid grid-cols-1 gap-6 animate-in fade-in slide-in-from-bottom-2 duration-300 items-start">
                         <AdminInquiryChatSection dbCardDesigns={dbCardDesigns} />
@@ -1105,6 +1110,9 @@ function AdminInquiryChatSection({ dbCardDesigns }: { dbCardDesigns: any[] }) {
     const [chatPageIdx, setChatPageIdx] = useState<number>(0);
     const [chatHasNext, setChatHasNext] = useState(false);
     const [shopOpenDialogOpen, setShopOpenDialogOpen] = useState(false);
+    const [cardDesignDialogOpen, setCardDesignDialogOpen] = useState(false);
+    const [cardDesignCompleteMemo, setCardDesignCompleteMemo] = useState('');
+    const [cardDesignActionLoading, setCardDesignActionLoading] = useState(false);
     const [approveDesignId, setApproveDesignId] = useState('');
     const [rejectReason, setRejectReason] = useState('');
     const [adminMemo, setAdminMemo] = useState('');
@@ -1118,6 +1126,7 @@ function AdminInquiryChatSection({ dbCardDesigns }: { dbCardDesigns: any[] }) {
             USER_SUPPORT: '一般問い合わせ',
             SHOP_SUPPORT: 'ショップ運営サポート',
             SHOP_DESIGN: 'ショップデザイン相談',
+            CARD_DESIGN: 'カードデザイン追加申請',
             MISC: 'その他',
         };
         return labels[chatType] || chatType;
@@ -1132,6 +1141,8 @@ function AdminInquiryChatSection({ dbCardDesigns }: { dbCardDesigns: any[] }) {
             DRAFT: t('inquiryChat.statuses.draft'),
             SUBMITTED: t('inquiryChat.statuses.submitted'),
             IN_REVIEW: t('inquiryChat.statuses.inReview'),
+            IN_DESIGN: t('inquiryChat.statuses.inDesign'),
+            COMPLETED: t('inquiryChat.statuses.completed'),
             APPROVED: t('inquiryChat.statuses.approved'),
             REJECTED: t('inquiryChat.statuses.rejected'),
             CANCELLED: t('inquiryChat.statuses.cancelled'),
@@ -1160,19 +1171,30 @@ function AdminInquiryChatSection({ dbCardDesigns }: { dbCardDesigns: any[] }) {
     const isTerminalStatus = (status?: string) => TERMINAL_STATUSES.has(normalizeStatus(status));
 
     const isSupportChatType = (chatType?: string) => {
-        return ['USER_SUPPORT', 'SHOP_SUPPORT', 'SHOP_DESIGN', 'MISC'].includes(String(chatType || '').toUpperCase());
+        return ['USER_SUPPORT', 'SHOP_SUPPORT', 'SHOP_DESIGN', 'CARD_DESIGN', 'MISC'].includes(String(chatType || '').toUpperCase());
     };
 
     const getAvailableTransitions = (chat: any): string[] => {
         const status = normalizeStatus(chat?.status);
         const chatType = String(chat?.chat_type || '').toUpperCase();
 
+        // 一般チャット系（USER_SUPPORT, SHOP_SUPPORT, SHOP_DESIGN, CARD_DESIGN, MISC）
+        // ステート遷移:
+        //   OPEN → RESOLVED, CANCELLED
+        //   RESOLVED → CLOSED, OPEN
+        // CARD_DESIGN も採用している「一般チャット型」なので、
+        // OPEN 状態で「デザイン完了」ボタン（→RESOLVED へ遷移）を有効化
         if (isSupportChatType(chatType)) {
             if (status === 'OPEN') return ['RESOLVED', 'CANCELLED'];
             if (status === 'RESOLVED') return ['CLOSED', 'OPEN'];
             return [];
         }
 
+        // SHOP_OPENING: 詳細フロー型
+        // ステート遷移:
+        //   DRAFT/SUBMITTED → IN_REVIEW, CANCELLED
+        //   IN_REVIEW → CANCELLED
+        // 最終的には ADMIN_DECISION workflow で APPROVED/REJECTED へ至る
         if (chatType === 'SHOP_OPENING') {
             if (status === 'DRAFT' || status === 'SUBMITTED') return ['IN_REVIEW', 'CANCELLED'];
             if (status === 'IN_REVIEW') return ['CANCELLED'];
@@ -1489,12 +1511,30 @@ function AdminInquiryChatSection({ dbCardDesigns }: { dbCardDesigns: any[] }) {
     const isChatClosed = isTerminalStatus(selectedChat?.status);
     const availableTransitions = useMemo(() => getAvailableTransitions(selectedChat), [selectedChat]);
     const isShopOpeningSelected = String(selectedChat?.chat_type || '').toUpperCase() === 'SHOP_OPENING';
+    const isCardDesignSelected = String(selectedChat?.chat_type || '').toUpperCase() === 'CARD_DESIGN';
 
     const editableStatuses = useMemo(() => new Set(['OPEN', 'DRAFT', 'SUBMITTED', 'IN_REVIEW']), []);
     const isShopOpeningDecisionLocked = useMemo(() => {
         if (!isShopOpeningSelected) return true;
         return !editableStatuses.has(String(selectedChat?.status || '').toUpperCase());
     }, [editableStatuses, isShopOpeningSelected, selectedChat]);
+
+    const cardDesignEditableStatuses = useMemo(() => new Set(['OPEN']), []);
+    const isCardDesignCompleteLocked = useMemo(() => {
+        if (!isCardDesignSelected) return true;
+        return !cardDesignEditableStatuses.has(String(selectedChat?.status || '').toUpperCase());
+    }, [cardDesignEditableStatuses, isCardDesignSelected, selectedChat]);
+
+    const selectedCardDesignSnapshot = useMemo(() => {
+        for (const message of selectedMessages) {
+            if (message?.payload_type === 'FORM_SUBMITTED') {
+                if (isValidWorkflowPayload('CARD_DESIGN', 'FORM_SUBMITTED', message.payload)) {
+                    return message.payload.form_snapshot;
+                }
+            }
+        }
+        return null;
+    }, [selectedMessages]);
 
     const selectedFormSnapshot = useMemo(() => {
         const metaSnapshot = selectedChat?.shop_opening_form_snapshot;
@@ -1512,6 +1552,57 @@ function AdminInquiryChatSection({ dbCardDesigns }: { dbCardDesigns: any[] }) {
         }
         return null;
     }, [selectedChat, selectedMessages]);
+
+    const handleCardDesignComplete = async () => {
+        // CARD_DESIGN チャットの「デザイン完了」ボタン処理
+        // 条件: OPEN 状態のみ有効。OPEN → RESOLVED へ遷移。
+        // 処理: DESIGN_COMPLETED workflow メッセージ送信 + status更新
+        // 以降: RESOLVED 状態から CLOSED へ遷移または再度 OPEN へ戻し可能。
+        if (!selectedChat?.chat_id || isCardDesignCompleteLocked || cardDesignActionLoading) return;
+
+        setCardDesignActionLoading(true);
+        try {
+            const completedAt = new Date().toISOString();
+            await adminApi.fetch_post('/unified/chat/messages/send', {
+                chat_id: selectedChat.chat_id,
+                sender_id: 'ADMIN',
+                type: 'WORKFLOW',
+                message: t('inquiryChat.cardDesignComplete'),
+                payload_type: 'DESIGN_COMPLETED',
+                workflow_status: 'RESOLVED',
+                payload: {
+                    completed_by: 'ADMIN',
+                    completed_at: completedAt,
+                    note: cardDesignCompleteMemo.trim() || undefined,
+                },
+            });
+
+            const latestChat = await adminApi.fetch_post('/unified/chat/get', {
+                chat_id: selectedChat.chat_id,
+            });
+            const latestVersion = latestChat?.chat?.version;
+            if (typeof latestVersion !== 'number') {
+                throw new Error('latest chat version is missing');
+            }
+
+            await adminApi.fetch_post('/unified/chat/status/update', {
+                chat_id: selectedChat.chat_id,
+                next_status: 'RESOLVED',
+                expected_version: latestVersion,
+            });
+
+            setCardDesignDialogOpen(false);
+            setCardDesignCompleteMemo('');
+            await fetchNotifications();
+        } catch (e: any) {
+            console.error('card design complete failed', e);
+            const detail = e?.message || e?.error || e?.statusText || '';
+            alert(detail ? `カードデザイン完了に失敗しました
+${detail}` : 'カードデザイン完了に失敗しました');
+        } finally {
+            setCardDesignActionLoading(false);
+        }
+    };
 
     const handleShopOpeningApprove = async () => {
         if (!selectedChat?.chat_id || !selectedChat?.initiator_id?.startsWith('USER#')) {
@@ -1692,10 +1783,10 @@ function AdminInquiryChatSection({ dbCardDesigns }: { dbCardDesigns: any[] }) {
                 style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}
             >
                 <Card className="flex flex-col h-[67rem]">
-                    <CardHeader className="pb-3 border-b bg-gray-50/60">
-                        <div className="flex items-center gap-2">
+                    <CardHeader className="pb-0 justify-end">
+                        {/* <div className="flex items-center gap-2">
                             <CardTitle>{t('inquiryChat.listTitle')}</CardTitle>
-                        </div>
+                        </div> */}
                         <div className="flex items-center gap-1">
                             <span className="text-xs text-gray-500 mr-1">{t('inquiryChat.pageSize')}:</span>
                             {([5, 10, 25, 50] as const).map((s) => (
@@ -1804,9 +1895,9 @@ function AdminInquiryChatSection({ dbCardDesigns }: { dbCardDesigns: any[] }) {
                 </Card>
 
                 <Card className="overflow-hidden flex flex-col h-[67rem]">
-                    <CardHeader>
+                    {/* <CardHeader>
                         <CardTitle>{t('inquiryChat.detailTitle')}</CardTitle>
-                    </CardHeader>
+                    </CardHeader> */}
                     <CardContent className="flex flex-col flex-1 min-h-0 space-y-4">
                         {!selectedChatId ? (
                             <p className="text-sm text-gray-500">{t('inquiryChat.selectPrompt')}</p>
@@ -1863,6 +1954,44 @@ function AdminInquiryChatSection({ dbCardDesigns }: { dbCardDesigns: any[] }) {
                                     </Card>
                                 )}
 
+                                {isCardDesignSelected && (
+                                    <Card className="border-blue-300 bg-blue-50">
+                                        <CardHeader className="pb-3">
+                                            <CardTitle className="text-base">{t('inquiryChat.cardDesignActions')}</CardTitle>
+                                        </CardHeader>
+                                        <CardContent className="space-y-2 text-sm">
+                                            {selectedCardDesignSnapshot ? (
+                                                <>
+                                                    <div><span className="text-gray-500">{t('inquiries.detail.contactEmail')}:</span> {selectedCardDesignSnapshot.contact_email || '-'}</div>
+                                                    <div><span className="text-gray-500">{t('inquiryChat.detail.designReady')}:</span> {selectedCardDesignSnapshot.design_ready ? t('inquiryChat.detail.yes') : t('inquiryChat.detail.no')}</div>
+                                                    {selectedCardDesignSnapshot.reference_urls && (
+                                                        <div className="min-w-0">
+                                                            <span className="text-gray-500">{t('inquiryChat.detail.referenceUrls')}:</span>{' '}
+                                                            <span className="whitespace-pre-wrap break-all">{selectedCardDesignSnapshot.reference_urls}</span>
+                                                        </div>
+                                                    )}
+                                                    {selectedCardDesignSnapshot.notes && (
+                                                        <div className="min-w-0">
+                                                            <span className="text-gray-500">{t('inquiries.detail.notes')}:</span>{' '}
+                                                            <span className="whitespace-pre-wrap break-all">{selectedCardDesignSnapshot.notes}</span>
+                                                        </div>
+                                                    )}
+                                                </>
+                                            ) : (
+                                                <p className="text-gray-400 text-xs">{t('inquiryChat.noFormSnapshot')}</p>
+                                            )}
+                                            <Button
+                                                className="mt-2"
+                                                size="sm"
+                                                onClick={() => setCardDesignDialogOpen(true)}
+                                                disabled={isCardDesignCompleteLocked}
+                                            >
+                                                {t('inquiryChat.cardDesignComplete')}
+                                            </Button>
+                                        </CardContent>
+                                    </Card>
+                                )}
+
                                 {!isShopOpeningSelected && availableTransitions.length > 0 && (
                                     <div className="flex flex-wrap gap-2">
                                         {availableTransitions.map((nextStatus) => (
@@ -1879,15 +2008,19 @@ function AdminInquiryChatSection({ dbCardDesigns }: { dbCardDesigns: any[] }) {
                                     </div>
                                 )}
 
+
+                                <div className="border-t border-gray-200"></div>
+                                <div className="text-md font-semibold mb-0 ml-2">{t('inquiryChat.chat')}</div> 
+
                                 <div
-                                    className="space-y-2 flex-1 min-h-0 max-h-[45vh] overflow-y-auto pr-1 overscroll-contain xl:max-h-none"
+                                    className="space-y-2 flex-1 min-h-0 max-h-[45vh] overflow-y-auto pr-1 overscroll-contain xl:max-h-none border rounded-md bg-gray-50 p-3"
                                     style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}
                                 >
                                     {selectedMessages.length === 0 ? (
                                         <p className="text-sm text-gray-500">{t('inquiryChat.noMessages')}</p>
                                     ) : (
                                         selectedMessages.map((message) => (
-                                            <div key={message.message_id || `${message.seq}`} className="rounded-md border p-3 text-sm">
+                                            <div key={message.message_id || `${message.seq}`} className="rounded-md border p-3 text-sm bg-white">
                                                 <div className="mb-1 flex justify-between text-xs text-gray-500">
                                                     <span>{getSenderDisplayName(message)}</span>
                                                     <span>{message.ts_created_at ? new Date(message.ts_created_at).toLocaleString() : '-'}</span>
@@ -1907,6 +2040,7 @@ function AdminInquiryChatSection({ dbCardDesigns }: { dbCardDesigns: any[] }) {
                                         ))
                                     )}
                                 </div>
+
 
                                 {isChatClosed ? (
                                     <p className="text-xs text-center text-gray-400 border rounded-md py-2">
@@ -1943,7 +2077,7 @@ function AdminInquiryChatSection({ dbCardDesigns }: { dbCardDesigns: any[] }) {
                                             onChange={(e) => {
                                                 const file = e.target.files?.[0];
                                                 if (!file) return;
-                                                if (file.size > 10 * 1024 * 1024) {
+                                                if (file.size > 30 * 1024 * 1024) {
                                                     alert(t('inquiryChat.fileTooLarge'));
                                                     e.currentTarget.value = '';
                                                     return;
@@ -1958,14 +2092,15 @@ function AdminInquiryChatSection({ dbCardDesigns }: { dbCardDesigns: any[] }) {
                                             size="sm"
                                             onClick={() => document.getElementById('adminInquiryFile')?.click()}
                                             disabled={sendingMessage || uploading}
+                                            className="w-full"
                                         >
                                             {t('inquiryChat.attachFile')}
                                         </Button>
                                         <Button
-                                            className="self-end"
                                             size="sm"
                                             onClick={sendFreeText}
                                             disabled={sendingMessage || uploading || (!inputMessage.trim() && !selectedFile)}
+                                            className="w-full"
                                         >
                                             {uploading ? t('inquiryChat.uploading') : sendingMessage ? t('inquiryChat.sending') : t('inquiryChat.send')}
                                         </Button>
@@ -2058,6 +2193,70 @@ function AdminInquiryChatSection({ dbCardDesigns }: { dbCardDesigns: any[] }) {
                                 />
                                 <Button variant="destructive" onClick={handleShopOpeningReject} disabled={shopOpenActionLoading || isShopOpeningDecisionLocked}>
                                     {shopOpenActionLoading ? t('inquiries.detail.processing') : t('inquiries.detail.reject')}
+                                </Button>
+                            </CardContent>
+                        </Card>
+                    </div>
+                </DialogContent>
+            </Dialog>
+
+            <Dialog open={cardDesignDialogOpen} onOpenChange={setCardDesignDialogOpen}>
+                <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
+                    <DialogHeader>
+                        <DialogTitle>{t('inquiryChat.cardDesignActions')}</DialogTitle>
+                        <DialogDescription>{selectedChat?.chat_id || ''}</DialogDescription>
+                    </DialogHeader>
+
+                    <div className="space-y-4">
+                        {isCardDesignCompleteLocked && (
+                            <p className="text-sm font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded-md px-3 py-2">
+                                {t('inquiryChat.detail.decisionLocked')}
+                            </p>
+                        )}
+
+                        {selectedCardDesignSnapshot && (
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle className="text-sm">{t('inquiryChat.detail.requestInfo')}</CardTitle>
+                                </CardHeader>
+                                <CardContent className="space-y-2 text-sm">
+                                    <div><span className="text-gray-500">{t('inquiries.detail.contactEmail')}:</span> {selectedCardDesignSnapshot.contact_email || '-'}</div>
+                                    <div><span className="text-gray-500">{t('inquiryChat.detail.designReady')}:</span> {selectedCardDesignSnapshot.design_ready ? t('inquiryChat.detail.yes') : t('inquiryChat.detail.no')}</div>
+                                    {selectedCardDesignSnapshot.reference_urls && (
+                                        <div className="min-w-0">
+                                            <span className="text-gray-500">{t('inquiryChat.detail.referenceUrls')}:</span>{' '}
+                                            <span className="whitespace-pre-wrap break-all">{selectedCardDesignSnapshot.reference_urls}</span>
+                                        </div>
+                                    )}
+                                    {selectedCardDesignSnapshot.notes && (
+                                        <div className="min-w-0">
+                                            <span className="text-gray-500">{t('inquiries.detail.notes')}:</span>{' '}
+                                            <span className="whitespace-pre-wrap break-all">{selectedCardDesignSnapshot.notes}</span>
+                                        </div>
+                                    )}
+                                </CardContent>
+                            </Card>
+                        )}
+
+                        <Card>
+                            <CardHeader>
+                                <CardTitle className="text-sm">{t('inquiryChat.cardDesignComplete')}</CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-3">
+                                <div className="space-y-2">
+                                    <Label>{t('inquiryChat.cardDesignMemoLabel')}</Label>
+                                    <Textarea
+                                        value={cardDesignCompleteMemo}
+                                        onChange={(e) => setCardDesignCompleteMemo(e.target.value)}
+                                        placeholder={t('inquiryChat.cardDesignMemoPlaceholder')}
+                                        disabled={cardDesignActionLoading || isCardDesignCompleteLocked}
+                                    />
+                                </div>
+                                <Button
+                                    onClick={handleCardDesignComplete}
+                                    disabled={cardDesignActionLoading || isCardDesignCompleteLocked}
+                                >
+                                    {cardDesignActionLoading ? t('inquiries.detail.processing') : t('inquiryChat.cardDesignComplete')}
                                 </Button>
                             </CardContent>
                         </Card>
@@ -2593,7 +2792,7 @@ function ShopOpeningInquirySection({ dbCardDesigns }: { dbCardDesigns: any[] }) 
                                             onChange={(e) => {
                                                 const file = e.target.files?.[0];
                                                 if (!file) return;
-                                                if (file.size > 10 * 1024 * 1024) {
+                                                                if (file.size > 30 * 1024 * 1024) {
                                                     alert(t('inquiryChat.fileTooLarge'));
                                                     e.currentTarget.value = '';
                                                     return;

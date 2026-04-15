@@ -313,7 +313,7 @@ export function ProductsSection({
         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
             <Card style={{ maxHeight: 'calc(100vh - 100px)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
                 <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between space-y-2 sm:space-y-0 pb-4">
-                    <div>
+                    <div className="space-y-2">
                         <CardTitle>{t('products')}</CardTitle>
                         <CardDescription>{t('productsDescription')}</CardDescription>
                     </div>

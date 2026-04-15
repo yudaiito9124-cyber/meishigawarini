@@ -192,6 +192,65 @@ function isShopOpeningAdminDecisionPayload(value: unknown): value is ShopOpening
     );
 }
 
+// --------------------------------------------------
+// CARD_DESIGN workflow payloads
+// --------------------------------------------------
+
+export type CardDesignRequestSubmittedPayload = {
+    form_snapshot: {
+        design_ready: boolean;
+        reference_urls?: string;
+        notes?: string;
+        contact_email: string;
+    };
+    submitted_at: string;
+};
+
+export type CardDesignCompletedPayload = {
+    completed_by: string;
+    completed_at: string;
+    note?: string;
+};
+
+function isCardDesignRequestSubmittedPayload(value: unknown): value is CardDesignRequestSubmittedPayload {
+    if (!isRecord(value) || !isRecord(value.form_snapshot)) {
+        return false;
+    }
+
+    if (!hasOnlyKeys(value, ['form_snapshot', 'submitted_at'])) {
+        return false;
+    }
+
+    const snapshot = value.form_snapshot;
+    if (!hasOnlyKeys(snapshot, ['design_ready', 'reference_urls', 'notes', 'contact_email'])) {
+        return false;
+    }
+
+    return (
+        isBoolean(snapshot.design_ready) &&
+        isOptionalString(snapshot.reference_urls) &&
+        isOptionalString(snapshot.notes) &&
+        isString(snapshot.contact_email) &&
+        isString(value.submitted_at)
+    );
+}
+
+function isCardDesignCompletedPayload(value: unknown): value is CardDesignCompletedPayload {
+    if (!isRecord(value)) {
+        return false;
+    }
+
+    if (!hasOnlyKeys(value, ['completed_by', 'completed_at', 'note'])) {
+        return false;
+    }
+
+    return (
+        isString(value.completed_by) &&
+        isString(value.completed_at) &&
+        isOptionalString(value.note)
+    );
+}
+
 export const WORKFLOW_REGISTRY = defineWorkflowRegistry({
     // -------------------------------------------------------------------------
     // 追加手順の最重要ポイント:
@@ -212,7 +271,43 @@ export const WORKFLOW_REGISTRY = defineWorkflowRegistry({
     // - chatType の文字列値とオブジェクトキー名を一致させる
     // - statuses に存在しない値を nextStatuses に書かない
     // - validate 関数は unknown を厳密チェックし、曖昧な any を使わない
+    //
     // -------------------------------------------------------------------------
+    // ワークフロータイプ毎のステート遷移説明:
+    //
+    // 1) SHOP_OPENING: 詳細フロー型（フォーム保存と申請が分離）
+    //    DRAFT → SUBMITTED → IN_REVIEW → { APPROVED | REJECTED }
+    //    - initialStatus: DRAFT
+    //    - 特徴: 申請者のフォーム入力が複数段階、管理者の審査が明確な終端
+    //    - events: FORM_DRAFT_SAVED (途中保存)
+    //             FORM_SUBMITTED (完全送信)
+    //             ADMIN_DECISION (承認/却下)
+    //
+    // 2) CARD_DESIGN: 一般チャット型（構造化フォーム初回送信 + フリーテキストやり取り）
+    //    OPEN → { RESOLVED | CANCELLED }
+    //    - initialStatus: OPEN
+    //    - 特徴: デザイン申請フォーム（form_snapshot）を初回送信
+    //           ショップと管理者がテキスト/ファイルでやり取り
+    //           管理者が「デザイン完了」で RESOLVED へ遷移
+    //           必要に応じて RESOLVED → OPEN へ再開可
+    //    - events: FORM_SUBMITTED (申請入力送信)
+    //             DESIGN_COMPLETED (デザイン完了メッセージ送信)
+    //    - payload: 申請時は form_snapshot（design_ready, reference_urls, notes等）
+    //              完了時は completed_by, completed_at, note
+    //
+    // 3) USER_SUPPORT / SHOP_SUPPORT / SHOP_DESIGN / MISC: 一般チャット型
+    //    OPEN → { RESOLVED | CANCELLED }
+    //    RESOLVED → { CLOSED | OPEN }
+    //    - initialStatus: OPEN
+    //    - 特徴: 構造化フォームなし、純粋なテキスト/ファイルやり取り
+    //    - events: {} (workflow event なし)
+    //    - 状態遷移はUI/管理者の手動操作のみ
+    //
+    // 補足: RESOLVED と CLOSED の使い分け:
+    //       RESOLVED = 一度対応完了と判定したが、再開の可能性あり
+    //       CLOSED = 完全終了。以降対応なし（記録化フェーズ）
+    // -------------------------------------------------------------------------
+    // SHOP_OPENING: 詳細フロー型（ショップ開設申請）
     SHOP_OPENING: {
         chatType: 'SHOP_OPENING',
         initialStatus: 'DRAFT',
@@ -255,6 +350,21 @@ export const WORKFLOW_REGISTRY = defineWorkflowRegistry({
         initialStatus: 'OPEN',
         statuses: ['OPEN', 'RESOLVED', 'CLOSED', 'CANCELLED'],
         events: {}
+    },
+    CARD_DESIGN: {
+        chatType: 'CARD_DESIGN',
+        initialStatus: 'OPEN',
+        statuses: ['OPEN', 'RESOLVED', 'CLOSED', 'CANCELLED'],
+        events: {
+            FORM_SUBMITTED: {
+                validate: isCardDesignRequestSubmittedPayload,
+                nextStatuses: ['OPEN', 'RESOLVED']
+            },
+            DESIGN_COMPLETED: {
+                validate: isCardDesignCompletedPayload,
+                nextStatuses: ['RESOLVED']
+            }
+        }
     }
 } as const);
 

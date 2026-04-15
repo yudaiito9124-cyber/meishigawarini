@@ -62,7 +62,7 @@ const DEFAULT_PAGE_SIZE = 50;
 
 // S3 アップロード関連の定数
 const s3 = new S3Client({});
-const FILE_SIZE_LIMIT_MB = 10; // 10MB
+const FILE_SIZE_LIMIT_MB = 30; // 30MB（カードデザイン用画像アップロードに対応）
 
 /** ISO8601文字列をエポックミリ秒へ変換します。 */
 // ISO文字列をミリ秒に変換（reverse sort key 計算で使用）
@@ -265,7 +265,9 @@ async function createChat(body: UnifiedChatApiSchema['unified_chat_create'], cal
         const seq = 1;
 
         // WORKFLOW 初期メッセージの payload を契約に沿って検証
-        // SHOP_OPENING + FORM_SUBMITTED の場合のみ form_snapshot を META に複写
+        // - SHOP_OPENING + FORM_SUBMITTED の場合のみ form_snapshot を META に複写
+        // - CARD_DESIGN + FORM_SUBMITTED の場合も form_snapshot を認可（簡易版、META複写なし）
+        // - その他の workflow event はメッセージのみ保存
         if (body.initial_message.type === 'WORKFLOW') {
             if (!body.initial_message.payload_type) {
                 return errorResponse(400, 'payload_type is required for WORKFLOW initial_message');
@@ -583,6 +585,8 @@ async function sendMessage(body: UnifiedChatApiSchema['unified_chat_messages_sen
         const payloadType = body.payload_type as any;
 
         // workflow payload 契約検証 + 状態遷移検証
+        // 例: CARD_DESIGN/DESIGN_COMPLETED なら workflow_status = RESOLVED に遷移
+        //    SHOP_OPENING/ADMIN_DECISION なら workflow_status = APPROVED|REJECTED に遷移
         try {
             (assertValidWorkflowPayload as any)(chatType, payloadType, body.payload);
         } catch (e: any) {
@@ -590,6 +594,7 @@ async function sendMessage(body: UnifiedChatApiSchema['unified_chat_messages_sen
         }
 
         if (workflowStatus) {
+            // workflow_status は payload_type ごとに許可ステータスが決まっている
             const allowed = (canTransitionTo as any)(chatType, payloadType, workflowStatus);
             if (!allowed) {
                 return errorResponse(400, `invalid workflow transition to ${workflowStatus}`);
@@ -786,6 +791,9 @@ async function updateStatus(body: UnifiedChatApiSchema['unified_chat_status_upda
     }
 
     // chat_type ごとの許可ステータスを強制し、不正値への更新を防止
+    // 例: CARD_DESIGN なら statuses = ['OPEN', 'RESOLVED', 'CLOSED', 'CANCELLED']
+    //    SHOP_OPENING なら statuses = ['DRAFT', 'SUBMITTED', 'IN_REVIEW', 'APPROVED', 'REJECTED', 'CANCELLED']
+    // これにより、レジストリに定義されているステートのみへの遷移を許可
     const workflow = WORKFLOW_REGISTRY[meta.chat_type as keyof typeof WORKFLOW_REGISTRY];
     if (!workflow) {
         return errorResponse(400, `Unsupported chat_type: ${meta.chat_type}`);
