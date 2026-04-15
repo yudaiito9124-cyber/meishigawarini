@@ -553,6 +553,11 @@ async function sendMessage(body: UnifiedChatApiSchema['unified_chat_messages_sen
         return errorResponse(404, 'chat not found');
     }
 
+    const normalizedStatus = String(meta.status || '').toUpperCase();
+    if (['APPROVED', 'REJECTED', 'CANCELLED', 'RESOLVED', 'CLOSED'].includes(normalizedStatus)) {
+        return errorResponse(400, 'chat is already closed');
+    }
+
     // sender_id が参加者に含まれていることを必須化
     if (!meta.participants.includes(body.sender_id)) {
         return errorResponse(403, 'sender is not chat participant');
@@ -770,14 +775,22 @@ async function markRead(body: UnifiedChatApiSchema['unified_chat_read_mark'], ca
  * 管理者によるチャットステータス更新処理です。
  * METAと全参加者inboxの status をトランザクションで同期更新します。
  */
-async function updateStatus(body: UnifiedChatApiSchema['unified_chat_status_update'], groups: string[] = []) {
-    if (!body.chat_id || !body.next_status || body.expected_version === undefined) {
-        return errorResponse(400, 'chat_id, next_status, expected_version are required');
+function canAdminTransition(chatType: string, currentStatus: string, nextStatus: string): boolean {
+    if (chatType === 'SHOP_OPENING') {
+        return currentStatus === 'OPEN' && (nextStatus === 'APPROVED' || nextStatus === 'REJECTED');
     }
 
-    // ステータス変更は管理者のみ
-    if (!isAdminGroups(groups)) {
-        return errorResponse(403, 'status update requires admin privileges');
+    return currentStatus === 'OPEN' && nextStatus === 'RESOLVED';
+}
+
+function canInitiatorCancel(meta: ChatMeta, callerUserId?: string): boolean {
+    const callerParticipantId = getCallerParticipantId(callerUserId);
+    return !!callerParticipantId && callerParticipantId.startsWith('USER#') && meta.initiator_id === callerParticipantId;
+}
+
+async function updateStatus(body: UnifiedChatApiSchema['unified_chat_status_update'], callerUserId?: string, groups: string[] = []) {
+    if (!body.chat_id || !body.next_status || body.expected_version === undefined) {
+        return errorResponse(400, 'chat_id, next_status, expected_version are required');
     }
 
     const metaRes = await ddb.send(new GetCommand({
@@ -790,9 +803,12 @@ async function updateStatus(body: UnifiedChatApiSchema['unified_chat_status_upda
         return errorResponse(404, 'chat not found');
     }
 
+    const isAdmin = isAdminGroups(groups);
+    const normalizedCurrentStatus = String(meta.status || '').toUpperCase();
+
     // chat_type ごとの許可ステータスを強制し、不正値への更新を防止
-    // 例: CARD_DESIGN なら statuses = ['OPEN', 'RESOLVED', 'CLOSED', 'CANCELLED']
-    //    SHOP_OPENING なら statuses = ['DRAFT', 'SUBMITTED', 'IN_REVIEW', 'APPROVED', 'REJECTED', 'CANCELLED']
+    // 例: CARD_DESIGN なら statuses = ['OPEN', 'RESOLVED', 'CANCELLED']
+    //    SHOP_OPENING なら statuses = ['OPEN', 'APPROVED', 'REJECTED', 'CANCELLED']
     // これにより、レジストリに定義されているステートのみへの遷移を許可
     const workflow = WORKFLOW_REGISTRY[meta.chat_type as keyof typeof WORKFLOW_REGISTRY];
     if (!workflow) {
@@ -802,6 +818,17 @@ async function updateStatus(body: UnifiedChatApiSchema['unified_chat_status_upda
     const allowedStatuses = workflow.statuses.map((status) => String(status).toUpperCase());
     if (!allowedStatuses.includes(normalizedNextStatus)) {
         return errorResponse(400, `invalid next_status for ${meta.chat_type}: ${body.next_status}`);
+    }
+
+    const isUserInitiatorCancel = !isAdmin
+        && normalizedNextStatus === 'CANCELLED'
+        && normalizedCurrentStatus === 'OPEN'
+        && canInitiatorCancel(meta, callerUserId);
+    const isAllowedAdminTransition = isAdmin
+        && canAdminTransition(String(meta.chat_type || '').toUpperCase(), normalizedCurrentStatus, normalizedNextStatus);
+
+    if (!isAllowedAdminTransition && !isUserInitiatorCancel) {
+        return errorResponse(403, 'status transition is not allowed');
     }
 
     const now = new Date().toISOString();
@@ -1033,7 +1060,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         }
         if (action === 'status_update') {
             // ステータス更新: チャットの status フィールドを楽観的ロック（version）付きで変更します。
-            return await updateStatus(body as UnifiedChatApiSchema['unified_chat_status_update'], groups);
+            return await updateStatus(body as UnifiedChatApiSchema['unified_chat_status_update'], callerUserId, groups);
         }
         if (action === 'uploadurl') {
             // ファイルアップロード: Presigned URL を生成します。
