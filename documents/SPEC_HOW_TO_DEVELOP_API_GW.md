@@ -443,16 +443,19 @@ export const getHeader = (headers: any, key: string) => {
 実際の定義箇所: [infra/lib/infra-stack.ts](../infra/lib/infra-stack.ts)
 ```typescript
 // infra/lib/infra-stack.ts
+// ⚠️ responseParameters（旧 CDK v1 スタイル）ではなく responseHeaders を使用すること。
+// responseParameters を使うと CDK v2 では型エラーが発生し、as any で握り潰しても
+// 実際の Gateway Response にヘッダーが付与されない。
 api.addGatewayResponse('Default401Response', {
   type: apigateway.ResponseType.UNAUTHORIZED,
   statusCode: '404',
-  responseParameters: {
-    'gatewayresponse.header.Access-Control-Allow-Origin': "'*'",
-    'gatewayresponse.header.Access-Control-Allow-Headers': `'${joinHeaders(ALL_ALLOW_HEADERS)}'`,
-    'gatewayresponse.header.Access-Control-Allow-Methods': "'GET,POST,PUT,DELETE,OPTIONS,PATCH'",
+  responseHeaders: {
+    'Access-Control-Allow-Origin': "'*'",
+    'Access-Control-Allow-Headers': `'${joinHeaders(ALL_ALLOW_HEADERS)}'`,
+    'Access-Control-Allow-Methods': "'GET,POST,PUT,DELETE,OPTIONS,PATCH'",
   },
   templates: { 'application/json': '{"message": "Not Found."}' }
-} as any);
+});
 ```
 
 ---

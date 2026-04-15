@@ -237,92 +237,91 @@ export class InfraStack extends cdk.Stack {
     api.addGatewayResponse('Default401Response', {
       type: apigateway.ResponseType.UNAUTHORIZED,
       statusCode: '404',
-      responseParameters: {
-        // ヘッダー名にはシングルクォート、値にはシングル＋ダブルクォートが必要
-        'gatewayresponse.header.Access-Control-Allow-Origin': "'*'",
-        'gatewayresponse.header.Access-Control-Allow-Headers': `'${joinHeaders(ALL_ALLOW_HEADERS)}'`,
-        'gatewayresponse.header.Access-Control-Allow-Methods': "'GET,POST,PUT,DELETE,OPTIONS,PATCH'",
+      responseHeaders: {
+        'Access-Control-Allow-Origin': "'*'",
+        'Access-Control-Allow-Headers': `'${joinHeaders(ALL_ALLOW_HEADERS)}'`,
+        'Access-Control-Allow-Methods': "'GET,POST,PUT,DELETE,OPTIONS,PATCH'",
       },
       templates: {
         'application/json': '{"message": "Not Found."}'
       }
-    } as any); // オブジェクト全体を any でキャストして型エラー(ts2353)を消す
+    });
 
     // --- 権限エラー(403)を 404 に偽装しつつ CORS を許可 ---
     api.addGatewayResponse('Default403Response', {
       type: apigateway.ResponseType.ACCESS_DENIED,
       statusCode: '404',
-      responseParameters: {
-        'gatewayresponse.header.Access-Control-Allow-Origin': "'*'",
-        'gatewayresponse.header.Access-Control-Allow-Headers': "'*'",
-        'gatewayresponse.header.Access-Control-Allow-Methods': "'GET,POST,PUT,DELETE,OPTIONS,PATCH'",
+      responseHeaders: {
+        'Access-Control-Allow-Origin': "'*'",
+        'Access-Control-Allow-Headers': "'*'",
+        'Access-Control-Allow-Methods': "'GET,POST,PUT,DELETE,OPTIONS,PATCH'",
       },
       templates: {
         'application/json': '{"message": "Not Found."}'
       }
-    } as any);
+    });
 
     // --- エンドポイント未定義エラー(403)を 404 に偽装しつつ CORS を許可 ---
     api.addGatewayResponse('DefaultMissingAuthTokenResponse', {
       type: apigateway.ResponseType.MISSING_AUTHENTICATION_TOKEN,
       statusCode: '404',
-      responseParameters: {
-        'gatewayresponse.header.Access-Control-Allow-Origin': "'*'",
-        'gatewayresponse.header.Access-Control-Allow-Headers': "'*'",
-        'gatewayresponse.header.Access-Control-Allow-Methods': "'GET,POST,PUT,DELETE,OPTIONS,PATCH'",
+      responseHeaders: {
+        'Access-Control-Allow-Origin': "'*'",
+        'Access-Control-Allow-Headers': "'*'",
+        'Access-Control-Allow-Methods': "'GET,POST,PUT,DELETE,OPTIONS,PATCH'",
       },
       templates: {
         'application/json': '{"message": "Not Found (Missing Auth Token). Check Deployment."}'
       }
-    } as any);
+    });
 
     // --- タイムアウト(504) ---
     api.addGatewayResponse('IntegrationTimeoutResponse', {
       type: apigateway.ResponseType.INTEGRATION_TIMEOUT,
       statusCode: '504',
-      responseParameters: {
-        'gatewayresponse.header.Access-Control-Allow-Origin': "'*'",
-        'gatewayresponse.header.Access-Control-Allow-Headers': "'*'",
-        'gatewayresponse.header.Access-Control-Allow-Methods': "'GET,POST,PUT,DELETE,OPTIONS,PATCH'",
+      responseHeaders: {
+        'Access-Control-Allow-Origin': "'*'",
+        'Access-Control-Allow-Headers': "'*'",
+        'Access-Control-Allow-Methods': "'GET,POST,PUT,DELETE,OPTIONS,PATCH'",
       },
       templates: {
         'application/json': '{"message": "Gateway Timeout"}'
       }
-    } as any);
+    });
 
     // --- 統合エラー(500) ---
     api.addGatewayResponse('IntegrationFailureResponse', {
       type: apigateway.ResponseType.INTEGRATION_FAILURE,
       statusCode: '500',
-      responseParameters: {
-        'gatewayresponse.header.Access-Control-Allow-Origin': "'*'",
-        'gatewayresponse.header.Access-Control-Allow-Headers': "'*'",
-        'gatewayresponse.header.Access-Control-Allow-Methods': "'GET,POST,PUT,DELETE,OPTIONS,PATCH'",
+      responseHeaders: {
+        'Access-Control-Allow-Origin': "'*'",
+        'Access-Control-Allow-Headers': "'*'",
+        'Access-Control-Allow-Methods': "'GET,POST,PUT,DELETE,OPTIONS,PATCH'",
       },
       templates: {
         'application/json': '{"message": "Internal Server Error"}'
       }
-    } as any);
+    });
 
     // --- その他 全ての4XX系エラーへのCORS許可 ---
     api.addGatewayResponse('Default4XXResponse', {
       type: apigateway.ResponseType.DEFAULT_4XX,
-      responseParameters: {
-        'gatewayresponse.header.Access-Control-Allow-Origin': "'*'",
-        'gatewayresponse.header.Access-Control-Allow-Headers': "'*'",
-        'gatewayresponse.header.Access-Control-Allow-Methods': "'GET,POST,PUT,DELETE,OPTIONS,PATCH'",
+      responseHeaders: {
+        'Access-Control-Allow-Origin': "'*'",
+        'Access-Control-Allow-Headers': "'*'",
+        'Access-Control-Allow-Methods': "'GET,POST,PUT,DELETE,OPTIONS,PATCH'",
       },
-    } as any);
+    });
 
     // --- その他 全ての5XX系エラーへのCORS許可 ---
     api.addGatewayResponse('Default5XXResponse', {
       type: apigateway.ResponseType.DEFAULT_5XX,
-      responseParameters: {
-        'gatewayresponse.header.Access-Control-Allow-Origin': "'*'",
-        'gatewayresponse.header.Access-Control-Allow-Headers': "'*'",
-        'gatewayresponse.header.Access-Control-Allow-Methods': "'GET,POST,PUT,DELETE,OPTIONS,PATCH'",
+      responseHeaders: {
+        'Access-Control-Allow-Origin': "'*'",
+        'Access-Control-Allow-Headers': "'*'",
+        'Access-Control-Allow-Methods': "'GET,POST,PUT,DELETE,OPTIONS,PATCH'",
       },
-    } as any);
+    });
 
     ////////////////////////////////////////////////////////////////////////////////
     /**

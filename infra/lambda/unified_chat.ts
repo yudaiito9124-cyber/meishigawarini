@@ -105,10 +105,18 @@ function toChatPk(chatId: string): string {
     return `CHAT#${chatId}`;
 }
 
+/** participant_id を保存・判定用に正規化します（ADMIN#... は ADMIN に集約）。 */
+function normalizeParticipantId(participantId?: string): string {
+    const id = String(participantId || '').trim();
+    if (!id) return '';
+    if (/^ADMIN(#.*)?$/i.test(id)) return 'ADMIN';
+    return id;
+}
+
 /** 参加者配列を重複なし・空値なしに正規化します。 */
 // 参加者IDの重複・空文字を除去して正規化
 function normalizeParticipants(participants: string[]): string[] {
-    return Array.from(new Set(participants.filter(Boolean)));
+    return Array.from(new Set(participants.map((participantId) => normalizeParticipantId(participantId)).filter(Boolean)));
 }
 
 /** チャット一覧で使う最終メッセージプレビューを生成します。 */
@@ -160,20 +168,31 @@ function encodeCursor(lastKey?: Record<string, unknown>): string | null {
  * - META行・参加者inbox行・初期メッセージ行を1トランザクションで作成
  * - WORKFLOW初期payloadの契約検証を実施
  */
-async function createChat(body: UnifiedChatApiSchema['unified_chat_create'], callerUserId?: string, event?: any) {
+async function createChat(body: UnifiedChatApiSchema['unified_chat_create'], callerUserId?: string, groups: string[] = [], event?: any) {
     // chat_id はサーバー採番（クライアント指定不可）
     const chat_id = generateId();
     const now = new Date().toISOString();
     let shopOpeningFormSnapshot: ChatMeta['shop_opening_form_snapshot'] | undefined;
 
     // 参加者・起票者・chat_type の整合性を先に検証
+    const initiatorId = normalizeParticipantId(body.initiator_id);
     const participants = normalizeParticipants(body.participants || []);
     if (participants.length === 0) {
         return errorResponse(400, 'participants is required');
     }
 
-    if (!participants.includes(body.initiator_id)) {
+    if (!initiatorId) {
+        return errorResponse(400, 'initiator_id is required');
+    }
+
+    if (!participants.includes(initiatorId)) {
         return errorResponse(400, 'initiator_id must be included in participants');
+    }
+
+    // 無関係ユーザーの inbox へチャットを混入させないため、参加者構成を厳密化
+    // 現行仕様では管理窓口を必ず含む2者チャットのみ許可
+    if (participants.length !== 2 || !participants.includes('ADMIN')) {
+        return errorResponse(400, 'participants must include exactly two participants: initiator and ADMIN');
     }
 
     if (!WORKFLOW_REGISTRY[body.chat_type as keyof typeof WORKFLOW_REGISTRY]) {
@@ -185,19 +204,17 @@ async function createChat(body: UnifiedChatApiSchema['unified_chat_create'], cal
 
     const isSupportChatType = body.chat_type === 'USER_SUPPORT' || body.chat_type === 'SHOP_SUPPORT';
     if (isSupportChatType) {
-        const expectedSupportType = body.initiator_id.startsWith('SHOP#') ? 'SHOP_SUPPORT' : 'USER_SUPPORT';
+        const expectedSupportType = initiatorId.startsWith('SHOP#') ? 'SHOP_SUPPORT' : 'USER_SUPPORT';
         if (body.chat_type !== expectedSupportType) {
             return errorResponse(400, `invalid chat_type for initiator: expected ${expectedSupportType}`);
         }
     }
 
-    // USER#起票時は、認証済み caller と initiator の一致を強制
-    // なりすましで別ユーザー名義のチャットを作れないようにする
-    if (body.initiator_id.startsWith('USER#') && callerUserId) {
-        const expected = `USER#${callerUserId}`;
-        if (body.initiator_id !== expected) {
-            return errorResponse(403, 'initiator_id does not match authenticated user');
-        }
+    // initiator_id の立場（USER# / SHOP# / ADMIN）に応じて権限チェック
+    // なりすましで他人名義のチャットを作れないようにする
+    const isAllowedInitiator = await canAccessParticipantId(initiatorId, callerUserId, groups, event);
+    if (!isAllowedInitiator) {
+        return errorResponse(403, 'initiator_id does not match authenticated user or insufficient permissions');
     }
 
     const shard = calcShard(chat_id);
@@ -206,7 +223,7 @@ async function createChat(body: UnifiedChatApiSchema['unified_chat_create'], cal
         SK: 'META',
         chat_id,
         participants,
-        initiator_id: body.initiator_id,
+        initiator_id: initiatorId,
         chat_type: body.chat_type,
         status: initialStatus,
         ts_created_at: now,
@@ -260,6 +277,11 @@ async function createChat(body: UnifiedChatApiSchema['unified_chat_create'], cal
     }
 
     if (body.initial_message) {
+        // 初期メッセージを保存する場合は認証済みユーザー必須
+        if (!callerUserId) {
+            return errorResponse(401, 'authentication required');
+        }
+
         const msgId = generateId();
         const preview = makePreview(body.initial_message.message, body.initial_message.payload_type);
         const seq = 1;
@@ -297,9 +319,10 @@ async function createChat(body: UnifiedChatApiSchema['unified_chat_create'], cal
                     SK: toMsgSk(seq),
                     message_id: msgId,
                     seq,
-                    sender_id: body.initiator_id,
-                    role: body.initiator_id.split('#')[0] || 'USER',
-                    username: toStandardSenderLabel(body.initiator_id),
+                    sender_id: initiatorId,
+                    sender_user_id: callerUserId,
+                    role: initiatorId.split('#')[0] || 'USER',
+                    username: toStandardSenderLabel(initiatorId),
                     message: body.initial_message.message || '',
                     type: body.initial_message.type || 'TEXT',
                     payload_type: body.initial_message.payload_type,
@@ -367,19 +390,21 @@ function getCallerParticipantId(userId?: string): string | null {
  * - SHOP#: owner/gm 権限必須
  */
 async function canAccessParticipantId(participantId: string, callerUserId?: string, groups: string[] = [], event?: any): Promise<boolean> {
+    const normalizedParticipantId = normalizeParticipantId(participantId);
+
     // ADMIN inbox は管理者グループのみアクセス可能
-    if (participantId === 'ADMIN') {
+    if (normalizedParticipantId === 'ADMIN') {
         return isAdminGroups(groups);
     }
 
     // USER#xxx inbox は本人のみアクセス可能
-    if (participantId.startsWith('USER#')) {
-        return participantId === getCallerParticipantId(callerUserId);
+    if (normalizedParticipantId.startsWith('USER#')) {
+        return normalizedParticipantId === getCallerParticipantId(callerUserId);
     }
 
     // SHOP#xxx inbox は shop-owner/gm チェックで判定
-    if (participantId.startsWith('SHOP#') && callerUserId) {
-        const shopId = participantId.replace('SHOP#', '');
+    if (normalizedParticipantId.startsWith('SHOP#') && callerUserId) {
+        const shopId = normalizedParticipantId.replace('SHOP#', '');
         const permission = await checkShopOwnerOrGM(ddb, TABLE_NAME, shopId, callerUserId, event, groups);
         return !!permission;
     }
@@ -400,16 +425,58 @@ async function canAccessChat(meta: ChatMeta, callerUserId?: string, groups: stri
     return false;
 }
 
+type ChatAccessResult = { ok: true; meta: ChatMeta } | { ok: false; response: ReturnType<typeof errorResponse> };
+
+/**
+ * チャット META を取得し、呼び出し元のアクセス権を一括検証する共通ヘルパーです。
+ *
+ * 全チャット操作エンドポイント（取得・送信・既読・アップロード）から呼び出し、
+ * 以下を1か所で保証します。
+ *  1. 認証済みユーザーであること（未認証 → 401）
+ *  2. チャットが存在すること（存在しない → 404）
+ *  3. 参加者として正当なアクセス権を持つこと（canAccessChat → 403）
+ *     - USER#xxx : Cognito sub の完全一致
+ *     - SHOP#xxx : checkShopOwnerOrGM による owner / gm 確認
+ *     - ADMIN    : Administrators / GlobalAdmins グループ所属確認
+ */
+async function fetchAndAuthorizeChatMeta(
+    chatId: string,
+    callerUserId: string | undefined,
+    groups: string[],
+    event: any,
+): Promise<ChatAccessResult> {
+    if (!callerUserId && !isAdminGroups(groups)) {
+        return { ok: false, response: errorResponse(401, 'authentication required') };
+    }
+
+    const res = await ddb.send(new GetCommand({
+        TableName: TABLE_NAME,
+        Key: { PK: toChatPk(chatId), SK: 'META' },
+    }));
+
+    if (!res.Item) {
+        return { ok: false, response: errorResponse(404, 'chat not found') };
+    }
+
+    const meta = res.Item as ChatMeta;
+    if (!(await canAccessChat(meta, callerUserId, groups, event))) {
+        return { ok: false, response: errorResponse(403, 'forbidden') };
+    }
+
+    return { ok: true, meta };
+}
+
 /**
  * 指定 participant の inbox 一覧を取得します（ページング対応）。
  * 取得後に include_archived/chat_type/status フィルタを適用します。
  */
 async function listChats(body: UnifiedChatApiSchema['unified_chat_list'], callerUserId?: string, groups: string[] = [], event?: any) {
-    if (!body.participant_id) {
+    const participantId = normalizeParticipantId(body.participant_id);
+    if (!participantId) {
         return errorResponse(400, 'participant_id is required');
     }
 
-    const isAllowedParticipant = await canAccessParticipantId(body.participant_id, callerUserId, groups, event);
+    const isAllowedParticipant = await canAccessParticipantId(participantId, callerUserId, groups, event);
     if (!isAllowedParticipant) {
         return errorResponse(403, 'participant_id does not match caller');
     }
@@ -423,7 +490,7 @@ async function listChats(body: UnifiedChatApiSchema['unified_chat_list'], caller
         IndexName: 'GSI2',
         KeyConditionExpression: 'GSI2_PK = :pk',
         ExpressionAttributeValues: {
-            ':pk': `CHAT_INBOX#${body.participant_id}`,
+            ':pk': `CHAT_INBOX#${participantId}`,
         },
         Limit: limit,
         ScanIndexForward: true,
@@ -457,22 +524,10 @@ async function getChat(body: UnifiedChatApiSchema['unified_chat_get'], callerUse
         return errorResponse(400, 'chat_id is required');
     }
 
-    const res = await ddb.send(new GetCommand({
-        TableName: TABLE_NAME,
-        Key: { PK: toChatPk(body.chat_id), SK: 'META' },
-    }));
+    const result = await fetchAndAuthorizeChatMeta(body.chat_id, callerUserId, groups, event);
+    if (!result.ok) return result.response;
 
-    if (!res.Item) {
-        return errorResponse(404, 'chat not found');
-    }
-
-    const chat = res.Item as ChatMeta;
-    // METAを読めても参加者でなければ閲覧不可
-    if (!(await canAccessChat(chat, callerUserId, groups, event))) {
-        return errorResponse(403, 'forbidden');
-    }
-
-    return successResponse({ chat: res.Item });
+    return successResponse({ chat: result.meta });
 }
 
 /**
@@ -484,18 +539,9 @@ async function getMessages(body: UnifiedChatApiSchema['unified_chat_messages_get
         return errorResponse(400, 'chat_id is required');
     }
 
-    const metaRes = await ddb.send(new GetCommand({
-        TableName: TABLE_NAME,
-        Key: { PK: toChatPk(body.chat_id), SK: 'META' },
-    }));
-    const meta = metaRes.Item as ChatMeta | undefined;
-    if (!meta) {
-        return errorResponse(404, 'chat not found');
-    }
-
-    if (!(await canAccessChat(meta, callerUserId, groups, event))) {
-        return errorResponse(403, 'forbidden');
-    }
+    const result = await fetchAndAuthorizeChatMeta(body.chat_id, callerUserId, groups, event);
+    if (!result.ok) return result.response;
+    const meta = result.meta;
 
     // メッセージは新しい順で返す（UI側で必要に応じて reverse）
     const limit = Math.min(Math.max(body.limit || DEFAULT_PAGE_SIZE, 1), MAX_PAGE_SIZE);
@@ -544,14 +590,16 @@ async function sendMessage(body: UnifiedChatApiSchema['unified_chat_messages_sen
         return errorResponse(400, 'chat_id, sender_id, type are required');
     }
 
-    const metaRes = await ddb.send(new GetCommand({
-        TableName: TABLE_NAME,
-        Key: { PK: toChatPk(body.chat_id), SK: 'META' },
-    }));
-    const meta = metaRes.Item as ChatMeta | undefined;
-    if (!meta) {
-        return errorResponse(404, 'chat not found');
+    const senderId = normalizeParticipantId(body.sender_id);
+
+    // メッセージ送信は常に認証済みユーザーのみ許可
+    if (!callerUserId) {
+        return errorResponse(401, 'authentication required');
     }
+
+    const result = await fetchAndAuthorizeChatMeta(body.chat_id, callerUserId, groups, event);
+    if (!result.ok) return result.response;
+    const meta = result.meta;
 
     const normalizedStatus = String(meta.status || '').toUpperCase();
     if (['APPROVED', 'REJECTED', 'CANCELLED', 'RESOLVED', 'CLOSED'].includes(normalizedStatus)) {
@@ -559,12 +607,12 @@ async function sendMessage(body: UnifiedChatApiSchema['unified_chat_messages_sen
     }
 
     // sender_id が参加者に含まれていることを必須化
-    if (!meta.participants.includes(body.sender_id)) {
+    if (!meta.participants.includes(senderId)) {
         return errorResponse(403, 'sender is not chat participant');
     }
 
     // sender_id の実アクセス権（本人/管理者/ショップ権限）を検証
-    const isAllowedSender = await canAccessParticipantId(body.sender_id, callerUserId, groups, event);
+    const isAllowedSender = await canAccessParticipantId(senderId, callerUserId, groups, event);
     if (!isAllowedSender) {
         return errorResponse(403, 'sender_id does not match caller');
     }
@@ -631,9 +679,10 @@ async function sendMessage(body: UnifiedChatApiSchema['unified_chat_messages_sen
                     SK: toMsgSk(seq),
                     message_id: msgId,
                     seq,
-                    sender_id: body.sender_id,
-                    role: body.sender_id.split('#')[0] || 'USER',
-                    username: toStandardSenderLabel(body.sender_id),
+                    sender_id: senderId,
+                    sender_user_id: callerUserId,
+                    role: senderId.split('#')[0] || 'USER',
+                    username: toStandardSenderLabel(senderId),
                     message: body.message || '',
                     type: body.type,
                     payload_type: body.payload_type,
@@ -661,7 +710,7 @@ async function sendMessage(body: UnifiedChatApiSchema['unified_chat_messages_sen
     ];
 
     for (const participantId of meta.participants) {
-        const isSender = participantId === body.sender_id;
+        const isSender = participantId === senderId;
         const lastReadSeq = isSender ? seq : undefined;
 
         // inbox 更新方針:
@@ -733,21 +782,22 @@ async function sendMessage(body: UnifiedChatApiSchema['unified_chat_messages_sen
  * メッセージ総数との整合性を検証してから inbox 行を更新します。
  */
 async function markRead(body: UnifiedChatApiSchema['unified_chat_read_mark'], callerUserId?: string, groups: string[] = [], event?: any) {
-    if (!body.chat_id || !body.participant_id || body.last_read_seq === undefined) {
+    const participantId = normalizeParticipantId(body.participant_id);
+    if (!body.chat_id || !participantId || body.last_read_seq === undefined) {
         return errorResponse(400, 'chat_id, participant_id, last_read_seq are required');
     }
 
-    const metaRes = await ddb.send(new GetCommand({
-        TableName: TABLE_NAME,
-        Key: { PK: toChatPk(body.chat_id), SK: 'META' },
-    }));
+    const result = await fetchAndAuthorizeChatMeta(body.chat_id, callerUserId, groups, event);
+    if (!result.ok) return result.response;
+    const meta = result.meta;
 
-    const meta = metaRes.Item as ChatMeta | undefined;
-    if (!meta) {
-        return errorResponse(404, 'chat not found');
+    // participant_id がこのチャットの参加者リストに含まれることを検証
+    if (!meta.participants.includes(participantId)) {
+        return errorResponse(403, 'participant_id is not a chat participant');
     }
 
-    const isAllowedParticipant = await canAccessParticipantId(body.participant_id, callerUserId, groups, event);
+    // participant_id に対する呼び出し元の権限を検証（checkShopOwnerOrGM 経由）
+    const isAllowedParticipant = await canAccessParticipantId(participantId, callerUserId, groups, event);
     if (!isAllowedParticipant) {
         return errorResponse(403, 'participant_id does not match caller');
     }
@@ -759,7 +809,7 @@ async function markRead(body: UnifiedChatApiSchema['unified_chat_read_mark'], ca
 
     await ddb.send(new UpdateCommand({
         TableName: TABLE_NAME,
-        Key: { PK: body.participant_id, SK: `CHAT#${body.chat_id}` },
+        Key: { PK: participantId, SK: `CHAT#${body.chat_id}` },
         UpdateExpression: 'SET last_read_seq = :seq, ts_last_read_at = :ts, unread_count_cache = :unread',
         ExpressionAttributeValues: {
             ':seq': body.last_read_seq,
@@ -775,22 +825,54 @@ async function markRead(body: UnifiedChatApiSchema['unified_chat_read_mark'], ca
  * 管理者によるチャットステータス更新処理です。
  * METAと全参加者inboxの status をトランザクションで同期更新します。
  */
+/**
+ * 管理者のステータス遷移可否を WORKFLOW_REGISTRY に基づいて判定します。
+ *
+ * ルール:
+ *  - 遷移元は常に OPEN のみ（終了ステータスからの再動作を禁止）
+ *  - 遷移先は OPEN 以外の値（OPEN に戻す操作は不可）
+ *  - 遷移先は WORKFLOW_REGISTRY.statuses に含まれる値のみ許可
+ */
 function canAdminTransition(chatType: string, currentStatus: string, nextStatus: string): boolean {
-    if (chatType === 'SHOP_OPENING') {
-        return currentStatus === 'OPEN' && (nextStatus === 'APPROVED' || nextStatus === 'REJECTED');
-    }
+    if (currentStatus !== 'OPEN') return false;
+    if (nextStatus === 'OPEN') return false;
 
-    return currentStatus === 'OPEN' && nextStatus === 'RESOLVED';
+    const workflow = WORKFLOW_REGISTRY[chatType as keyof typeof WORKFLOW_REGISTRY];
+    if (!workflow) return false;
+
+    const allowedTargets = workflow.statuses.filter((s) => s !== 'OPEN');
+    return (allowedTargets as readonly string[]).includes(nextStatus);
 }
 
-function canInitiatorCancel(meta: ChatMeta, callerUserId?: string): boolean {
+/**
+ * 起票者自身によるキャンセル可否を判定します。
+ *
+ *  - USER# 起票者: Cognito sub が一致する呼び出し元のみ許可
+ *  - SHOP# 起票者: canAccessParticipantId による SHOP 権限確認が updateStatus 内で
+ *    isAllowedInitiator として別途実施済みのため、ここでは initiator_id が SHOP# か否かを確認するだけでよい
+ */
+function isInitiatorOf(meta: ChatMeta, callerUserId?: string): boolean {
     const callerParticipantId = getCallerParticipantId(callerUserId);
-    return !!callerParticipantId && callerParticipantId.startsWith('USER#') && meta.initiator_id === callerParticipantId;
+    if (!callerParticipantId) return false;
+    if (meta.initiator_id.startsWith('USER#')) {
+        return meta.initiator_id === callerParticipantId;
+    }
+    // SHOP# 起票者: アクセス権は canAccessParticipantId 済みなので initiator_id が SHOP# であることだけ確認
+    if (meta.initiator_id.startsWith('SHOP#')) {
+        return true;
+    }
+    return false;
 }
 
-async function updateStatus(body: UnifiedChatApiSchema['unified_chat_status_update'], callerUserId?: string, groups: string[] = []) {
+async function updateStatus(body: UnifiedChatApiSchema['unified_chat_status_update'], callerUserId?: string, groups: string[] = [], event?: any) {
     if (!body.chat_id || !body.next_status || body.expected_version === undefined) {
         return errorResponse(400, 'chat_id, next_status, expected_version are required');
+    }
+
+    // updateStatus は管理者が参加者でないチャットも操作できるため fetchAndAuthorizeChatMeta は使わず
+    // 認証の有無のみ先に確認する
+    if (!callerUserId && !isAdminGroups(groups)) {
+        return errorResponse(401, 'authentication required');
     }
 
     const metaRes = await ddb.send(new GetCommand({
@@ -820,10 +902,15 @@ async function updateStatus(body: UnifiedChatApiSchema['unified_chat_status_upda
         return errorResponse(400, `invalid next_status for ${meta.chat_type}: ${body.next_status}`);
     }
 
+    // SHOP# 起票者のキャンセルは canAccessParticipantId による権限確認も必須
+    const shopInitiatorHasAccess = meta.initiator_id.startsWith('SHOP#')
+        ? await canAccessParticipantId(meta.initiator_id, callerUserId, groups, event)
+        : true;
     const isUserInitiatorCancel = !isAdmin
         && normalizedNextStatus === 'CANCELLED'
         && normalizedCurrentStatus === 'OPEN'
-        && canInitiatorCancel(meta, callerUserId);
+        && isInitiatorOf(meta, callerUserId)
+        && shopInitiatorHasAccess;
     const isAllowedAdminTransition = isAdmin
         && canAdminTransition(String(meta.chat_type || '').toUpperCase(), normalizedCurrentStatus, normalizedNextStatus);
 
@@ -900,21 +987,8 @@ async function uploadUrl(body: UnifiedChatApiSchema['unified_chat_uploadurl_get'
         return errorResponse(413, `File size exceeds ${FILE_SIZE_LIMIT_MB}MB limit`);
     }
 
-    // チャットメタを取得
-    const metaRes = await ddb.send(new GetCommand({
-        TableName: TABLE_NAME,
-        Key: { PK: toChatPk(body.chat_id), SK: 'META' },
-    }));
-
-    const meta = metaRes.Item as ChatMeta | undefined;
-    if (!meta) {
-        return errorResponse(404, 'chat not found');
-    }
-
-    // チャット参加者であるか確認
-    if (!(await canAccessChat(meta, callerUserId, groups, event))) {
-        return errorResponse(403, 'forbidden');
-    }
+    const result = await fetchAndAuthorizeChatMeta(body.chat_id, callerUserId, groups, event);
+    if (!result.ok) return result.response;
 
     // S3 のキーを生成 (CHAT#chat_id/file_id.ext)
     const fileId = generateId();
@@ -1036,7 +1110,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 
         if (action === 'create') {
             // チャット作成: 参加者リストと初期メッセージを受け取り、DynamoDBに保存します。
-            return await createChat(body as UnifiedChatApiSchema['unified_chat_create'], callerUserId, event);
+            return await createChat(body as UnifiedChatApiSchema['unified_chat_create'], callerUserId, groups, event);
         }
         if (action === 'list') {
             // チャット一覧: GSI2 を使って参加者インボックスをクエリします。
@@ -1060,7 +1134,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         }
         if (action === 'status_update') {
             // ステータス更新: チャットの status フィールドを楽観的ロック（version）付きで変更します。
-            return await updateStatus(body as UnifiedChatApiSchema['unified_chat_status_update'], callerUserId, groups);
+            return await updateStatus(body as UnifiedChatApiSchema['unified_chat_status_update'], callerUserId, groups, event);
         }
         if (action === 'uploadurl') {
             // ファイルアップロード: Presigned URL を生成します。

@@ -133,13 +133,13 @@ export function ShopProvider({ children, shopId }: { children: React.ReactNode, 
     }, []);
 
     const refreshAll = useCallback(async () => {
-        await Promise.all([
-            refreshShopDetails(),
-            refreshProducts(),
-            refreshCardOrders(),
-            refreshOrders(),
-            fetchUser()
-        ]);
+        // 開発時の二重実行や初回リロード直後の同時アクセス集中を避けるため、
+        // 初期ロードは段階的に実行してバックエンド負荷を平準化する。
+        await fetchUser();
+        await refreshShopDetails();
+        await refreshProducts();
+        await refreshCardOrders();
+        await refreshOrders();
     }, [refreshShopDetails, refreshProducts, refreshCardOrders, refreshOrders, fetchUser]);
 
     // 権限エラーが確定している場合は、このレンダリングフェーズでnotFoundを投げる
