@@ -163,6 +163,127 @@ function encodeCursor(lastKey?: Record<string, unknown>): string | null {
     return Buffer.from(JSON.stringify(lastKey), 'utf-8').toString('base64');
 }
 
+const TERMINAL_CHAT_STATUSES = new Set(['APPROVED', 'REJECTED', 'CANCELLED', 'RESOLVED', 'CLOSED']);
+
+/**
+ * 認証の責務を共通化し、未認証時のエラー文言を全エンドポイントで統一します。
+ */
+function requireAuthenticatedUser(callerUserId?: string): ReturnType<typeof errorResponse> | null {
+    if (!callerUserId) {
+        return errorResponse(401, 'authentication required');
+    }
+    return null;
+}
+
+function requireAuthenticatedOrAdmin(callerUserId: string | undefined, groups: string[]): ReturnType<typeof errorResponse> | null {
+    if (!callerUserId && !isAdminGroups(groups)) {
+        return errorResponse(401, 'authentication required');
+    }
+    return null;
+}
+
+function getWorkflowOrError(chatType: string): { workflow: (typeof WORKFLOW_REGISTRY)[keyof typeof WORKFLOW_REGISTRY] } | { response: ReturnType<typeof errorResponse> } {
+    const workflow = WORKFLOW_REGISTRY[chatType as keyof typeof WORKFLOW_REGISTRY];
+    if (!workflow) {
+        return { response: errorResponse(400, `Unsupported chat_type: ${chatType}`) };
+    }
+    return { workflow };
+}
+
+function validateSupportChatTypeOrError(chatType: string, initiatorId: string): ReturnType<typeof errorResponse> | null {
+    const isSupportChatType = chatType === 'USER_SUPPORT' || chatType === 'SHOP_SUPPORT';
+    if (!isSupportChatType) return null;
+
+    const expectedSupportType = initiatorId.startsWith('SHOP#') ? 'SHOP_SUPPORT' : 'USER_SUPPORT';
+    if (chatType !== expectedSupportType) {
+        return errorResponse(400, `invalid chat_type for initiator: expected ${expectedSupportType}`);
+    }
+    return null;
+}
+
+function validateChatIdRequired(chatId?: string): ReturnType<typeof errorResponse> | null {
+    if (!chatId) {
+        return errorResponse(400, 'chat_id is required');
+    }
+    return null;
+}
+
+function validateSendMessageRequired(body: UnifiedChatApiSchema['unified_chat_messages_send']): ReturnType<typeof errorResponse> | null {
+    if (!body.chat_id || !body.sender_id || !body.type) {
+        return errorResponse(400, 'chat_id, sender_id, type are required');
+    }
+    return null;
+}
+
+function validateMarkReadRequired(chatId?: string, participantId?: string, lastReadSeq?: number): ReturnType<typeof errorResponse> | null {
+    if (!chatId || !participantId || lastReadSeq === undefined) {
+        return errorResponse(400, 'chat_id, participant_id, last_read_seq are required');
+    }
+    return null;
+}
+
+function validateStatusUpdateRequired(body: UnifiedChatApiSchema['unified_chat_status_update']): ReturnType<typeof errorResponse> | null {
+    if (!body.chat_id || !body.next_status || body.expected_version === undefined) {
+        return errorResponse(400, 'chat_id, next_status, expected_version are required');
+    }
+    return null;
+}
+
+function validateUploadUrlRequired(body: UnifiedChatApiSchema['unified_chat_uploadurl_get']): ReturnType<typeof errorResponse> | null {
+    if (!body.chat_id || !body.filename || !body.content_type) {
+        return errorResponse(400, 'chat_id, filename, content_type are required');
+    }
+    return null;
+}
+
+/**
+ * WORKFLOW メッセージ専用の厳密検証。
+ * ここでは payload_type/payload の存在と workflow 遷移の妥当性を検証します。
+ */
+function validateWorkflowMessageAndGetStatus(
+    body: UnifiedChatApiSchema['unified_chat_messages_send'],
+    chatType: string,
+): { workflowStatus: UnifiedChatApiSchema['unified_chat_messages_send']['workflow_status'] } | { response: ReturnType<typeof errorResponse> } {
+    // WORKFLOW は payload_type と payload を必須化
+    if (!body.payload_type) {
+        return { response: errorResponse(400, 'payload_type is required for WORKFLOW message') };
+    }
+
+    if (body.payload === undefined) {
+        return { response: errorResponse(400, 'payload is required for WORKFLOW message') };
+    }
+
+    const payloadType = body.payload_type as any;
+    const workflowStatus = body.workflow_status;
+
+    // workflow payload 契約検証 + 状態遷移検証
+    // 例: CARD_DESIGN/DESIGN_COMPLETED なら workflow_status = RESOLVED に遷移
+    //    SHOP_OPENING/ADMIN_DECISION なら workflow_status = APPROVED|REJECTED に遷移
+    try {
+        (assertValidWorkflowPayload as any)(chatType as keyof typeof WORKFLOW_REGISTRY, payloadType, body.payload);
+    } catch (e: any) {
+        return { response: errorResponse(400, e.message || 'invalid workflow payload') };
+    }
+
+    if (workflowStatus) {
+        // workflow_status は payload_type ごとに許可ステータスが決まっている
+        const allowed = (canTransitionTo as any)(chatType as keyof typeof WORKFLOW_REGISTRY, payloadType, workflowStatus);
+        if (!allowed) {
+            return { response: errorResponse(400, `invalid workflow transition to ${workflowStatus}`) };
+        }
+    }
+
+    return { workflowStatus };
+}
+
+function validateNonWorkflowMessageFields(body: UnifiedChatApiSchema['unified_chat_messages_send']): ReturnType<typeof errorResponse> | null {
+    // 非WORKFLOWメッセージでは workflow 用フィールドの混入を拒否します。
+    if (body.payload_type !== undefined || body.payload !== undefined || body.workflow_status !== undefined) {
+        return errorResponse(400, 'payload_type/payload/workflow_status are only allowed for WORKFLOW message');
+    }
+    return null;
+}
+
 /**
  * チャットを新規作成します。
  * - META行・参加者inbox行・初期メッセージ行を1トランザクションで作成
@@ -195,19 +316,16 @@ async function createChat(body: UnifiedChatApiSchema['unified_chat_create'], cal
         return errorResponse(400, 'participants must include exactly two participants: initiator and ADMIN');
     }
 
-    if (!WORKFLOW_REGISTRY[body.chat_type as keyof typeof WORKFLOW_REGISTRY]) {
-        return errorResponse(400, `Unsupported chat_type: ${body.chat_type}`);
+    const workflowResult = getWorkflowOrError(body.chat_type);
+    if ('response' in workflowResult) {
+        return workflowResult.response;
     }
-
-    const workflow = WORKFLOW_REGISTRY[body.chat_type as keyof typeof WORKFLOW_REGISTRY];
+    const workflow = workflowResult.workflow;
     const initialStatus = workflow.initialStatus;
 
-    const isSupportChatType = body.chat_type === 'USER_SUPPORT' || body.chat_type === 'SHOP_SUPPORT';
-    if (isSupportChatType) {
-        const expectedSupportType = initiatorId.startsWith('SHOP#') ? 'SHOP_SUPPORT' : 'USER_SUPPORT';
-        if (body.chat_type !== expectedSupportType) {
-            return errorResponse(400, `invalid chat_type for initiator: expected ${expectedSupportType}`);
-        }
+    const supportTypeError = validateSupportChatTypeOrError(body.chat_type, initiatorId);
+    if (supportTypeError) {
+        return supportTypeError;
     }
 
     // initiator_id の立場（USER# / SHOP# / ADMIN）に応じて権限チェック
@@ -278,8 +396,9 @@ async function createChat(body: UnifiedChatApiSchema['unified_chat_create'], cal
 
     if (body.initial_message) {
         // 初期メッセージを保存する場合は認証済みユーザー必須
-        if (!callerUserId) {
-            return errorResponse(401, 'authentication required');
+        const authError = requireAuthenticatedUser(callerUserId);
+        if (authError) {
+            return authError;
         }
 
         const msgId = generateId();
@@ -350,6 +469,8 @@ async function createChat(body: UnifiedChatApiSchema['unified_chat_create'], cal
         };
     }
 
+    // META + 参加者inbox(+初期メッセージ)を単一トランザクションで確定します。
+    // これにより「チャットだけ作成されて inbox がない」などの部分成功を防ぎます。
     await ddb.send(new TransactWriteCommand({ TransactItems: transactItems }));
 
     return successResponse({ chat_id, status: initialStatus, participants });
@@ -445,10 +566,12 @@ async function fetchAndAuthorizeChatMeta(
     groups: string[],
     event: any,
 ): Promise<ChatAccessResult> {
-    if (!callerUserId && !isAdminGroups(groups)) {
-        return { ok: false, response: errorResponse(401, 'authentication required') };
+    const authError = requireAuthenticatedOrAdmin(callerUserId, groups);
+    if (authError) {
+        return { ok: false, response: authError };
     }
 
+    // チャット本体(META)を主キー直読し、存在確認と後続認可判定に使います。
     const res = await ddb.send(new GetCommand({
         TableName: TABLE_NAME,
         Key: { PK: toChatPk(chatId), SK: 'META' },
@@ -500,6 +623,8 @@ async function listChats(body: UnifiedChatApiSchema['unified_chat_list'], caller
         params.ExclusiveStartKey = exclusiveKey;
     }
 
+    // participant inbox(GSI2) をページング取得します。
+    // この時点では「参加者に紐づく候補」を取得し、追加条件はアプリ側で絞り込みます。
     const res = await ddb.send(new QueryCommand(params));
     let items = res.Items || [];
 
@@ -520,8 +645,9 @@ async function listChats(body: UnifiedChatApiSchema['unified_chat_list'], caller
 
 /** chat_id 指定でチャットMETAを1件取得し、閲覧権限を検証します。 */
 async function getChat(body: UnifiedChatApiSchema['unified_chat_get'], callerUserId?: string, groups: string[] = [], event?: any) {
-    if (!body.chat_id) {
-        return errorResponse(400, 'chat_id is required');
+    const requiredError = validateChatIdRequired(body.chat_id);
+    if (requiredError) {
+        return requiredError;
     }
 
     const result = await fetchAndAuthorizeChatMeta(body.chat_id, callerUserId, groups, event);
@@ -535,8 +661,9 @@ async function getChat(body: UnifiedChatApiSchema['unified_chat_get'], callerUse
  * before_seq 指定時は「それより古いメッセージ」を降順で返します。
  */
 async function getMessages(body: UnifiedChatApiSchema['unified_chat_messages_get'], callerUserId?: string, groups: string[] = [], event?: any) {
-    if (!body.chat_id) {
-        return errorResponse(400, 'chat_id is required');
+    const requiredError = validateChatIdRequired(body.chat_id);
+    if (requiredError) {
+        return requiredError;
     }
 
     const result = await fetchAndAuthorizeChatMeta(body.chat_id, callerUserId, groups, event);
@@ -561,6 +688,8 @@ async function getMessages(body: UnifiedChatApiSchema['unified_chat_messages_get
         filterExpression = 'begins_with(SK, :prefix)';
     }
 
+    // メッセージ本体は CHAT#chat_id パーティションを Query で取得します。
+    // before_seq 指定時は SK 比較で過去方向へページングします。
     const res = await ddb.send(new QueryCommand({
         TableName: TABLE_NAME,
         KeyConditionExpression: keyCondition,
@@ -586,15 +715,17 @@ async function getMessages(body: UnifiedChatApiSchema['unified_chat_messages_get
  * - 参加者inboxの未読/既読キャッシュを更新
  */
 async function sendMessage(body: UnifiedChatApiSchema['unified_chat_messages_send'], callerUserId?: string, groups: string[] = [], event?: any) {
-    if (!body.chat_id || !body.sender_id || !body.type) {
-        return errorResponse(400, 'chat_id, sender_id, type are required');
+    const requiredError = validateSendMessageRequired(body);
+    if (requiredError) {
+        return requiredError;
     }
 
     const senderId = normalizeParticipantId(body.sender_id);
 
     // メッセージ送信は常に認証済みユーザーのみ許可
-    if (!callerUserId) {
-        return errorResponse(401, 'authentication required');
+    const authError = requireAuthenticatedUser(callerUserId);
+    if (authError) {
+        return authError;
     }
 
     const result = await fetchAndAuthorizeChatMeta(body.chat_id, callerUserId, groups, event);
@@ -602,7 +733,7 @@ async function sendMessage(body: UnifiedChatApiSchema['unified_chat_messages_sen
     const meta = result.meta;
 
     const normalizedStatus = String(meta.status || '').toUpperCase();
-    if (['APPROVED', 'REJECTED', 'CANCELLED', 'RESOLVED', 'CLOSED'].includes(normalizedStatus)) {
+    if (TERMINAL_CHAT_STATUSES.has(normalizedStatus)) {
         return errorResponse(400, 'chat is already closed');
     }
 
@@ -625,36 +756,16 @@ async function sendMessage(body: UnifiedChatApiSchema['unified_chat_messages_sen
 
     let workflowStatus = body.workflow_status;
     if (body.type === 'WORKFLOW') {
-        // WORKFLOW は payload_type と payload を必須化
-        if (!body.payload_type) {
-            return errorResponse(400, 'payload_type is required for WORKFLOW message');
+        const workflowValidation = validateWorkflowMessageAndGetStatus(body, meta.chat_type);
+        if ('response' in workflowValidation) {
+            return workflowValidation.response;
         }
-
-        if (body.payload === undefined) {
-            return errorResponse(400, 'payload is required for WORKFLOW message');
+        workflowStatus = workflowValidation.workflowStatus;
+    } else {
+        const nonWorkflowError = validateNonWorkflowMessageFields(body);
+        if (nonWorkflowError) {
+            return nonWorkflowError;
         }
-
-        const chatType = meta.chat_type as keyof typeof WORKFLOW_REGISTRY;
-        const payloadType = body.payload_type as any;
-
-        // workflow payload 契約検証 + 状態遷移検証
-        // 例: CARD_DESIGN/DESIGN_COMPLETED なら workflow_status = RESOLVED に遷移
-        //    SHOP_OPENING/ADMIN_DECISION なら workflow_status = APPROVED|REJECTED に遷移
-        try {
-            (assertValidWorkflowPayload as any)(chatType, payloadType, body.payload);
-        } catch (e: any) {
-            return errorResponse(400, e.message || 'invalid workflow payload');
-        }
-
-        if (workflowStatus) {
-            // workflow_status は payload_type ごとに許可ステータスが決まっている
-            const allowed = (canTransitionTo as any)(chatType, payloadType, workflowStatus);
-            if (!allowed) {
-                return errorResponse(400, `invalid workflow transition to ${workflowStatus}`);
-            }
-        }
-    } else if (body.payload_type !== undefined || body.payload !== undefined || body.workflow_status !== undefined) {
-        return errorResponse(400, 'payload_type/payload/workflow_status are only allowed for WORKFLOW message');
     }
 
     const shard = calcShard(meta.chat_id);
@@ -768,6 +879,8 @@ async function sendMessage(body: UnifiedChatApiSchema['unified_chat_messages_sen
         });
     }
 
+    // 送信処理は「MSG追加 + META更新 + 全参加者inbox更新」を同時コミットします。
+    // version 条件により競合更新時の上書きを防止します。
     await ddb.send(new TransactWriteCommand({ TransactItems: transactItems }));
 
     return successResponse({
@@ -783,8 +896,9 @@ async function sendMessage(body: UnifiedChatApiSchema['unified_chat_messages_sen
  */
 async function markRead(body: UnifiedChatApiSchema['unified_chat_read_mark'], callerUserId?: string, groups: string[] = [], event?: any) {
     const participantId = normalizeParticipantId(body.participant_id);
-    if (!body.chat_id || !participantId || body.last_read_seq === undefined) {
-        return errorResponse(400, 'chat_id, participant_id, last_read_seq are required');
+    const requiredError = validateMarkReadRequired(body.chat_id, participantId, body.last_read_seq);
+    if (requiredError) {
+        return requiredError;
     }
 
     const result = await fetchAndAuthorizeChatMeta(body.chat_id, callerUserId, groups, event);
@@ -807,6 +921,8 @@ async function markRead(body: UnifiedChatApiSchema['unified_chat_read_mark'], ca
         return errorResponse(400, 'last_read_seq must be <= last_message_seq');
     }
 
+    // 既読更新は対象 participant の inbox 行のみ更新します。
+    // unread_count_cache は last_message_seq との差分で再計算して整合を維持します。
     await ddb.send(new UpdateCommand({
         TableName: TABLE_NAME,
         Key: { PK: participantId, SK: `CHAT#${body.chat_id}` },
@@ -865,16 +981,19 @@ function isInitiatorOf(meta: ChatMeta, callerUserId?: string): boolean {
 }
 
 async function updateStatus(body: UnifiedChatApiSchema['unified_chat_status_update'], callerUserId?: string, groups: string[] = [], event?: any) {
-    if (!body.chat_id || !body.next_status || body.expected_version === undefined) {
-        return errorResponse(400, 'chat_id, next_status, expected_version are required');
+    const requiredError = validateStatusUpdateRequired(body);
+    if (requiredError) {
+        return requiredError;
     }
 
     // updateStatus は管理者が参加者でないチャットも操作できるため fetchAndAuthorizeChatMeta は使わず
     // 認証の有無のみ先に確認する
-    if (!callerUserId && !isAdminGroups(groups)) {
-        return errorResponse(401, 'authentication required');
+    const authError = requireAuthenticatedOrAdmin(callerUserId, groups);
+    if (authError) {
+        return authError;
     }
 
+    // updateStatus は参加者外の管理者操作を許可するため、まず META を直接取得します。
     const metaRes = await ddb.send(new GetCommand({
         TableName: TABLE_NAME,
         Key: { PK: toChatPk(body.chat_id), SK: 'META' },
@@ -892,10 +1011,11 @@ async function updateStatus(body: UnifiedChatApiSchema['unified_chat_status_upda
     // 例: CARD_DESIGN なら statuses = ['OPEN', 'RESOLVED', 'CANCELLED']
     //    SHOP_OPENING なら statuses = ['OPEN', 'APPROVED', 'REJECTED', 'CANCELLED']
     // これにより、レジストリに定義されているステートのみへの遷移を許可
-    const workflow = WORKFLOW_REGISTRY[meta.chat_type as keyof typeof WORKFLOW_REGISTRY];
-    if (!workflow) {
-        return errorResponse(400, `Unsupported chat_type: ${meta.chat_type}`);
+    const workflowResult = getWorkflowOrError(meta.chat_type);
+    if ('response' in workflowResult) {
+        return workflowResult.response;
     }
+    const workflow = workflowResult.workflow;
     const normalizedNextStatus = String(body.next_status || '').toUpperCase();
     const allowedStatuses = workflow.statuses.map((status) => String(status).toUpperCase());
     if (!allowedStatuses.includes(normalizedNextStatus)) {
@@ -965,6 +1085,7 @@ async function updateStatus(body: UnifiedChatApiSchema['unified_chat_status_upda
         });
     }
 
+    // ステータス更新は META と全参加者inboxを同時反映し、一覧表示の不整合を防ぎます。
     await ddb.send(new TransactWriteCommand({ TransactItems: transactItems }));
 
     return successResponse({ ok: true, next_status: normalizedNextStatus });
@@ -978,8 +1099,9 @@ async function updateStatus(body: UnifiedChatApiSchema['unified_chat_status_upda
  * - S3 署名付きURLを生成
  */
 async function uploadUrl(body: UnifiedChatApiSchema['unified_chat_uploadurl_get'], callerUserId?: string, groups: string[] = [], event?: any) {
-    if (!body.chat_id || !body.filename || !body.content_type) {
-        return errorResponse(400, 'chat_id, filename, content_type are required');
+    const requiredError = validateUploadUrlRequired(body);
+    if (requiredError) {
+        return requiredError;
     }
 
     const fileSize = body.file_size || 0;
@@ -1011,6 +1133,41 @@ async function uploadUrl(body: UnifiedChatApiSchema['unified_chat_uploadurl_get'
         key,
     });
 }
+
+const PATH_ACTION_MAP: Record<string, string> = {
+    '/unified/chat/create': 'create',
+    '/unified/chat/list': 'list',
+    '/unified/chat/messages/get': 'messages_get',
+    '/unified/chat/messages/send': 'messages_send',
+    '/unified/chat/get': 'get',
+    '/unified/chat/read/mark': 'read_mark',
+    '/unified/chat/status/update': 'status_update',
+    '/unified/chat/uploadurl/get': 'uploadurl',
+};
+
+/**
+ * リクエストパスからアクション名を解決します。
+ * 定義済みパスに一致しない場合は body.action の後方互換フォールバックを使います。
+ */
+function resolveAction(path: string, event: any, body: any): string | undefined {
+    // 既知パスを最優先し、互換用途としてのみ body.action を許可します。
+    return PATH_ACTION_MAP[path] || getAction(event, body);
+}
+
+type ActionHandler = (body: any, callerUserId?: string, groups?: string[], event?: any) => Promise<ReturnType<typeof successResponse> | ReturnType<typeof errorResponse>>;
+
+const ACTION_HANDLERS: Record<string, ActionHandler> = {
+    // このマップは「どの action が公開APIとして有効か」の単一情報源です。
+    // 追加時は PATH_ACTION_MAP と対で更新し、未定義 action は 404 に落とします。
+    create: (body, callerUserId, groups = [], event) => createChat(body as UnifiedChatApiSchema['unified_chat_create'], callerUserId, groups, event),
+    list: (body, callerUserId, groups = [], event) => listChats(body as UnifiedChatApiSchema['unified_chat_list'], callerUserId, groups, event),
+    get: (body, callerUserId, groups = [], event) => getChat(body as UnifiedChatApiSchema['unified_chat_get'], callerUserId, groups, event),
+    messages_get: (body, callerUserId, groups = [], event) => getMessages(body as UnifiedChatApiSchema['unified_chat_messages_get'], callerUserId, groups, event),
+    messages_send: (body, callerUserId, groups = [], event) => sendMessage(body as UnifiedChatApiSchema['unified_chat_messages_send'], callerUserId, groups, event),
+    read_mark: (body, callerUserId, groups = [], event) => markRead(body as UnifiedChatApiSchema['unified_chat_read_mark'], callerUserId, groups, event),
+    status_update: (body, callerUserId, groups = [], event) => updateStatus(body as UnifiedChatApiSchema['unified_chat_status_update'], callerUserId, groups, event),
+    uploadurl: (body, callerUserId, groups = [], event) => uploadUrl(body as UnifiedChatApiSchema['unified_chat_uploadurl_get'], callerUserId, groups, event),
+};
 
 /**
  * Unified Chat の単一エントリポイント。
@@ -1062,39 +1219,9 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         const path = event.resource || event.path || '';
 
         // パスの完全一致でアクション名を決定します。
-        // どのパスにもマッチしない場合は undefined のまま進み、最後の 404 に到達します。
-        let action: string | undefined;
-        if (path === '/unified/chat/create') {
-            // 新しいチャットルームを作成します（ショップ開設申請などのワークフロー起点）。
-            action = 'create';
-        } else if (path === '/unified/chat/list') {
-            // 指定した参加者ID（USER#xxx / SHOP#xxx）が参加しているチャット一覧を取得します。
-            action = 'list';
-        } else if (path === '/unified/chat/messages/get') {
-            // 完全一致（===）で判定しているため、/unified/chat/get との誤判定は発生しません。
-            // （部分一致のときに起きた衝突を避けるため、現在は === に統一しています。）
-            // 指定チャットのメッセージ一覧（本文・ペイロード・ワークフロー状態等）を取得します。
-            action = 'messages_get';
-        } else if (path === '/unified/chat/messages/send') {
-            // チャットに新しいメッセージを送信します（テキスト・ワークフロー判定含む）。
-            action = 'messages_send';
-        } else if (path === '/unified/chat/get') {
-            // 特定チャットのメタデータ（参加者・ステータス・最終メッセージ連番等）を1件取得します。
-            action = 'get';
-        } else if (path === '/unified/chat/read/mark') {
-            // 既読位置（last_read_seq）を記録し、未読バッジのカウントを解消します。
-            action = 'read_mark';
-        } else if (path === '/unified/chat/status/update') {
-            // チャットのステータスを変更します（例: OPEN → RESOLVED）。
-            action = 'status_update';
-        } else if (path === '/unified/chat/uploadurl/get') {
-            // ファイルアップロード用のPresigned URLを生成します。
-            action = 'uploadurl';
-        } else {
-            // 上記のいずれにもマッチしない場合は、リクエストボディの action フィールドを参照します。
-            // 主に開発・デバッグ時の後方互換目的のフォールバックです。
-            action = getAction(event, body);
-        }
+        // どのパスにもマッチしない場合は body.action フォールバックを使用し、
+        // それでも未解決なら最後に 404 を返します。
+        const action = resolveAction(path, event, body);
 
         // ─── 認証情報の抽出 ──────────────────────────────────────────────────────
         // Lambda Authorizer が JWT を検証し、ユーザーIDを event.requestContext に付与しています。
@@ -1108,37 +1235,9 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         // 決定したアクション名に応じて対応するビジネスロジック関数に処理を委譲します。
         // 各関数の内部でさらにアクセス権チェック・バリデーション・DB操作が行われます。
 
-        if (action === 'create') {
-            // チャット作成: 参加者リストと初期メッセージを受け取り、DynamoDBに保存します。
-            return await createChat(body as UnifiedChatApiSchema['unified_chat_create'], callerUserId, groups, event);
-        }
-        if (action === 'list') {
-            // チャット一覧: GSI2 を使って参加者インボックスをクエリします。
-            return await listChats(body as UnifiedChatApiSchema['unified_chat_list'], callerUserId, groups, event);
-        }
-        if (action === 'get') {
-            // チャット詳細: PK=CHAT#xxx / SK=META のアイテムを1件取得します。
-            return await getChat(body as UnifiedChatApiSchema['unified_chat_get'], callerUserId, groups, event);
-        }
-        if (action === 'messages_get') {
-            // メッセージ一覧: PK=CHAT#xxx / SK begins_with MSG# でクエリします。
-            return await getMessages(body as UnifiedChatApiSchema['unified_chat_messages_get'], callerUserId, groups, event);
-        }
-        if (action === 'messages_send') {
-            // メッセージ送信: メッセージを保存し、チャットMETAの最終メッセージ情報を更新します。
-            return await sendMessage(body as UnifiedChatApiSchema['unified_chat_messages_send'], callerUserId, groups, event);
-        }
-        if (action === 'read_mark') {
-            // 既読マーク: 参加者ごとの last_read_seq と unread_count_cache を更新します。
-            return await markRead(body as UnifiedChatApiSchema['unified_chat_read_mark'], callerUserId, groups, event);
-        }
-        if (action === 'status_update') {
-            // ステータス更新: チャットの status フィールドを楽観的ロック（version）付きで変更します。
-            return await updateStatus(body as UnifiedChatApiSchema['unified_chat_status_update'], callerUserId, groups, event);
-        }
-        if (action === 'uploadurl') {
-            // ファイルアップロード: Presigned URL を生成します。
-            return await uploadUrl(body as UnifiedChatApiSchema['unified_chat_uploadurl_get'], callerUserId, groups, event);
+        const selectedHandler = action ? ACTION_HANDLERS[action] : undefined;
+        if (selectedHandler) {
+            return await selectedHandler(body, callerUserId, groups, event);
         }
 
         // どのアクションにも該当しないリクエストは 404 を返します。
