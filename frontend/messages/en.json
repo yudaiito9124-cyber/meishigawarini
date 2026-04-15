@@ -97,6 +97,7 @@
         "type": "Type",
         "status": "Status",
         "updatedAt": "Updated At",
+        "participantsLabel": "Participants",
         "requestInfo": "Request Information",
         "decisionLocked": "This request has already been processed and can no longer be changed.",
         "designReady": "Design Ready",
@@ -121,9 +122,13 @@
         "title": "Application Details",
         "shopName": "Shop Name",
         "ownerName": "Applicant Name",
+        "designReady": "Design Finalized",
+        "referenceUrls": "Reference URLs",
         "contactEmail": "Contact Email",
         "notes": "Notes",
         "submittedAt": "Submitted At",
+        "yes": "Yes",
+        "no": "No",
         "rawJson": "Show JSON"
       },
       "messagePlaceholder": "Type a message... (Enter to send, Shift+Enter for newline)",
@@ -134,8 +139,32 @@
       "youLabel": "You",
       "adminLabel": "Operations",
       "chatClosed": "This chat is closed and no longer accepts messages.",
+      "chatTypes": {
+        "shopOpening": "Shop Opening Request",
+        "userSupport": "General Inquiry",
+        "shopSupport": "Shop Operations Support",
+        "shopDesign": "Shop Design Consultation",
+        "cardDesign": "Card Design Request",
+        "misc": "Other"
+      },
+      "statuses": {
+        "open": "Open",
+        "resolved": "Resolved",
+        "closed": "Closed",
+        "draft": "Draft",
+        "submitted": "Submitted",
+        "inReview": "In Review",
+        "approved": "Approved",
+        "rejected": "Rejected",
+        "cancelled": "Cancelled",
+        "pending": "Pending",
+        "verified": "Verified",
+        "expired": "Expired",
+        "failed": "Failed"
+      },
       "createGeneral": "Chat with Operations",
       "createShopOpening": "Shop Opening Request",
+      "createCardDesign": "Card Design Request",
       "createNew": "Create New Chat",
       "createDescription": "Create a new chat.",
       "chatType": "Chat Type",
@@ -145,6 +174,11 @@
       },
       "initialMessage": "Initial Message (Optional)",
       "initialMessagePlaceholder": "Type a message...",
+      "cancelChat": "Cancel This Chat",
+      "cancelChatConfirm": "Cancel this chat?",
+      "cancelChatFailed": "Failed to cancel the chat. Please try again later.",
+      "createFailed": "Failed to create chat.",
+      "sendFailed": "Failed to send message.",
       "cancel": "Cancel",
       "create": "Create"
     },
@@ -341,7 +375,8 @@
         "chatId": "Chat ID",
         "type": "Type",
         "status": "Status",
-        "updatedAt": "Updated At"
+        "updatedAt": "Updated At",
+        "participantsLabel": "Participants"
       },
       "decision": {
         "label": "Review Result",
@@ -360,9 +395,13 @@
         "title": "Application Details",
         "shopName": "Shop Name",
         "ownerName": "Applicant Name",
+        "designReady": "Design Finalized",
+        "referenceUrls": "Reference URLs",
         "contactEmail": "Contact Email",
         "notes": "Notes",
         "submittedAt": "Submitted At",
+        "yes": "Yes",
+        "no": "No",
         "rawJson": "Show JSON"
       },
       "messagePlaceholder": "Type a message... (Enter to send, Shift+Enter for newline)",
@@ -373,6 +412,29 @@
       "youLabel": "You",
       "adminLabel": "Operations",
       "chatClosed": "This chat is closed and no longer accepts messages.",
+      "chatTypes": {
+        "shopOpening": "Shop Opening Request",
+        "userSupport": "General Inquiry",
+        "shopSupport": "Shop Operations Support",
+        "shopDesign": "Shop Design Consultation",
+        "cardDesign": "Card Design Request",
+        "misc": "Other"
+      },
+      "statuses": {
+        "open": "Open",
+        "resolved": "Resolved",
+        "closed": "Closed",
+        "draft": "Draft",
+        "submitted": "Submitted",
+        "inReview": "In Review",
+        "approved": "Approved",
+        "rejected": "Rejected",
+        "cancelled": "Cancelled",
+        "pending": "Pending",
+        "verified": "Verified",
+        "expired": "Expired",
+        "failed": "Failed"
+      },
       "createGeneral": "Chat with Operations",
       "createShopOpening": "Shop Opening Request",
       "createCardDesign": "Card Design Request",
@@ -385,6 +447,11 @@
       },
       "initialMessage": "Initial Message (Optional)",
       "initialMessagePlaceholder": "Type a message...",
+      "cancelChat": "Cancel This Chat",
+      "cancelChatConfirm": "Cancel this chat?",
+      "cancelChatFailed": "Failed to cancel the chat. Please try again later.",
+      "createFailed": "Failed to create chat.",
+      "sendFailed": "Failed to send message.",
       "cancel": "Cancel",
       "create": "Create"
     },
@@ -924,6 +991,7 @@
         "requestInfo": "Request Information",
         "initiator": "Applicant",
         "chatStatus": "Chat Status",
+        "participantsLabel": "Participants",
         "shopName": "Shop Name",
         "ownerName": "Applicant Name",
         "contactEmail": "Contact Email",
@@ -987,6 +1055,8 @@
       "cardDesignComplete": "Mark Design Complete",
       "sendFailed": "Failed to send the message.",
       "updateFailed": "Failed to update chat status.",
+      "confirmTerminalActionTitle": "Run this action?",
+      "confirmTerminalActionDescription": "After this action, no more messages can be exchanged in this chat. Continue?",
       "detail": {
         "designReady": "Design Ready",
         "referenceUrls": "Reference URLs",
@@ -997,10 +1067,11 @@
         "chatId": "Chat ID",
         "type": "Type",
         "status": "Status",
-        "updatedAt": "Updated At"
+        "updatedAt": "Updated At",
+        "participantsLabel": "Participants"
       },
       "actions": {
-        "complete": "Mark Completed",
+        "complete": "Complete (RESOLVED)",
         "close": "Close Chat",
         "cancel": "Cancel Chat",
         "reopen": "Reopen",
@@ -1030,6 +1101,14 @@
         "verified": "Verified",
         "expired": "Expired",
         "failed": "Failed"
+      },
+      "chatTypes": {
+        "shopOpening": "Shop Opening Request",
+        "userSupport": "General Inquiry",
+        "shopSupport": "Shop Operations Support",
+        "shopDesign": "Shop Design Consultation",
+        "cardDesign": "Card Design Request",
+        "misc": "Other"
       }
     },
     "AdminNeed2FA": "Admin Required 2FA",

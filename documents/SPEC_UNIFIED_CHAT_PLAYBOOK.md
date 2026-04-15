@@ -351,13 +351,9 @@ Unified Chat では、全てのワークフロータイプが以下のステー�
 
 | ステート | 意味 | 再開可否 | 用途 |
 | --- | --- | --- | --- |
-| `OPEN` | 対応中（初期状態） | N/A | 申請/問い合わせ直後、または対応を再開した状態 |
-| `RESOLVED` | 対応完了（一時的終了） | 再開可 | 対応が一度完了したが、必要に応じて再開できる段階 |
-| `CLOSED` | 最終クローズ（完全終了） | 不可 | チャットを打ち切って記録化する |
+| `OPEN` | 対応中（初期状態） | N/A | 申請/問い合わせ直後の状態 |
+| `RESOLVED` | 対応完了 | 不可 | 管理者が完了操作を行った状態 |
 | `CANCELLED` | キャンセル/取消 | 不可 | ユーザー発起の申請取下げ、または管理者による取消 |
-| `DRAFT` | 下書き（SHOP_OPENING のみ） | N/A | 申請者がフォーム途中保存 |
-| `SUBMITTED` | 申請済み（SHOP_OPENING のみ） | N/A | 申請者が完全送信完了 |
-| `IN_REVIEW` | 審査中（SHOP_OPENING のみ） | N/A | 管理者が審査開始 |
 | `APPROVED` | 承認（SHOP_OPENING のみ） | 不可 | 管理者が申請を認可、shop 作成 |
 | `REJECTED` | 却下（SHOP_OPENING のみ） | 不可 | 管理者が申請を棄却 |
 
@@ -366,60 +362,49 @@ Unified Chat では、全てのワークフロータイプが以下のステー�
 #### 9.2.1 SHOP_OPENING（ショップ開設申請）
 
 ```
-DRAFT → SUBMITTED → IN_REVIEW → { APPROVED | REJECTED }
-                             ↘ CANCELLED (at any point)
+OPEN → { APPROVED | REJECTED | CANCELLED }
 ```
 
-- **特殊性**: フォーム途中保存とフロー管理が詳細（専用ステートが多い）
-- **初期ステート**: DRAFT
+- **特殊性**: 完全送信された申請をそのまま管理者が承認/却下する
+- **初期ステート**: OPEN
 - **終端ステート**: APPROVED, REJECTED, CANCELLED
-- **payload_type**: `FORM_DRAFT_SAVED`, `FORM_SUBMITTED`, `ADMIN_DECISION`
+- **payload_type**: `FORM_SUBMITTED`, `ADMIN_DECISION`
 - **payload**: フォームスナップショット（shop_name, owner_name, contact_email, notes）
+- **補足**: 現在の申請UIは完全送信でチャットを作成するため、管理画面には最初から `OPEN`（対応中）で表示される
 
 #### 9.2.2 CARD_DESIGN（カードデザイン申請）
 
 ```
-OPEN → RESOLVED → CLOSED
-  ↑        ↓
-  └────────┘ (必要に応じて再開)
-
-OPEN → CANCELLED (any time)
-RESOLVED → CANCELLED (any time)
+OPEN → { RESOLVED | CANCELLED }
 ```
 
 - **特性**: 一般チャット系（USER_SUPPORT/SHOP_SUPPORT と同じステート群）
 - **初期ステート**: OPEN
-- **終端ステート**: CLOSED, CANCELLED
+- **終端ステート**: RESOLVED, CANCELLED
 - **管理者操作**:
-  - `OPEN` 状態でのみ「デザイン完了」ボタンが有効
-  - クリックで `DESIGN_COMPLETED` workflow メッセージを送信
-  - チャット status を `RESOLVED` へ遷移
-  - 必要に応じて再度 `RESOLVED → OPEN` で再開可能
-- **payload_type**: `FORM_SUBMITTED`, `DESIGN_COMPLETED`
-- **payload**: 申請フォーム（design_ready, reference_urls, notes, contact_email）と完了メモ
+   - `OPEN` 状態でのみ完了ボタンが有効
+   - クリックでチャット status を `RESOLVED` へ遷移
+- **payload_type**: `FORM_SUBMITTED`
+- **payload**: 申請フォーム（design_ready, reference_urls, notes, contact_email）
 - **使用シーン**: ショップオーナーがカードデザイン追加をリクエスト → 管理者がテンプレート調整 → デザイン完了 → チャット終結
 
 #### 9.2.3 USER_SUPPORT / SHOP_SUPPORT / SHOP_DESIGN / MISC（一般問い合わせ系）
 
 ```
 OPEN → { RESOLVED | CANCELLED }
-  ↑          ↓
-  └──────────┘ (必要に応じて再開)
-
-RESOLVED → { CLOSED | OPEN }
 ```
 
 - **特性**: 構造化フォーム不要、フロー管理シンプル
 - **初期ステート**: OPEN
-- **終端ステート**: CLOSED, CANCELLED
+- **終端ステート**: RESOLVED, CANCELLED
 - **管理者操作**:
-  - `OPEN` 状態: `RESOLVED` または `CANCELLED` へ遷移可
-  - `RESOLVED` 状態: `CLOSED` または `OPEN` へ遷移可
+   - `OPEN` 状態: `RESOLVED` へ遷移可
+- **起票ユーザー操作**:
+   - `OPEN` 状態: 起票した `USER#...` 本人のみ `CANCELLED` へ遷移可
 - **payload_type**: なし（TEXT/FILE メッセージのみ）
 - **フロー例**:
-  - 通常終了: `OPEN → RESOLVED → CLOSED`
-  - 再対応: `OPEN → RESOLVED → OPEN → RESOLVED → CLOSED`
-  - キャンセル: `OPEN → CANCELLED` (any point)
+   - 通常終了: `OPEN → RESOLVED`
+   - キャンセル: `OPEN → CANCELLED`
 
 ### 9.3 RESOLVED と CLOSED の使い分け（一般チャット系）
 
@@ -450,11 +435,9 @@ RESOLVED → { CLOSED | OPEN }
    - テキスト/ファイルで質問・提案をやりとり
    - 例: 参考にしたURLの詳細確認、デザイン修正提案など
 
-3. **管理者がデザイン完了処理**
-   - 管理画面: 「デザイン完了にする」ボタン（OPEN 状態のみ有効）
-   - クリック後、オプショナルなメモを入力可
-   - `DESIGN_COMPLETED` workflow メッセージ送信
-   - `status: OPEN → RESOLVED` へ自動遷移
+3. **管理者が完了処理**
+   - 管理画面: 完了ボタン（OPEN 状態のみ有効）
+   - `status: OPEN → RESOLVED` へ遷移
 
 4. **チャット終結処理**
    - 管理画面: `RESOLVED → CLOSED` で完全終了

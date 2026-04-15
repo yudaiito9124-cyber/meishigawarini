@@ -1,0 +1,160 @@
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+
+<style>
+/* プレフィックス: .au-fund-list */
+.au-fund-list-root,
+.au-fund-list-root * {
+box-sizing: border-box !important;
+margin: 0;
+padding: 0;
+}
+
+.au-fund-list-root {
+font-family: 'Noto Sans JP', sans-serif;
+max-width: 600px;
+margin: 0 auto;
+background-color: #ffffff;
+color: #333;
+line-height: 1.7;
+height: auto;
+border: 1px solid #eee;
+//border-radius: 8px;
+overflow: hidden;
+padding: 4px;
+}
+
+/* トップ画像 */
+.au-fund-list-banner {
+width: 100%;
+}
+
+.au-fund-list-banner img {
+width: 100%;
+height: auto;
+display: block;
+}
+
+/* 説明文セクション */
+.au-fund-list-body {
+padding: 24px;
+}
+
+.au-fund-list-intro {
+font-size: 14.5px;
+color: #444;
+text-align: justify;
+margin-bottom: 24px;
+}
+
+.au-fund-list-intro p {
+margin-bottom: 12px;
+}
+
+/* 基金名称リスト */
+.au-fund-list-container {
+background-color: #f8fbf9;
+padding: 20px;
+border-radius: 6px;
+margin-bottom: 30px;
+}
+
+.au-fund-list-title {
+font-size: 16px;
+font-weight: 700;
+color: #00a859;
+margin-bottom: 15px;
+border-bottom: 2px solid #00a859;
+padding-bottom: 5px;
+display: inline-block;
+}
+
+.au-fund-list-items {
+display: grid;
+grid-template-columns: 1fr 1fr;
+gap: 10px;
+list-style: none;
+}
+
+.au-fund-list-item {
+font-size: 14px;
+font-weight: 500;
+padding: 4px 0;
+display: flex;
+align-items: center;
+}
+
+.au-fund-list-item::before {
+content: "●";
+color: #00a859;
+font-size: 10px;
+margin-right: 8px;
+}
+
+/* ボトムの巨大ボタン */
+.au-fund-list-cta {
+padding: 0 24px 32px;
+}
+
+.au-fund-list-btn {
+display: block;
+width: 100%;
+padding: 18px;
+background-color: #00a859;
+color: #ffffff;
+text-align: center;
+text-decoration: none;
+font-size: 18px;
+font-weight: 700;
+border-radius: 50px;
+box-shadow: 0 4px 15px rgba(0, 168, 89, 0.3);
+transition: transform 0.2s, background-color 0.2s;
+}
+
+.au-fund-list-btn:hover {
+background-color: #008f4c;
+transform: translateY(-2px);
+}
+
+/* モバイル対応 */
+@media (max-width: 480px) {
+.au-fund-list-items {
+grid-template-columns: 1fr;
+}
+.au-fund-list-btn {
+font-size: 16px;
+}
+}
+</style>
+
+<div class="au-fund-list-root">
+<div class="au-fund-list-banner">
+<img src="https://infrastack-productimagebucketdce10e3f-qmgx3s9tvlno.s3.ap-northeast-1.amazonaws.com/qrcode/20260406055813nbd-7724360d-dc10-4ac2-95fe-3aa46002ed9a/chat/20260406062725pez-c5ac0f7a-ad52-4c00-a4ea-00ec05973796.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=ASIAYTMSSPW4DESCITOE%2F20260415%2Fap-northeast-1%2Fs3%2Faws4_request&X-Amz-Date=20260415T071230Z&X-Amz-Expires=3600&X-Amz-Security-Token=IQoJb3JpZ2luX2VjENf%2F%2F%2F%2F%2F%2F%2F%2F%2F%2FwEaDmFwLW5vcnRoZWFzdC0xIkcwRQIgOYv4rY9nZ%2Bv6jpM6nAEObehql2BYqAye%2BtLSCN5F8NACIQDNxiklUGnFq%2FttTNUK7bxBCa%2Fo7n%2Bb9RmjCozQnMY7zSqGBQig%2F%2F%2F%2F%2F%2F%2F%2F%2F%2F8BEAAaDDU5MTQwMjI3MDEzNiIMqcIy5IfLoijFrNQ2KtoE3d5oyPXe2iMgQKuZzLfNlbMr5QE5fWewnHNytAC3j0nPKcmBKs5pRo%2FCmll1FvER8j27hubq5NjF5eUStr17KmzaNAqmzKba1WD36KxxEGF7ynDkSM0xMGBK2HXmgOrmzn9mp%2FhXfG1Ww%2B9Dpm8MvaWr9LKrZUjPfrfOmdpqwJ20oHS2%2F3Af3fKe8yfFqfG%2Fkqom7NtnIf%2BaGqE3aMe4hQHSkYgLFNx8Gzw1Rd%2BaDVnGMarUnaMsZiLY5Hsu99z9x%2BMKtmxOSIdBv3KLOVzD7cmozfXeFWraJ%2BtbB6xIyvIUwB7ikAt25g1UVSlk2GozuN2DQBh%2BXUA7eJj0WiGRyYwEqcE0lVvstjvBi7TMvNXDgmlx5xWb%2BBlAuv9RzHeshFxSPp5Qw1AjQ%2FiDpzcYgxwsbqUEMIlu4f%2BN2hr%2BRUN3YNdf%2FDyvfEaMCgJni32jsz2eGEf1TSI0aTlywNKcw0Lf1BY1eww6GiKQ5nRV39A74uh4IE%2BJaTT5t%2Fz4JJtP1JCNfWAlyMpcoTpqo%2BFEXCwYR8U8YOax8KvXsP98cQQ0zQsI9cyVtYZF2VtcdZade48KmudXoCVP0gf3M5Kef72pPB2S0Y02H4%2FTmUVPXazlEbr8kTOLkTiEcFmDhwBei4XjfHwYbFsxrtnvmGx%2Fg4ItShWEZiHpDadTSakNYEGfMiMKOpuyjNMu%2Bj%2BSlit0TJz5FuB5cSQ3Jjhvkf3o5SdtsQp0lb4RHXzm550EnjRvzEf5AUULcpt288lNcZWPoj5wBvcYov6PEBMR7vOhj%2B72%2BUF98CNT84gw3PT8zgY6owFNEm31FyDs3ZQXSjoFsFPOi0zxmHy7hrfMPvUfuqFWAz9tycAVkE1DvgMgRQPzZh9Mmd8xW16qvVlTBe0HSH6bbtz6lrzMZVQIzaUAvXTZIJdreLm%2FY%2BDiETnVKRGRCi9aJH051%2FEitXQ5%2B62qwxFwz1Mh%2FIaCoCFt22gz3KRz7i6EXM9gEPn1kgZDf%2B9VaxD%2B6yr4NHcdx2tWn79BiWhQ63t2&X-Amz-Signature=a37613dd7d3b279654a281c9944c40b9d33acccc69dcfd37b316ec17faf121bf&X-Amz-SignedHeaders=host&x-amz-checksum-mode=ENABLED&x-id=GetObject" alt="秋田大学みらい創造基金 ～ご寄附のおねがい～">
+</div>
+
+<div class="au-fund-list-body">
+    <div class="au-fund-list-intro">
+        <p>秋田大学みらい創造基金は、学生の経済的支援など大学全体の活動を広く支援いただく「一般基金」と、各学部等が実施する事業を支援いただく「特定基金」で構成しており、企業・団体や個人の皆様等多くの方々から御支援をいただいております。</p>
+        <p>本基金は、教育・研究による社会への貢献という本学の使命を果たすための大きな支えとなっております。さらに、ウクライナ支援事業や周年事業など、一定の時期に実施される特別な事業についても御支援をいただいております。</p>
+    </div>
+
+    <div class="au-fund-list-container">
+        <h3 class="au-fund-list-title">基金の種類</h3>
+        <ul class="au-fund-list-items">
+            <li class="au-fund-list-item">一般基金</li>
+            <li class="au-fund-list-item">特定基金</li>
+            <li class="au-fund-list-item">遠隔医療推進事業寄附金</li>
+            <li class="au-fund-list-item">ウクライナ支援事業寄附金</li>
+            <li class="au-fund-list-item">附属小150周年事業寄附金</li>
+            <li class="au-fund-list-item">返礼品付き寄附</li>
+        </ul>
+    </div>
+</div>
+
+<div class="au-fund-list-cta">
+    <a href="https://www.akita-u.ac.jp/honbu/ed_fund/" class="au-fund-list-btn" target="_blank">
+        基金の詳細・寄附のお申し込みはこちら
+    </a>
+</div>
+</div>

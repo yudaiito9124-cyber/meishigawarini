@@ -1088,6 +1088,7 @@ export default function AdminPage() {
  */
 function AdminInquiryChatSection({ dbCardDesigns }: { dbCardDesigns: any[] }) {
     const t = useTranslations('AdminPage');
+    const [confirmTerminalAction, setConfirmTerminalAction] = useState<'RESOLVED' | 'APPROVED' | 'REJECTED' | null>(null);
     const [notificationLoading, setNotificationLoading] = useState(false);
     const [statusUpdating, setStatusUpdating] = useState(false);
     const [detailLoading, setDetailLoading] = useState(false);
@@ -1110,9 +1111,6 @@ function AdminInquiryChatSection({ dbCardDesigns }: { dbCardDesigns: any[] }) {
     const [chatPageIdx, setChatPageIdx] = useState<number>(0);
     const [chatHasNext, setChatHasNext] = useState(false);
     const [shopOpenDialogOpen, setShopOpenDialogOpen] = useState(false);
-    const [cardDesignDialogOpen, setCardDesignDialogOpen] = useState(false);
-    const [cardDesignCompleteMemo, setCardDesignCompleteMemo] = useState('');
-    const [cardDesignActionLoading, setCardDesignActionLoading] = useState(false);
     const [approveDesignId, setApproveDesignId] = useState('');
     const [rejectReason, setRejectReason] = useState('');
     const [adminMemo, setAdminMemo] = useState('');
@@ -1122,12 +1120,12 @@ function AdminInquiryChatSection({ dbCardDesigns }: { dbCardDesigns: any[] }) {
     const getChatTypeLabel = (chatType?: string): string => {
         if (!chatType) return '-';
         const labels: Record<string, string> = {
-            SHOP_OPENING: 'ショップ開設申請',
-            USER_SUPPORT: '一般問い合わせ',
-            SHOP_SUPPORT: 'ショップ運営サポート',
-            SHOP_DESIGN: 'ショップデザイン相談',
-            CARD_DESIGN: 'カードデザイン追加申請',
-            MISC: 'その他',
+            SHOP_OPENING: t('inquiryChat.chatTypes.shopOpening'),
+            USER_SUPPORT: t('inquiryChat.chatTypes.userSupport'),
+            SHOP_SUPPORT: t('inquiryChat.chatTypes.shopSupport'),
+            SHOP_DESIGN: t('inquiryChat.chatTypes.shopDesign'),
+            CARD_DESIGN: t('inquiryChat.chatTypes.cardDesign'),
+            MISC: t('inquiryChat.chatTypes.misc'),
         };
         return labels[chatType] || chatType;
     };
@@ -1168,6 +1166,35 @@ function AdminInquiryChatSection({ dbCardDesigns }: { dbCardDesigns: any[] }) {
 
     const normalizeStatus = (status?: string) => String(status || '').toUpperCase();
 
+    const renderTextWithLinks = (value?: string): React.ReactNode => {
+        const text = String(value || '').trim();
+        if (!text) {
+            return '-';
+        }
+
+        const parts = text.split(/(https?:\/\/[^\s]+)/g);
+        return (
+            <span className="whitespace-pre-wrap break-all">
+                {parts.map((part, index) => {
+                    if (/^https?:\/\/[^\s]+$/i.test(part)) {
+                        return (
+                            <a
+                                key={`${part}-${index}`}
+                                href={part}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-blue-700 underline hover:text-blue-900"
+                            >
+                                {part}
+                            </a>
+                        );
+                    }
+                    return <React.Fragment key={`text-${index}`}>{part}</React.Fragment>;
+                })}
+            </span>
+        );
+    };
+
     const isTerminalStatus = (status?: string) => TERMINAL_STATUSES.has(normalizeStatus(status));
 
     const isSupportChatType = (chatType?: string) => {
@@ -1180,24 +1207,14 @@ function AdminInquiryChatSection({ dbCardDesigns }: { dbCardDesigns: any[] }) {
 
         // 一般チャット系（USER_SUPPORT, SHOP_SUPPORT, SHOP_DESIGN, CARD_DESIGN, MISC）
         // ステート遷移:
-        //   OPEN → RESOLVED, CANCELLED
-        //   RESOLVED → CLOSED, OPEN
-        // CARD_DESIGN も採用している「一般チャット型」なので、
-        // OPEN 状態で「デザイン完了」ボタン（→RESOLVED へ遷移）を有効化
+        //   OPEN → RESOLVED
         if (isSupportChatType(chatType)) {
-            if (status === 'OPEN') return ['RESOLVED', 'CANCELLED'];
-            if (status === 'RESOLVED') return ['CLOSED', 'OPEN'];
+            if (status === 'OPEN') return ['RESOLVED'];
             return [];
         }
 
-        // SHOP_OPENING: 詳細フロー型
-        // ステート遷移:
-        //   DRAFT/SUBMITTED → IN_REVIEW, CANCELLED
-        //   IN_REVIEW → CANCELLED
-        // 最終的には ADMIN_DECISION workflow で APPROVED/REJECTED へ至る
+        // SHOP_OPENING は承認/却下専用ダイアログで処理します。
         if (chatType === 'SHOP_OPENING') {
-            if (status === 'DRAFT' || status === 'SUBMITTED') return ['IN_REVIEW', 'CANCELLED'];
-            if (status === 'IN_REVIEW') return ['CANCELLED'];
             return [];
         }
 
@@ -1206,11 +1223,7 @@ function AdminInquiryChatSection({ dbCardDesigns }: { dbCardDesigns: any[] }) {
 
     const getTransitionLabel = (status: string) => {
         const labels: Record<string, string> = {
-            OPEN: t('inquiryChat.actions.reopen'),
             RESOLVED: t('inquiryChat.actions.complete'),
-            CLOSED: t('inquiryChat.actions.close'),
-            CANCELLED: t('inquiryChat.actions.cancel'),
-            IN_REVIEW: t('inquiryChat.actions.startReview'),
         };
         return labels[status] || status;
     };
@@ -1512,18 +1525,18 @@ function AdminInquiryChatSection({ dbCardDesigns }: { dbCardDesigns: any[] }) {
     const availableTransitions = useMemo(() => getAvailableTransitions(selectedChat), [selectedChat]);
     const isShopOpeningSelected = String(selectedChat?.chat_type || '').toUpperCase() === 'SHOP_OPENING';
     const isCardDesignSelected = String(selectedChat?.chat_type || '').toUpperCase() === 'CARD_DESIGN';
+    const visibleTransitions = useMemo(() => {
+        if (isCardDesignSelected) {
+            return [];
+        }
+        return availableTransitions;
+    }, [availableTransitions, isCardDesignSelected]);
 
-    const editableStatuses = useMemo(() => new Set(['OPEN', 'DRAFT', 'SUBMITTED', 'IN_REVIEW']), []);
+    const editableStatuses = useMemo(() => new Set(['OPEN']), []);
     const isShopOpeningDecisionLocked = useMemo(() => {
         if (!isShopOpeningSelected) return true;
         return !editableStatuses.has(String(selectedChat?.status || '').toUpperCase());
     }, [editableStatuses, isShopOpeningSelected, selectedChat]);
-
-    const cardDesignEditableStatuses = useMemo(() => new Set(['OPEN']), []);
-    const isCardDesignCompleteLocked = useMemo(() => {
-        if (!isCardDesignSelected) return true;
-        return !cardDesignEditableStatuses.has(String(selectedChat?.status || '').toUpperCase());
-    }, [cardDesignEditableStatuses, isCardDesignSelected, selectedChat]);
 
     const selectedCardDesignSnapshot = useMemo(() => {
         for (const message of selectedMessages) {
@@ -1552,57 +1565,6 @@ function AdminInquiryChatSection({ dbCardDesigns }: { dbCardDesigns: any[] }) {
         }
         return null;
     }, [selectedChat, selectedMessages]);
-
-    const handleCardDesignComplete = async () => {
-        // CARD_DESIGN チャットの「デザイン完了」ボタン処理
-        // 条件: OPEN 状態のみ有効。OPEN → RESOLVED へ遷移。
-        // 処理: DESIGN_COMPLETED workflow メッセージ送信 + status更新
-        // 以降: RESOLVED 状態から CLOSED へ遷移または再度 OPEN へ戻し可能。
-        if (!selectedChat?.chat_id || isCardDesignCompleteLocked || cardDesignActionLoading) return;
-
-        setCardDesignActionLoading(true);
-        try {
-            const completedAt = new Date().toISOString();
-            await adminApi.fetch_post('/unified/chat/messages/send', {
-                chat_id: selectedChat.chat_id,
-                sender_id: 'ADMIN',
-                type: 'WORKFLOW',
-                message: t('inquiryChat.cardDesignComplete'),
-                payload_type: 'DESIGN_COMPLETED',
-                workflow_status: 'RESOLVED',
-                payload: {
-                    completed_by: 'ADMIN',
-                    completed_at: completedAt,
-                    note: cardDesignCompleteMemo.trim() || undefined,
-                },
-            });
-
-            const latestChat = await adminApi.fetch_post('/unified/chat/get', {
-                chat_id: selectedChat.chat_id,
-            });
-            const latestVersion = latestChat?.chat?.version;
-            if (typeof latestVersion !== 'number') {
-                throw new Error('latest chat version is missing');
-            }
-
-            await adminApi.fetch_post('/unified/chat/status/update', {
-                chat_id: selectedChat.chat_id,
-                next_status: 'RESOLVED',
-                expected_version: latestVersion,
-            });
-
-            setCardDesignDialogOpen(false);
-            setCardDesignCompleteMemo('');
-            await fetchNotifications();
-        } catch (e: any) {
-            console.error('card design complete failed', e);
-            const detail = e?.message || e?.error || e?.statusText || '';
-            alert(detail ? `カードデザイン完了に失敗しました
-${detail}` : 'カードデザイン完了に失敗しました');
-        } finally {
-            setCardDesignActionLoading(false);
-        }
-    };
 
     const handleShopOpeningApprove = async () => {
         if (!selectedChat?.chat_id || !selectedChat?.initiator_id?.startsWith('USER#')) {
@@ -1739,6 +1701,35 @@ ${detail}` : 'カードデザイン完了に失敗しました');
         }
     };
 
+    const getConfirmTerminalActionLabel = () => {
+        if (confirmTerminalAction === 'APPROVED') {
+            return t('inquiries.detail.approve');
+        }
+        if (confirmTerminalAction === 'REJECTED') {
+            return t('inquiries.detail.reject');
+        }
+        return t('inquiryChat.actions.complete');
+    };
+
+    const handleConfirmTerminalAction = async () => {
+        const action = confirmTerminalAction;
+        if (!action) return;
+
+        setConfirmTerminalAction(null);
+
+        if (action === 'APPROVED') {
+            await handleShopOpeningApprove();
+            return;
+        }
+
+        if (action === 'REJECTED') {
+            await handleShopOpeningReject();
+            return;
+        }
+
+        await handleUpdateChatStatus('RESOLVED');
+    };
+
     useEffect(() => {
         fetchNotifications();
     }, []);
@@ -1759,7 +1750,7 @@ ${detail}` : 'カードデザイン完了に失敗しました');
 
     return (
         <Card className="flex flex-col min-h-[70vh]">
-            <CardHeader className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between border-b bg-gray-50/60">
+            <CardHeader className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
                 <div>
                     <CardTitle>{t('inquiryChat.title')}</CardTitle>
                     <CardDescription>{t('inquiryChat.description')}</CardDescription>
@@ -1779,7 +1770,7 @@ ${detail}` : 'カードデザイン完了に失敗しました');
             </CardHeader>
 
             <CardContent
-                className="grid grid-cols-1 xl:grid-cols-2 gap-6 flex-1 min-h-0 p-6 overflow-y-auto xl:grid-rows-1"
+                className="grid grid-cols-1 xl:grid-cols-2 gap-0 flex-1 min-h-0 p-6 overflow-y-auto xl:grid-rows-1"
                 style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}
             >
                 <Card className="flex flex-col h-[67rem]">
@@ -1911,7 +1902,7 @@ ${detail}` : 'カードデザイン完了に失敗しました');
                                     <div><span className="text-gray-500">{t('inquiryChat.detail.status')}:</span> {getStatusLabel(selectedChat?.status)}</div>
                                     <div><span className="text-gray-500">{t('inquiryChat.detail.updatedAt')}:</span> {selectedChat?.ts_last_message_at ? new Date(selectedChat.ts_last_message_at).toLocaleString() : '-'}</div>
                                     <div className="pt-1">
-                                        <span className="text-gray-500">参加者:</span>
+                                        <span className="text-gray-500">{t('inquiryChat.detail.participantsLabel')}:</span>
                                         <div className="mt-1 space-y-1">
                                             {selectedParticipantIds.length === 0 ? (
                                                 <div className="text-xs text-gray-500">-</div>
@@ -1931,7 +1922,7 @@ ${detail}` : 'カードデザイン完了に失敗しました');
                                 {isShopOpeningSelected && (
                                     <Card className="border-amber-300 bg-amber-50">
                                         <CardHeader className="pb-3">
-                                            <CardTitle className="text-base">{t('inquiries.title')}</CardTitle>
+                                            <CardTitle className="text-base">{t('inquiries.shopcreationformcontent')}</CardTitle>
                                             <CardDescription>{t('inquiries.description')}</CardDescription>
                                         </CardHeader>
                                         <CardContent className="space-y-2 text-sm">
@@ -1940,8 +1931,8 @@ ${detail}` : 'カードデザイン完了に失敗しました');
                                             <div><span className="text-gray-500">{t('inquiries.detail.ownerName')}:</span> {selectedFormSnapshot?.owner_name || '-'}</div>
                                             <div><span className="text-gray-500">{t('inquiries.detail.contactEmail')}:</span> {selectedFormSnapshot?.contact_email || '-'}</div>
                                             <div className="min-w-0">
-                                                <span className="text-gray-500">{t('inquiries.detail.notes')}:</span>{' '}
-                                                <span className="whitespace-pre-wrap break-all">{selectedFormSnapshot?.notes || '-'}</span>
+                                                <span className="text-gray-500">{t('inquiries.detail.notes')}:</span>
+                                                <div className="mt-1 whitespace-pre-wrap break-all">{selectedFormSnapshot?.notes || '-'}</div>
                                             </div>
                                             <Button
                                                 className="mt-2"
@@ -1966,41 +1957,49 @@ ${detail}` : 'カードデザイン完了に失敗しました');
                                                     <div><span className="text-gray-500">{t('inquiryChat.detail.designReady')}:</span> {selectedCardDesignSnapshot.design_ready ? t('inquiryChat.detail.yes') : t('inquiryChat.detail.no')}</div>
                                                     {selectedCardDesignSnapshot.reference_urls && (
                                                         <div className="min-w-0">
-                                                            <span className="text-gray-500">{t('inquiryChat.detail.referenceUrls')}:</span>{' '}
-                                                            <span className="whitespace-pre-wrap break-all">{selectedCardDesignSnapshot.reference_urls}</span>
+                                                            <span className="text-gray-500">{t('inquiryChat.detail.referenceUrls')}:</span>
+                                                            <div className="mt-1">{renderTextWithLinks(selectedCardDesignSnapshot.reference_urls)}</div>
                                                         </div>
                                                     )}
                                                     {selectedCardDesignSnapshot.notes && (
                                                         <div className="min-w-0">
-                                                            <span className="text-gray-500">{t('inquiries.detail.notes')}:</span>{' '}
-                                                            <span className="whitespace-pre-wrap break-all">{selectedCardDesignSnapshot.notes}</span>
+                                                            <span className="text-gray-500">{t('inquiries.detail.notes')}:</span>
+                                                            <div className="mt-1 whitespace-pre-wrap break-all">{selectedCardDesignSnapshot.notes}</div>
                                                         </div>
                                                     )}
                                                 </>
                                             ) : (
                                                 <p className="text-gray-400 text-xs">{t('inquiryChat.noFormSnapshot')}</p>
                                             )}
-                                            <Button
-                                                className="mt-2"
-                                                size="sm"
-                                                onClick={() => setCardDesignDialogOpen(true)}
-                                                disabled={isCardDesignCompleteLocked}
-                                            >
-                                                {t('inquiryChat.cardDesignComplete')}
-                                            </Button>
+                                            {normalizeStatus(selectedChat?.status) === 'OPEN' && (
+                                                <Button
+                                                    className="mt-2"
+                                                    size="sm"
+                                                    disabled={statusUpdating}
+                                                    onClick={() => setConfirmTerminalAction('RESOLVED')}
+                                                >
+                                                    {statusUpdating ? t('inquiryChat.updating') : getTransitionLabel('RESOLVED')}
+                                                </Button>
+                                            )}
                                         </CardContent>
                                     </Card>
                                 )}
 
-                                {!isShopOpeningSelected && availableTransitions.length > 0 && (
+                                {!isShopOpeningSelected && visibleTransitions.length > 0 && (
                                     <div className="flex flex-wrap gap-2">
-                                        {availableTransitions.map((nextStatus) => (
+                                        {visibleTransitions.map((nextStatus) => (
                                             <Button
                                                 key={nextStatus}
-                                                variant="outline"
+                                                variant={nextStatus === 'RESOLVED' ? 'default' : 'outline'}
                                                 size="sm"
                                                 disabled={statusUpdating}
-                                                onClick={() => handleUpdateChatStatus(nextStatus)}
+                                                onClick={() => {
+                                                    if (nextStatus === 'RESOLVED') {
+                                                        setConfirmTerminalAction('RESOLVED');
+                                                        return;
+                                                    }
+                                                    handleUpdateChatStatus(nextStatus);
+                                                }}
                                             >
                                                 {statusUpdating ? t('inquiryChat.updating') : getTransitionLabel(nextStatus)}
                                             </Button>
@@ -2173,7 +2172,7 @@ ${detail}` : 'カードデザイン完了に失敗しました');
                                     />
                                 </div>
 
-                                <Button onClick={handleShopOpeningApprove} disabled={shopOpenActionLoading || isShopOpeningDecisionLocked}>
+                                <Button onClick={() => setConfirmTerminalAction('APPROVED')} disabled={shopOpenActionLoading || isShopOpeningDecisionLocked}>
                                     {shopOpenActionLoading ? t('inquiries.detail.processing') : t('inquiries.detail.approve')}
                                 </Button>
                             </CardContent>
@@ -2191,7 +2190,7 @@ ${detail}` : 'カードデザイン完了に失敗しました');
                                     placeholder={t('inquiries.detail.rejectReasonPlaceholder')}
                                     disabled={shopOpenActionLoading || isShopOpeningDecisionLocked}
                                 />
-                                <Button variant="destructive" onClick={handleShopOpeningReject} disabled={shopOpenActionLoading || isShopOpeningDecisionLocked}>
+                                <Button variant="destructive" onClick={() => setConfirmTerminalAction('REJECTED')} disabled={shopOpenActionLoading || isShopOpeningDecisionLocked}>
                                     {shopOpenActionLoading ? t('inquiries.detail.processing') : t('inquiries.detail.reject')}
                                 </Button>
                             </CardContent>
@@ -2200,67 +2199,22 @@ ${detail}` : 'カードデザイン完了に失敗しました');
                 </DialogContent>
             </Dialog>
 
-            <Dialog open={cardDesignDialogOpen} onOpenChange={setCardDesignDialogOpen}>
-                <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
+            <Dialog open={confirmTerminalAction !== null} onOpenChange={(open) => {
+                if (!open) setConfirmTerminalAction(null);
+            }}>
+                <DialogContent className="max-w-md">
                     <DialogHeader>
-                        <DialogTitle>{t('inquiryChat.cardDesignActions')}</DialogTitle>
-                        <DialogDescription>{selectedChat?.chat_id || ''}</DialogDescription>
+                        <DialogTitle>{t('inquiryChat.confirmTerminalActionTitle')}</DialogTitle>
+                        <DialogDescription>{t('inquiryChat.confirmTerminalActionDescription')}</DialogDescription>
                     </DialogHeader>
-
-                    <div className="space-y-4">
-                        {isCardDesignCompleteLocked && (
-                            <p className="text-sm font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded-md px-3 py-2">
-                                {t('inquiryChat.detail.decisionLocked')}
-                            </p>
-                        )}
-
-                        {selectedCardDesignSnapshot && (
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle className="text-sm">{t('inquiryChat.detail.requestInfo')}</CardTitle>
-                                </CardHeader>
-                                <CardContent className="space-y-2 text-sm">
-                                    <div><span className="text-gray-500">{t('inquiries.detail.contactEmail')}:</span> {selectedCardDesignSnapshot.contact_email || '-'}</div>
-                                    <div><span className="text-gray-500">{t('inquiryChat.detail.designReady')}:</span> {selectedCardDesignSnapshot.design_ready ? t('inquiryChat.detail.yes') : t('inquiryChat.detail.no')}</div>
-                                    {selectedCardDesignSnapshot.reference_urls && (
-                                        <div className="min-w-0">
-                                            <span className="text-gray-500">{t('inquiryChat.detail.referenceUrls')}:</span>{' '}
-                                            <span className="whitespace-pre-wrap break-all">{selectedCardDesignSnapshot.reference_urls}</span>
-                                        </div>
-                                    )}
-                                    {selectedCardDesignSnapshot.notes && (
-                                        <div className="min-w-0">
-                                            <span className="text-gray-500">{t('inquiries.detail.notes')}:</span>{' '}
-                                            <span className="whitespace-pre-wrap break-all">{selectedCardDesignSnapshot.notes}</span>
-                                        </div>
-                                    )}
-                                </CardContent>
-                            </Card>
-                        )}
-
-                        <Card>
-                            <CardHeader>
-                                <CardTitle className="text-sm">{t('inquiryChat.cardDesignComplete')}</CardTitle>
-                            </CardHeader>
-                            <CardContent className="space-y-3">
-                                <div className="space-y-2">
-                                    <Label>{t('inquiryChat.cardDesignMemoLabel')}</Label>
-                                    <Textarea
-                                        value={cardDesignCompleteMemo}
-                                        onChange={(e) => setCardDesignCompleteMemo(e.target.value)}
-                                        placeholder={t('inquiryChat.cardDesignMemoPlaceholder')}
-                                        disabled={cardDesignActionLoading || isCardDesignCompleteLocked}
-                                    />
-                                </div>
-                                <Button
-                                    onClick={handleCardDesignComplete}
-                                    disabled={cardDesignActionLoading || isCardDesignCompleteLocked}
-                                >
-                                    {cardDesignActionLoading ? t('inquiries.detail.processing') : t('inquiryChat.cardDesignComplete')}
-                                </Button>
-                            </CardContent>
-                        </Card>
-                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setConfirmTerminalAction(null)}>
+                            {t('cancel')}
+                        </Button>
+                        <Button onClick={handleConfirmTerminalAction}>
+                            {getConfirmTerminalActionLabel()}
+                        </Button>
+                    </DialogFooter>
                 </DialogContent>
             </Dialog>
         </Card>
@@ -2292,7 +2246,7 @@ function ShopOpeningInquirySection({ dbCardDesigns }: { dbCardDesigns: any[] }) 
     const [replyLoading, setReplyLoading] = useState(false);
     const [replyFile, setReplyFile] = useState<File | null>(null);
     const [replyUploading, setReplyUploading] = useState(false);
-    const editableStatuses = new Set(['OPEN', 'DRAFT', 'SUBMITTED', 'IN_REVIEW']);
+    const editableStatuses = new Set(['OPEN']);
     const isDecisionLocked = !!selectedMeta && !editableStatuses.has(String(selectedMeta.status || '').toUpperCase());
 
     /**
@@ -2579,7 +2533,7 @@ function ShopOpeningInquirySection({ dbCardDesigns }: { dbCardDesigns: any[] }) 
         <Card className="w-full">
             <CardHeader className="flex flex-row items-center justify-between">
                 <div>
-                    <CardTitle>{t('inquiries.title')}</CardTitle>
+                    <CardTitle>{t('inquiries.shopcreationformcontent')}</CardTitle>
                     <CardDescription>{t('inquiries.description')}</CardDescription>
                 </div>
                 <Button variant="outline" onClick={fetchRequests} disabled={loading}>
@@ -2642,7 +2596,7 @@ function ShopOpeningInquirySection({ dbCardDesigns }: { dbCardDesigns: any[] }) 
                                 <div><span className="text-gray-500">{t('inquiries.detail.contactEmail')}:</span> {selectedFormSnapshot?.contact_email || '-'}</div>
                                 <div><span className="text-gray-500">{t('inquiries.detail.notes')}:</span> {selectedFormSnapshot?.notes || '-'}</div>
                                 <div className="md:col-span-2">
-                                    <span className="text-gray-500">参加者:</span>
+                                    <span className="text-gray-500">{t('inquiries.detail.participantsLabel')}:</span>
                                     <div className="mt-1 space-y-1">
                                         {selectedParticipantIds.length === 0 ? (
                                             <div className="text-xs text-gray-500">-</div>

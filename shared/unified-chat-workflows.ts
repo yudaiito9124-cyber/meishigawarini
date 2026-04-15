@@ -275,12 +275,11 @@ export const WORKFLOW_REGISTRY = defineWorkflowRegistry({
     // -------------------------------------------------------------------------
     // ワークフロータイプ毎のステート遷移説明:
     //
-    // 1) SHOP_OPENING: 詳細フロー型（フォーム保存と申請が分離）
-    //    DRAFT → SUBMITTED → IN_REVIEW → { APPROVED | REJECTED }
-    //    - initialStatus: DRAFT
-    //    - 特徴: 申請者のフォーム入力が複数段階、管理者の審査が明確な終端
-    //    - events: FORM_DRAFT_SAVED (途中保存)
-    //             FORM_SUBMITTED (完全送信)
+    // 1) SHOP_OPENING: 申請型
+    //    OPEN → { APPROVED | REJECTED | CANCELLED }
+    //    - initialStatus: OPEN
+    //    - 特徴: 完全送信された申請は作成直後から管理者の対応対象に載る
+    //    - events: FORM_SUBMITTED (完全送信)
     //             ADMIN_DECISION (承認/却下)
     //
     // 2) CARD_DESIGN: 一般チャット型（構造化フォーム初回送信 + フリーテキストやり取り）
@@ -288,38 +287,24 @@ export const WORKFLOW_REGISTRY = defineWorkflowRegistry({
     //    - initialStatus: OPEN
     //    - 特徴: デザイン申請フォーム（form_snapshot）を初回送信
     //           ショップと管理者がテキスト/ファイルでやり取り
-    //           管理者が「デザイン完了」で RESOLVED へ遷移
-    //           必要に応じて RESOLVED → OPEN へ再開可
+    //           管理者が完了操作で RESOLVED へ遷移
     //    - events: FORM_SUBMITTED (申請入力送信)
-    //             DESIGN_COMPLETED (デザイン完了メッセージ送信)
-    //    - payload: 申請時は form_snapshot（design_ready, reference_urls, notes等）
-    //              完了時は completed_by, completed_at, note
     //
     // 3) USER_SUPPORT / SHOP_SUPPORT / SHOP_DESIGN / MISC: 一般チャット型
     //    OPEN → { RESOLVED | CANCELLED }
-    //    RESOLVED → { CLOSED | OPEN }
     //    - initialStatus: OPEN
     //    - 特徴: 構造化フォームなし、純粋なテキスト/ファイルやり取り
     //    - events: {} (workflow event なし)
-    //    - 状態遷移はUI/管理者の手動操作のみ
-    //
-    // 補足: RESOLVED と CLOSED の使い分け:
-    //       RESOLVED = 一度対応完了と判定したが、再開の可能性あり
-    //       CLOSED = 完全終了。以降対応なし（記録化フェーズ）
+    //    - 状態遷移は管理者完了または起票ユーザー取消のみ
     // -------------------------------------------------------------------------
-    // SHOP_OPENING: 詳細フロー型（ショップ開設申請）
     SHOP_OPENING: {
         chatType: 'SHOP_OPENING',
-        initialStatus: 'DRAFT',
-        statuses: ['DRAFT', 'SUBMITTED', 'IN_REVIEW', 'APPROVED', 'REJECTED', 'CANCELLED'],
+        initialStatus: 'OPEN',
+        statuses: ['OPEN', 'APPROVED', 'REJECTED', 'CANCELLED'],
         events: {
-            FORM_DRAFT_SAVED: {
-                validate: isShopOpeningDraftSavedPayload,
-                nextStatuses: ['DRAFT']
-            },
             FORM_SUBMITTED: {
                 validate: isShopOpeningSubmittedPayload,
-                nextStatuses: ['SUBMITTED', 'IN_REVIEW']
+                nextStatuses: ['OPEN']
             },
             ADMIN_DECISION: {
                 validate: isShopOpeningAdminDecisionPayload,
@@ -330,31 +315,31 @@ export const WORKFLOW_REGISTRY = defineWorkflowRegistry({
     USER_SUPPORT: {
         chatType: 'USER_SUPPORT',
         initialStatus: 'OPEN',
-        statuses: ['OPEN', 'RESOLVED', 'CLOSED', 'CANCELLED'],
+        statuses: ['OPEN', 'RESOLVED', 'CANCELLED'],
         events: {}
     },
     SHOP_SUPPORT: {
         chatType: 'SHOP_SUPPORT',
         initialStatus: 'OPEN',
-        statuses: ['OPEN', 'RESOLVED', 'CLOSED', 'CANCELLED'],
+        statuses: ['OPEN', 'RESOLVED', 'CANCELLED'],
         events: {}
     },
     SHOP_DESIGN: {
         chatType: 'SHOP_DESIGN',
         initialStatus: 'OPEN',
-        statuses: ['OPEN', 'RESOLVED', 'CLOSED', 'CANCELLED'],
+        statuses: ['OPEN', 'RESOLVED', 'CANCELLED'],
         events: {}
     },
     MISC: {
         chatType: 'MISC',
         initialStatus: 'OPEN',
-        statuses: ['OPEN', 'RESOLVED', 'CLOSED', 'CANCELLED'],
+        statuses: ['OPEN', 'RESOLVED', 'CANCELLED'],
         events: {}
     },
     CARD_DESIGN: {
         chatType: 'CARD_DESIGN',
         initialStatus: 'OPEN',
-        statuses: ['OPEN', 'RESOLVED', 'CLOSED', 'CANCELLED'],
+        statuses: ['OPEN', 'RESOLVED', 'CANCELLED'],
         events: {
             FORM_SUBMITTED: {
                 validate: isCardDesignRequestSubmittedPayload,

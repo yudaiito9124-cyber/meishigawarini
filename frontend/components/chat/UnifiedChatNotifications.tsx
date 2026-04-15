@@ -14,7 +14,7 @@
  *    それぞれのロールに対応した認証トークンでAPIにアクセスします。
  */
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useImperativeHandle, useMemo, useState } from 'react';
 // チャットアイコン（lucide-react はアイコンライブラリ）
 import { MessageCircle } from 'lucide-react';
 // next-intl の翻訳フック（テキストを ja.json / en.json から取得します）
@@ -29,12 +29,15 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { useImperativeHandle } from 'react';
 import { isValidWorkflowPayload } from '@shared/unified-chat-workflows';
 import { getDisplayMessage } from '@/lib/chatMessage';
 import { uploadChatFile, ChatFileData } from '@/lib/uploadChatFile';
 import { toDisplayParticipantId } from '@/lib/chatId';
 import ChatAttachment from '@/components/chat/ChatAttachment';
+
+const NOTIFICATION_POLL_INTERVAL_MS = 30_000;
+const UNREAD_SYNC_PAGE_LIMIT = 100;
+const UNREAD_SYNC_MAX_PAGES = 20;
 
 /**
  * チャット一覧の各行に対応する型定義。
@@ -84,6 +87,8 @@ type ChatMeta = {
     chat_id?: string;              // チャットID
     chat_type?: string;            // チャット種別
     status?: string;               // チャット全体の状態
+    initiator_id?: string;         // 起票者 participant_id
+    version?: number;              // optimistic lock 用 version
     ts_last_message_at?: string;   // 最終メッセージ日時
     last_message_seq?: number;     // 最後のメッセージ連番（既読処理に使用）
     participants?: string[];       // 参加者IDの配列（例: ["USER#xxx", "ADMIN", "SHOP#xxx"]）
@@ -169,6 +174,8 @@ export const UnifiedChatNotifications = React.forwardRef<
     const [notificationLoading, setNotificationLoading] = useState(false);
     /** 取得したチャット一覧データ */
     const [chats, setChats] = useState<ChatListItem[]>([]);
+    /** ベルバッジ用の未読合計 */
+    const [unreadTotal, setUnreadTotal] = useState(0);
     /** 現在選択中のチャットID（null なら未選択） */
     const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
     /** 選択中チャットのメタデータ（参加者・ステータス等） */
@@ -270,6 +277,22 @@ export const UnifiedChatNotifications = React.forwardRef<
         return String(selectedChat?.chat_type || '').toUpperCase() === 'SHOP_OPENING';
     }, [selectedChat?.chat_type]);
 
+    const isCardDesignChat = useMemo(() => {
+        return String(selectedChat?.chat_type || '').toUpperCase() === 'CARD_DESIGN';
+    }, [selectedChat?.chat_type]);
+
+    const selectedCardDesignSnapshot = useMemo(() => {
+        for (const message of selectedMessages) {
+            if (message?.payload_type !== 'FORM_SUBMITTED') {
+                continue;
+            }
+            if (isValidWorkflowPayload('CARD_DESIGN', 'FORM_SUBMITTED', message.payload)) {
+                return message.payload.form_snapshot;
+            }
+        }
+        return null;
+    }, [selectedMessages]);
+
     const selectedParticipantIds = useMemo(() => {
         return Array.isArray(selectedChat?.participants) ? selectedChat.participants : [];
     }, [selectedChat]);
@@ -294,12 +317,12 @@ export const UnifiedChatNotifications = React.forwardRef<
     const getChatTypeLabel = (chatType?: string): string => {
         if (!chatType) return '-';
         const labels: Record<string, string> = {
-            SHOP_OPENING: 'ショップ開設申請',
-            USER_SUPPORT: '一般問い合わせ',
-            SHOP_SUPPORT: 'ショップ運営サポート',
-            SHOP_DESIGN: 'ショップデザイン相談',
-            CARD_DESIGN: 'カードデザイン追加申請',
-            MISC: 'その他',
+            SHOP_OPENING: t('notifications.chatTypes.shopOpening'),
+            USER_SUPPORT: t('notifications.chatTypes.userSupport'),
+            SHOP_SUPPORT: t('notifications.chatTypes.shopSupport'),
+            SHOP_DESIGN: t('notifications.chatTypes.shopDesign'),
+            CARD_DESIGN: t('notifications.chatTypes.cardDesign'),
+            MISC: t('notifications.chatTypes.misc'),
         };
         return labels[chatType] || chatType;
     };
@@ -307,45 +330,93 @@ export const UnifiedChatNotifications = React.forwardRef<
     const getStatusLabel = (status?: string): string => {
         if (!status) return '-';
         const labels: Record<string, string> = {
-            OPEN: '対応中',
-            RESOLVED: '解決済み',
-            CLOSED: 'クローズ',
-            DRAFT: '下書き',
-            SUBMITTED: '申請済み',
-            IN_REVIEW: '審査中',
-            APPROVED: '承認',
-            REJECTED: '却下',
-            CANCELLED: '取消',
-            PENDING: '保留',
-            VERIFIED: '認証済み',
-            EXPIRED: '期限切れ',
-            FAILED: '失敗',
+            OPEN: t('notifications.statuses.open'),
+            RESOLVED: t('notifications.statuses.resolved'),
+            CLOSED: t('notifications.statuses.closed'),
+            DRAFT: t('notifications.statuses.draft'),
+            SUBMITTED: t('notifications.statuses.submitted'),
+            IN_REVIEW: t('notifications.statuses.inReview'),
+            APPROVED: t('notifications.statuses.approved'),
+            REJECTED: t('notifications.statuses.rejected'),
+            CANCELLED: t('notifications.statuses.cancelled'),
+            PENDING: t('notifications.statuses.pending'),
+            VERIFIED: t('notifications.statuses.verified'),
+            EXPIRED: t('notifications.statuses.expired'),
+            FAILED: t('notifications.statuses.failed'),
         };
         return labels[status] || status;
+    };
+
+    const normalizeStatus = (status?: string) => String(status || '').toUpperCase();
+
+    const renderTextWithLinks = (value?: string): React.ReactNode => {
+        const text = String(value || '').trim();
+        if (!text) {
+            return '-';
+        }
+
+        const parts = text.split(/(https?:\/\/[^\s]+)/g);
+        return (
+            <span className="whitespace-pre-wrap break-all">
+                {parts.map((part, index) => {
+                    if (/^https?:\/\/[^\s]+$/i.test(part)) {
+                        return (
+                            <a
+                                key={`${part}-${index}`}
+                                href={part}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-blue-700 underline hover:text-blue-900"
+                            >
+                                {part}
+                            </a>
+                        );
+                    }
+                    return <React.Fragment key={`text-${index}`}>{part}</React.Fragment>;
+                })}
+            </span>
+        );
     };
 
     const renderWorkflowPayload = (message: ChatMessage): React.ReactNode => {
         if (!message.payload_type) return null;
 
         if (message.payload_type === 'FORM_SUBMITTED') {
-            const formSnapshot = message.payload && typeof message.payload === 'object'
-                ? (message.payload as any).form_snapshot
+            const payload = message.payload;
+            const formSnapshot = payload && typeof payload === 'object'
+                ? (payload as any).form_snapshot
                 : null;
-            const submittedAt = message.payload && typeof message.payload === 'object'
-                ? (message.payload as any).submitted_at
+            const submittedAt = payload && typeof payload === 'object'
+                ? (payload as any).submitted_at
                 : null;
+            const isCardDesignForm = isValidWorkflowPayload('CARD_DESIGN', 'FORM_SUBMITTED', payload);
 
             return (
                 <div className="mt-2 rounded-md border bg-gray-50 p-2 text-xs text-gray-700 space-y-1">
                     <div className="font-semibold text-gray-800">{t('notifications.formSubmitted.title')}</div>
-                    <div>
-                        <span className="text-gray-500">{t('notifications.formSubmitted.shopName')}:</span>{' '}
-                        {formSnapshot?.shop_name || '-'}
-                    </div>
-                    <div>
-                        <span className="text-gray-500">{t('notifications.formSubmitted.ownerName')}:</span>{' '}
-                        {formSnapshot?.owner_name || '-'}
-                    </div>
+                    {isCardDesignForm ? (
+                        <>
+                            <div>
+                                <span className="text-gray-500">{t('notifications.formSubmitted.designReady')}:</span>{' '}
+                                {formSnapshot?.design_ready ? t('notifications.formSubmitted.yes') : t('notifications.formSubmitted.no')}
+                            </div>
+                            <div>
+                                <span className="text-gray-500">{t('notifications.formSubmitted.referenceUrls')}:</span>{' '}
+                                {renderTextWithLinks(formSnapshot?.reference_urls)}
+                            </div>
+                        </>
+                    ) : (
+                        <>
+                            <div>
+                                <span className="text-gray-500">{t('notifications.formSubmitted.shopName')}:</span>{' '}
+                                {formSnapshot?.shop_name || '-'}
+                            </div>
+                            <div>
+                                <span className="text-gray-500">{t('notifications.formSubmitted.ownerName')}:</span>{' '}
+                                {formSnapshot?.owner_name || '-'}
+                            </div>
+                        </>
+                    )}
                     <div>
                         <span className="text-gray-500">{t('notifications.formSubmitted.contactEmail')}:</span>{' '}
                         {formSnapshot?.contact_email || '-'}
@@ -379,8 +450,6 @@ export const UnifiedChatNotifications = React.forwardRef<
      * ベルボタン横の赤いバッジに表示する数値です。
      * 0 の場合はバッジを表示しません。
      */
-    const unreadTotal = useMemo(() => chats.reduce((sum, chat) => sum + (chat.unread_count_cache ?? 0), 0), [chats]);
-
     /**
      * 完了ステータス（APPROVED / REJECTED / CANCELLED / RESOLVED / CLOSED）かどうか。
      * チャットが封じられている間はメッセージ入力欄を非表示にします。
@@ -390,6 +459,12 @@ export const UnifiedChatNotifications = React.forwardRef<
         () => TERMINAL_STATUSES.has((selectedChat?.status || '').toUpperCase()),
         [selectedChat],
     );
+    const canCancelSelectedChat = useMemo(() => {
+        return participantId.startsWith('USER#')
+            && selectedChat?.initiator_id === participantId
+            && normalizeStatus(selectedChat?.status) === 'OPEN'
+            && typeof selectedChat?.version === 'number';
+    }, [participantId, selectedChat]);
     const canSubmitShopOpening = participantId.startsWith('USER#');
     /** CARD_DESIGN 申請ボタンを表示するかどうか（SHOP# だけ利用可能） */
     const canSubmitCardDesign = participantId.startsWith('SHOP#');
@@ -421,15 +496,47 @@ export const UnifiedChatNotifications = React.forwardRef<
      * @param idx 取得するページのインデックス（0始まり）
      * @param cursors 最新のカーソル配列（state 遅延を避けるため引数で渡す）
      */
-    const fetchPage = async (idx: number, cursors: (string | null)[] = chatPageCursors) => {
+    const syncUnreadTotal = useCallback(async () => {
+        if (disabled || !participantId) {
+            setUnreadTotal(0);
+            return;
+        }
+
+        try {
+            let totalUnread = 0;
+            let cursor: string | null = null;
+
+            for (let page = 0; page < UNREAD_SYNC_MAX_PAGES; page += 1) {
+                const response = await apiFetchPost('/unified/chat/list', {
+                    participant_id: participantId,
+                    include_archived: false,
+                    limit: UNREAD_SYNC_PAGE_LIMIT,
+                    ...(cursor ? { cursor } : {}),
+                });
+
+                const items: ChatListItem[] = Array.isArray(response?.items) ? response.items : [];
+                totalUnread += items.reduce((sum, chat) => sum + (chat.unread_count_cache ?? 0), 0);
+
+                cursor = response?.cursor ?? null;
+                if (!cursor) break;
+            }
+
+            setUnreadTotal(totalUnread);
+        } catch (e) {
+            console.error('Failed to sync unread total', e);
+        }
+    }, [apiFetchPost, disabled, participantId]);
+
+    const fetchPage = useCallback(async (idx: number, cursors?: (string | null)[]) => {
         setNotificationLoading(true);
         try {
+            const resolvedCursors = cursors ?? chatPageCursors;
             const body: Record<string, any> = {
                 participant_id: participantId,
                 include_archived: false,
                 limit: chatPageSize,
             };
-            const cursor = cursors[idx] ?? null;
+            const cursor = resolvedCursors[idx] ?? null;
             if (cursor) body.cursor = cursor;
             const response = await apiFetchPost('/unified/chat/list', body);
             const items: ChatListItem[] = response.items || [];
@@ -450,16 +557,19 @@ export const UnifiedChatNotifications = React.forwardRef<
         } finally {
             setNotificationLoading(false);
         }
-    };
+    }, [apiFetchPost, chatPageSize, participantId]);
 
     /** ダイアログを開いたとき・更新ボタンを押したときに1ページ目から取り直す */
-    const fetchNotifications = () => {
+    const fetchNotifications = useCallback(async () => {
         const fresh: (string | null)[] = [null];
         setChatPageCursors(fresh);
         setChatPageIdx(0);
         setChatHasNext(false);
-        fetchPage(0, fresh);
-    };
+        await Promise.all([
+            fetchPage(0, fresh),
+            syncUnreadTotal(),
+        ]);
+    }, [fetchPage, syncUnreadTotal]);
 
     // ─── 全メッセージの取得（古い履歴まで自動で遡る） ─────────────────────────
     const fetchAllMessages = async (chatId: string): Promise<ChatMessage[]> => {
@@ -544,6 +654,7 @@ export const UnifiedChatNotifications = React.forwardRef<
                 setChats((prev) => prev.map((chat) => (
                     chat.chat_id === chatId ? { ...chat, unread_count_cache: 0 } : chat
                 )));
+                setUnreadTotal((prev) => Math.max(0, prev - unreadBefore));
             }
         } catch (e) {
             console.error('Failed to fetch chat detail', e);
@@ -561,7 +672,7 @@ export const UnifiedChatNotifications = React.forwardRef<
      */
     useEffect(() => {
         if (isOpen) {
-            fetchNotifications();
+            void fetchNotifications();
         } else {
             // ダイアログを閉じるときに選択状態をリセット
             setSelectedChatId(null);
@@ -569,7 +680,7 @@ export const UnifiedChatNotifications = React.forwardRef<
             setSelectedMessages([]);
             setInputMessage('');
         }
-    }, [isOpen]);
+    }, [fetchNotifications, isOpen]);
 
     // チャット一覧のページサイズが変わったらカーソル履歴をリセットして1ページ目から取り直す
     useEffect(() => {
@@ -579,8 +690,36 @@ export const UnifiedChatNotifications = React.forwardRef<
         setChatPageIdx(0);
         setChatHasNext(false);
         setChats([]);
-        fetchPage(0, fresh);
-    }, [chatPageSize]);
+        void Promise.all([
+            fetchPage(0, fresh),
+            syncUnreadTotal(),
+        ]);
+    }, [chatPageSize, fetchPage, isOpen, syncUnreadTotal]);
+
+    useEffect(() => {
+        if (disabled || !participantId) {
+            setUnreadTotal(0);
+            return;
+        }
+
+        void syncUnreadTotal();
+    }, [disabled, participantId, syncUnreadTotal]);
+
+    useEffect(() => {
+        if (disabled || !participantId) return;
+
+        const intervalId = window.setInterval(() => {
+            void syncUnreadTotal();
+
+            if (isOpen) {
+                void fetchPage(chatPageIdx, chatPageCursors);
+            }
+        }, NOTIFICATION_POLL_INTERVAL_MS);
+
+        return () => {
+            window.clearInterval(intervalId);
+        };
+    }, [chatPageCursors, chatPageIdx, disabled, fetchPage, isOpen, participantId, syncUnreadTotal]);
 
     // ─── 新規チャット作成 ────────────────────────────────────────────────────
     /**
@@ -619,11 +758,11 @@ export const UnifiedChatNotifications = React.forwardRef<
             setCardDesignReferenceUrls('');
             setCardDesignNotes('');
             setCardDesignError('');
-            fetchNotifications();
+            void fetchNotifications();
         } catch (e) {
             console.error('Failed to create chat', e);
             const detail = (e as any)?.message || (e as any)?.error || (e as any)?.detail || (e as any)?.statusText || '';
-            alert(detail ? `チャット作成に失敗しました\n${detail}` : 'チャット作成に失敗しました');
+            alert(detail ? `${t('notifications.createFailed')}\n${detail}` : t('notifications.createFailed'));
         } finally {
             setCreatingChat(false);
         }
@@ -800,9 +939,38 @@ export const UnifiedChatNotifications = React.forwardRef<
             );
         } catch (e) {
             console.error('Failed to send message', e);
-            alert(`Error: ${e instanceof Error ? e.message : 'Unknown error'}`);
+            const detail = e instanceof Error ? e.message : '';
+            alert(detail ? `${t('notifications.sendFailed')}\n${detail}` : t('notifications.sendFailed'));
         } finally {
             setSendingMessage(false);
+        }
+    };
+
+    const handleCancelSelectedChat = async () => {
+        if (!selectedChat?.chat_id || typeof selectedChat.version !== 'number' || !canCancelSelectedChat) {
+            return;
+        }
+
+        if (!confirm(t('notifications.cancelChatConfirm'))) {
+            return;
+        }
+
+        try {
+            await apiFetchPost('/unified/chat/status/update', {
+                chat_id: selectedChat.chat_id,
+                next_status: 'CANCELLED',
+                expected_version: selectedChat.version,
+            });
+
+            const updated = await apiFetchPost('/unified/chat/get', { chat_id: selectedChat.chat_id });
+            setSelectedChat(updated.chat || null);
+            await Promise.all([
+                fetchPage(chatPageIdx, chatPageCursors),
+                syncUnreadTotal(),
+            ]);
+        } catch (e) {
+            console.error('Failed to cancel chat', e);
+            alert(t('notifications.cancelChatFailed'));
         }
     };
 
@@ -917,7 +1085,7 @@ export const UnifiedChatNotifications = React.forwardRef<
 
                     {/* 2カラムグリッド: 左=チャット一覧、右=チャット詳細
                         モバイルでは1カラム（grid-cols-1）、PCでは2カラム（lg:grid-cols-2）に切替 */}
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 min-h-0 items-start">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-0 min-h-0 items-start">
 
                         {/* ─── 左パネル: チャット一覧 ────────────────────────────── */}
                         <Card className="overflow-hidden flex flex-col h-[67rem]">
@@ -986,7 +1154,7 @@ export const UnifiedChatNotifications = React.forwardRef<
                                 <div className="mt-3 flex items-center justify-between">
                                     <Button
                                         variant="outline" size="sm"
-                                        onClick={() => fetchPage(chatPageIdx - 1)}
+                                        onClick={() => fetchPage(chatPageIdx - 1, chatPageCursors)}
                                         disabled={notificationLoading || chatPageIdx === 0}
                                     >
                                         {t('notifications.prevPage')}
@@ -994,7 +1162,7 @@ export const UnifiedChatNotifications = React.forwardRef<
                                     <span className="text-xs text-gray-500">{chatPageIdx + 1} {t('notifications.pageOf')}</span>
                                     <Button
                                         variant="outline" size="sm"
-                                        onClick={() => fetchPage(chatPageIdx + 1)}
+                                        onClick={() => fetchPage(chatPageIdx + 1, chatPageCursors)}
                                         disabled={notificationLoading || !chatHasNext}
                                     >
                                         {t('notifications.nextPage')}
@@ -1024,7 +1192,7 @@ export const UnifiedChatNotifications = React.forwardRef<
                                             <div><span className="text-gray-500">{t('notifications.detail.status')}:</span> {getStatusLabel(selectedChat?.status)}</div>
                                             <div><span className="text-gray-500">{t('notifications.detail.updatedAt')}:</span> {selectedChat?.ts_last_message_at ? new Date(selectedChat.ts_last_message_at).toLocaleString() : '-'}</div>
                                             <div className="pt-1">
-                                                <span className="text-gray-500">参加者:</span>
+                                                <span className="text-gray-500">{t('notifications.detail.participantsLabel')}:</span>
                                                 <div className="mt-1 space-y-1">
                                                     {selectedParticipantIds.length === 0 ? (
                                                         <div className="text-xs text-gray-500">-</div>
@@ -1040,6 +1208,30 @@ export const UnifiedChatNotifications = React.forwardRef<
                                                 </div>
                                             </div>
                                         </div>
+
+                                        {isCardDesignChat && (
+                                            <div className="rounded-md border border-sky-200 bg-sky-50 p-3 text-sm space-y-1">
+                                                <div className="font-semibold text-sky-900">{t('notifications.detail.requestInfo')}</div>
+                                                <div>
+                                                    <span className="text-gray-500">{t('notifications.formSubmitted.contactEmail')}:</span>{' '}
+                                                    {selectedCardDesignSnapshot?.contact_email || '-'}
+                                                </div>
+                                                <div>
+                                                    <span className="text-gray-500">{t('notifications.detail.designReady')}:</span>{' '}
+                                                    {selectedCardDesignSnapshot
+                                                        ? (selectedCardDesignSnapshot.design_ready ? t('notifications.detail.yes') : t('notifications.detail.no'))
+                                                        : '-'}
+                                                </div>
+                                                <div className="min-w-0">
+                                                    <span className="text-gray-500">{t('notifications.detail.referenceUrls')}:</span>{' '}
+                                                    <div className="mt-1">{renderTextWithLinks(selectedCardDesignSnapshot?.reference_urls)}</div>
+                                                </div>
+                                                <div className="min-w-0">
+                                                    <span className="text-gray-500">{t('notifications.formSubmitted.notes')}:</span>
+                                                    <div className="mt-1 whitespace-pre-wrap break-all">{selectedCardDesignSnapshot?.notes || '-'}</div>
+                                                </div>
+                                            </div>
+                                        )}
 
                                         {/* ─── 審査結果サマリーパネル（アンバー色のボックス） ────────
                                             decisionStatus・adminDecisionMessage・linkedShopId をもとに
@@ -1127,6 +1319,18 @@ export const UnifiedChatNotifications = React.forwardRef<
                                                 ))
                                             )}
                                         </div>
+
+                                        {canCancelSelectedChat && (
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={handleCancelSelectedChat}
+                                                className="w-full"
+                                            >
+                                                {t('notifications.cancelChat')}
+                                            </Button>
+                                        )}
 
                                         {isChatClosed ? (
                                             <p className="text-xs text-center text-gray-400 border rounded-md py-2">
