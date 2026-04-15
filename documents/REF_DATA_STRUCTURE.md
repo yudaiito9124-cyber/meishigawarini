@@ -170,22 +170,43 @@ QRコードに依存しない、システム管理者（Admin）、ショップ�
 ```mermaid
 classDiagram
     class Unified_Chat["汎用チャット本体 (Unified Chat)"] {
-        <<PK: CHAT#chat_id, SK: METADATA>>
+        <<PK: CHAT#chat_id, SK: META>>
+        +String chat_id
         +Array participants [PREFIX#id]
+        +String initiator_id
         +String chat_type
         +String status
-        +Array messages
+        +Number last_message_seq
+        +String last_message_text
         +String ts_last_message_at
+        +Number version
+    }
+
+    class Chat_Message["チャット本文 (Message)"] {
+        <<PK: CHAT#chat_id, SK: MSG#000000000001>>
+        +Number seq
+        +String sender_id
+        +String sender_user_id
+        +String type
+        +String payload_type
+        +Map payload
+        +String workflow_status
+        +String ts_created_at
     }
 
     class Chat_Membership["チャット参加情報 (Membership)"] {
-        <<PK: USER#id / SHOP#id, SK: CHAT#chat_id>>
+        <<PK: USER#id / SHOP#id / ADMIN, SK: CHAT#chat_id>>
+        +String participant_id
         +String ts_last_message_at
         +String last_message_text
-        +Number unread_count
+        +Number last_read_seq
+        +Number unread_count_cache
+        +String GSI2_PK (CHAT_INBOX#participant)
+        +String GSI2_SK (TS#reverse_epoch#CHAT#chat_id)
     }
 
     Unified_Chat "1" -- "*" Chat_Membership : 参加者ごとに紐付けレコードを作成
+    Unified_Chat "1" -- "*" Chat_Message : 本文はMSGレコードに分離保存
     User_Identity "1" -- "*" Chat_Membership : 個人として参加 (USER#)
     Shop_Metadata "1" -- "*" Chat_Membership : ショップとして参加 (SHOP#)
 ```

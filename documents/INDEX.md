@@ -16,10 +16,14 @@
   AI アシスタントが遵守すべき「鉄則」と、共同開発の作法。
 - 🔰 **[ATFIRST_DEVELOPER_GUIDE.md](./ATFIRST_DEVELOPER_GUIDE.md)**  
   【ポータル・共通基準】技術的な全体像、日常のワークフロー、ツール索引、および**プロジェクト共通の技術規約（命名・設計思想）**。
+
+  
 - 🔰 **[SPEC_HOW_TO_DEVELOP_BACKEND.md](./SPEC_HOW_TO_DEVELOP_BACKEND.md)**  
   【実践ガイド・BE基準】バックエンド（Lambda/DynamoDB）の実装レシピおよび**バックエンド専用規約**。
 - 🔰 **[SPEC_HOW_TO_DEVELOP_FRONTEND.md](./SPEC_HOW_TO_DEVELOP_FRONTEND.md)**  
   【実践ガイド・FE基準】フロントエンド（React/UI）の実装レシピおよび**フロントエンド専用規約**。
+- 🔰 **[SPEC_HOW_TO_DEVELOP_API_GW.md](./SPEC_HOW_TO_DEVELOP_API_GW.md)**  
+  【実践ガイド・API基準】API Gateway のリクエスト・レスポンス変換規則と、フラットなルーティング設計の詳細。
 
 ---
 
@@ -44,8 +48,6 @@
   DynamoDBシングルテーブル設計の基本概念とベストプラクティス。
 - 📊 **[REF_DATA_STRUCTURE.md](./REF_DATA_STRUCTURE.md)**  
   ロール別（User/Shop/QR/Admin）に整理された論理データ構造のUMLクラス図。
-- ☁️ **[SPEC_HOW_TO_DEVELOP_API_GW.md](./SPEC_HOW_TO_DEVELOP_API_GW.md)**  
-  API Gateway のリクエスト・レスポンス変換規則と、フラットなルーティング設計の詳細。
   API Gateway ルーティング、CORS、Lambda Authorizer の仕組み。
 - 💬 **[SPEC_UNIFIED_CHAT_PLAYBOOK.md](./SPEC_UNIFIED_CHAT_PLAYBOOK.md)**  
   Unified Chat の設計思想、実装パターン、編集監査フローをまとめた運用プレイブック。

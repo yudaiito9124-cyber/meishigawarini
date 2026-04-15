@@ -165,7 +165,7 @@ export function ShopSettingsSection({ shopId }: { shopId: string }) {
     return (
         <Dialog open={isSettingsOpen} onOpenChange={handleSettingsOpenChange}>
             <DialogTrigger asChild>
-                <Button variant="ghost" size="icon" className="text-gray-500 hover:text-gray-900 cursor-pointer">
+                <Button variant="outline" size="icon" className="text-gray-500 hover:text-gray-900 cursor-pointer rounded-full">
                     <Settings className="h-5 w-5" />
                 </Button>
             </DialogTrigger>

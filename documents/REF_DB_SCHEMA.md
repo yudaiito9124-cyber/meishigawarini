@@ -310,10 +310,10 @@ QRコードのライフサイクルや注文ステータス、商品との紐付
 | `PK` | String | `CHAT#{chat_id}` （UUID形式） |
 | `SK` | String | 常に固定値 `META` |
 | `chat_id` | String | チャットID（UUID） |
-| `participants` | Array<String> | 参加者のプレフィックス付きIDリスト (例: `USER#{user_id}`, `SHOP#{shop_id}`, `ADMIN`)。<br>※**一番最初の要素はチャットを開始した主体のID**です。 |
-| `initiator_id` | String | 開始主体（`participants[0]` を明示保持） |
-| `chat_type` | String | チャット種別 (`MISC`, `USER_SUPPORT`, `SHOP_OPENING`, `SHOP_DESIGN`, `SHOP_SUPPORT`) |
-| `status` | String | チャット状態。`SHOP_OPENING` は (`DRAFT`, `SUBMITTED`, `IN_REVIEW`, `APPROVED`, `REJECTED`, `CANCELLED`)、`USER_SUPPORT` / `SHOP_SUPPORT` / `SHOP_DESIGN` / `MISC` は (`OPEN`, `RESOLVED`, `CLOSED`, `CANCELLED`) |
+| `participants` | Array<String> | 参加者のプレフィックス付きIDリスト (例: `USER#{user_id}`, `SHOP#{shop_id}`, `ADMIN`)。現行実装では重複除去・正規化済みの集合として扱い、順序には意味を持たせません。 |
+| `initiator_id` | String | 開始主体（順序ではなくこの属性を正本として判定） |
+| `chat_type` | String | チャット種別 (`MISC`, `USER_SUPPORT`, `SHOP_OPENING`, `SHOP_DESIGN`, `SHOP_SUPPORT`, `CARD_DESIGN`) |
+| `status` | String | チャット状態。`SHOP_OPENING` は (`OPEN`, `APPROVED`, `REJECTED`, `CANCELLED`)、`USER_SUPPORT` / `SHOP_SUPPORT` / `SHOP_DESIGN` / `MISC` / `CARD_DESIGN` は (`OPEN`, `RESOLVED`, `CANCELLED`) |
 | `ts_created_at` | String | 作成日時 (ISO 8601) |
 | `ts_updated_at` | String | 更新日時 (ISO 8601) |
 | `ts_last_message_at` | String | 最終メッセージ送信日時 (ソート用・ISO 8601) |
@@ -373,13 +373,14 @@ QRコードのライフサイクルや注文ステータス、商品との紐付
 | `message_id` | String | メッセージID（UUID/ULID） |
 | `seq` | Number | チャット内単調増加連番 |
 | `sender_id` | String | 送信主体 (`USER#...` / `SHOP#...` / `ADMIN`) |
+| `sender_user_id` | String | 実際に送信操作を実行した認証ユーザーID（Cognito sub）。`sender_id` とは別に監査用途で保持。 |
 | `role` | String | 表示用ロール (`USER`, `SHOP`, `ADMIN`, `SYSTEM`) |
 | `username` | String | 表示名スナップショット |
 | `message` | String | テキスト本文 |
 | `type` | String | `TEXT`, `IMAGE`, `FILE`, `SYSTEM` |
 | `payload_type` | String | ワークフローイベント種別（例: `FORM_SUBMITTED`, `ADMIN_DECISION`, `VERIFICATION_COMPLETED`） |
 | `payload` | Map | イベントごとの構造化データ（型は `shared/unified-chat-workflows.ts` のレジストリで定義） |
-| `workflow_status` | String | ワークフローステータス（例: `DRAFT`, `SUBMITTED`, `IN_REVIEW`, `APPROVED`, `REJECTED`） |
+| `workflow_status` | String | ワークフローステータス（例: `OPEN`, `APPROVED`, `REJECTED`, `RESOLVED`, `CANCELLED`） |
 | `file_url` | String | 添付URL（任意） |
 | `file_name` | String | 添付ファイル名（任意） |
 | `file_size` | Number | 添付サイズ（任意） |
@@ -417,12 +418,17 @@ QRコードのライフサイクルや注文ステータス、商品との紐付
 
 | ユースケース | 推奨エンドポイント (`POST`) | 主な必須入力 | 主な検証・整合ルール |
 | --- | --- | --- | --- |
-| チャット作成 | `/unified/chat/create` | `chat_type`, `participants`, `initiator_id` | `chat_type` はレジストリ定義値のみ許可。`participants[0]` と `initiator_id` を一致させる。`USER_SUPPORT` は `USER#...` 起票、`SHOP_SUPPORT` は `SHOP#...` 起票のみ許可。 |
+| チャット作成 | `/unified/chat/create` | `chat_type`, `participants`, `initiator_id` | `chat_type` はレジストリ定義値のみ許可。`participants` に `initiator_id` と `ADMIN` を含む2者構成のみ許可。`USER_SUPPORT` は `USER#...` 起票、`SHOP_SUPPORT` は `SHOP#...` 起票のみ許可。 |
 | 参加者受信箱一覧 | `/unified/chat/list` | `participant_id`, `chat_type?`, `status?`, `limit?`, `cursor?` | `participant_id` 主体で取得し、管理者画面は `chat_type` 先頭で絞る。 |
 | メッセージ履歴取得 | `/unified/chat/messages/get` | `chat_id`, `before_seq?`, `limit?` | `limit` 上限を固定（例: 200）。`before_seq` 指定時は過去方向ページング。 |
 | メッセージ送信 | `/unified/chat/messages/send` | `chat_id`, `sender_id`, `type`, `message?`, `payload_type?`, `payload?` | `payload` がある場合は `assertValidWorkflowPayload` を必須実行。送信処理は `TransactWrite` で整合更新。 |
 | 既読更新 | `/unified/chat/read/mark` | `chat_id`, `participant_id`, `last_read_seq` | `last_read_seq <= last_message_seq` を必須保証。違反は 400。 |
-| ステータス更新 | `/unified/chat/status/update` | `chat_id`, `next_status`, `expected_version` | 楽観ロック `version` 一致必須。不一致時は 409。 |
+| ステータス更新 | `/unified/chat/status/update` | `chat_id`, `next_status`, `expected_version` | 楽観ロック `version` 一致必須。条件不一致時は競合として失敗し、クライアントは再取得して再試行する。 |
+
+補足（現行実装の運用ルール）:
+- `/unified/chat/create` の `participants` は「起票者 + ADMIN」の2者のみを許可します（第三者混入を防止）。
+- `/unified/chat/messages/send` では `sender_id` がチャット参加者であり、かつ認証主体がその `sender_id` にアクセス可能なことを検証します。
+- 入力検証は必須項目・業務整合・workflow payload を中心に実施しています。未知キーの一括拒否（strict schema）は現時点では未導入です。
 
 #### 2.13.8 新チャットタイプ追加時に API 側で必ず変更する箇所
 以下の順に変更すると、型安全を維持したまま機械的に拡張できます。

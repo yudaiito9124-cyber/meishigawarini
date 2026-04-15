@@ -397,24 +397,150 @@ UI を構築する際、どの部品を使うべきかのクイックリファ�
 
 ### 2.12 多言語対応 (i18n) の設計と運用
 
-システム全体で日本語（ja）と英語（en）の多言語対応を行っています。
+本システムのフロントエンドは、日本語（`ja`）と英語（`en`）を `next-intl` で運用しています。
+この章では「仕組みの全体像」「実装手順」「運用時の落とし穴」をまとめます。
 
-- **採用ライブラリ**: フロントエンドでは `next-intl` を使用しています。
-- **URL設計とルーティング**:
-    - **設定**: [`frontend/i18n/routing.ts`](../frontend/i18n/routing.ts) にて `localePrefix: 'never'` を指定。
-    - **挙動**: URLパスに `/ja/` などの言語プレフィックスを含めず、`/shop` などのクリーンなURLを維持します。
-    - **設定スクリプト**: [`frontend/next.config.ts`](../frontend/next.config.ts) で `withNextIntl` プラグインを統合しています。
-- **言語の自動判定ロジック**:
-    - [`frontend/middleware.ts`](../frontend/middleware.ts) がリクエストをインターセプトし、以下の優先順位で言語を判定して内部的に `app/[locale]` セグメントへマッピングします。
-        1. **Cookie**: `NEXT_LOCALE` の値。
-        2. **ヘッダー**: ブラウザの `Accept-Language`。
-        3. **デフォルト**: 判定不能な場合は `ja` を使用。
-- **メッセージ管理と整合性チェック**:
-    - **ファイル**: `frontend/messages/ja.json`, `en.json`
-    - **チェックスクリプト**: [`frontend/messages/check.py`](../frontend/messages/check.py)
-        - `python check.py` を実行することで、日・英のメッセージファイル間でキーの過不足がないかを自動検証できます。
-- **バックエンドの対応**:
-    - メール通知などは [`infra/lambda/templates/email.ts`](../infra/lambda/templates/email.ts) ににて、DynamoDB上のユーザー設定やリクエストに応じた言語切り替えを行っています。詳細は [`REF_EMAIL_TEMPLATES.md`](./REF_EMAIL_TEMPLATES.md) を参照してください。
+#### A. 全体アーキテクチャ（どこで言語が決まるか）
+
+1. **ルーティング定義**: [`frontend/i18n/routing.ts`](../frontend/i18n/routing.ts)
+  - サポートロケール: `['en', 'ja']`
+  - デフォルト: `ja`
+  - `localePrefix: 'never'` を指定し、ユーザー向け URL は `/ja/...` を出さない運用。
+
+2. **リクエスト時のメッセージ解決**: [`frontend/i18n/request.ts`](../frontend/i18n/request.ts)
+  - `requestLocale` を受け取り、無効値なら `defaultLocale` にフォールバック。
+  - `../messages/${locale}.json` を動的 import してメッセージカタログを注入。
+
+3. **ミドルウェアによるロケール判定**: [`frontend/middleware.ts`](../frontend/middleware.ts)
+  - `next-intl/middleware` が `NEXT_LOCALE` Cookie と `Accept-Language` を使ってロケールを決定。
+  - さらに本プロジェクト独自で旧ドメインから新ドメインへの 301 リダイレクトを先に実行。
+
+4. **App Router 側の受け口**: `frontend/app/[locale]/...`
+  - URL 上はプレフィックスを見せないが、アプリ内部は `[locale]` セグメントで分岐。
+  - [`frontend/app/[locale]/layout.tsx`](../frontend/app/[locale]/layout.tsx) で `NextIntlClientProvider` を注入し、全画面で翻訳関数が利用可能。
+
+#### B. 実装時の基本ルール（新規 UI を追加するとき）
+
+1. **ハードコード禁止**
+  - 画面表示文言（見出し、ボタン、トースト、バリデーション文言）は直接文字列を書かず、必ず翻訳キー経由で出す。
+
+2. **キー命名規約**
+  - 画面単位の namespace を作る（例: `AdminPage`, `ShopPage`, `ReceivePage`）。
+  - 深い階層は「機能単位」で切る（例: `UserProfilePage.notifications.detail.updatedAt`）。
+  - 既存キーの意味を変えない。意味が変わる場合は新キーを追加する。
+
+3. **Client Component では `useTranslations`**
+  - 例: `const t = useTranslations('ShopPage');`
+  - 利用時: `t('title')`, `t('errors.submitFailed')`
+
+4. **Server Component / Metadata では `getTranslations`**
+  - 例: `const t = await getTranslations({ locale, namespace: 'Metadata' });`
+  - `generateMetadata` 内も同様に namespace を明示する。
+
+5. **翻訳ファイルは必ず同時更新**
+  - [`frontend/messages/ja.json`](../frontend/messages/ja.json)
+  - [`frontend/messages/en.json`](../frontend/messages/en.json)
+  - 片方だけ更新した状態でマージしない。
+
+#### C. 実装レシピ（最短手順）
+
+新しい文言を 1 つ追加する標準手順です。
+
+1. `ja.json` と `en.json` の同じ階層に同じキーを追加。
+2. コンポーネントで `useTranslations('Namespace')` または `getTranslations(...)` を取得。
+3. JSX 内の固定文字列を `t('...')` に置換。
+4. `frontend/messages` で `python check.py` を実行し、キーの不足/過剰を確認。
+5. 画面で日本語・英語の両方を目視確認（レイアウト崩れも含む）。
+
+#### D. 変数埋め込み・複数形・条件分岐（ICU メッセージ）
+
+`next-intl` は ICU 形式を扱えるため、文言内で安全に変数展開できます。
+
+```json
+{
+  "Inbox": {
+   "unread": "未読 {count} 件",
+   "invite": "{name} さんから招待されています",
+   "items": "{count, plural, =0 {項目なし} one {# 件} other {# 件}}"
+  }
+}
+```
+
+```tsx
+const t = useTranslations('Inbox');
+<p>{t('unread', { count: unreadCount })}</p>
+<p>{t('invite', { name: profileName })}</p>
+<p>{t('items', { count: items.length })}</p>
+```
+
+> [!TIP]
+> 数値・日付の表現はロケール依存のため、表示形式を固定したい場合は `toLocaleString(locale)` 等で明示的に整形してから `t()` に渡してください。
+
+#### E. エラー文言の多言語化（Backend エラー翻訳）
+
+API 由来のエラーは、可能な限り UI 文言として翻訳して提示します。
+
+- フック: [`frontend/hooks/useBackendError.ts`](../frontend/hooks/useBackendError.ts)
+- 方針:
+  - バックエンドの文字列（例: `USER_NOT_FOUND` や `Access Denied`）をキー形式に正規化。
+  - `messages/[locale].json` の `Backend` セクションを参照。
+  - キー未登録時は原文フォールバック。
+
+これにより「未知エラーでも最低限情報を失わない」運用が可能です。
+
+#### F. URL 設計とリンク生成の注意点
+
+本プロジェクトは `localePrefix: 'never'` ですが、内部的には `[locale]` ルートを使います。
+
+- 画面遷移は可能な限り [`frontend/i18n/routing.ts`](../frontend/i18n/routing.ts) から export された `Link` / `useRouter` を利用する。
+- `window.location.pathname` の文字列解析でロケールを推測する実装は、必要最小限に留める。
+- 共有 URL（SNS 共有やメール）では、受信側環境で言語判定が走ることを前提にする。
+
+#### G. 新規ロケール追加時の手順（将来拡張）
+
+例: `fr` を追加する場合。
+
+1. [`frontend/i18n/routing.ts`](../frontend/i18n/routing.ts) の `locales` に `fr` を追加。
+2. [`frontend/messages/fr.json`](../frontend/messages/fr.json) を新規作成（`ja.json` のキー構造を踏襲）。
+3. ロケール依存表示（日付、通貨、曜日名など）で `locale` 引数を適切に渡す。
+4. ヘルプコンテンツも必要に応じて `content/help/fr/...` を整備。
+5. UI 崩れ（英語より文字長が長くなる言語）を優先チェック。
+
+#### H. 品質保証チェックリスト（i18n 専用）
+
+1. [ ] 追加したキーは `ja.json` / `en.json` 両方に存在するか。
+2. [ ] `python check.py` の結果で不足キーが 0 件か。
+3. [ ] `t('...')` の namespace は実データ構造と一致しているか。
+4. [ ] 画面の日本語/英語で改行崩れ・ボタン幅崩れがないか。
+5. [ ] エラー時文言（API失敗時）も翻訳されるか。
+
+#### I. バックエンド（メールテンプレート）との責務分離
+
+- フロント UI 文言: `frontend/messages/*.json`
+- バックエンド通知（例: メール）: [`infra/lambda/templates/email.ts`](../infra/lambda/templates/email.ts)
+
+責務を混在させると、翻訳更新漏れの原因になります。
+
+#### J. メール通知の多言語選択ロジック（UI 外メッセージ）
+
+メール通知はフロント画面の `next-intl` とは別系統で、多言語テンプレートを選択します。
+
+1. **テンプレート配置**
+  - 本文テンプレート: `infra/lambda/templates/locales/{ja|en}/`
+  - 件名テンプレート: `infra/lambda/templates/locales/{ja|en}.json`
+
+2. **言語選択の優先情報**
+  - 送信先メールアドレスごとの `email_preferences`
+  - API 側で渡される `locale` パラメータ
+  - プロフィールに保持された言語設定
+
+3. **運用上の注意**
+  - UI の翻訳キー更新と、メールテンプレート更新は別作業として管理する。
+  - 新しい通知種別を追加する際は、`ja` / `en` の本文・件名を同時に追加する。
+  - 「画面は翻訳済みだがメールは未翻訳」という乖離を防ぐため、PR で両系統を同時レビューする。
+
+4. **参照先**
+  - メールの通知種別や送信条件は [`REF_EMAIL_TEMPLATES.md`](./REF_EMAIL_TEMPLATES.md) を参照。
 
 ### 2.13 外部アカウント連携 (External Identity Providers)
 
@@ -439,8 +565,8 @@ UI を構築する際、どの部品を使うべきかのクイックリファ�
 ### 2.14 マニュアル用画像の自動撮影 (Screenshot Automation)
 
 製品マニュアルやヘルプページで使用するスクリーンショットの撮影を、AI Agent（Playwright + browser-use）を用いて自動化しています。これにより、UIの変更に追従したマニュアルの更新コストを最小化しています。
-- **詳細設計**: `SPEC_HELP_CMS.md` を参照してください。
-- **実行方法**: `ATFIRST_DEVELOPER_GUIDE.md` のツール索引を参照してください。
+- **詳細設計**: [SPEC_HELP_CMS.md](./SPEC_HELP_CMS.md) を参照してください。
+- **実行方法**: [ATFIRST_DEVELOPER_GUIDE.md](./ATFIRST_DEVELOPER_GUIDE.md) のツール索引を参照してください。
 
 ---
 

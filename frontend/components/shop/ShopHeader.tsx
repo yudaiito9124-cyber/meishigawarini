@@ -123,7 +123,7 @@ export function ShopHeader({
                         apiFetchPost={shopApi.fetch_post.bind(shopApi)}
                         translationNamespace="ShopPage"
                         currentUserEmail={currentUserEmail}
-                        buttonClassName="text-mist-500 hover:text-mist-800 relative"
+                        buttonClassName="text-mist-500 hover:text-mist-800 relative rounded-full"
                     />
 
                     <ShopSettingsSection
@@ -131,19 +131,19 @@ export function ShopHeader({
                     />
 
                     {(!singleShopOwner || isAdmin) && (
-                        <Button variant="ghost" className="text-mist-500 hover:text-mist-800" onClick={handleShops}>
+                        <Button variant="outline" className="text-mist-500 hover:text-mist-800 rounded-full" onClick={handleShops}>
                             <ChevronDown className="h-4 w-4 mr-1 rotate-90" /> {t('movetoshops')}
                         </Button>
                     )}
                     
                     {(singleShopOwner && !isAdmin) && (
-                        <Button variant="ghost" className="text-mist-500 hover:text-mist-800" onClick={handleLogin}>
+                        <Button variant="outline" className="text-mist-500 hover:text-mist-800 rounded-full" onClick={handleLogin}>
                             <ChevronDown className="h-4 w-4 mr-1 rotate-90" /> {t('movetologin')}
                         </Button>
                     )}
 
                     <Button
-                        variant="ghost"
+                        variant="outline"
                         className="text-mist-500 hover:text-mist-800"
                         onClick={handleSignOut}
                     >

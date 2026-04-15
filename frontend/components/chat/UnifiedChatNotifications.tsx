@@ -159,7 +159,7 @@ export const UnifiedChatNotifications = React.forwardRef<
     apiFetchPost,
     translationNamespace,
     buttonClassName,
-    buttonVariant = 'ghost',
+    buttonVariant = 'outline',
     disabled = false,
     currentUserEmail,
 }, ref) => {
@@ -460,8 +460,7 @@ export const UnifiedChatNotifications = React.forwardRef<
         [selectedChat],
     );
     const canCancelSelectedChat = useMemo(() => {
-        return participantId.startsWith('USER#')
-            && selectedChat?.initiator_id === participantId
+        return selectedChat?.initiator_id === participantId
             && normalizeStatus(selectedChat?.status) === 'OPEN'
             && typeof selectedChat?.version === 'number';
     }, [participantId, selectedChat]);
@@ -1341,12 +1340,6 @@ export const UnifiedChatNotifications = React.forwardRef<
                                                 <Textarea
                                                     value={inputMessage}
                                                     onChange={(e) => setInputMessage(e.target.value)}
-                                                    onKeyDown={(e) => {
-                                                        if (e.key === 'Enter' && !e.shiftKey) {
-                                                            e.preventDefault();
-                                                            sendFreeText();
-                                                        }
-                                                    }}
                                                     placeholder={t('notifications.messagePlaceholder')}
                                                     rows={3}
                                                     disabled={sendingMessage || uploading}

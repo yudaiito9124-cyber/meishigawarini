@@ -46,7 +46,7 @@ Next.js (App Router) をベースとした構成です。
 | `lib/` | API クライアント、ユーティリティ関数。 |
 | `store/` | 状態管理に関連する定義。 |
 | `public/` | 画像、アイコン、フォントなどの静的ファイル。 |
-| `messages/` / `i18n/` | 多言語対応（日本語・英語など）の設定とメッセージ。 |
+| `messages/` / `i18n/` | 表示文言メッセージとロケール関連設定（運用方針は [SPEC_HOW_TO_DEVELOP_FRONTEND.md](./SPEC_HOW_TO_DEVELOP_FRONTEND.md) を参照）。 |
 | `package.json` | フロントエンドの依存ライブラリ管理。 |
 
 ---

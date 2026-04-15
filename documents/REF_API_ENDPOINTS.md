@@ -105,20 +105,40 @@
 
 | 名前 | 概要 | エンドポイント (`POST`) | DB操作 (Commands) | ソースコード |
 | :--- | :--- | :--- | :--- | :--- |
-| チャット作成 | 参加者・種別を指定して新規チャットを作成 | `/unified/chat/create` | `PutCommand` (META) + `TransactWriteCommand` (Membership) | [unified_chat.ts](../infra/lambda/unified_chat.ts) |
+| チャット作成 | 参加者・種別を指定して新規チャットを作成 | `/unified/chat/create` | `TransactWriteCommand` (META + Membership + optional初期Message) | [unified_chat.ts](../infra/lambda/unified_chat.ts) |
 | 受信箱一覧取得 | 参加者単位でチャット一覧を最新順取得 | `/unified/chat/list` | `QueryCommand` (GSI2 `CHAT_INBOX#{participantId}`) | [unified_chat.ts](../infra/lambda/unified_chat.ts) |
 | チャット詳細取得 | チャット本体メタデータを1件取得 | `/unified/chat/get` | `GetCommand` (PK=`CHAT#{chat_id}`, SK=`META`) | [unified_chat.ts](../infra/lambda/unified_chat.ts) |
 | メッセージ一覧取得 | 指定チャットのメッセージ履歴をページング取得 | `/unified/chat/messages/get` | `QueryCommand` (PK=`CHAT#{chat_id}`, SK begins_with `MSG#`) | [unified_chat.ts](../infra/lambda/unified_chat.ts) |
 | メッセージ送信 | テキスト/ワークフローpayloadを送信 | `/unified/chat/messages/send` | `TransactWriteCommand` (Message追加 + META更新 + Membership更新) | [unified_chat.ts](../infra/lambda/unified_chat.ts) |
 | 既読更新 | 参加者の既読カーソルと未読数を更新 | `/unified/chat/read/mark` | `UpdateCommand` (Membership `last_read_seq` + `unread_count_cache`) | [unified_chat.ts](../infra/lambda/unified_chat.ts) |
-| ステータス更新 | チャットの状態（OPEN/RESOLVED等）を更新 | `/unified/chat/status/update` | `UpdateCommand` (META `status` + `version` 楽観的ロック) | [unified_chat.ts](../infra/lambda/unified_chat.ts) |
+| ステータス更新 | チャットの状態（OPEN/RESOLVED等）を更新 | `/unified/chat/status/update` | `GetCommand` (META) + `TransactWriteCommand` (META + Membership status同期) | [unified_chat.ts](../infra/lambda/unified_chat.ts) |
+| アップロードURL取得 | 添付ファイル用のPresigned URLを発行 | `/unified/chat/uploadurl/get` | `GetCommand` (META認可確認) + S3 Presign | [unified_chat.ts](../infra/lambda/unified_chat.ts) |
+
+### 実装コメント（運用・保守メモ）
+
+- チャット作成 (`/unified/chat/create`):
+	現行仕様では参加者は「起票者 + ADMIN」の2者のみ許可されます。第三者の inbox へ混入させる入力を防ぐためです。
+- 受信箱一覧 (`/unified/chat/list`):
+	まず GSI2 で participant 単位の候補を取得し、`include_archived` / `chat_type` / `status` はアプリ側で追加絞り込みします。
+- チャット詳細・メッセージ取得 (`/unified/chat/get`, `/unified/chat/messages/get`):
+	いずれも先に META を取得してアクセス権を検証してから返却します（存在しない場合404、権限不足は403）。
+- メッセージ送信 (`/unified/chat/messages/send`):
+	`sender_id` は参加者一致 + 呼び出し元権限一致を必須化しています。DBには `sender_id`（主体）に加えて `sender_user_id`（実操作者）を保存します。
+- 既読更新 (`/unified/chat/read/mark`):
+	`last_read_seq <= last_message_seq` を強制し、`unread_count_cache` は差分再計算で整合を維持します。
+- ステータス更新 (`/unified/chat/status/update`):
+	遷移可否は `chat_type` ごとの workflow 定義に従い、META と参加者 inbox の status をトランザクションで同期更新します。
+- アップロードURL取得 (`/unified/chat/uploadurl/get`):
+	チャット参加権限の検証後にのみ Presigned URL を発行します。サイズ上限は Lambda 側定数で制御しています。
+- 入力検証方針（重要）:
+	必須項目・業務整合・workflow payload 検証は実装済みですが、未知キーを一括拒否する strict schema 検証は現時点で未導入です。
 
 ### DynamoDBデータ構造
 
 | アイテム種別 | PK | SK | 主要フィールド |
 | :--- | :--- | :--- | :--- |
 | チャットメタ | `CHAT#{chat_id}` | `META` | `participants[]`, `status`, `last_message_seq`, `version` |
-| メッセージ | `CHAT#{chat_id}` | `MSG#{seq:012d}` | `workflow_status`, `payload_type`, `payload{}`, `sender_id` |
+| メッセージ | `CHAT#{chat_id}` | `MSG#{seq:012d}` | `workflow_status`, `payload_type`, `payload{}`, `sender_id`, `sender_user_id` |
 | 受信ボックス | `CHAT_INBOX#{participantId}` (GSI2_PK) | - | `unread_count_cache`, `last_read_seq` |
 
 ### メッセージのペイロード構造（審査結果: ADMIN_DECISION）
