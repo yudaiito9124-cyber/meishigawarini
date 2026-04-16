@@ -61,6 +61,7 @@ export class InfraStack extends cdk.Stack {
     const allowedOrigins = [
       'https://meishigawarini.com',
       'https://stg.dh74sua11za2r.amplifyapp.com', // Staging
+      'https://master.d19yct597o7t9y.amplifyapp.com', // Production
       'http://localhost:3000',
       'http://localhost:3001',
       ...extraOrigins
