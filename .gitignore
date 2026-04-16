@@ -14,3 +14,9 @@ dist/
 # OS
 Thumbs.db
 .DS_Store
+
+scripts/__pycache__/
+scripts/*.pyc
+.venv
+scripts/.browser_profile/
+all_links.txt

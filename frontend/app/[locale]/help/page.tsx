@@ -1,8 +1,23 @@
+/**
+ * ファイル概要: ヘルプ・操作マニュアル インデックスページ
+ * 
+ * 役割:
+ * 受取人、贈り主、ショップオーナーなど、役割に応じた操作マニュアルへの導線を提供します。
+ * Markdown形式で提供される各詳細ページへの玄関口となります。
+ * 
+ * 仕様:
+ * 1. Server Component として実装し、SEOのためのメタデータ生成に対応。
+ * 2. 視認性の高いカード形式のナビゲーション。
+ */
+
 import Image from 'next/image';
 import Link from 'next/link';
 import { getTranslations } from 'next-intl/server';
-import { Store, Package, ChevronRight, Bug, PlaneTakeoff, Gift } from 'lucide-react';
+import { Store, Package, ChevronRight, Bug, SendHorizontal, Gift, CircleUserRound, Waypoints, Crown, CircleQuestionMark } from 'lucide-react';
 
+/**
+ * SEO用メタデータの生成
+ */
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }) {
     const { locale } = await params;
     const t = await getTranslations({ locale, namespace: 'Metadata' });
@@ -13,12 +28,22 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
     };
 }
 
+/**
+ * ヘルプインデックスページコンポーネント
+ */
 export default function HelpPage() {
     return (
         <div className="min-h-screen bg-background pt-10 flex flex-col">
             <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-4xl flex-grow">
 
+
                 {/* Header Section */}
+                <div className="flex justify-center">
+                    <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 text-primary shadow-sm">
+                        <CircleQuestionMark className="h-8 w-8" />
+                    </div>
+                </div>
+
                 <div className="mb-10 text-center">
                     <h1 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
                         ヘルプ・操作マニュアル
@@ -30,6 +55,28 @@ export default function HelpPage() {
 
                 <div className="min-h-screen">
                     <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                        {/* Universal Flow Card */}
+                        <Link href="/help/overview"
+                            className="group relative rounded-xl border border-primary/20 bg-primary/5 p-8 shadow-sm transition-all hover:border-primary/50 hover:shadow-md block md:col-span-2">
+                            <div className="flex items-center gap-6">
+                                <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg">
+                                    <Waypoints className="h-8 w-8" />
+                                </div>
+                                <div className="flex-grow">
+                                    <h2 className="text-2xl font-bold tracking-tight text-foreground group-hover:text-primary transition-colors">
+                                        新しいギフト体験を贈る
+                                    </h2>
+                                    <p className="mt-2 text-muted-foreground">
+                                        カードの受け取りからギフトの到着まで、ユーザーの体験をステップ形式で解説します。
+                                    </p>
+                                </div>
+                            </div>
+                            <div className="mt-6 flex items-center text-sm font-medium text-primary">
+                                全体の流れを見る
+                                <ChevronRight className="ml-1 h-4 w-4 transition-transform group-hover:translate-x-1" />
+                            </div>
+                        </Link>
+
                         {/* Recipient Card */}
                         <Link href="/help/receive"
                             className="group relative rounded-xl border bg-card p-8 shadow-sm transition-all hover:border-primary/50 hover:shadow-md block ">
@@ -48,11 +95,11 @@ export default function HelpPage() {
                             </div>
                         </Link>
 
-                        {/* Recipient Card */}
+                        {/* Sender Card */}
                         <Link href="/help/send"
                             className="group relative rounded-xl border bg-card p-8 shadow-sm transition-all hover:border-primary/50 hover:shadow-md block">
                             <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary">
-                                <PlaneTakeoff className="h-6 w-6" />
+                                <SendHorizontal className="h-6 w-6" />
                             </div>
                             <h2 className="text-2xl font-bold tracking-tight text-foreground group-hover:text-primary transition-colors">
                                 ギフトを贈る方
@@ -66,17 +113,17 @@ export default function HelpPage() {
                             </div>
                         </Link>
 
-                        {/* Shop Owner Card */}
-                        <Link href="/help/shop"
-                            className="group relative rounded-xl border bg-card p-8 shadow-sm transition-all hover:border-primary/50 hover:shadow-md block md:col-span-2">
+                        {/* User Profile Card */}
+                        <Link href="/help/user"
+                            className="group relative rounded-xl border bg-card p-8 shadow-sm transition-all hover:border-primary/50 hover:shadow-md block">
                             <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary">
-                                <Store className="h-6 w-6" />
+                                <CircleUserRound className="h-6 w-6" />
                             </div>
                             <h2 className="text-2xl font-bold tracking-tight text-foreground group-hover:text-primary transition-colors">
-                                ショップオーナーの方
+                                マイページの使い方
                             </h2>
                             <p className="mt-2 text-muted-foreground">
-                                アカウントの登録方法、ログイン、ショップの作成や商品の管理、QRコードの紐付けなど、運用に関するマニュアルです。
+                                アカウントをお持ちの方（贈り主・受取人）向けの、プロフィール設定や履歴確認に関するマニュアルです。
                             </p>
                             <div className="mt-6 flex items-center text-sm font-medium text-primary">
                                 マニュアルを見る
@@ -84,6 +131,23 @@ export default function HelpPage() {
                             </div>
                         </Link>
 
+                        {/* Shop Owner Card */}
+                        <Link href="/help/shop"
+                            className="group relative rounded-xl border bg-card p-8 shadow-sm transition-all hover:border-primary/50 hover:shadow-md block">
+                            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary">
+                                <Store className="h-6 w-6" />
+                            </div>
+                            <h2 className="text-2xl font-bold tracking-tight text-foreground group-hover:text-primary transition-colors">
+                                ショップオーナーの方
+                            </h2>
+                            <p className="mt-2 text-muted-foreground">
+                                ショップの作成や商品の管理、QRコードの有効化など、運用に関するマニュアルです。
+                            </p>
+                            <div className="mt-6 flex items-center text-sm font-medium text-primary">
+                                マニュアルを見る
+                                <ChevronRight className="ml-1 h-4 w-4 transition-transform group-hover:translate-x-1" />
+                            </div>
+                        </Link>
                     </div>
                 </div>
 

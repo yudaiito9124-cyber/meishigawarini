@@ -1,11 +1,26 @@
+/**
+ * ファイル概要: 動的ヘルプマニュアル・レンダリングページ
+ * 
+ * 役割:
+ * 指定されたパス (slug) に基づいて、プロジェクト内の Markdown ファイルを読み込み、
+ * ヘルプ記事としてレンダリングします。
+ * 
+ * 仕組み:
+ * 1. URL の [...slug] から `content/help/{locale}/{slug}/index.md` を特定。
+ * 2. gray-matter で Frontmatter (title等) と本文を分離。
+ * 3. カテゴリ（第1階層のslug）に応じてアイコンとタイトルを選択。
+ * 4. MarkdownRenderer で本文（Mermaid図式、Sanitized HTML含む）を表示。
+ */
+
 import { getTranslations } from 'next-intl/server';
 import Link from 'next/link';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Waypoints, Gift, SendHorizontal, CircleUserRound, Store, Crown } from 'lucide-react';
 import fs from 'fs/promises';
 import path from 'path';
 import matter from 'gray-matter';
 import { MarkdownRenderer } from '@/components/help/MarkdownRenderer';
 import { notFound } from 'next/navigation';
+import { Button } from '@/components/ui/button';
 
 interface Props {
   params: Promise<{
@@ -14,8 +29,31 @@ interface Props {
   }>;
 }
 
+/** カテゴリ（ルートパス）とアイコンの対応定義 */
+const CategoryIconMap: Record<string, React.ElementType> = {
+  overview: Waypoints,
+  receive: Gift,
+  send: SendHorizontal,
+  user: CircleUserRound,
+  shop: Store,
+  admin: Crown,
+};
+
+/** カテゴリと日本語タイトルの対応定義 */
+const CategoryTitleMap: Record<string, string> = {
+  overview: 'ご利用ガイド',
+  receive: '受取人マニュアル',
+  send: '贈り主マニュアル',
+  user: 'マイページヘルプ',
+  shop: 'ショップ管理',
+};
+
+/**
+ * MarkdownのFrontmatterからタイトルを抽出し、メタデータを生成します。
+ */
 export async function generateMetadata({ params }: Props) {
   const { locale, slug } = await params;
+  // index.md 形式のファイルパスを構築
   const filePath = path.join(process.cwd(), 'content', 'help', locale, ...slug, 'index.md');
 
   try {
@@ -33,6 +71,9 @@ export async function generateMetadata({ params }: Props) {
   }
 }
 
+/**
+ * 動的原稿（Markdown）を読み込んで表示するメインコンポーネント
+ */
 export default async function DynamicHelpPage({ params }: Props) {
   const { locale, slug } = await params;
   const filePath = path.join(process.cwd(), 'content', 'help', locale, ...slug, 'index.md');
@@ -46,9 +87,16 @@ export default async function DynamicHelpPage({ params }: Props) {
 
   const { data, content } = matter(fileContent);
 
+  // Determine category icon based on root slug
+  const category = slug[0];
+  const Icon = CategoryIconMap[category];
+  const categoryTitle = CategoryTitleMap[category];
+
   // Determine parent link
   const parentSlug = slug.slice(0, -1);
-  const parentPath = parentSlug.length > 0 ? `/help/${parentSlug.join('/')}` : '/help';
+  let parentPath = parentSlug.length > 0 ? `/help/${parentSlug.join('/')}` : '/help';
+
+  const backLabel = parentSlug.length > 0 ? '戻る' : 'ヘルプのトップに戻る';
 
   return (
     <div className="min-h-screen bg-background pb-20 pt-10">
@@ -60,23 +108,44 @@ export default async function DynamicHelpPage({ params }: Props) {
             className="inline-flex items-center text-sm font-medium text-muted-foreground hover:text-foreground mb-4 transition-colors"
           >
             <ArrowLeft className="mr-2 h-4 w-4" />
-            {parentSlug.length > 0 ? '戻る' : 'ヘルプのトップに戻る'}
+            {backLabel}
           </Link>
         </div>
 
         <div className="flex-grow font-sans">
-          <MarkdownRenderer content={content} />
+          <MarkdownRenderer 
+            content={content} 
+            categoryIcon={Icon} 
+            categoryTitle={categoryTitle} 
+            mermaidVariant="light"
+          />
         </div>
 
         {/* Footer Section */}
-        <div className="mt-12 pt-8 border-t">
+        <div className="mt-12 pt-8 border-t flex flex-col items-center gap-4">
           <Link
             href={parentPath}
             className="inline-flex items-center text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
           >
             <ArrowLeft className="mr-2 h-4 w-4" />
-            {parentSlug.length > 0 ? '戻る' : 'ヘルプのトップに戻る'}
+            {backLabel}
           </Link>
+
+          {slug[0] === 'shop' && (
+            <Link href="/shop" className="mt-4">
+              <Button variant="outline" className="rounded-full px-8">
+                ショップ管理画面に戻る
+              </Button>
+            </Link>
+          )}
+
+          {slug[0] === 'admin' && (
+            <Link href="/admin" className="mt-4">
+              <Button variant="outline" className="rounded-full px-8">
+                管理者画面に戻る
+              </Button>
+            </Link>
+          )}
         </div>
       </div>
     </div>

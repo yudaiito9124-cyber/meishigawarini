@@ -1,76 +1,65 @@
 /**
- * 概要: 送り主プロフィール（Sender Info）の管理
- * 詳細: チャット画面に表示される送り主情報の更新、ユーザーテンプレートとしての保存・読み込み、および不要画像の削除を行います。
- * エンドポイント:
- *  - POST /receive/sender/update (現在のチャットの送り主情報を更新)
- *  - POST /receive/sender/load (ユーザーテンプレートから読み込み)
- *  - POST /receive/sender/save (現在の内容をユーザーテンプレートとして保存)
- *  - POST /receive/sender/delete-images (S3画像の削除)
- * リクエストボディ:
- *  - shop_id: 操作対象のショップID (不要だが互換性のために残る場合あり)
- *  [update の場合]
- *  - sender_info: 更新するプロフィール情報オブジェクト (必須)
- *  - deleted_html_image_urls: 削除対象の画像URLリスト (オプション)
- *  [load / save の場合]
- *  - id: ユーザーID (必須)
- *  [delete-images の場合]
- *  - urls: 削除するS3画像URLの配列 (必須)
+ * @file receive_sender.ts
+ * @role ゲストおよびユーザー用：送り主プロファイル（アイデンティティ）連携ハンドラー
+ * @responsibility
+ *  - ギフトの受取人画面に表示される「送り主の顔（アイコン、詳細メッセージ）」をチャット単位で管理します。
+ *  - 【メーリングリストの動的同期】
+ *    - プロフィール内の Email が更新された際、通知用 Email セット（`notification_emails`）と設定マップ（`email_preferences`）を自動で同期・整理します。
+ *  - 【再帰的アセット永続化（Onboarding）】
+ *    - `save_as_new_user`: ゲストとしてチャット内で作成したプロフ情報を、正式なユーザーアカウントのマスターとして昇格させます。
+ *    - その際、チャット固有のテンポラリディレクトリにある画像を、ユーザー専用フォルダへ `S3 CopyObject` で物理的に移動・再配置します。
+ *  - 【アセット・クリーンアップ】
+ *    - 試行錯誤中にアップロードされた不要な画像や、プロフ更新で不要になった古い画像を S3 から物理削除します。
+ * @context
+ *  - 「一時的なギフト利用」から「継続的なユーザー利用」へのスムーズなオンボーディングフローの中核を支えます。
  */
+
 import { APIGatewayProxyHandler } from 'aws-lambda';
-import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
-import { DynamoDBDocumentClient, GetCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
-import { stripSignature, deleteFileByUrl, copyS3Object, signUrlIfS3, signUrlsInHtml, stripSignaturesInHtml } from './utils/s3';
+import { GetCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
+import { stripSignature, deleteFileByUrl, copyS3Object, signUrlIfS3, signUrlsInHtml, stripSignaturesInHtml, getPublicUrl } from './utils/s3';
 import { generateId } from './utils/id';
-
-const client = new DynamoDBClient({});
-const ddb = DynamoDBDocumentClient.from(client, {
-    marshallOptions: {
-        removeUndefinedValues: true,
-        convertEmptyValues: true
-    }
-});
-const TABLE_NAME = process.env.TABLE_NAME || '';
-const BUCKET_NAME = process.env.BUCKET_NAME || '';
-
-const corsHeaders = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type,Authorization,X-QR-UUID,X-QR-PIN',
-    'Access-Control-Allow-Methods': 'OPTIONS,POST'
-};
+import { successResponse, errorResponse } from './utils/response';
+import { ddb, TABLE_NAME, BUCKET_NAME } from './share/db';
+import { getQrId, getAction, getUserId } from './utils/request';
+import { ReceiveApiSchema } from '@shared/api-types';
 
 export const handler: APIGatewayProxyHandler = async (event) => {
     try {
-        if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers: corsHeaders, body: '' };
-
-        const authorizer = event.requestContext.authorizer;
-        const uuid = authorizer?.uuid || (event.headers['X-QR-UUID'] || event.headers['x-qr-uuid']);
-        if (!uuid) return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Missing UUID' }) };
+        if (event.httpMethod === 'OPTIONS') return successResponse();
 
         const body = JSON.parse(event.body || '{}');
-        
-        // Determine action from path or body
-        let action = body.action;
+        const userId = getUserId(event);
+        const qr_id = getQrId(event, body);
+        let action = getAction(event, body);
+
+        // リソースパスに基づくルーティング
         const resPath = event.resource;
         if (resPath.endsWith('/update')) action = 'update_sender_info';
         else if (resPath.endsWith('/load')) action = 'load_from_id';
         else if (resPath.endsWith('/save')) action = 'save_as_new_user';
-        else if (resPath.endsWith('/delete-images')) action = 'delete_images';
+        else if (resPath.endsWith('/delete-images')) action = 'delete-images';
 
-        // ====================================================================
-        // ACTION: update_sender_info (送り主プロフィール情報の更新)
-        // ====================================================================
+        if (!qr_id) return errorResponse(400, 'Missing QR ID');
+
+        // --------------------------------------------------------------------
+        // ACTION: update_sender_info (個別チャット用プロフィールの更新)
+        // 目的: 該当ギフト(qr_id)専用のチャット画面に表示する名前や画像を更新。
+        // --------------------------------------------------------------------
         if (action === 'update_sender_info') {
-            const { sender_info, deleted_html_image_urls, locale } = body;
-            if (!sender_info) return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Missing sender_info' }) };
+            const { sender_info, deleted_html_image_urls } = body as ReceiveApiSchema['receive_sender_update'];
+            if (!sender_info) return errorResponse(400, 'Missing sender_info');
 
-            // 【DB操作: UpdateItem】
-            // - 目的: チャット画面に表示される送り主のプロフィール情報(名称, メアド, HTML詳細等)を更新
-            // - テーブル: TABLE_NAME
-            // - リクエストキー: { PK: `QR#${uuid}`, SK: 'CHAT' }
-            // - 更新内容: sender_info 属性を丸ごと更新 (ReturnValues: 'ALL_OLD' を使用して旧画像削除に備える)
+            // 発送前の ACTIVE なギフトのみ編集を許可
+            const metaRes = await ddb.send(new GetCommand({
+                TableName: TABLE_NAME, Key: { PK: `QR#${qr_id}`, SK: 'METADATA' }
+            }));
+            if (!metaRes.Item || metaRes.Item.status !== 'ACTIVE') {
+                return errorResponse(403, 'Sender info can only be updated for active gifts.');
+            }
+
             const res = await ddb.send(new UpdateCommand({
                 TableName: TABLE_NAME,
-                Key: { PK: `QR#${uuid}`, SK: 'CHAT' },
+                Key: { PK: `QR#${qr_id}`, SK: 'CHAT' },
                 UpdateExpression: 'SET sender_info = :info',
                 ExpressionAttributeValues: {
                     ':info': {
@@ -83,43 +72,31 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 ReturnValues: 'ALL_OLD'
             }));
 
-            // メール配信リスト(Mailing List)の同期処理
+            // 【メーリングリスト連動】プロフィール上のメールアドレスが変更されたら、通知先リストも入れ替える
             const oldEmail = res.Attributes?.sender_info?.email;
             const newEmail = sender_info.email;
+
             if (oldEmail !== newEmail) {
                 if (oldEmail) {
-                    // 【DB操作: UpdateItem】
-                    // - 目的: メーリングリスト(notification_emails)から旧メールアドレスを削除
                     await ddb.send(new UpdateCommand({
                         TableName: TABLE_NAME,
-                        Key: { PK: `QR#${uuid}`, SK: 'CHAT' },
+                        Key: { PK: `QR#${qr_id}`, SK: 'CHAT' },
                         UpdateExpression: 'DELETE notification_emails :old_email REMOVE email_preferences.#em',
                         ExpressionAttributeNames: { '#em': oldEmail },
                         ExpressionAttributeValues: { ':old_email': new Set([oldEmail]) }
-                    })).catch(e => console.error("Sync failed (remove old email):", e));
+                    })).catch(() => {});
                 }
                 if (newEmail) {
-                    // 【DB操作: UpdateItem】
-                    // - 目的: メーリングリスト(notification_emails)に新メールアドレスを追加し言語設定を保存
-                    const lang = locale === 'ja' ? 'ja' : 'en';
                     await ddb.send(new UpdateCommand({
                         TableName: TABLE_NAME,
-                        Key: { PK: `QR#${uuid}`, SK: 'CHAT' },
-                        UpdateExpression: 'ADD notification_emails :new_email SET email_preferences = if_not_exists(email_preferences, :empty_map)',
-                        ExpressionAttributeValues: { ':new_email': new Set([newEmail]), ':empty_map': {} }
-                    })).catch(e => console.error("Sync failed (add new email):", e));
-                    
-                    await ddb.send(new UpdateCommand({
-                        TableName: TABLE_NAME,
-                        Key: { PK: `QR#${uuid}`, SK: 'CHAT' },
-                        UpdateExpression: 'SET email_preferences.#em = :lang',
-                        ExpressionAttributeNames: { '#em': newEmail },
-                        ExpressionAttributeValues: { ':lang': lang }
-                    })).catch(e => console.error("Sync failed (set preference):", e));
+                        Key: { PK: `QR#${qr_id}`, SK: 'CHAT' },
+                        UpdateExpression: 'ADD notification_emails :new_email',
+                        ExpressionAttributeValues: { ':new_email': new Set([newEmail]) }
+                    })).catch(() => {});
                 }
             }
 
-            // 不要になったS3画像の物理削除
+            // 旧アセットの物理削除
             const oldImageUrl = res.Attributes?.sender_info?.card_image_url;
             const newImageUrl = stripSignature(sender_info.card_image_url);
             if (oldImageUrl && oldImageUrl !== newImageUrl) await deleteFileByUrl(oldImageUrl, BUCKET_NAME);
@@ -136,19 +113,22 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 }
             }
 
-            return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ message: 'Sender info updated', data: sender_info }) };
+            return successResponse({ message: 'Sender info updated successfully' });
         }
 
-        // ====================================================================
-        // ACTION: save_as_new_user (入力情報をテンプレートとして新規ユーザー保存)
-        // ====================================================================
+        // --------------------------------------------------------------------
+        // ACTION: save_as_new_user (マスタープロフィールへの昇格と S3 移設)
+        // 目的: 現在入力されているプロフ情報を、正式な「自分のマスターデータ」として永続化。
+        // --------------------------------------------------------------------
         if (action === 'save_as_new_user') {
-            const { sender_info, id } = body;
-            if (!sender_info) return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Missing sender_info' }) };
-            
+            const { sender_info, id } = body as ReceiveApiSchema['receive_sender_save'];
+            if (!sender_info) return errorResponse(400, 'Missing sender_info');
+
             const userid = id ? id.replace('USER#', '').trim() : generateId();
 
-            // S3ファイルをユーザー別の永続ディレクトリへコピー
+            /**
+             * チャット用の一時ディレクトリから、ユーザー専用の永続ディレクトリへファイルを物理コピーする。
+             */
             const copyFile = async (url: string) => {
                 if (!url || !url.includes(BUCKET_NAME)) return url;
                 try {
@@ -156,16 +136,16 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                     let sourceKey = decodeURIComponent(urlObj.pathname.substring(1));
                     if (sourceKey.startsWith(`${BUCKET_NAME}/`)) sourceKey = sourceKey.substring(BUCKET_NAME.length + 1);
                     const filename = sourceKey.split('/').pop();
-                    const destKey = `user/${userid}/usercontent/${filename}`;
+                    const destKey = `user/${userid}/usercontent/${filename}`; // ユーザー専用パス
                     await copyS3Object(BUCKET_NAME, sourceKey, destKey);
-                    const region = process.env.AWS_REGION || 'ap-northeast-1';
-                    return `https://${BUCKET_NAME}.s3.${region}.amazonaws.com/${destKey}`;
+                    return getPublicUrl(BUCKET_NAME, destKey);
                 } catch (e) {
                     console.error("S3 Copy failed:", url, e);
                     return url;
                 }
             };
 
+            // HTML 内を含む、全 S3 画像パスをユーザー配下へ移設（置換）
             let senderInfoStr = JSON.stringify(sender_info);
             const urlRegex = /https?:\/\/[^"'\s\\]+/g;
             const matches = senderInfoStr.match(urlRegex) || [];
@@ -175,14 +155,11 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 senderInfoStr = senderInfoStr.split(url).join(newUrl);
             }
             const newSenderInfo = JSON.parse(senderInfoStr);
+            
+            // ユーザーの SENDER レコードを動的更新
             const restrictedKeys = ['ts_created_at', 'ts_updated_at', 'PK', 'SK', 'sender_id', 'import_id'];
             const keys = Object.keys(newSenderInfo).filter(k => !restrictedKeys.includes(k));
 
-            // 【DB操作: UpdateItem】
-            // - 目的: 送り手ユーザー本人としてのプロフィールテンプレートを保存
-            // - テーブル: TABLE_NAME
-            // - リクエストキー: { PK: `USER#${userid}`, SK: 'SENDER' }
-            // - 更新内容: ts_created_at/ts_updated_at のタイムスタンプ管理および全プロフィール属性の保存
             await ddb.send(new UpdateCommand({
                 TableName: TABLE_NAME,
                 Key: { PK: `USER#${userid}`, SK: 'SENDER' },
@@ -198,71 +175,62 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 }
             }));
 
-            return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ message: 'User updated successfully', userid }) };
+            return successResponse({ message: 'User updated successfully', userid });
         }
 
-        // ====================================================================
-        // ACTION: load_from_id (既存のユーザープロフィールをこのチャットに読み込み)
-        // ====================================================================
+        // --------------------------------------------------------------------
+        // ACTION: load_from_id (マスターからのプロフ読み込み)
+        // 目的: 自身の正規プロフィールを、現在のギフトチャットへ紐付け・反映。
+        // --------------------------------------------------------------------
         if (action === 'load_from_id') {
-            let { id } = body;
-            if (!id || typeof id !== 'string') return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Missing or invalid ID' }) };
-            
-            let trimid = id.startsWith("USER#") ? id.replace("USER#", "") : id;
-            const pk = `USER#${trimid}`;
+            const { id } = body as ReceiveApiSchema['receive_sender_load'];
+            if (!id) return errorResponse(400, 'Missing or invalid ID');
 
-            // 【DB操作: GetItem】
-            // - 目的: 指定されたユーザーIDのプロフィールテンプレート情報を取得
-            // - テーブル: TABLE_NAME
-            // - リクエストキー: { PK: pk, SK: 'SENDER' }
-            const getRes = await ddb.send(new GetCommand({ TableName: TABLE_NAME, Key: { PK: pk, SK: 'SENDER' } }));
-            if (!getRes.Item) return { statusCode: 404, headers: corsHeaders, body: JSON.stringify({ message: 'User data not found' }) };
+            const trimid = id.startsWith("USER#") ? id.replace("USER#", "") : id;
+            const getRes = await ddb.send(new GetCommand({ TableName: TABLE_NAME, Key: { PK: `USER#${trimid}`, SK: 'SENDER' } }));
+            if (!getRes.Item) return errorResponse(404, 'User data not found');
 
             const sender_info = { ...getRes.Item };
             delete sender_info.PK; delete sender_info.SK;
 
-            // S3画像に期限付き署名を付与
+            // 表示用の署名
             if (sender_info.card_image_url) sender_info.card_image_url = await signUrlIfS3(sender_info.card_image_url, BUCKET_NAME);
             if (sender_info.detail_html) sender_info.detail_html = await signUrlsInHtml(sender_info.detail_html, BUCKET_NAME);
             if (sender_info.html_image_urls && Array.isArray(sender_info.html_image_urls)) {
                 sender_info.html_image_urls = await Promise.all(sender_info.html_image_urls.map((url: string) => signUrlIfS3(url, BUCKET_NAME)));
             }
 
-            // 【DB操作: UpdateItem】
-            // - 目的: このチャット(QR)がどのユーザーテンプレートに紐づいているかの参照IDを更新
-            // - テーブル: TABLE_NAME
-            // - リクエストキー: { PK: `QR#${uuid}`, SK: 'CHAT' }
+            // チャットレコードに送信者の ID 参照をセット
             await ddb.send(new UpdateCommand({
                 TableName: TABLE_NAME,
-                Key: { PK: `QR#${uuid}`, SK: 'CHAT' },
+                Key: { PK: `QR#${qr_id}`, SK: 'CHAT' },
                 UpdateExpression: 'SET sender_id = :id',
                 ExpressionAttributeValues: { ':id': trimid }
             }));
 
-            return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ sender_info }) };
+            return successResponse({ sender_info });
         }
 
-        // ====================================================================
-        // ACTION: delete_images (画像の物理削除)
-        // ====================================================================
-        if (action === 'delete_images') {
-            const { urls } = body;
-            if (!urls || !Array.isArray(urls)) return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Missing urls' }) };
-
+        // --------------------------------------------------------------------
+        // ACTION: delete-images (不要アセットの物理削除)
+        // --------------------------------------------------------------------
+        if (action === 'delete-images') {
+            const { urls } = body as ReceiveApiSchema['receive_sender_delete_images'];
+            if (!urls || !Array.isArray(urls)) return errorResponse(400, 'Missing urls');
             for (const url of urls) {
                 const cleanUrl = stripSignature(url);
-                // セキュリティチェック: 適切なバケット内かつ関連するパスのみ許可
-                if (cleanUrl && cleanUrl.includes(BUCKET_NAME) && (cleanUrl.includes(`qrcode/${uuid}/`) || cleanUrl.includes(`user/`))) {
+                // パスベースのバリデーション: 自身が触るべきディレクトリ以外の削除は許可しない
+                if (cleanUrl && cleanUrl.includes(BUCKET_NAME) && (cleanUrl.includes(`qrcode/${qr_id}/`) || cleanUrl.includes(`user/`))) {
                     await deleteFileByUrl(cleanUrl, BUCKET_NAME);
                 }
             }
-            return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ message: 'Images deleted' }) };
+            return successResponse({ message: 'Images deleted' });
         }
 
-        return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Unknown action' }) };
+        return errorResponse(400, 'Unknown action');
 
     } catch (error: any) {
-        console.error(error);
-        return { statusCode: 500, headers: corsHeaders, body: JSON.stringify({ message: 'Internal Server Error' }) };
+        console.error('Receive sender error:', error);
+        return errorResponse(500, 'Internal Server Error', error.message);
     }
 };

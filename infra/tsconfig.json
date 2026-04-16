@@ -6,6 +6,9 @@
     "lib": [
       "es2022"
     ],
+    "types": [
+      "node"
+    ],
     "declaration": true,
     "strict": true,
     "noImplicitAny": true,
@@ -23,7 +26,10 @@
     "skipLibCheck": true,
     "typeRoots": [
       "./node_modules/@types"
-    ]
+    ],
+    "paths": {
+      "@shared/*": ["../shared/*"]
+    }
   },
   "exclude": [
     "node_modules",

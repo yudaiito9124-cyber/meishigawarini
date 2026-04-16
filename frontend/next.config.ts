@@ -10,6 +10,7 @@ const withNextIntl = createNextIntlPlugin('./i18n/request.ts');
 const nextConfig: NextConfig = {
   env: {
     NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
+    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL,
   },
   images: {
     remotePatterns: [
@@ -19,7 +20,21 @@ const nextConfig: NextConfig = {
       },
     ],
   },
-  serverExternalPackages: ['jspdf'],
+  serverExternalPackages: ['jspdf', 'sharp'],
+  async redirects() {
+    return [
+      {
+        source: '/share',
+        destination: '/share/you-will-love-it?shop&product&card',
+        permanent: true,
+      },
+      {
+        source: '/receive',
+        destination: '/receive/you-will-love-it',
+        permanent: true,
+      },
+    ];
+  },
 };
 
 export default withNextIntl(nextConfig);

@@ -4,7 +4,7 @@ title: ショップ運用のヘルプ - まず初めに
 
 <section class="manual-container">
 
-# ショップ運用マニュアル（まず初めに）
+# まず初めに
 
 ## 用意するもの
 
@@ -21,9 +21,9 @@ title: ショップ運用のヘルプ - まず初めに
 ## アカウントの作成
 
 ### 1 管理者画面への移動
-管理画面には、トップページの右上にある「ショップ管理者画面」からアクセスできます。
+管理画面には、トップページの右上にある「ログイン」からアクセスできます。
 
-![トップ画面 https://meishigawarini.com](/images/manual/top.webp)
+![トップ画面 https://meishigawarini.com](/images/manual/landing.webp)
 
 ### 2 アカウント登録
 初めてご利用の方は、アカウントの登録が必要です。ログイン画面の下にある青文字の「登録する」を押して登録ページに移動してください。
@@ -32,7 +32,7 @@ title: ショップ運用のヘルプ - まず初めに
 
 ※ ここで登録したメールアドレスは、ログインに使用します。また、**配送に関する問い合わせ窓口**としてユーザーに表示されます。
 
-![登録画面 https://meishigawarini.com/register](/images/manual/registercut.webp)
+![登録画面 https://meishigawarini.com/register](/images/manual/register.webp)
 
 ### 3 メール認証
 登録したメールアドレス宛に認証メールが届きます。認証メールの本文に記載された6桁の数字を認証ページに入力してください。
@@ -44,11 +44,23 @@ title: ショップ運用のヘルプ - まず初めに
 
 認証メールの例
 ![認証メールの例](/images/manual/verifymail.webp)
-![認証ページ https://meishigawarini.com/verify](/images/manual/verifycut.webp)
+![認証ページ https://meishigawarini.com/verify](/images/manual/verify.webp)
 
 ### 4 ログイン
 登録したメールアドレスとパスワードでログインします。
 
-![ログイン画面 https://meishigawarini.com/login](/images/manual/logincut.webp)
+![ログイン画面 https://meishigawarini.com/login](/images/manual/login.webp)
+
+### 5 ショップの開設
+
+ユーザーページに移動します。このページの下端にある「ショップを開設する」ボタンを押してください。
+
+![ユーザーページ https://meishigawarini.com/user](/images/manual/user.webp)
+
+### 6 カードデザインの登録
+
+システム管理者に対して、ショップを開設した旨とショップで使いたいカードデザインの要望をご連絡ください。
+カード登録完了後、次のステップ「[商品登録・ショップ設定](/help/shop/manage)」に進んでください。
+
 
 </section>

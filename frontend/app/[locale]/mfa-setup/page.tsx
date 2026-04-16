@@ -1,3 +1,11 @@
+/**
+ * ファイル概要: MFA (多要素認証) 設定ページ
+ * 
+ * 役割:
+ * 管理者ユーザーが、認証アプリ（Google Authenticator, iOS Passwords等）を使用して
+ * ログイン時の二段階認証を設定するためのインターフェースです。
+ * TOTP（Time-based One-Time Password）のシークレットキー生成およびQRコード表示を行います。
+ */
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
@@ -11,16 +19,29 @@ import { Label } from "@/components/ui/label";
 import QRCode from 'qrcode';
 import { CheckCircle2, AlertCircle, Fingerprint, HelpCircle } from "lucide-react";
 
+/**
+ * MFA設定ページコンポーネント
+ */
 export default function MFASetupPage() {
+    /** 翻訳用フック */
     const t = useTranslations('MFASetupPage');
     const router = useRouter();
+
+    /** QRコードの画像URL (Data URL) */
     const [qrCodeUrl, setQrCodeUrl] = useState('');
+    /** 入力値：確認用の6桁コード */
     const [code, setCode] = useState('');
+    /** 処理中フラグ */
     const [loading, setLoading] = useState(false);
+    /** エラー表示用 */
     const [error, setError] = useState('');
+    /** TOTP設定成功フラグ */
     const [success, setSuccess] = useState(false);
+    /** パスキー設定成功フラグ */
     const [passkeySuccess, setPasskeySuccess] = useState(false);
+    /** ログイン済みフラグ */
     const [isLoggedIn, setIsLoggedIn] = useState(false);
+    /** 二重初期化防止用の参照 */
     const isInitiating = useRef(false);
 
     useEffect(() => {
@@ -41,27 +62,35 @@ export default function MFASetupPage() {
         checkAuth();
     }, []);
 
+    /**
+     * MFAのセットアッププロセスを初期化します。
+     * Cognitoからシークレットキーを生成し、認証アプリ登録用のURIを作成します。
+     */
     const initiateMFASetup = async () => {
         if (isInitiating.current) return;
         isInitiating.current = true;
 
         try {
             setLoading(true);
+            // ユーザー情報と属性（メール等）を並行取得
             const [{ username }, attributes] = await Promise.all([
                 getCurrentUser(),
                 import('aws-amplify/auth').then(m => m.fetchUserAttributes())
             ]);
 
+            // TOTP設定の開始（シークレットキーの取得）
             const totpSetupDetails = await setUpTOTP();
             const appName = "Meishigawarini";
             const accountName = attributes.email || username;
 
-            // Highly optimized URI for iOS Passwords app
-            // Use a literal ':' as the separator in the label (Issuer:Account)
-            // Issuer should match the issuer parameter exactly.
+            /**
+             * iOS Passwords や Google Authenticator で正しく認識されるためのURI構築
+             * label: 'Issuer:Account' 形式
+             */
             const label = `${appName}:${accountName}`;
             const setupUri = `otpauth://totp/${label}?secret=${totpSetupDetails.sharedSecret}&issuer=${encodeURIComponent(appName)}`;
 
+            // URIをQRコード画像として生成
             const dataUrl = await QRCode.toDataURL(setupUri, {
                 errorCorrectionLevel: 'H',
                 margin: 2,
@@ -70,35 +99,41 @@ export default function MFASetupPage() {
             setQrCodeUrl(dataUrl);
         } catch (err: any) {
             console.error(err)
-            // console.error('MFA Setup initiation failed', err);
             setError('errors.setupFailed');
         } finally {
             setLoading(false);
         }
     };
 
+    /**
+     * 入力されたコードを検証し、MFAを「優先（PREFERRED）」に設定します。
+     */
     const handleVerifyToken = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
         setError('');
 
         try {
+            // 入力コードの検証
             await verifyTOTPSetup({ code });
+            // 以降のログインでMFAを必須化
             await updateMFAPreference({ totp: 'PREFERRED' });
             setSuccess(true);
         } catch (err: any) {
-            // console.error('Verification failed', err);
             setError(err.message || 'errors.verifyFailed');
         } finally {
             setLoading(false);
         }
     };
 
+    /**
+     * パスキー（WebAuthn）等の生体認証設定を試行します。
+     */
     const handlePasskeySetup = async () => {
         setLoading(true);
         setError('');
         try {
-            // パスキーを作成 (顔認証・指紋認証ダイアログが表示される)
+            // パスキーを作成 (顔認証・指紋認証などのネイティブダイアログが表示される)
             const { associateWebAuthnCredential } = await import('aws-amplify/auth');
             if (typeof associateWebAuthnCredential === 'function') {
                 await associateWebAuthnCredential();
@@ -107,7 +142,6 @@ export default function MFASetupPage() {
                 throw new Error("associateWebAuthnCredential function not found in aws-amplify/auth");
             }
         } catch (err: any) {
-            // console.error('Passkey registration failed', err);
             setError('errors.biometricFailed');
         } finally {
             setLoading(false);

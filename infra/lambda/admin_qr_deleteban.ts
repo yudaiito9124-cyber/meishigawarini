@@ -1,131 +1,101 @@
 /**
- * 概要: BANNED（利用停止）状態のQRコードを物理削除する。
- * 詳細: 特定のUUIDかつBAN状態のQRコードを削除、またはGSIを利用してBANNEDステータスのアイテムを抽出し、DBから一括削除する。
- * エンドポイント: POST /admin/qr/deleteban
- * リクエストボディ:
- *  - target: 削除対象のQRコードUUID（オプション。指定がない場合は全BANNEDアイテムを一括削除）
+ * @file admin_qr_deleteban.ts
+ * @role 管理者用：BAN 済み QR コード物理削除ハンドラー
+ * @responsibility
+ *  - 悪用防止やデータ整理のため、ステータスが `BANNED`（利用停止）となっている QR コードをデータベースから物理的に削除します。
+ *  - 【デュアルモード削除】
+ *    1. 特定 ID 指定: 指定された一つの QR コード（BAN 状態必須）を削除。
+ *    2. 一括パージ: GSI1 (`GSI1_PK = QR#BANNED`) をスキャンし、現在 BAN されている全てのアイテムをバッチ処理で一括削除。
+ *  - 【安全・効率設計】物理削除前に、必ずインデックスやフィルタを用いて `BANNED` 状態であることを二重チェックします。また、25 件ずつのチャンクでバッチ書き込みを行い、効率化しています。
+ * @context
+ *  - BAN 処理後、法的な要求や運用上の理由でデータを完全に抹消する必要がある場合に使用されます。
  */
-import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
-import { DynamoDBDocumentClient, QueryCommand, BatchWriteCommand } from '@aws-sdk/lib-dynamodb';
+
+import { QueryCommand, BatchWriteCommand } from '@aws-sdk/lib-dynamodb';
 import { APIGatewayProxyHandler } from 'aws-lambda';
+import { successResponse, errorResponse } from './utils/response';
+import { ddb, TABLE_NAME } from './share/db';
+import { getAction } from './utils/request';
+import { AdminApiSchema } from '@shared/api-types';
 
-const client = new DynamoDBClient({});
-const ddb = DynamoDBDocumentClient.from(client);
-const TABLE_NAME = process.env.TABLE_NAME || '';
 const INDEX_NAME = 'GSI1';
-
-const corsHeaders = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type,Authorization',
-    'Access-Control-Allow-Methods': 'POST,OPTIONS'
-};
 
 export const handler: APIGatewayProxyHandler = async (event) => {
     try {
-        if (event.httpMethod === 'OPTIONS') {
-            return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ message: 'OK' }) };
-        }
-        if (event.httpMethod !== 'POST') {
-            return { statusCode: 405, headers: corsHeaders, body: JSON.stringify({ message: 'Method Not Allowed' }) };
-        }
+        if (event.httpMethod === 'OPTIONS') return successResponse();
+        if (event.httpMethod !== 'POST') return errorResponse(405, 'Method Not Allowed');
 
-        const body = JSON.parse(event.body || '{}');
+        const body = JSON.parse(event.body || '{}') as AdminApiSchema['admin_qr_deleteban'];
+        const qr_id = body.target;
+        const action = getAction(event, body);
 
-        console.log('Event:', JSON.stringify(event));
+        console.log('Delete BAN event started:', { qr_id, action });
 
-        // 1. Query & Delete in batches
         let deletedCount = 0;
         let lastEvaluatedKey: Record<string, any> | undefined;
 
+        /**
+         * 削除対象の抽出とバッチ処理
+         * ループにより、LastEvaluatedKey が無くなるまで全件を処理します。
+         */
         do {
             let result;
-            if (body.target) {
-                // 特定のUUIDのQRコードを検索 (BANNED状態であることも確認)
-                // - 検索条件: PK = QR#{uuid}
-                // - フィルタ条件: status = "BANNED"
-                // - 取得カラム: PK, SK (削除に必要な最小限の属性)
+            if (qr_id) {
+                // --------------------------------------------------------------------
+                // モード 1: 特定の QR ID の削除
+                // --------------------------------------------------------------------
+                // 目的: 誤操作防止のため、直接 Key 指定(DeleteItem) ではなく Query + FilterExpression を使用し、
+                // 対象が確実に BANNED 状態であることを確認してからキーを抽出します。
                 result = await ddb.send(new QueryCommand({
                     TableName: TABLE_NAME,
                     KeyConditionExpression: 'PK = :pk',
                     FilterExpression: '#status = :status',
-                    ExpressionAttributeNames: {
-                        '#status': 'status'
-                    },
-                    ExpressionAttributeValues: {
-                        ':pk': 'QR#' + body.target,
-                        ':status': 'BANNED'
-                    },
-                    ProjectionExpression: 'PK, SK'
+                    ExpressionAttributeNames: { '#status': 'status' },
+                    ExpressionAttributeValues: { ':pk': `QR#${qr_id}`, ':status': 'BANNED' },
+                    ProjectionExpression: 'PK, SK' // 削除に必要なキーのみ取得して通信量を節約
                 }));
-
-                if (!result.Items) {
-                    return {
-                        statusCode: 404,
-                        headers: corsHeaders,
-                        body: JSON.stringify({ message: 'QR code not found or not BANNED' })
-                    };
-                }
             } else {
-                // BANNED状態のQRコードをインデックスから全件取得
-                // - 検索条件: GSI1_PK = "QR#BANNED"
-                // - 取得カラム: PK, SK (削除に必要な最小限の属性)
-                // - ページング: LastEvaluatedKey を使用して全件取得をサポート
+                // --------------------------------------------------------------------
+                // モード 2: BAN 全件の一括削除 (パージ)
+                // --------------------------------------------------------------------
+                // 目的: 管理画面からの一括クリーンアップ。GSI1 を用いて BANNED 全件を高速抽出。
                 result = await ddb.send(new QueryCommand({
-                    TableName: TABLE_NAME,
-                    IndexName: INDEX_NAME,
+                    TableName: TABLE_NAME, IndexName: INDEX_NAME,
                     KeyConditionExpression: 'GSI1_PK = :pk',
-                    ExpressionAttributeValues: {
-                        ':pk': 'QR#BANNED'
-                    },
-                    ProjectionExpression: 'PK, SK', // Only need keys for deletion
+                    ExpressionAttributeValues: { ':pk': 'QR#BANNED' },
+                    ProjectionExpression: 'PK, SK',
                     ExclusiveStartKey: lastEvaluatedKey
                 }));
             }
 
             if (result.Items && result.Items.length > 0) {
-                // Process this page of items immediately
                 const pageItems = result.Items;
 
-                // Chunk into batches of 25 for BatchWrite
+                // DynamoDB の制限（1 リクエスト 25 件まで）に合わせ、チャンク分割して実行
                 for (let i = 0; i < pageItems.length; i += 25) {
                     const chunk = pageItems.slice(i, i + 25);
                     const deleteRequests = chunk.map((item: any) => ({
-                        DeleteRequest: {
-                            Key: { PK: item.PK, SK: item.SK }
-                        }
+                        DeleteRequest: { Key: { PK: item.PK, SK: item.SK } }
                     }));
 
-                    // 抽出したQRコードを物理削除 (25件ずつのバッチ実行)
-                    // - 削除条件: PK = item.PK, SK = item.SK
                     await ddb.send(new BatchWriteCommand({
-                        RequestItems: {
-                            [TABLE_NAME]: deleteRequests
-                        }
+                        RequestItems: { [TABLE_NAME]: deleteRequests }
                     }));
-
                     deletedCount += chunk.length;
                 }
             }
 
             lastEvaluatedKey = result.LastEvaluatedKey;
-            if (body.target) break;
+            
+            // 単体指定(qr_id)の場合は、見つかった 1 件(あるいは 0 件)を処理して即終了
+            if (qr_id) break;
+
         } while (lastEvaluatedKey);
 
-        return {
-            statusCode: 200,
-            headers: corsHeaders,
-            body: JSON.stringify({
-                message: 'Successfully deleted BANNED items',
-                count: deletedCount
-            })
-        };
+        return successResponse({ message: 'Successfully deleted BANNED items', count: deletedCount });
 
-    } catch (error) {
-        console.error('Error:', error);
-        return {
-            statusCode: 500,
-            headers: corsHeaders,
-            body: JSON.stringify({ message: 'Internal Server Error', error: String(error) })
-        };
+    } catch (error: any) {
+        console.error('Admin delete BAN error:', error);
+        return errorResponse(500, 'Internal Server Error', error.message);
     }
 };

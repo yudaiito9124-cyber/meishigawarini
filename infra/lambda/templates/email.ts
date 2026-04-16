@@ -1,8 +1,20 @@
+/**
+ * @file email.ts
+ * @role 多言語対応メールテンプレートマネージャー
+ * @responsibility
+ *  - 日本語（ja）および英語（en）のメールテンプレート（件名・本文）を統合管理します。
+ *  - テンプレート内のプレースホルダー（`{{variable}}`）を実データに置換する共通ロジックを提供します。
+ *  - 指定された言語と通知タイプに基づき、最終的なメールコンテンツを構築して送信依頼を行います。
+ * @context
+ *  - `infra/lambda/utils/notification.ts` 等から呼び出され、ユーザーへの最終的な通知文面を決定します。
+ *  - 文面自体は `locales/` 配下の各ディレクトリでタイプ別に分割定義されています。
+ */
+
 import { sendEmail } from '../utils/email-client';
 import jaSubjects from './locales/ja.json';
 import enSubjects from './locales/en.json';
 
-// Import bodies
+// 各種通知タイプの本文テンプレートをインポート
 import * as jaMessageNotification from './locales/ja/MESSAGE_NOTIFICATION';
 import * as enMessageNotification from './locales/en/MESSAGE_NOTIFICATION';
 import * as jaSystemNotification from './locales/ja/SYSTEM_NOTIFICATION';
@@ -14,6 +26,7 @@ import * as enAddressConfirmation from './locales/en/ADDRESS_REGISTRATION_CONFIR
 import * as jaAddressNotification from './locales/ja/ADDRESS_REGISTRATION_NOTIFICATION';
 import * as enAddressNotification from './locales/en/ADDRESS_REGISTRATION_NOTIFICATION';
 
+/** システムで利用可能な通知メールのタイプ */
 export type EmailType =
     | 'MESSAGE_NOTIFICATION'
     | 'SYSTEM_NOTIFICATION'
@@ -21,11 +34,13 @@ export type EmailType =
     | 'ADDRESS_REGISTRATION_CONFIRMATION'
     | 'ADDRESS_REGISTRATION_NOTIFICATION';
 
+/** 言語別の件名マッピング */
 const subjects: Record<string, any> = {
     ja: jaSubjects,
     en: enSubjects
 };
 
+/** 言語別の本文テンプレートマッピング */
 const bodies: Record<string, Record<string, string>> = {
     ja: {
         MESSAGE_NOTIFICATION: jaMessageNotification.body,
@@ -44,7 +59,11 @@ const bodies: Record<string, Record<string, string>> = {
 };
 
 /**
- * Replaces placeholders like {{variable}} with actual values.
+ * テンプレート文字列内の `{{variable}}` 形式のプレースホルダーをパラメータ値で置換します。
+ * 
+ * @param template - 置換対象の文字列。
+ * @param params - 置換に使用するキーバリューペア。
+ * @returns 置換後の文字列。
  */
 function replacePlaceholders(template: string, params: Record<string, string>): string {
     return template.replace(/\{\{(\w+)\}\}/g, (match, key) => {
@@ -53,17 +72,24 @@ function replacePlaceholders(template: string, params: Record<string, string>): 
 }
 
 interface SendLocalizedEmailParams {
+    /** 送信メールのタイプ */
     type: EmailType;
+    /** 宛先アドレス */
     to: string | string[];
+    /** テンプレート内プレースホルダーの置換用パラメータ */
     params: Record<string, string>;
+    /** 言語設定 (デフォルト 'ja') */
     lang?: 'ja' | 'en';
 }
 
 /**
- * Unified function to send localized emails based on type and params.
+ * 言語設定に基づいたローカライズ済みメールを送信します。
+ * 
+ * @param options - 送信先、タイプ、言語、各種パラメータ。
  */
 export async function sendLocalizedEmail(options: SendLocalizedEmailParams) {
     const { type, to, params, lang = 'ja' } = options;
+    // リンク生成に使用するベース URL (環境変数から取得)
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://meishigawarini.com';
 
     const subjectTemplate = subjects[lang][type];
@@ -73,10 +99,12 @@ export async function sendLocalizedEmail(options: SendLocalizedEmailParams) {
         throw new Error(`Email template not found for type: ${type} and lang: ${lang}`);
     }
 
+    // デフォルトの baseUrl を含めて全パラメータをマージ
     const allParams = { ...params, baseUrl };
     const subject = replacePlaceholders(subjectTemplate, allParams);
     const bodyText = replacePlaceholders(bodyTemplate, allParams);
 
+    // email-client を用いて送信を実行
     return await sendEmail({
         to,
         subject,

@@ -1,22 +1,42 @@
 /**
- * ファイル概要: システム管理者向けダッシュボード
- * 目的: QRコードのバッチ生成機能や生成履歴の確認、およびQRコードの個別ステータス管理やBAN処理を行います。
+ * ファイル概要: システム管理者向け統合ダッシュボード (Admin Dashboard)
+ * 
+ * 役割:
+ * システム全体の運用・管理を一括して行うための管理者専用画面です。
+ * 主にQRコードのバッチ生成、注文管理（Card Orders）、デザイン管理、ショップ権限管理、
+ * およびデバッグ用のデータダンプツールを提供します。
+ * 
+ * 主要機能:
+ * 1. QRコードの生成とエクスポート（PDF/CSV）。
+ * 2. カード注文（印刷依頼）のステータス管理とワークフロー。
+ * 3. 任意のQRコード・ユーザー・ショップのステータス確認とBAN/復元処理。
+ * 4. ショップに対するカードデザインの割当。
+ * 5. 新規ショップ作成、オーナー変更、マネージャー紐付け。
+ * 6. システムデバッグ用のDynamoDBデータダンプ。
+ * 
+ * セキュリティ:
+ * このページへのアクセスは Amplify の Cognito グループ (Administrators/GlobalAdmins) 
+ * によってバックエンド側でも厳格に制限されています。
  */
+
 "use client";
 
-import { useState, useEffect, useRef } from "react";
-import { notFound } from "next/navigation";
+import React, { useState, useEffect, useMemo } from 'react';
+import { notFound, useParams } from "next/navigation";
 import { getCurrentUser, fetchAuthSession } from 'aws-amplify/auth';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { APP_CONFIG } from "@/lib/config";
 import { generateId } from '@/lib/id';
 import { useTranslations } from 'next-intl';
-import { generatePDF, cardformats, paperformats } from '@/lib/generatePDF';
-import { ExternalLink, Copy, Eye, QrCode, Store, Wrench, Layers, HelpCircle, Home, Trash2, RotateCcw, Loader2 } from 'lucide-react';
+import { useBackendError } from '@/hooks/useBackendError';
+import { generatePDF } from '@/lib/generatePDF';
+import { cardformats, paperformats } from '@/lib/constants/designs';
+import { generateCSVExport } from '@/lib/generateCSVExport';
+import { ExternalLink, Copy, Check, Eye, QrCode, Store, Wrench, Layers, HelpCircle, Home, Trash2, RotateCcw, Loader2, Plus, X, Search, Save, FileText, Download, CreditCard, Printer, Paintbrush, ChevronDown, Settings } from 'lucide-react';
 import CardDesignEditor from "@/components/admin/CardDesignEditor";
 const NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 const NEXT_PUBLIC_APP_URL = process.env.NEXT_PUBLIC_APP_URL || "";
@@ -35,30 +55,122 @@ import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { Link, useRouter } from '@/i18n/routing';
 import { Textarea } from "@/components/ui/textarea";
+import { isValidWorkflowPayload } from '@shared/unified-chat-workflows';
 
 import { adminApi } from "@/lib/api/admin";
+import { uploadChatFile, ChatFileData } from '@/lib/uploadChatFile';
+import { getDisplayMessage } from '@/lib/chatMessage';
+import { toDisplayParticipantId } from '@/lib/chatId';
+import ChatAttachment from '@/components/chat/ChatAttachment';
+import OrderDetailsDialog from "@/components/admin/OrderDetailsDialog";
 
+/**
+ * SHOP_OPENING の form_snapshot を厳格に検証する type guard。
+ *
+ * 背景:
+ * - DBには過去バージョン由来の余分なキーや欠損データが混在する可能性があります。
+ * - 管理画面では承認処理時にこのスナップショットをそのまま表示・利用するため、
+ *   予期しない形状を受け入れない方針にしています。
+ */
+function isStrictShopOpeningSnapshot(value: unknown): value is {
+    shop_name: string;
+    owner_name: string;
+    contact_email: string;
+    notes?: string;
+} {
+    if (!value || typeof value !== 'object') {
+        return false;
+    }
+
+    const v = value as Record<string, unknown>;
+    const keys = Object.keys(v);
+    const allowed = ['shop_name', 'owner_name', 'contact_email', 'notes'];
+    if (!keys.every((k) => allowed.includes(k))) {
+        return false;
+    }
+
+    return (
+        typeof v.shop_name === 'string' &&
+        typeof v.owner_name === 'string' &&
+        typeof v.contact_email === 'string' &&
+        (v.notes === undefined || typeof v.notes === 'string')
+    );
+}
+
+/**
+ * 管理画面メインコンポーネント
+ */
 export default function AdminPage() {
+    /** 翻訳用フック (AdminPage namespace) */
     const t = useTranslations('AdminPage');
-    const tb = useTranslations('Backend');
+    /** エラー翻訳用フック */
+    const { translateError } = useBackendError();
+    /** 生成するQRコードの数 */
     const [count, setCount] = useState(10);
+    /** 検索キーワード (現在はQRCodeListSectionが主に担当) */
     const [keyword, setKeyword] = useState("");
+    /** 管理者による手動生成時の対象ショップID */
     const [shopId, setShopId] = useState("");
+    /** 紐付ける商品ID(オプション) */
     const [productId, setProductId] = useState("");
+    /** 紐付ける会員ID(オプション) */
     const [ownerUuid, setOwnerUuid] = useState("");
+    /** 紐付ける贈り主ID(オプション) */
     const [senderId, setSenderId] = useState("");
+    /** 有効期限設定 */
     const [expiryDate, setExpiryDate] = useState("");
+    /** 生成時に即アクティベートするかどうかの設定 */
     const [activateNow, setActivateNow] = useState(false);
+    /** メタデータ（ShopID等）を使用した詳細設定を使用するか */
     const [useMetadataOptions, setUseMetadataOptions] = useState(false);
+    /** このセッション中に生成されたバッチの履歴 */
     const [generatedBatches, setGeneratedBatches] = useState<any[]>([]);
+    /** PDF生成時の用紙フォーマット（A4等） */
     const [paperFormat, setPaperFormat] = useState("10S31251");
+    /** カードのデザイン（システムのプリセットまたはDBカスタムデザイン） */
     const [cardFormat, setCardFormat] = useState("gakuchousenbeiv1");
+    /** DBから取得したカスタムデザイン一覧 */
     const [dbCardDesigns, setDbCardDesigns] = useState<any[]>([]);
+    /** デザイン情報の再取得が必要かどうかのフラグ */
     const [reloadDbCardDesigns, setReloadDbCardDesigns] = useState(true);
+    /** 生成中フラグ */
     const [isGenerating, setIsGenerating] = useState(false);
+    /** CSVエクスポート中フラグ (OrderIDを保持) */
+    const [isExportingCsv, setIsExportingCsv] = useState<string | null>(null);
+    /** アクティブなタブ (qrcodes / cardorders / designs / shops / tools) */
     const [activeTab, setActiveTab] = useState("qrcodes");
+    /** カード注文一覧 */
+    const [cardOrders, setCardOrders] = useState<any[]>([]);
+    /** カード注文読み込み中フラグ */
+    const [cardOrdersLoading, setCardOrdersLoading] = useState(false);
+    /** カード注文のフィルターステータス (ORDERED / PRINTING / SHIPPED 等) */
+    const [cardOrderFilterStatus, setCardOrderFilterStatus] = useState("ORDERED");
+    /** カード注文のショップフィルター */
+    const [cardOrderFilterShopId, setCardOrderFilterShopId] = useState("");
+    /** ルーター */
     const router = useRouter();
+    /** 直近でコピーしたID (UI通知用) */
+    const [copiedId, setCopiedId] = useState<string | null>(null);
 
+    // ID Search states
+    const [searchId, setSearchId] = useState("");
+    const [isSearching, setIsSearching] = useState(false);
+    const [searchedOrder, setSearchedOrder] = useState<any>(null);
+
+
+    /**
+     * クリップボードにテキストをコピーします。
+     */
+    const handleCopy = (id: string) => {
+        navigator.clipboard.writeText(id).then(() => {
+            setCopiedId(id);
+            setTimeout(() => setCopiedId(null), 2000);
+        });
+    };
+
+    /**
+     * カスタムカードデザインの一覧をバックエンドから取得します。
+     */
     const fetchDbCardDesigns = async () => {
         try {
             const data = await adminApi.admin_carddesigns_list({});
@@ -68,15 +180,69 @@ export default function AdminPage() {
         }
     };
 
+    /**
+     * タブ切り替えや初期化時のデータ取得制御。
+     */
     useEffect(() => {
-        if (reloadDbCardDesigns && activeTab === "qrcodes") {
+        if (reloadDbCardDesigns && (activeTab === "qrcodes" || activeTab === "cardorders" || activeTab === "shops")) {
             fetchDbCardDesigns();
             setReloadDbCardDesigns(false);
         }
         if (activeTab === "designs") {
             setReloadDbCardDesigns(true);
         }
-    }, [activeTab, reloadDbCardDesigns]);
+        if (activeTab === "cardorders") {
+            fetchCardOrders();
+        }
+    }, [activeTab, reloadDbCardDesigns, cardOrderFilterStatus]);
+
+    /**
+     * カード注文の一覧を取得します（フィルタ条件に従う）。
+     */
+    const fetchCardOrders = async () => {
+        setCardOrdersLoading(true);
+        try {
+            const data = await adminApi.admin_card_orders_list({
+                status: cardOrderFilterStatus,
+                limit: 50
+            });
+            setCardOrders(data.items || []);
+        } catch (e) {
+            console.error("Failed to fetch card orders", e);
+        } finally {
+            setCardOrdersLoading(false);
+        }
+    };
+
+    /**
+     * カード注文のステータスを更新します。
+     * ワークフローの制御（未処理 -> 印刷中 -> 発送済み等）を行います。
+     * @param shopId 対象ショップID
+     * @param orderId 対象注文ID
+     * @param status 新しいステータス
+     * @param batchId 紐付けるQRバッチID (印刷工程開始時に自動設定されることが多い)
+     */
+    const handleUpdateCardOrderStatus = async (shopId: string, orderId: string, status: string, batchId?: string) => {
+        try {
+            // UIに即座に反映させるため楽観的更新を実施
+            setCardOrders(prev => prev.map(o => o.order_id === orderId ? { ...o, status, batch_id: batchId || o.batch_id, ts_updated_at: new Date().toISOString() } : o));
+
+            await adminApi.admin_card_orders_update({
+                shop_id: shopId,
+                order_id: orderId,
+                status,
+                batch_id: batchId
+            });
+
+            // GSI(Global Secondary Index)の反映遅延を考慮し、少々の待機後に一覧を再取得
+            setTimeout(() => fetchCardOrders(), 1000);
+        } catch (e) {
+            console.error("Failed to update status:", e);
+            alert(translateError('Internal Server Error'));
+            // エラー時はDBの状態を正として再取得し直す
+            fetchCardOrders();
+        }
+    };
 
     //Note: Authentication check is now handled by AdminLayout
 
@@ -86,54 +252,182 @@ export default function AdminPage() {
 
 
 
-    const handleGenerate = async () => {
-        setIsGenerating(true);
+    /**
+     * 指定されたカード注文 (Card Order) に対して、PDFまたはCSVのエクスポートを実行します。
+     * 必要に応じて、このタイミングで新規のQRコードを生成（バッチ作成）します。
+     * 
+     * フロー:
+     * 1. 注文に紐づくバッチがあるか確認。
+     * 2. あれば既存バッチの内容を取得。なければ新規生成 API を叩く。
+     * 3. 印刷物生成用のデータをローカルバッチ履歴に追加。
+     * 4. デザイン情報（システム定義 or カスタム定義）を解決。
+     * 5. generatePDF / generateCSVExport を呼び出してブラウザからダウンロード。
+     * 
+     * @param order 注文データ
+     * @param type エクスポート形式 ('pdf' | 'csv')
+     */
+    const handleExport = async (order: any, type: 'pdf' | 'csv') => {
+        setIsExportingCsv(order.order_id); // UIの進捗表示に使用
         try {
+            let codes: any[] = [];
+            let batchId = order.batch_id;
+
+            if (batchId) {
+                // 【ケースA】既にバッチIDが注文に紐付いている場合 -> 既存データを取得
+                const data = await adminApi.admin_qr_batch_get({ batch_id: batchId });
+                codes = data.data;
+
+                // もしステータスが ORDERED のままなら、印刷開始(PRINTING)に更新
+                if (order.status === 'ORDERED') {
+                    await handleUpdateCardOrderStatus(order.shop_id, order.order_id, 'PRINTING', batchId);
+                }
+            } else if (order.status === 'ORDERED') {
+                // 【ケースB】まだQRコードが未生成の場合 -> 新規一括生成を実行
+                const data = await adminApi.admin_qr_generate({
+                    order_id: order.order_id
+                });
+                codes = data.data;
+                batchId = data.batch_id;
+
+                // Lambda側で注文データの更新も行われるが、念のためUIを同期
+                setTimeout(() => fetchCardOrders(), 1000);
+            } else {
+                // 特殊ケース：バッチ情報なしに発送等へ移行している場合
+                alert("No QR codes found for this order. It may have been processed without saving a batch ID.");
+                return;
+            }
+
+            // ダウンロードトリガー用のバッチオブジェクト作成
+            const batch = {
+                id: batchId,
+                count: codes.length,
+                codes: codes,
+                date: new Date(order.ts_created_at || new Date()).toLocaleString(),
+                status: 'ready',
+                design_id: order.design_id
+            };
+
+            // ローカルの生成履歴に追加（セッション中のみ保持）
+            setGeneratedBatches(prev => {
+                const exists = prev.find(b => b.id === batchId);
+                if (exists) return prev;
+                return [batch, ...prev];
+            });
+
+            // デザインIDの解決（カスタム design_id または システムプリセット）
             const resolveDesign = (designId?: string) => {
                 const targetId = designId || cardFormat;
                 const dbDesign = dbCardDesigns.find(d => d.design_id === targetId);
                 if (dbDesign) return dbDesign;
                 if (cardformats[targetId]) return targetId;
-                // Fallback to currently selected global design
                 const globalDesign = dbCardDesigns.find(d => d.design_id === cardFormat);
                 return globalDesign || cardFormat;
             };
+            const design = resolveDesign(order.design_id);
 
-            const data = await adminApi.admin_qr_generate({
-                count,
-                ...(useMetadataOptions ? {
-                    shopId: shopId || undefined,
-                    productId: productId || undefined,
-                    owner_uuid: ownerUuid || undefined,
-                    senderId: senderId || undefined,
-                    expiry_date: expiryDate ? new Date(expiryDate).toISOString() : undefined,
-                    activate_now: activateNow
-                } : {}),
-                card_design: cardFormat
+            // PDF/CSVのダウンロード実行
+            if (type === 'pdf') {
+                await generatePDF(batch, paperFormat, design);
+            } else {
+                await generateCSVExport(batch, design);
+            }
+        } catch (e) {
+            console.error("Export failed", e);
+            alert("Export failed. Please check if the design and shop are correct.");
+        } finally {
+            setIsExportingCsv(null);
+        }
+    };
+
+    /**
+     * フォーム入力内容から新規の「カード注文 (Card Order)」を作成し、
+     * 即座にQRコード生成とPDFダウンロード（初期配布用）までを一括して実行します。
+     * 
+     * 本システムでは、QRコードのみの生成は行わず、必ず「注文」に紐付けることで
+     * 発送フローやデザイン履歴、メタ情報の整合性を担保しています。
+     */
+    const handleGenerate = async () => {
+        setIsGenerating(true);
+        try {
+            // 1. CARD_ORDER エンティティを作成 (DBに永続化)
+            const orderRes = await adminApi.admin_card_orders_create({
+                shop_id: shopId,
+                quantity: count,
+                design_id: cardFormat,
+                product_id: productId || undefined,
+                shop_user_id: ownerUuid || undefined,
+                sender_user_id: senderId || undefined,
+                expiration_date: expiryDate ? new Date(expiryDate).toISOString() : undefined,
+                activate_now: activateNow
             });
 
-            const batchid = `batch-${data.batch_id}`;
-            const now = new Date();
+            // 2. 注文履歴を再読込
+            await fetchCardOrders();
 
-            const newBatch = {
-                id: batchid,
-                count: data.count,
-                date: now.toLocaleString(),
-                status: t('batches.status.ready'),
-                codes: data.data // Store the codes
+            // 3. 作成された注文を元に、生成・ダウンロード処理を開始 (handleExportを共有)
+            const newOrder = {
+                order_id: orderRes.order_id,
+                shop_id: shopId,
+                quantity: count,
+                status: 'ORDERED',
+                design_id: cardFormat,
+                product_id: productId,
+                ts_created_at: new Date().toISOString()
             };
-            setGeneratedBatches([newBatch, ...generatedBatches]);
 
-            // Automatically download PDF
-            const design = resolveDesign(cardFormat);
-            await generatePDF(newBatch, paperFormat, design);
+            await handleExport(newOrder, 'pdf');
+
         } catch (e: any) {
             const errData = e;
-            alert((tb(errData?.message?.replace(/\./g, '_')) || errData?.message) || t('batches.alerts.failed') + (errData?.detail?.toString() || ''));
+            alert((translateError(errData?.message, errData?.detail) || errData?.message) || t('batches.alerts.failed') + (errData?.detail?.toString() || ''));
         } finally {
             setIsGenerating(false);
         }
     };
+
+    /**
+     * ID（注文ID、バッチID、QRコードID）による各リソースの検索を実行します。
+     * プレフィックス(QR#, ORDER#等)の正規化を行い、適切なAPIエンドポイントへ振り分けます。
+     */
+    const handleIdSearch = async () => {
+        if (!searchId.trim()) return;
+        setIsSearching(true);
+        try {
+            // 入力の正規化: 先頭のプレフィックスを除去して純粋なUUID/IDを取り出す
+            let orderId = searchId.trim().replace(/^(ORDER#|QR_BATCH#|QR#)/, '');
+
+            console.log(`[AdminSearch] Starting search workflow for normalized ID: ${orderId}`);
+
+            // 1. バッチID（QRコードの束）としての検索を優先試行
+            try {
+                const batchRes = await adminApi.admin_qr_batch_get({ batch_id: orderId });
+                if (batchRes && batchRes.order_id) {
+                    // バッチに紐づく注文IDを発見した場合は、注文情報の取得へ移行
+                    console.log(`[AdminSearch] Found matching Batch. Resolving to OrderID: ${batchRes.order_id}`);
+                    orderId = batchRes.order_id;
+                }
+            } catch (e) {
+                // バッチIDでない場合はそのまま注文IDとして扱う
+            }
+
+            // 2. 確定した注文IDを用いて、詳細情報を取得
+            const orderRes = await adminApi.admin_card_orders_get({ order_id: orderId });
+            setSearchedOrder(orderRes);
+        } catch (e: any) {
+            console.error('[AdminSearch] Search failed:', e);
+            if (e.status === 404) {
+                alert(t('cardOrders.search.notFound'));
+            } else {
+                alert(t('cardOrders.search.error') || 'Search failed. Please try again.');
+            }
+        } finally {
+            setIsSearching(false);
+        }
+    };
+
+
+    const currentSelectedDesign = dbCardDesigns.find(d => d.design_id === cardFormat) || cardformats[cardFormat] || cardformats['gakuchousenbeiv1'];
+    const previewAspectRatio = `${currentSelectedDesign.width || 84} / ${currentSelectedDesign.height || 52}`;
 
 
 
@@ -143,22 +437,26 @@ export default function AdminPage() {
                 <div className="flex justify-between items-center flex-wrap gap-4">
                     <h1 className="text-2xl font-bold text-white w-full sm:w-auto text-center sm:text-left">{t('title')}</h1>
                     <div className="flex items-center gap-2 flex-wrap justify-center sm:justify-end w-full sm:w-auto">
-                        <Link href="/admin/help/overview">
+                        <Link href="/admin/help" target="_blank" rel="noopener noreferrer">
                             <Button variant="outline" className="bg-mist-800 border-mist-700 text-mist-300 hover:bg-mist-700 hover:text-white transition-all duration-300">
                                 <HelpCircle className="w-4 h-4 mr-2" />
                                 {t('helpButton') || "Help"}
                             </Button>
                         </Link>
-                        <Link href="/login" className="w-full sm:w-auto">
+                        {/* <Link href="/login" className="w-full sm:w-auto">
                             <Button variant="destructive" className="shadow-md cursor-pointer border border-red-900 w-full sm:w-auto">
                                 {t('qrAdminLoginPage')}
                             </Button>
-                        </Link>
+                        </Link> */}
+
+                        <Button variant="ghost" className="text-mist-500 hover:text-mist-800" onClick={() => router.push('/login')}>
+                            <ChevronDown className="h-4 w-4 mr-1 rotate-90" /> {t('back')}
+                        </Button>
                     </div>
                 </div>
 
 
-                <div className="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
                     <button
                         onClick={() => setActiveTab("qrcodes")}
                         className={cn(
@@ -168,8 +466,20 @@ export default function AdminPage() {
                                 : "bg-mist-800 border-mist-700 text-mist-300 hover:border-mist-600 hover:bg-mist-700/50"
                         )}
                     >
-                        <QrCode className={cn("w-12 h-12 mb-3", activeTab === "qrcodes" ? "text-mist-900" : "text-mist-400")} />
+                        <CreditCard className={cn("w-12 h-12 mb-3", activeTab === "qrcodes" ? "text-mist-900" : "text-mist-400")} />
                         <span className="text-lg font-bold">{t('tabs.qrcodes')}</span>
+                    </button>
+                    <button
+                        onClick={() => setActiveTab("cardorders")}
+                        className={cn(
+                            "flex flex-col items-center justify-center p-6 rounded-2xl border-2 transition-all duration-200 cursor-pointer shadow-sm hover:shadow-md",
+                            activeTab === "cardorders"
+                                ? "bg-white border-white text-mist-900 ring-2 ring-mist-700 ring-offset-2 ring-offset-mist-900"
+                                : "bg-mist-800 border-mist-700 text-mist-300 hover:border-mist-600 hover:bg-mist-700/50"
+                        )}
+                    >
+                        <Printer className={cn("w-12 h-12 mb-3", activeTab === "cardorders" ? "text-mist-900" : "text-mist-400")} />
+                        <span className="text-lg font-bold">{t('tabs.cardorders')}</span>
                     </button>
                     <button
                         onClick={() => setActiveTab("designs")}
@@ -180,7 +490,7 @@ export default function AdminPage() {
                                 : "bg-mist-800 border-mist-700 text-mist-300 hover:border-mist-600 hover:bg-mist-700/50"
                         )}
                     >
-                        <Layers className={cn("w-12 h-12 mb-3", activeTab === "designs" ? "text-mist-900" : "text-mist-400")} />
+                        <Paintbrush className={cn("w-12 h-12 mb-3", activeTab === "designs" ? "text-mist-900" : "text-mist-400")} />
                         <span className="text-lg font-bold">{t('tabs.designs')}</span>
                     </button>
                     <button
@@ -196,6 +506,18 @@ export default function AdminPage() {
                         <span className="text-lg font-bold">{t('tabs.shops')}</span>
                     </button>
                     <button
+                        onClick={() => setActiveTab("inquiries")}
+                        className={cn(
+                            "flex flex-col items-center justify-center p-6 rounded-2xl border-2 transition-all duration-200 cursor-pointer shadow-sm hover:shadow-md",
+                            activeTab === "inquiries"
+                                ? "bg-white border-white text-mist-900 ring-2 ring-mist-700 ring-offset-2 ring-offset-mist-900"
+                                : "bg-mist-800 border-mist-700 text-mist-300 hover:border-mist-600 hover:bg-mist-700/50"
+                        )}
+                    >
+                        <HelpCircle className={cn("w-12 h-12 mb-3", activeTab === "inquiries" ? "text-mist-900" : "text-mist-400")} />
+                        <span className="text-lg font-bold">{t('tabs.inquiries')}</span>
+                    </button>
+                    <button
                         onClick={() => setActiveTab("tools")}
                         className={cn(
                             "flex flex-col items-center justify-center p-6 rounded-2xl border-2 transition-all duration-200 cursor-pointer shadow-sm hover:shadow-md",
@@ -209,17 +531,131 @@ export default function AdminPage() {
                     </button>
                 </div>
 
+
+
+
+
+                {/* 
+                 * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                 * ─── QRコード管理タブ (QR Codes) ──────────────────────────────────────
+                 * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                 */}
                 {activeTab === "qrcodes" && (
                     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
+
+
+                        {/* すべてのQRコード一覧 */}
+                        <QRCodeListSection
+                            apiUrl={NEXT_PUBLIC_API_URL}
+                            onGeneratePDF={generatePDF}
+                            paperFormat={paperFormat}
+                            cardFormat={cardFormat}
+                            dbCardDesigns={dbCardDesigns}
+                        />
+                    </div>
+                )}
+
+
+
+
+
+                {/* 
+                 * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                 * ─── カード注文管理タブ (Card Orders) ──────────────────────────────────
+                 * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                 */}
+                {activeTab === "cardorders" && (
+                    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
+
+                        <Card>
+                            <CardHeader className="flex flex-row items-center gap-2">
+                                <Settings />
+                                <CardTitle>Config</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="flex flex-col w-full gap-1 ">
+                                    <label className="mt-4 w-full flex  items-center text-[11px] sm:text-xs text-gray-700 font-medium">{t('generate.paperFormat')}</label>
+                                    <select
+                                        className="w-full rounded-md p-2 text-sm border border-gray-200 shadow-sm text-black bg-white"
+                                        value={paperFormat}
+                                        onChange={(e) => setPaperFormat(e.target.value)}
+                                    >
+                                        {Object.entries(paperformats).map(([key, value]: [string, any]) => (
+                                            <option key={key} value={key}>{value.description || key}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            </CardContent>
+                        </Card>
+
+
+                        <CardOrderListSection
+                            orders={cardOrders}
+                            loading={cardOrdersLoading}
+                            statusFilter={cardOrderFilterStatus}
+                            setStatusFilter={setCardOrderFilterStatus}
+                            shopIdFilter={cardOrderFilterShopId}
+                            setShopIdFilter={setCardOrderFilterShopId}
+                            onUpdateStatus={handleUpdateCardOrderStatus}
+                            onRefresh={fetchCardOrders}
+                            onExport={handleExport}
+                            isExporting={isExportingCsv}
+                            dbCardDesigns={dbCardDesigns}
+                            paperFormat={paperFormat}
+                            cardFormat={cardFormat}
+                        />
+
+                        {/* ID Search Section (Standalone) */}
+                        {/* <Card>
+                            <CardHeader>
+                                <CardTitle className="flex items-center gap-2">
+                                    <Search className="w-5 h-5" />
+                                    {t('cardOrders.search.title')}
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="flex gap-2">
+                                    <div className="relative flex-1">
+                                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                                        <Input
+                                            placeholder={t('cardOrders.search.placeholder')}
+                                            value={searchId}
+                                            onChange={(e) => setSearchId(e.target.value)}
+                                            onKeyDown={(e) => e.key === 'Enter' && handleIdSearch()}
+                                            className="pl-10 h-11 text-black bg-white border-gray-200"
+                                        />
+                                    </div>
+                                    <Button
+                                        onClick={handleIdSearch}
+                                        disabled={isSearching || !searchId.trim()}
+                                        className="h-11 px-6 bg-mist-800 hover:bg-mist-700 text-white font-bold transition-all"
+                                    >
+                                        {isSearching ? (
+                                            <>
+                                                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                                                {t('cardOrders.search.searching')}
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Search className="w-4 h-4 mr-2" />
+                                                {t('cardOrders.search.button')}
+                                            </>
+                                        )}
+                                    </Button>
+                                </div>
+                            </CardContent>
+                        </Card> */}
+
                         {/* QRコード生成 */}
                         <Card>
+
                             <CardHeader>
                                 <CardTitle>{t('generate.title')}</CardTitle>
                             </CardHeader>
                             <CardContent className="space-y-4">
                                 <div className="flex flex-col w-full gap-1.5">
                                     <div className="grid w-full items-center gap-1.5">
-                                        <label htmlFor="count" className="text-sm font-medium">{t('generate.quantity')}</label>
+                                        <label htmlFor="count" className="text-lg font-bold mt-4">1. {t('generate.quantity')}</label>
                                         <Input
                                             id="count"
                                             type="number"
@@ -228,7 +664,67 @@ export default function AdminPage() {
                                         />
                                     </div>
 
-                                    <div className="flex items-center gap-2 mt-4">
+                                    <h3 className="text-lg font-bold mt-4">2. {t('generate.pdfOptions')}</h3>
+                                    <div className="space-y-4 rounded-xl bg-gray-100 border border-gray-200 border-dashed border-5 p-3 sm:p-4">
+                                        <div className="flex flex-col gap-3">
+
+                                            <div className="flex flex-col sm:flex-row w-full gap-1">
+                                                <label className="flex w-full sm:w-24 items-center text-[11px] sm:text-xs text-gray-700 font-medium">{t('generate.cardFormat')}</label>
+                                                <select
+                                                    className="flex-1 min-w-0 w-full rounded-md p-2 text-sm border border-gray-200 shadow-sm text-black bg-white"
+                                                    value={cardFormat}
+                                                    onChange={(e) => setCardFormat(e.target.value)}
+                                                >
+                                                    {Object.entries(cardformats).map(([key, value]: [string, any]) => (
+                                                        <option key={key} value={key}>{value.name || key} [System]</option>
+                                                    ))}
+                                                    {dbCardDesigns.map((d: any) => (
+                                                        <option key={d.design_id} value={d.design_id}>{d.name || d.design_id} [DB]</option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                        </div>
+
+                                        {/* Card Preview */}
+                                        <div className="w-full overflow-hidden">
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                                <div className="space-y-1 w-full">
+                                                    <div
+                                                        className="w-full relative rounded shadow-lg overflow-hidden border border-gray-700 bg-white"
+                                                        style={{ aspectRatio: previewAspectRatio }}
+                                                    >
+                                                        <img
+                                                            src={(dbCardDesigns.find(d => d.design_id === cardFormat)?.thumbf || dbCardDesigns.find(d => d.design_id === cardFormat)?.bgimgf) || cardformats[cardFormat]?.bgimgf}
+                                                            alt={t('generate.frontPreview')}
+                                                            className="absolute inset-0 w-full h-full object-fill"
+                                                            crossOrigin="anonymous"
+                                                        />
+                                                    </div>
+                                                    <p className="text-[10px] text-gray-500 text-center uppercase tracking-wider">{t('generate.front')}</p>
+                                                </div>
+                                                <div className="space-y-1 w-full">
+                                                    <div
+                                                        className="w-full relative rounded shadow-lg overflow-hidden border border-gray-700 bg-white"
+                                                        style={{ aspectRatio: previewAspectRatio }}
+                                                    >
+                                                        <img
+                                                            src={(dbCardDesigns.find(d => d.design_id === cardFormat)?.thumbb || dbCardDesigns.find(d => d.design_id === cardFormat)?.bgimgb) || cardformats[cardFormat]?.bgimgb}
+                                                            alt={t('generate.backPreview')}
+                                                            className="absolute inset-0 w-full h-full object-fill"
+                                                            crossOrigin="anonymous"
+                                                        />
+                                                    </div>
+                                                    <p className="text-[10px] text-gray-500 text-center uppercase tracking-wider">{t('generate.back')}</p>
+                                                </div>
+                                            </div>
+                                        </div>
+
+
+                                    </div>
+
+
+                                    <label htmlFor="shopId" className="text-lg font-bold mt-4">3. {t('generate.option')}</label>
+                                    <div className="flex items-center gap-2">
                                         <Switch
                                             id="useMetadataOptions"
                                             checked={useMetadataOptions}
@@ -239,7 +735,6 @@ export default function AdminPage() {
                                         </Label>
                                     </div>
 
-                                    <label htmlFor="shopId" className="text-sm font-medium mb-0 mt-2">{t('generate.option')}</label>
                                     <div className={cn(
                                         "grid w-full items-center gap-2 p-4 rounded-xl bg-gray-100 border border-gray-200 border-dashed border-5 transition-all duration-200",
                                         !useMetadataOptions && "opacity-50 grayscale pointer-events-none"
@@ -273,7 +768,7 @@ export default function AdminPage() {
                                         <div className="grid w-full items-center gap-1.5">
                                             <div className="flex items-center gap-2">
                                                 <div className={cn("w-3 h-3 rounded-full items-center justify-center", ownerUuid ? "bg-red-500" : "bg-gray-500")}></div>
-                                                <label htmlFor="ownerUuid" className="text-sm font-medium">{t('generate.ownerUuid')}</label>
+                                                <label htmlFor="ownerUuid" className="text-sm font-medium">{t('generate.ownerUserId')}</label>
                                             </div>
                                             <Input
                                                 id="ownerUuid"
@@ -322,71 +817,10 @@ export default function AdminPage() {
                                         </div>
                                     </div>
 
-                                    <h3 className="text-sm font-semibold pt-8">{t('generate.pdfOptions')}</h3>
-                                    <div className="space-y-4 rounded-xl bg-gray-100 border border-gray-200 border-dashed border-5 p-3 sm:p-4">
-                                        <div className="flex flex-col gap-3">
-                                            <div className="flex flex-col sm:flex-row w-full gap-1">
-                                                <label className="flex w-full sm:w-24 items-center text-[11px] sm:text-xs text-gray-700 font-medium">{t('generate.paperFormat')}</label>
-                                                <select
-                                                    className="flex-1 min-w-0 w-full rounded-md p-2 text-sm border border-gray-200 shadow-sm text-black bg-white"
-                                                    value={paperFormat}
-                                                    onChange={(e) => setPaperFormat(e.target.value)}
-                                                >
-                                                    {Object.entries(paperformats).map(([key, value]: [string, any]) => (
-                                                        <option key={key} value={key}>{value.description || key}</option>
-                                                    ))}
-                                                </select>
-                                            </div>
-                                            <div className="flex flex-col sm:flex-row w-full gap-1">
-                                                <label className="flex w-full sm:w-24 items-center text-[11px] sm:text-xs text-gray-700 font-medium">{t('generate.cardFormat')}</label>
-                                                <select
-                                                    className="flex-1 min-w-0 w-full rounded-md p-2 text-sm border border-gray-200 shadow-sm text-black bg-white"
-                                                    value={cardFormat}
-                                                    onChange={(e) => setCardFormat(e.target.value)}
-                                                >
-                                                    {Object.entries(cardformats).map(([key, value]: [string, any]) => (
-                                                        <option key={key} value={key}>{value.description || key} [System]</option>
-                                                    ))}
-                                                    {dbCardDesigns.map((d: any) => (
-                                                        <option key={d.design_id} value={d.design_id}>{d.description} [DB]</option>
-                                                    ))}
-                                                </select>
-                                            </div>
-                                        </div>
-
-                                        {/* Card Preview */}
-                                        <div className="w-full overflow-hidden">
-                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                                <div className="space-y-1 w-full">
-                                                    <div className="aspect-[84/52] w-full relative rounded shadow-lg overflow-hidden border border-gray-700 bg-white">
-                                                        <img
-                                                            src={(dbCardDesigns.find(d => d.design_id === cardFormat)?.thumbf || dbCardDesigns.find(d => d.design_id === cardFormat)?.bgimgf) || cardformats[cardFormat]?.bgimgf}
-                                                            alt={t('generate.frontPreview')}
-                                                            className="absolute inset-0 w-full h-full object-cover"
-                                                            crossOrigin="anonymous"
-                                                        />
-                                                    </div>
-                                                    <p className="text-[10px] text-gray-500 text-center uppercase tracking-wider">{t('generate.front')}</p>
-                                                </div>
-                                                <div className="space-y-1 w-full">
-                                                    <div className="aspect-[84/52] w-full relative rounded shadow-lg overflow-hidden border border-gray-700 bg-white">
-                                                        <img
-                                                            src={(dbCardDesigns.find(d => d.design_id === cardFormat)?.thumbb || dbCardDesigns.find(d => d.design_id === cardFormat)?.bgimgb) || cardformats[cardFormat]?.bgimgb}
-                                                            alt={t('generate.backPreview')}
-                                                            className="absolute inset-0 w-full h-full object-cover"
-                                                            crossOrigin="anonymous"
-                                                        />
-                                                    </div>
-                                                    <p className="text-[10px] text-gray-500 text-center uppercase tracking-wider">{t('generate.back')}</p>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-
                                     <div className="grid w-full items-center gap-1.5 mt-4">
                                         <Button
                                             onClick={handleGenerate}
-                                            className="w-full items-center gap-1.5 h-12"
+                                            className="w-full items-center gap-1.5 h-24"
                                             disabled={isGenerating}
                                         >
                                             {isGenerating ? (
@@ -399,56 +833,145 @@ export default function AdminPage() {
                                             )}
                                         </Button>
                                     </div>
+
                                 </div>
                             </CardContent>
-                        </Card>
+                            {/* このページを開いてから生成したQRコードのバッチ一覧 */}
+                            <CardFooter className="border-t">
 
 
-                        {/* このページを開いてから生成したQRコードのバッチ一覧 */}
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>{t('batches.title')}</CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="space-y-4">
+                                <div className="space-y-4 w-full">
+                                    <CardTitle>{t('batches.title')}</CardTitle>
                                     {generatedBatches.length === 0 ? <p className="text-gray-500">{t('batches.noBatches')}</p> : (
                                         generatedBatches.map(batch => (
                                             <div key={batch.id} className="bg-white border p-4 rounded-md">
-                                                <div className="flex flex-wrap items-center mb-2">
+                                                <div className="flex items-center mb-2">
                                                     <div className="flex gap-2 flex-wrap flex-rows items-center">
                                                         <div>
-                                                            <p className="font-medium">{t('batches.batchId', { id: batch.id })}</p>
+                                                            <div className="flex items-center gap-1">
+                                                                <p className="font-medium">{t('batches.batchId', { id: batch.id })}</p>
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="icon"
+                                                                    className="h-4 w-4"
+                                                                    onClick={() => handleCopy(batch.id)}
+                                                                >
+                                                                    {copiedId === batch.id ? (
+                                                                        <Check className="h-3 w-3 text-green-500" />
+                                                                    ) : (
+                                                                        <Copy className="h-3 w-3" />
+                                                                    )}
+                                                                </Button>
+                                                            </div>
                                                             <p className="text-sm text-gray-500">{t('batches.info', { count: batch.count, date: batch.date })}</p>
                                                         </div>
-                                                        <p className="flex justify-center items-center text-sm bg-green-100 text-green-800 px-3 py-1 rounded-xl">{batch.status}</p>
+                                                        <p className="flex justify-center items-center text-sm bg-green-100 text-green-800 px-3 py-1 rounded-xl">{t(`batches.status.${batch.status}`)}</p>
                                                     </div>
                                                     <Button className="ml-auto" variant="outline" size="sm" onClick={() => {
-                                                        const resolveDesign = (designId?: string) => {
-                                                            const targetId = designId || cardFormat;
-                                                            const dbDesign = dbCardDesigns.find(d => d.design_id === targetId);
-                                                            if (dbDesign) return dbDesign;
-                                                            if (cardformats[targetId]) return targetId;
-                                                            const globalDesign = dbCardDesigns.find(d => d.design_id === cardFormat);
-                                                            return globalDesign || cardFormat;
-                                                        };
-                                                        const design = resolveDesign(batch.card_design);
-                                                        generatePDF(batch, paperFormat, design);
-                                                    }}>{t('batches.downloadPdf')}</Button>
+                                                        setIsExportingCsv(batch.id);
+                                                        try {
+                                                            const resolveDesign = (designId?: string) => {
+                                                                const targetId = designId || cardFormat;
+                                                                const dbDesign = dbCardDesigns.find(d => d.design_id === targetId);
+                                                                if (dbDesign) return dbDesign;
+                                                                if (cardformats[targetId]) return targetId;
+                                                                const globalDesign = dbCardDesigns.find(d => d.design_id === cardFormat);
+                                                                return globalDesign || cardFormat;
+                                                            };
+                                                            const design = resolveDesign(batch.design_id);
+                                                            generatePDF(batch, paperFormat, design);
+                                                        } finally {
+                                                            setIsExportingCsv(null);
+                                                        }
+                                                    }}>
+                                                        {isExportingCsv === batch.id ? (
+                                                            <>
+                                                                <Loader2 className="w-3 h-3 animate-spin mr-1" />
+                                                                {t('batches.downloading')}
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <FileText className="w-4 h-4 mr-2" />
+                                                                {t('batches.downloadPdf')}
+                                                            </>
+                                                        )}
+                                                    </Button>
+                                                    <Button className="ml-2" variant="outline" size="sm" disabled={isExportingCsv === batch.id} onClick={async () => {
+                                                        setIsExportingCsv(batch.id);
+                                                        try {
+                                                            const resolveDesign = (designId?: string) => {
+                                                                const targetId = designId || cardFormat;
+                                                                const dbDesign = dbCardDesigns.find(d => d.design_id === targetId);
+                                                                if (dbDesign) return dbDesign;
+                                                                if (cardformats[targetId]) return targetId;
+                                                                const globalDesign = dbCardDesigns.find(d => d.design_id === cardFormat);
+                                                                return globalDesign || cardFormat;
+                                                            };
+                                                            const design = resolveDesign(batch.design_id);
+                                                            await generateCSVExport(batch, design);
+                                                        } finally {
+                                                            setIsExportingCsv(null);
+                                                        }
+                                                    }}>
+                                                        {isExportingCsv === batch.id ? (
+                                                            <>
+                                                                <Loader2 className="w-3 h-3 animate-spin mr-1" />
+                                                                {t('batches.downloading')}
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <Download className="w-4 h-4 mr-2" />
+                                                                {t('batches.downloadCsv')}
+                                                            </>
+                                                        )}
+                                                    </Button>
                                                 </div>
                                                 {/* Display Codes */}
                                                 <div className="mt-2 bg-gray-100 p-2 rounded text-xs font-mono overflow-auto max-h-40">
                                                     <table className="w-full text-left">
                                                         <thead>
                                                             <tr>
-                                                                <th>{t('batches.table.uuid')}</th>
+                                                                <th>{t('batches.table.qrId')}</th>
                                                                 <th>{t('batches.table.pin')}</th>
                                                             </tr>
                                                         </thead>
                                                         <tbody>
                                                             {batch.codes?.map((code: any) => (
-                                                                <tr key={code.uuid} className="border-b border-gray-200 last:border-0">
-                                                                    <td className="pr-4 py-0.5 select-all text-[10px] break-all">{code.uuid}</td>
-                                                                    <td className="py-0.5 select-all text-[10px] break-all">{code.pin}</td>
+                                                                <tr key={code.qr_id} className="border-b border-gray-200 last:border-0 group">
+                                                                    <td className="pr-4 py-0.5 select-all text-[10px] break-all">
+                                                                        <div className="flex items-center gap-1">
+                                                                            {code.qr_id}
+                                                                            <Button
+                                                                                variant="ghost"
+                                                                                size="icon"
+                                                                                className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                                                onClick={() => handleCopy(code.qr_id)}
+                                                                            >
+                                                                                {copiedId === code.qr_id ? (
+                                                                                    <Check className="h-2 w-2 text-green-500" />
+                                                                                ) : (
+                                                                                    <Copy className="h-2 w-2" />
+                                                                                )}
+                                                                            </Button>
+                                                                        </div>
+                                                                    </td>
+                                                                    <td className="py-0.5 select-all text-[10px] break-all">
+                                                                        <div className="flex items-center gap-1">
+                                                                            {code.pin}
+                                                                            <Button
+                                                                                variant="ghost"
+                                                                                size="icon"
+                                                                                className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                                                onClick={() => handleCopy(code.pin)}
+                                                                            >
+                                                                                {copiedId === code.pin ? (
+                                                                                    <Check className="h-2 w-2 text-green-500" />
+                                                                                ) : (
+                                                                                    <Copy className="h-2 w-2" />
+                                                                                )}
+                                                                            </Button>
+                                                                        </div>
+                                                                    </td>
                                                                 </tr>
                                                             ))}
                                                         </tbody>
@@ -458,52 +981,1813 @@ export default function AdminPage() {
                                         ))
                                     )}
                                 </div>
-                            </CardContent>
+                            </CardFooter>
                         </Card>
 
+                        {searchedOrder && (
+                            <OrderDetailsDialog
+                                order={searchedOrder}
+                                isOpen={!!searchedOrder}
+                                onClose={() => setSearchedOrder(null)}
+                                onUpdateStatus={handleUpdateCardOrderStatus}
+                                onExport={handleExport}
+                                isExporting={isExportingCsv}
+                                dbCardDesigns={dbCardDesigns}
+                                paperFormat={paperFormat}
+                            />
+                        )}
 
-                        {/* すべてのQRコード一覧 */}
-                        <QRCodeListSection
-                            apiUrl={NEXT_PUBLIC_API_URL}
-                            onGeneratePDF={generatePDF}
-                            paperFormat={paperFormat}
-                            cardFormat={cardFormat}
-                            dbCardDesigns={dbCardDesigns}
-                        />
+
                     </div>
                 )}
 
+
+
+
+
+                {/* 
+                 * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                 * ─── ショップ管理タブ (Shops) ─────────────────────────────────────────
+                 * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                 */}
                 {activeTab === "shops" && (
                     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                        {/* ショップの新規作成 (NEW) */}
-                        <AdminShopCreationSection apiUrl={NEXT_PUBLIC_API_URL} />
+                        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 items-start">
+                            {/* ショップのメタデータ管理 (NEW) */}
+                            <AdminShopCardDesignLinkSection apiUrl={NEXT_PUBLIC_API_URL} dbCardDesigns={dbCardDesigns} />
 
-                        {/* ショップオーナーの変更 (NEW) */}
-                        <ShopOwnerChangeSection apiUrl={NEXT_PUBLIC_API_URL} />
+                            {/* ショップの新規作成 (NEW) */}
+                            <AdminShopCreationSection apiUrl={NEXT_PUBLIC_API_URL} />
 
-                        {/* ショップ管理者の紐づけ (NEW) */}
-                        <ManagerLinkingSection apiUrl={NEXT_PUBLIC_API_URL} />
+                            {/* ショップオーナーの変更 (NEW) */}
+                            <ShopOwnerChangeSection apiUrl={NEXT_PUBLIC_API_URL} />
+
+                            {/* ショップ管理者の紐づけ (NEW) */}
+                            <ManagerLinkingSection apiUrl={NEXT_PUBLIC_API_URL} />
+                        </div>
                     </div>
                 )}
 
+
+
+
+                {/* 
+                 * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                 * ─── 問い合わせ (Inquiries) ─────────────────────────────────────────
+                 * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                 */}
+                {activeTab === "inquiries" && (
+                    <div className="grid grid-cols-1 gap-6 animate-in fade-in slide-in-from-bottom-2 duration-300 items-start">
+                        <AdminInquiryChatSection dbCardDesigns={dbCardDesigns} />
+                    </div>
+                )}
+
+
+
+
+
+                {/* 
+                 * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                 * ─── システムツールタブ (Tools) ────────────────────────────────────────
+                 * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                 */}
                 {activeTab === "tools" && (
-                    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 animate-in fade-in slide-in-from-bottom-2 duration-300 items-start">
                         {/* データダンプ */}
                         <DataDumpSection apiUrl={NEXT_PUBLIC_API_URL} />
                     </div>
                 )}
 
+
+
+
+
+                {/* 
+                 * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                 * ─── デザイン管理タブ (Designs) ───────────────────────────────────────
+                 * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                 */}
                 {activeTab === "designs" && (
                     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
                         <CardDesignEditor apiUrl={NEXT_PUBLIC_API_URL} />
                     </div>
                 )}
 
+
+
+
+
             </div>
         </div>
     );
 }
 
+/**
+ * 管理者向けの問い合わせチャット画面。
+ * 一覧と詳細を同一画面で表示し、ADMIN 参加者としてメッセージの閲覧・返信を行います。
+ */
+function AdminInquiryChatSection({ dbCardDesigns }: { dbCardDesigns: any[] }) {
+    const t = useTranslations('AdminPage');
+    const [confirmTerminalAction, setConfirmTerminalAction] = useState<'RESOLVED' | 'APPROVED' | 'REJECTED' | null>(null);
+    const [notificationLoading, setNotificationLoading] = useState(false);
+    const [statusUpdating, setStatusUpdating] = useState(false);
+    const [detailLoading, setDetailLoading] = useState(false);
+    const [chats, setChats] = useState<any[]>([]);
+    const [pastChats, setPastChats] = useState<any[]>([]);
+    const [pastCarry, setPastCarry] = useState<any[]>([]);
+    const [pastLoading, setPastLoading] = useState(false);
+    const [pastCursor, setPastCursor] = useState<string | null>(null);
+    const [pastHasNext, setPastHasNext] = useState(false);
+    const [showPastChats, setShowPastChats] = useState(false);
+    const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
+    const [selectedChat, setSelectedChat] = useState<any | null>(null);
+    const [selectedMessages, setSelectedMessages] = useState<any[]>([]);
+    const [inputMessage, setInputMessage] = useState('');
+    const [sendingMessage, setSendingMessage] = useState(false);
+    const [selectedFile, setSelectedFile] = useState<File | null>(null);
+    const [uploading, setUploading] = useState(false);
+    const [chatPageSize, setChatPageSize] = useState<number>(10);
+    const [chatPageCursors, setChatPageCursors] = useState<(string | null)[]>([null]);
+    const [chatPageIdx, setChatPageIdx] = useState<number>(0);
+    const [chatHasNext, setChatHasNext] = useState(false);
+    const [shopOpenDialogOpen, setShopOpenDialogOpen] = useState(false);
+    const [approveDesignId, setApproveDesignId] = useState('');
+    const [rejectReason, setRejectReason] = useState('');
+    const [adminMemo, setAdminMemo] = useState('');
+    const [shopOpenActionLoading, setShopOpenActionLoading] = useState(false);
+    const TERMINAL_STATUSES = useMemo(() => new Set(['APPROVED', 'REJECTED', 'CANCELLED', 'RESOLVED', 'CLOSED']), []);
+
+    const getChatTypeLabel = (chatType?: string): string => {
+        if (!chatType) return '-';
+        const labels: Record<string, string> = {
+            SHOP_OPENING: t('inquiryChat.chatTypes.shopOpening'),
+            USER_SUPPORT: t('inquiryChat.chatTypes.userSupport'),
+            SHOP_SUPPORT: t('inquiryChat.chatTypes.shopSupport'),
+            SHOP_DESIGN: t('inquiryChat.chatTypes.shopDesign'),
+            CARD_DESIGN: t('inquiryChat.chatTypes.cardDesign'),
+            MISC: t('inquiryChat.chatTypes.misc'),
+        };
+        return labels[chatType] || chatType;
+    };
+
+    const getStatusLabel = (status?: string): string => {
+        if (!status) return '-';
+        const labels: Record<string, string> = {
+            OPEN: t('inquiryChat.statuses.open'),
+            RESOLVED: t('inquiryChat.statuses.resolved'),
+            CLOSED: t('inquiryChat.statuses.closed'),
+            DRAFT: t('inquiryChat.statuses.draft'),
+            SUBMITTED: t('inquiryChat.statuses.submitted'),
+            IN_REVIEW: t('inquiryChat.statuses.inReview'),
+            IN_DESIGN: t('inquiryChat.statuses.inDesign'),
+            COMPLETED: t('inquiryChat.statuses.completed'),
+            APPROVED: t('inquiryChat.statuses.approved'),
+            REJECTED: t('inquiryChat.statuses.rejected'),
+            CANCELLED: t('inquiryChat.statuses.cancelled'),
+            PENDING: t('inquiryChat.statuses.pending'),
+            VERIFIED: t('inquiryChat.statuses.verified'),
+            EXPIRED: t('inquiryChat.statuses.expired'),
+            FAILED: t('inquiryChat.statuses.failed'),
+        };
+        return labels[status] || status;
+    };
+
+    const selectedParticipantIds = useMemo(() => {
+        return Array.isArray(selectedChat?.participants) ? selectedChat.participants : [];
+    }, [selectedChat]);
+
+    const getSenderDisplayName = (message: any): string => {
+        const senderId = message?.sender_id || '';
+        if (senderId === 'ADMIN' || senderId.startsWith('ADMIN#')) {
+            return t('inquiryChat.adminLabel');
+        }
+        return toDisplayParticipantId(senderId);
+    };
+
+    const normalizeStatus = (status?: string) => String(status || '').toUpperCase();
+
+    const renderTextWithLinks = (value?: string): React.ReactNode => {
+        const text = String(value || '').trim();
+        if (!text) {
+            return '-';
+        }
+
+        const parts = text.split(/(https?:\/\/[^\s]+)/g);
+        return (
+            <span className="whitespace-pre-wrap break-all">
+                {parts.map((part, index) => {
+                    if (/^https?:\/\/[^\s]+$/i.test(part)) {
+                        return (
+                            <a
+                                key={`${part}-${index}`}
+                                href={part}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-blue-700 underline hover:text-blue-900"
+                            >
+                                {part}
+                            </a>
+                        );
+                    }
+                    return <React.Fragment key={`text-${index}`}>{part}</React.Fragment>;
+                })}
+            </span>
+        );
+    };
+
+    const isTerminalStatus = (status?: string) => TERMINAL_STATUSES.has(normalizeStatus(status));
+
+    const isSupportChatType = (chatType?: string) => {
+        return ['USER_SUPPORT', 'SHOP_SUPPORT', 'SHOP_DESIGN', 'CARD_DESIGN', 'MISC'].includes(String(chatType || '').toUpperCase());
+    };
+
+    const getAvailableTransitions = (chat: any): string[] => {
+        const status = normalizeStatus(chat?.status);
+        const chatType = String(chat?.chat_type || '').toUpperCase();
+
+        // 一般チャット系（USER_SUPPORT, SHOP_SUPPORT, SHOP_DESIGN, CARD_DESIGN, MISC）
+        // ステート遷移:
+        //   OPEN → RESOLVED
+        if (isSupportChatType(chatType)) {
+            if (status === 'OPEN') return ['RESOLVED'];
+            return [];
+        }
+
+        // SHOP_OPENING は承認/却下専用ダイアログで処理します。
+        if (chatType === 'SHOP_OPENING') {
+            return [];
+        }
+
+        return [];
+    };
+
+    const getTransitionLabel = (status: string) => {
+        const labels: Record<string, string> = {
+            RESOLVED: t('inquiryChat.actions.complete'),
+        };
+        return labels[status] || status;
+    };
+
+    const fetchFilteredChunk = async (
+        mode: 'active' | 'past',
+        startCursor: string | null,
+        takeCount: number,
+    ) => {
+        const collected: any[] = [];
+        let cursor = startCursor;
+        let hasNext = false;
+
+        for (let i = 0; i < 20; i += 1) {
+            const response = await adminApi.fetch_post('/unified/chat/list', {
+                participant_id: 'ADMIN',
+                include_archived: false,
+                limit: takeCount,
+                ...(cursor ? { cursor } : {}),
+            });
+
+            const items: any[] = response.items || [];
+            const filtered = items.filter((chat) => {
+                const terminal = isTerminalStatus(chat?.status);
+                return mode === 'active' ? !terminal : terminal;
+            });
+
+            if (filtered.length > 0) {
+                collected.push(...filtered);
+            }
+
+            cursor = response.cursor ?? null;
+            hasNext = !!cursor;
+            if (!hasNext || collected.length >= takeCount) {
+                break;
+            }
+        }
+
+        return {
+            items: collected.slice(0, takeCount),
+            nextCursor: cursor,
+            hasNext,
+        };
+    };
+
+    const fetchPage = async (idx: number, cursors: (string | null)[] = chatPageCursors) => {
+        setNotificationLoading(true);
+        try {
+            const cursor = cursors[idx] ?? null;
+
+            const response = await fetchFilteredChunk('active', cursor, chatPageSize);
+            setChats(response.items);
+            setChatPageIdx(idx);
+            setChatPageCursors((prev) => {
+                const updated = [...prev];
+                updated[idx] = cursor;
+                if (response.nextCursor) updated[idx + 1] = response.nextCursor;
+                else updated.splice(idx + 1);
+                return updated;
+            });
+            setChatHasNext(!!response.nextCursor && response.hasNext);
+        } catch (e) {
+            console.error('Failed to fetch admin inquiry chats', e);
+        } finally {
+            setNotificationLoading(false);
+        }
+    };
+
+    const fetchNotifications = () => {
+        const fresh: (string | null)[] = [null];
+        setChatPageCursors(fresh);
+        setChatPageIdx(0);
+        setChatHasNext(false);
+        setShowPastChats(false);
+        setPastChats([]);
+        setPastCarry([]);
+        setPastCursor(null);
+        setPastHasNext(false);
+        setSelectedChatId(null);
+        setSelectedChat(null);
+        setSelectedMessages([]);
+        fetchPage(0, fresh);
+    };
+
+    const handleFetchPastChats = async () => {
+        setPastLoading(true);
+        try {
+            const targetCount = chatPageSize;
+            const collected: any[] = [];
+            const carry = [...pastCarry];
+
+            while (carry.length > 0 && collected.length < targetCount) {
+                const item = carry.shift();
+                if (item) collected.push(item);
+            }
+
+            let cursor = showPastChats ? pastCursor : null;
+            let hasNext = !!cursor;
+            const apiLimit = Math.max(50, targetCount * 5);
+
+            for (let i = 0; i < 100 && collected.length < targetCount; i += 1) {
+                const response = await adminApi.fetch_post('/unified/chat/list', {
+                    participant_id: 'ADMIN',
+                    include_archived: false,
+                    limit: apiLimit,
+                    ...(cursor ? { cursor } : {}),
+                });
+
+                const items: any[] = response.items || [];
+                const filtered = items.filter((chat) => isTerminalStatus(chat?.status));
+
+                for (const chat of filtered) {
+                    if (collected.length < targetCount) {
+                        collected.push(chat);
+                    } else {
+                        carry.push(chat);
+                    }
+                }
+
+                cursor = response.cursor ?? null;
+                hasNext = !!cursor;
+                if (!hasNext) {
+                    break;
+                }
+            }
+
+            setShowPastChats(true);
+            setPastChats((prev) => {
+                const base = showPastChats ? prev : [];
+                const seen = new Set(base.map((chat) => String(chat?.chat_id || '')));
+                const merged = [...base];
+                for (const chat of collected) {
+                    const chatId = String(chat?.chat_id || '');
+                    if (!chatId || seen.has(chatId)) {
+                        continue;
+                    }
+                    seen.add(chatId);
+                    merged.push(chat);
+                }
+                return merged;
+            });
+            setPastCarry(carry);
+            setPastCursor(cursor);
+            setPastHasNext(carry.length > 0 || hasNext);
+        } catch (e) {
+            console.error('Failed to fetch past chats', e);
+        } finally {
+            setPastLoading(false);
+        }
+    };
+
+    const fetchAllMessages = async (chatId: string): Promise<any[]> => {
+        const pageLimit = 100;
+        let beforeSeq: number | undefined = undefined;
+        const allDesc: any[] = [];
+
+        for (let i = 0; i < 200; i += 1) {
+            const res = await adminApi.fetch_post('/unified/chat/messages/get', {
+                chat_id: chatId,
+                limit: pageLimit,
+                ...(typeof beforeSeq === 'number' ? { before_seq: beforeSeq } : {}),
+            });
+
+            const batch: any[] = Array.isArray(res?.messages) ? res.messages : [];
+            if (batch.length === 0) break;
+            allDesc.push(...batch);
+
+            const seqs = batch.map((m) => m.seq).filter((v): v is number => typeof v === 'number');
+            if (seqs.length === 0) break;
+            const oldestSeq = Math.min(...seqs);
+            if (oldestSeq <= 1 || batch.length < pageLimit) break;
+            beforeSeq = oldestSeq;
+        }
+
+        const seen = new Set<string>();
+        const dedupedDesc = allDesc.filter((m) => {
+            const key = `${m.seq ?? ''}:${m.message_id ?? ''}`;
+            if (seen.has(key)) return false;
+            seen.add(key);
+            return true;
+        });
+
+        return dedupedDesc.slice().reverse();
+    };
+
+    const openChatDetail = async (chatId: string) => {
+        setInputMessage('');
+        setSelectedChatId(chatId);
+        setDetailLoading(true);
+        try {
+            const [chatRes, messagesRes] = await Promise.all([
+                adminApi.fetch_post('/unified/chat/get', { chat_id: chatId }),
+                fetchAllMessages(chatId),
+            ]);
+
+            setSelectedChat(chatRes.chat || null);
+            setSelectedMessages(messagesRes);
+
+            const unreadBefore = chats.find((chat) => chat.chat_id === chatId)?.unread_count_cache ?? 0;
+            const lastMessageSeq = chatRes?.chat?.last_message_seq;
+            if (unreadBefore > 0 && typeof lastMessageSeq === 'number') {
+                await adminApi.fetch_post('/unified/chat/read/mark', {
+                    chat_id: chatId,
+                    participant_id: 'ADMIN',
+                    last_read_seq: lastMessageSeq,
+                });
+                setChats((prev) => prev.map((chat) => (
+                    chat.chat_id === chatId ? { ...chat, unread_count_cache: 0 } : chat
+                )));
+            }
+        } catch (e) {
+            console.error('Failed to fetch chat detail', e);
+        } finally {
+            setDetailLoading(false);
+        }
+    };
+
+    const sendFreeText = async () => {
+        const text = inputMessage.trim();
+        const hasFile = !!selectedFile;
+        if ((!text && !hasFile) || !selectedChatId || sendingMessage || uploading) return;
+        setSendingMessage(true);
+        try {
+            let fileData: ChatFileData | null = null;
+
+            if (selectedFile) {
+                setUploading(true);
+                try {
+                    fileData = await uploadChatFile(adminApi.fetch_post.bind(adminApi), selectedChatId, selectedFile);
+                } finally {
+                    setUploading(false);
+                }
+            }
+
+            await adminApi.fetch_post('/unified/chat/messages/send', {
+                chat_id: selectedChatId,
+                sender_id: 'ADMIN',
+                type: fileData ? 'FILE' : 'TEXT',
+                message: text || '',
+                ...fileData,
+            });
+
+            setInputMessage('');
+            setSelectedFile(null);
+            const allMessages = await fetchAllMessages(selectedChatId);
+            setSelectedMessages(allMessages);
+            setChats((prev) =>
+                prev.map((c) =>
+                    c.chat_id === selectedChatId
+                        ? { ...c, ts_last_message_at: new Date().toISOString() }
+                        : c,
+                ),
+            );
+        } catch (e) {
+            console.error('Failed to send message', e);
+            alert(t('inquiryChat.sendFailed'));
+        } finally {
+            setSendingMessage(false);
+        }
+    };
+
+    const handleUpdateChatStatus = async (nextStatus: string) => {
+        if (!selectedChat?.chat_id || typeof selectedChat?.version !== 'number' || statusUpdating) {
+            return;
+        }
+
+        setStatusUpdating(true);
+        try {
+            await adminApi.fetch_post('/unified/chat/status/update', {
+                chat_id: selectedChat.chat_id,
+                next_status: nextStatus,
+                expected_version: selectedChat.version,
+            });
+
+            const [chatRes, activeRes] = await Promise.all([
+                adminApi.fetch_post('/unified/chat/get', { chat_id: selectedChat.chat_id }),
+                fetchFilteredChunk('active', chatPageCursors[chatPageIdx] ?? null, chatPageSize),
+            ]);
+
+            setSelectedChat(chatRes.chat || null);
+            setChats(activeRes.items);
+            setChatHasNext(!!activeRes.nextCursor && activeRes.hasNext);
+
+            if (isTerminalStatus(chatRes?.chat?.status)) {
+                setSelectedChatId(null);
+                setSelectedChat(null);
+                setSelectedMessages([]);
+                setInputMessage('');
+            }
+        } catch (e) {
+            console.error('Failed to update chat status', e);
+            alert(t('inquiryChat.updateFailed'));
+        } finally {
+            setStatusUpdating(false);
+        }
+    };
+
+    const isChatClosed = isTerminalStatus(selectedChat?.status);
+    const availableTransitions = useMemo(() => getAvailableTransitions(selectedChat), [selectedChat]);
+    const isShopOpeningSelected = String(selectedChat?.chat_type || '').toUpperCase() === 'SHOP_OPENING';
+    const isCardDesignSelected = String(selectedChat?.chat_type || '').toUpperCase() === 'CARD_DESIGN';
+    const visibleTransitions = useMemo(() => {
+        if (isCardDesignSelected) {
+            return [];
+        }
+        return availableTransitions;
+    }, [availableTransitions, isCardDesignSelected]);
+
+    const editableStatuses = useMemo(() => new Set(['OPEN']), []);
+    const isShopOpeningDecisionLocked = useMemo(() => {
+        if (!isShopOpeningSelected) return true;
+        return !editableStatuses.has(String(selectedChat?.status || '').toUpperCase());
+    }, [editableStatuses, isShopOpeningSelected, selectedChat]);
+
+    const selectedCardDesignSnapshot = useMemo(() => {
+        for (const message of selectedMessages) {
+            if (message?.payload_type === 'FORM_SUBMITTED') {
+                if (isValidWorkflowPayload('CARD_DESIGN', 'FORM_SUBMITTED', message.payload)) {
+                    return message.payload.form_snapshot;
+                }
+            }
+        }
+        return null;
+    }, [selectedMessages]);
+
+    const selectedFormSnapshot = useMemo(() => {
+        const metaSnapshot = selectedChat?.shop_opening_form_snapshot;
+        if (isStrictShopOpeningSnapshot(metaSnapshot)) {
+            return metaSnapshot;
+        }
+
+        for (const message of selectedMessages) {
+            if (message?.payload_type !== 'FORM_SUBMITTED') {
+                continue;
+            }
+            if (isValidWorkflowPayload('SHOP_OPENING', 'FORM_SUBMITTED', message.payload)) {
+                return message.payload.form_snapshot;
+            }
+        }
+        return null;
+    }, [selectedChat, selectedMessages]);
+
+    const handleShopOpeningApprove = async () => {
+        if (!selectedChat?.chat_id || !selectedChat?.initiator_id?.startsWith('USER#')) {
+            alert(t('inquiries.errors.invalidInitiator'));
+            return;
+        }
+        if (isShopOpeningDecisionLocked) {
+            alert(t('inquiries.errors.decisionLocked'));
+            return;
+        }
+        if (!approveDesignId) {
+            alert(t('inquiries.errors.designRequired'));
+            return;
+        }
+
+        setShopOpenActionLoading(true);
+        try {
+            const ownerId = selectedChat.initiator_id.replace('USER#', '');
+            const shopName = selectedFormSnapshot?.shop_name || t('inquiries.defaultShopName');
+
+            const created = await adminApi.admin_shop_create({
+                owner_id: ownerId,
+                name: shopName,
+            });
+
+            await adminApi.admin_shop_carddesign_link_update({
+                shop_id: created.shop_id,
+                card_designs: [approveDesignId],
+            });
+
+            const reviewedAt = new Date().toISOString();
+            await adminApi.fetch_post('/unified/chat/messages/send', {
+                chat_id: selectedChat.chat_id,
+                sender_id: 'ADMIN',
+                type: 'WORKFLOW',
+                message: t('inquiries.decision.approvedMessage'),
+                payload_type: 'ADMIN_DECISION',
+                workflow_status: 'APPROVED',
+                payload: {
+                    approved: true,
+                    reason: adminMemo || undefined,
+                    reviewer_id: 'ADMIN',
+                    reviewed_at: reviewedAt,
+                    linked_shop_id: created.shop_id,
+                    default_design_id: approveDesignId,
+                },
+            });
+
+            const latestChat = await adminApi.fetch_post('/unified/chat/get', {
+                chat_id: selectedChat.chat_id,
+            });
+            const latestVersion = latestChat?.chat?.version;
+            if (typeof latestVersion !== 'number') {
+                throw new Error('latest chat version is missing');
+            }
+
+            await adminApi.fetch_post('/unified/chat/status/update', {
+                chat_id: selectedChat.chat_id,
+                next_status: 'APPROVED',
+                expected_version: latestVersion,
+            });
+
+            setShopOpenDialogOpen(false);
+            setApproveDesignId('');
+            setRejectReason('');
+            setAdminMemo('');
+            await fetchNotifications();
+        } catch (e: any) {
+            console.error('approval failed', e);
+            const detail = e?.message || e?.error || e?.statusText || '';
+            alert(detail ? `${t('inquiries.errors.approveFailed')}\n${detail}` : t('inquiries.errors.approveFailed'));
+        } finally {
+            setShopOpenActionLoading(false);
+        }
+    };
+
+    const handleShopOpeningReject = async () => {
+        if (!selectedChat?.chat_id) {
+            return;
+        }
+        if (isShopOpeningDecisionLocked) {
+            alert(t('inquiries.errors.decisionLocked'));
+            return;
+        }
+        if (!rejectReason.trim()) {
+            alert(t('inquiries.errors.rejectReasonRequired'));
+            return;
+        }
+
+        setShopOpenActionLoading(true);
+        try {
+            const reviewedAt = new Date().toISOString();
+
+            await adminApi.fetch_post('/unified/chat/messages/send', {
+                chat_id: selectedChat.chat_id,
+                sender_id: 'ADMIN',
+                type: 'WORKFLOW',
+                message: t('inquiries.decision.rejectedMessage'),
+                payload_type: 'ADMIN_DECISION',
+                workflow_status: 'REJECTED',
+                payload: {
+                    approved: false,
+                    reason: rejectReason.trim(),
+                    reviewer_id: 'ADMIN',
+                    reviewed_at: reviewedAt,
+                },
+            });
+
+            const latestChat = await adminApi.fetch_post('/unified/chat/get', {
+                chat_id: selectedChat.chat_id,
+            });
+            const latestVersion = latestChat?.chat?.version;
+            if (typeof latestVersion !== 'number') {
+                throw new Error('latest chat version is missing');
+            }
+
+            await adminApi.fetch_post('/unified/chat/status/update', {
+                chat_id: selectedChat.chat_id,
+                next_status: 'REJECTED',
+                expected_version: latestVersion,
+            });
+
+            setShopOpenDialogOpen(false);
+            setApproveDesignId('');
+            setRejectReason('');
+            setAdminMemo('');
+            await fetchNotifications();
+        } catch (e: any) {
+            console.error('rejection failed', e);
+            const detail = e?.message || e?.error || e?.statusText || '';
+            alert(detail ? `${t('inquiries.errors.rejectFailed')}\n${detail}` : t('inquiries.errors.rejectFailed'));
+        } finally {
+            setShopOpenActionLoading(false);
+        }
+    };
+
+    const getConfirmTerminalActionLabel = () => {
+        if (confirmTerminalAction === 'APPROVED') {
+            return t('inquiries.detail.approve');
+        }
+        if (confirmTerminalAction === 'REJECTED') {
+            return t('inquiries.detail.reject');
+        }
+        return t('inquiryChat.actions.complete');
+    };
+
+    const handleConfirmTerminalAction = async () => {
+        const action = confirmTerminalAction;
+        if (!action) return;
+
+        setConfirmTerminalAction(null);
+
+        if (action === 'APPROVED') {
+            await handleShopOpeningApprove();
+            return;
+        }
+
+        if (action === 'REJECTED') {
+            await handleShopOpeningReject();
+            return;
+        }
+
+        await handleUpdateChatStatus('RESOLVED');
+    };
+
+    useEffect(() => {
+        fetchNotifications();
+    }, []);
+
+    useEffect(() => {
+        const fresh: (string | null)[] = [null];
+        setChatPageCursors(fresh);
+        setChatPageIdx(0);
+        setChatHasNext(false);
+        setChats([]);
+        setShowPastChats(false);
+        setPastChats([]);
+        setPastCarry([]);
+        setPastCursor(null);
+        setPastHasNext(false);
+        fetchPage(0, fresh);
+    }, [chatPageSize]);
+
+    return (
+        <Card className="flex flex-col min-h-[70vh]">
+            <CardHeader className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
+                <div>
+                    <CardTitle>{t('inquiryChat.title')}</CardTitle>
+                    <CardDescription>{t('inquiryChat.description')}</CardDescription>
+                </div>
+                <div className="flex items-center gap-2">
+                    <Button variant="outline" size="sm" onClick={fetchNotifications} disabled={notificationLoading}>
+                        {notificationLoading ? t('inquiryChat.loading') : t('inquiryChat.refresh')}
+                    </Button>
+                            <Button variant="outline" size="sm" onClick={handleFetchPastChats} disabled={pastLoading}>
+                                {pastLoading
+                                    ? t('inquiryChat.loading')
+                                    : showPastChats
+                                        ? t('inquiryChat.fetchMorePast')
+                                        : t('inquiryChat.showPast')}
+                            </Button>
+                </div>
+            </CardHeader>
+
+            <CardContent
+                className="grid grid-cols-1 xl:grid-cols-2 gap-0 flex-1 min-h-0 p-6 overflow-y-auto xl:grid-rows-1"
+                style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}
+            >
+                <Card className="flex flex-col h-[67rem]">
+                    <CardHeader className="pb-0 justify-end">
+                        {/* <div className="flex items-center gap-2">
+                            <CardTitle>{t('inquiryChat.listTitle')}</CardTitle>
+                        </div> */}
+                        <div className="flex items-center gap-1">
+                            <span className="text-xs text-gray-500 mr-1">{t('inquiryChat.pageSize')}:</span>
+                            {([5, 10, 25, 50] as const).map((s) => (
+                                <button
+                                    type="button"
+                                    key={s}
+                                    onClick={() => setChatPageSize(s)}
+                                    className={`px-2 py-0.5 text-xs rounded border ${chatPageSize === s ? 'text-white' : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'}`}
+                                    style={chatPageSize === s ? { backgroundColor: '#374151', borderColor: '#374151', color: '#ffffff' } : undefined}
+                                >
+                                    {s}
+                                </button>
+                            ))}
+                        </div>
+                    </CardHeader>
+                    <CardContent className="overflow-auto min-h-0 flex-1">
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>{t('inquiryChat.table.updatedAt')}</TableHead>
+                                    <TableHead>{t('inquiryChat.table.type')}</TableHead>
+                                    <TableHead>{t('inquiryChat.table.status')}</TableHead>
+                                    <TableHead>{t('inquiryChat.table.unread')}</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {chats.length === 0 ? (
+                                    <TableRow>
+                                        <TableCell colSpan={4} className="text-center text-gray-500">
+                                            {t('inquiryChat.empty')}
+                                        </TableCell>
+                                    </TableRow>
+                                ) : (
+                                    chats.map((chat) => (
+                                        <TableRow
+                                            key={chat.chat_id}
+                                            className={`cursor-pointer hover:bg-gray-50 ${selectedChatId === chat.chat_id ? 'bg-blue-50 ring-1 ring-blue-200' : ''}`}
+                                            onClick={() => openChatDetail(chat.chat_id)}
+                                        >
+                                            <TableCell>{chat.ts_last_message_at ? new Date(chat.ts_last_message_at).toLocaleString() : '-'}</TableCell>
+                                            <TableCell>{getChatTypeLabel(chat.chat_type)}</TableCell>
+                                            <TableCell>{getStatusLabel(chat.status)}</TableCell>
+                                            <TableCell>{chat.unread_count_cache ?? 0}</TableCell>
+                                        </TableRow>
+                                    ))
+                                )}
+                            </TableBody>
+                        </Table>
+                        <div className="mt-3 flex items-center justify-between">
+                            <Button
+                                variant="outline" size="sm"
+                                onClick={() => fetchPage(chatPageIdx - 1)}
+                                disabled={notificationLoading || chatPageIdx === 0}
+                            >
+                                {t('inquiryChat.prevPage')}
+                            </Button>
+                            <span className="text-xs text-gray-500">{chatPageIdx + 1} {t('inquiryChat.pageOf')}</span>
+                            <Button
+                                variant="outline" size="sm"
+                                onClick={() => fetchPage(chatPageIdx + 1)}
+                                disabled={notificationLoading || !chatHasNext}
+                            >
+                                {t('inquiryChat.nextPage')}
+                            </Button>
+                        </div>
+
+                        {showPastChats && (
+                            <div className="mt-6 border-t pt-4 space-y-3">
+                                <div className="flex items-center justify-between">
+                                    <p className="text-sm font-semibold text-gray-700">{t('inquiryChat.pastTitle')}</p>
+                                    <Button variant="outline" size="sm" onClick={handleFetchPastChats} disabled={pastLoading || !pastHasNext}>
+                                        {pastLoading ? t('inquiryChat.loading') : t('inquiryChat.fetchMorePast')}
+                                    </Button>
+                                </div>
+                                {pastChats.length === 0 ? (
+                                    <p className="text-xs text-gray-500">{t('inquiryChat.pastEmpty')}</p>
+                                ) : (
+                                    <Table>
+                                        <TableHeader>
+                                            <TableRow>
+                                                <TableHead>{t('inquiryChat.table.updatedAt')}</TableHead>
+                                                <TableHead>{t('inquiryChat.table.type')}</TableHead>
+                                                <TableHead>{t('inquiryChat.table.status')}</TableHead>
+                                                <TableHead>{t('inquiryChat.table.unread')}</TableHead>
+                                            </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {pastChats.map((chat) => (
+                                                <TableRow
+                                                    key={`past-${chat.chat_id}-${chat.ts_last_message_at || ''}`}
+                                                    className={`cursor-pointer hover:bg-gray-50 ${selectedChatId === chat.chat_id ? 'bg-blue-50 ring-1 ring-blue-200' : ''}`}
+                                                    onClick={() => openChatDetail(chat.chat_id)}
+                                                >
+                                                    <TableCell>{chat.ts_last_message_at ? new Date(chat.ts_last_message_at).toLocaleString() : '-'}</TableCell>
+                                                    <TableCell>{getChatTypeLabel(chat.chat_type)}</TableCell>
+                                                    <TableCell>{getStatusLabel(chat.status)}</TableCell>
+                                                    <TableCell>{chat.unread_count_cache ?? 0}</TableCell>
+                                                </TableRow>
+                                            ))}
+                                        </TableBody>
+                                    </Table>
+                                )}
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
+
+                <Card className="overflow-hidden flex flex-col h-[67rem]">
+                    {/* <CardHeader>
+                        <CardTitle>{t('inquiryChat.detailTitle')}</CardTitle>
+                    </CardHeader> */}
+                    <CardContent className="flex flex-col flex-1 min-h-0 space-y-4">
+                        {!selectedChatId ? (
+                            <p className="text-sm text-gray-500">{t('inquiryChat.selectPrompt')}</p>
+                        ) : detailLoading ? (
+                            <p className="text-sm text-gray-500">{t('inquiryChat.loading')}</p>
+                        ) : (
+                            <>
+                                <div className="space-y-1 text-sm">
+                                    <div><span className="text-gray-500">{t('inquiryChat.detail.chatId')}:</span> {selectedChat?.chat_id || '-'}</div>
+                                    <div><span className="text-gray-500">{t('inquiryChat.detail.type')}:</span> {getChatTypeLabel(selectedChat?.chat_type)}</div>
+                                    <div><span className="text-gray-500">{t('inquiryChat.detail.status')}:</span> {getStatusLabel(selectedChat?.status)}</div>
+                                    <div><span className="text-gray-500">{t('inquiryChat.detail.updatedAt')}:</span> {selectedChat?.ts_last_message_at ? new Date(selectedChat.ts_last_message_at).toLocaleString() : '-'}</div>
+                                    <div className="pt-1">
+                                        <span className="text-gray-500">{t('inquiryChat.detail.participantsLabel')}:</span>
+                                        <div className="mt-1 space-y-1">
+                                            {selectedParticipantIds.length === 0 ? (
+                                                <div className="text-xs text-gray-500">-</div>
+                                            ) : (
+                                                selectedParticipantIds.map((id: string) => {
+                                                    return (
+                                                        <div key={id} className="text-xs text-gray-700 break-all">
+                                                                {toDisplayParticipantId(id)}
+                                                        </div>
+                                                    );
+                                                })
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {isShopOpeningSelected && (
+                                    <Card className="border-amber-300 bg-amber-50">
+                                        <CardHeader className="pb-3">
+                                            <CardTitle className="text-base">{t('inquiries.shopcreationformcontent')}</CardTitle>
+                                            <CardDescription>{t('inquiries.description')}</CardDescription>
+                                        </CardHeader>
+                                        <CardContent className="space-y-2 text-sm">
+                                            <div><span className="text-gray-500">{t('inquiries.detail.initiator')}:</span> {selectedChat?.initiator_id || '-'}</div>
+                                            <div><span className="text-gray-500">{t('inquiries.detail.shopName')}:</span> {selectedFormSnapshot?.shop_name || '-'}</div>
+                                            <div><span className="text-gray-500">{t('inquiries.detail.ownerName')}:</span> {selectedFormSnapshot?.owner_name || '-'}</div>
+                                            <div><span className="text-gray-500">{t('inquiries.detail.contactEmail')}:</span> {selectedFormSnapshot?.contact_email || '-'}</div>
+                                            <div className="min-w-0">
+                                                <span className="text-gray-500">{t('inquiries.detail.notes')}:</span>
+                                                <div className="mt-1 whitespace-pre-wrap break-all">{selectedFormSnapshot?.notes || '-'}</div>
+                                            </div>
+                                            <Button
+                                                className="mt-2"
+                                                size="sm"
+                                                onClick={() => setShopOpenDialogOpen(true)}
+                                            >
+                                                {t('inquiryChat.shopOpeningActions')}
+                                            </Button>
+                                        </CardContent>
+                                    </Card>
+                                )}
+
+                                {isCardDesignSelected && (
+                                    <Card className="border-blue-300 bg-blue-50">
+                                        <CardHeader className="pb-3">
+                                            <CardTitle className="text-base">{t('inquiryChat.cardDesignActions')}</CardTitle>
+                                        </CardHeader>
+                                        <CardContent className="space-y-2 text-sm">
+                                            {selectedCardDesignSnapshot ? (
+                                                <>
+                                                    <div><span className="text-gray-500">{t('inquiries.detail.contactEmail')}:</span> {selectedCardDesignSnapshot.contact_email || '-'}</div>
+                                                    <div><span className="text-gray-500">{t('inquiryChat.detail.designReady')}:</span> {selectedCardDesignSnapshot.design_ready ? t('inquiryChat.detail.yes') : t('inquiryChat.detail.no')}</div>
+                                                    {selectedCardDesignSnapshot.reference_urls && (
+                                                        <div className="min-w-0">
+                                                            <span className="text-gray-500">{t('inquiryChat.detail.referenceUrls')}:</span>
+                                                            <div className="mt-1">{renderTextWithLinks(selectedCardDesignSnapshot.reference_urls)}</div>
+                                                        </div>
+                                                    )}
+                                                    {selectedCardDesignSnapshot.notes && (
+                                                        <div className="min-w-0">
+                                                            <span className="text-gray-500">{t('inquiries.detail.notes')}:</span>
+                                                            <div className="mt-1 whitespace-pre-wrap break-all">{selectedCardDesignSnapshot.notes}</div>
+                                                        </div>
+                                                    )}
+                                                </>
+                                            ) : (
+                                                <p className="text-gray-400 text-xs">{t('inquiryChat.noFormSnapshot')}</p>
+                                            )}
+                                            {normalizeStatus(selectedChat?.status) === 'OPEN' && (
+                                                <Button
+                                                    className="mt-2"
+                                                    size="sm"
+                                                    disabled={statusUpdating}
+                                                    onClick={() => setConfirmTerminalAction('RESOLVED')}
+                                                >
+                                                    {statusUpdating ? t('inquiryChat.updating') : getTransitionLabel('RESOLVED')}
+                                                </Button>
+                                            )}
+                                        </CardContent>
+                                    </Card>
+                                )}
+
+                                {!isShopOpeningSelected && visibleTransitions.length > 0 && (
+                                    <div className="flex flex-wrap gap-2">
+                                        {visibleTransitions.map((nextStatus) => (
+                                            <Button
+                                                key={nextStatus}
+                                                variant={nextStatus === 'RESOLVED' ? 'default' : 'outline'}
+                                                size="sm"
+                                                disabled={statusUpdating}
+                                                onClick={() => {
+                                                    if (nextStatus === 'RESOLVED') {
+                                                        setConfirmTerminalAction('RESOLVED');
+                                                        return;
+                                                    }
+                                                    handleUpdateChatStatus(nextStatus);
+                                                }}
+                                            >
+                                                {statusUpdating ? t('inquiryChat.updating') : getTransitionLabel(nextStatus)}
+                                            </Button>
+                                        ))}
+                                    </div>
+                                )}
+
+
+                                <div className="border-t border-gray-200"></div>
+                                <div className="text-md font-semibold mb-0 ml-2">{t('inquiryChat.chat')}</div> 
+
+                                <div
+                                    className="space-y-2 flex-1 min-h-0 max-h-[45vh] overflow-y-auto pr-1 overscroll-contain xl:max-h-none border rounded-md bg-gray-50 p-3"
+                                    style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}
+                                >
+                                    {selectedMessages.length === 0 ? (
+                                        <p className="text-sm text-gray-500">{t('inquiryChat.noMessages')}</p>
+                                    ) : (
+                                        selectedMessages.map((message) => (
+                                            <div key={message.message_id || `${message.seq}`} className="rounded-md border p-3 text-sm bg-white">
+                                                <div className="mb-1 flex justify-between text-xs text-gray-500">
+                                                    <span>{getSenderDisplayName(message)}</span>
+                                                    <span>{message.ts_created_at ? new Date(message.ts_created_at).toLocaleString() : '-'}</span>
+                                                </div>
+                                                <div className="font-medium whitespace-pre-wrap break-words">{getDisplayMessage(message.message, (message as any).file_url)}</div>
+                                                {(message as any).file_url && (
+                                                    <ChatAttachment
+                                                        fileUrl={(message as any).file_url}
+                                                        fileName={(message as any).file_name}
+                                                        fileSize={(message as any).file_size}
+                                                    />
+                                                )}
+                                                {message.payload_type && (
+                                                    <div className="mt-1 text-xs text-gray-500">{message.payload_type}</div>
+                                                )}
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+
+
+                                {isChatClosed ? (
+                                    <p className="text-xs text-center text-gray-400 border rounded-md py-2">
+                                        {t('inquiryChat.chatClosed')}
+                                    </p>
+                                ) : (
+                                    <div className="flex flex-col gap-2">
+                                        <Textarea
+                                            value={inputMessage}
+                                            onChange={(e) => setInputMessage(e.target.value)}
+                                            placeholder={t('inquiryChat.messagePlaceholder')}
+                                            rows={3}
+                                            disabled={sendingMessage || uploading}
+                                            className="resize-none"
+                                        />
+                                        {selectedFile && (
+                                            <div className="flex items-center justify-between rounded-md border bg-slate-50 p-2 text-xs">
+                                                <span className="truncate">{selectedFile.name}</span>
+                                                <Button
+                                                    type="button"
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    onClick={() => setSelectedFile(null)}
+                                                    disabled={sendingMessage || uploading}
+                                                >
+                                                    {t('cancel')}
+                                                </Button>
+                                            </div>
+                                        )}
+                                        <input
+                                            id="adminInquiryFile"
+                                            type="file"
+                                            className="hidden"
+                                            onChange={(e) => {
+                                                const file = e.target.files?.[0];
+                                                if (!file) return;
+                                                if (file.size > 30 * 1024 * 1024) {
+                                                    alert(t('inquiryChat.fileTooLarge'));
+                                                    e.currentTarget.value = '';
+                                                    return;
+                                                }
+                                                setSelectedFile(file);
+                                                e.currentTarget.value = '';
+                                            }}
+                                        />
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => document.getElementById('adminInquiryFile')?.click()}
+                                            disabled={sendingMessage || uploading}
+                                            className="w-full"
+                                        >
+                                            {t('inquiryChat.attachFile')}
+                                        </Button>
+                                        <Button
+                                            size="sm"
+                                            onClick={sendFreeText}
+                                            disabled={sendingMessage || uploading || (!inputMessage.trim() && !selectedFile)}
+                                            className="w-full"
+                                        >
+                                            {uploading ? t('inquiryChat.uploading') : sendingMessage ? t('inquiryChat.sending') : t('inquiryChat.send')}
+                                        </Button>
+                                    </div>
+                                )}
+                            </>
+                        )}
+                    </CardContent>
+                </Card>
+            </CardContent>
+
+            <Dialog open={shopOpenDialogOpen} onOpenChange={setShopOpenDialogOpen}>
+                <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+                    <DialogHeader>
+                        <DialogTitle>{t('inquiries.detail.title')}</DialogTitle>
+                        <DialogDescription>{selectedChat?.chat_id || ''}</DialogDescription>
+                    </DialogHeader>
+
+                    <div className="space-y-4">
+                        {isShopOpeningDecisionLocked && (
+                            <p className="text-sm font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
+                                {t('inquiries.detail.decisionLocked')}
+                            </p>
+                        )}
+
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>{t('inquiries.detail.requestInfo')}</CardTitle>
+                            </CardHeader>
+                            <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                                <div><span className="text-gray-500">{t('inquiries.detail.initiator')}:</span> {selectedChat?.initiator_id || '-'}</div>
+                                <div><span className="text-gray-500">{t('inquiries.detail.chatStatus')}:</span> {selectedChat?.status || '-'}</div>
+                                <div><span className="text-gray-500">{t('inquiries.detail.shopName')}:</span> {selectedFormSnapshot?.shop_name || '-'}</div>
+                                <div><span className="text-gray-500">{t('inquiries.detail.ownerName')}:</span> {selectedFormSnapshot?.owner_name || '-'}</div>
+                                <div className="min-w-0 break-all"><span className="text-gray-500">{t('inquiries.detail.contactEmail')}:</span> {selectedFormSnapshot?.contact_email || '-'}</div>
+                                <div className="md:col-span-2 min-w-0">
+                                    <span className="text-gray-500">{t('inquiries.detail.notes')}:</span>{' '}
+                                    <span className="whitespace-pre-wrap break-all">{selectedFormSnapshot?.notes || '-'}</span>
+                                </div>
+                            </CardContent>
+                        </Card>
+
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>{t('inquiries.detail.approvalTitle')}</CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                                <div className="space-y-2">
+                                    <Label>{t('inquiries.detail.defaultDesign')}</Label>
+                                    <select
+                                        className="w-full rounded-md p-2 text-sm border border-gray-200 shadow-sm text-black bg-white"
+                                        value={approveDesignId}
+                                        onChange={(e) => setApproveDesignId(e.target.value)}
+                                        disabled={shopOpenActionLoading || isShopOpeningDecisionLocked}
+                                    >
+                                        <option value="">{t('inquiries.detail.selectDesign')}</option>
+                                        {dbCardDesigns.map((d: any) => (
+                                            <option key={d.design_id} value={d.design_id}>{d.name || d.design_id}</option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                <div className="space-y-2">
+                                    <Label>{t('inquiries.detail.adminMemo')}</Label>
+                                    <Textarea
+                                        value={adminMemo}
+                                        onChange={(e) => setAdminMemo(e.target.value)}
+                                        placeholder={t('inquiries.detail.adminMemoPlaceholder')}
+                                        disabled={shopOpenActionLoading || isShopOpeningDecisionLocked}
+                                    />
+                                </div>
+
+                                <Button onClick={() => setConfirmTerminalAction('APPROVED')} disabled={shopOpenActionLoading || isShopOpeningDecisionLocked}>
+                                    {shopOpenActionLoading ? t('inquiries.detail.processing') : t('inquiries.detail.approve')}
+                                </Button>
+                            </CardContent>
+                        </Card>
+
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>{t('inquiries.detail.rejectTitle')}</CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-3">
+                                <Label>{t('inquiries.detail.rejectReason')}</Label>
+                                <Textarea
+                                    value={rejectReason}
+                                    onChange={(e) => setRejectReason(e.target.value)}
+                                    placeholder={t('inquiries.detail.rejectReasonPlaceholder')}
+                                    disabled={shopOpenActionLoading || isShopOpeningDecisionLocked}
+                                />
+                                <Button variant="destructive" onClick={() => setConfirmTerminalAction('REJECTED')} disabled={shopOpenActionLoading || isShopOpeningDecisionLocked}>
+                                    {shopOpenActionLoading ? t('inquiries.detail.processing') : t('inquiries.detail.reject')}
+                                </Button>
+                            </CardContent>
+                        </Card>
+                    </div>
+                </DialogContent>
+            </Dialog>
+
+            <Dialog open={confirmTerminalAction !== null} onOpenChange={(open) => {
+                if (!open) setConfirmTerminalAction(null);
+            }}>
+                <DialogContent className="max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>{t('inquiryChat.confirmTerminalActionTitle')}</DialogTitle>
+                        <DialogDescription>{t('inquiryChat.confirmTerminalActionDescription')}</DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setConfirmTerminalAction(null)}>
+                            {t('cancel')}
+                        </Button>
+                        <Button onClick={handleConfirmTerminalAction}>
+                            {getConfirmTerminalActionLabel()}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+        </Card>
+    );
+}
+
+/**
+ * ショップ開設申請（SHOP_OPENING）を管理者が審査する専用セクション。
+ *
+ * 役割:
+ * - ADMIN 参加者として unified_chat/list を取得し、審査待ち案件を一覧表示
+ * - 詳細ダイアログで申請内容・履歴を確認
+ * - 承認時: ショップ作成 + デザイン紐付け + ADMIN_DECISION 送信 + APPROVED 化
+ * - 却下時: ADMIN_DECISION(REJECTED) 送信 + REJECTED 化
+ */
+function ShopOpeningInquirySection({ dbCardDesigns }: { dbCardDesigns: any[] }) {
+    const t = useTranslations('AdminPage');
+    const [loading, setLoading] = useState(false);
+    const [requests, setRequests] = useState<any[]>([]);
+    const [open, setOpen] = useState(false);
+    const [selected, setSelected] = useState<any>(null);
+    const [selectedMeta, setSelectedMeta] = useState<any>(null);
+    const [selectedMessages, setSelectedMessages] = useState<any[]>([]);
+    const [actionLoading, setActionLoading] = useState(false);
+    const [approveDesignId, setApproveDesignId] = useState('');
+    const [rejectReason, setRejectReason] = useState('');
+    const [adminMemo, setAdminMemo] = useState('');
+    const [replyMessage, setReplyMessage] = useState('');
+    const [replyLoading, setReplyLoading] = useState(false);
+    const [replyFile, setReplyFile] = useState<File | null>(null);
+    const [replyUploading, setReplyUploading] = useState(false);
+    const editableStatuses = new Set(['OPEN']);
+    const isDecisionLocked = !!selectedMeta && !editableStatuses.has(String(selectedMeta.status || '').toUpperCase());
+
+    /**
+     * 申請フォームのスナップショットを取得します。
+     *
+     * 参照優先順:
+     * 1. chat meta に保持された shop_opening_form_snapshot
+     * 2. FORM_SUBMITTED メッセージ payload の form_snapshot
+     *
+     * 理由:
+     * - 既存データ移行中でも管理画面表示を安定させるため、複数の保存位置を許容します。
+     */
+    const selectedFormSnapshot = useMemo(() => {
+        const metaSnapshot = selectedMeta?.shop_opening_form_snapshot;
+        if (isStrictShopOpeningSnapshot(metaSnapshot)) {
+            return metaSnapshot;
+        }
+
+        for (const message of selectedMessages) {
+            if (message?.payload_type !== 'FORM_SUBMITTED') {
+                continue;
+            }
+
+            if (isValidWorkflowPayload('SHOP_OPENING', 'FORM_SUBMITTED', message.payload)) {
+                return message.payload.form_snapshot;
+            }
+        }
+        return null;
+    }, [selectedMessages, selectedMeta]);
+
+    const selectedParticipantIds = useMemo(() => {
+        return Array.isArray(selectedMeta?.participants) ? selectedMeta.participants : [];
+    }, [selectedMeta]);
+
+    const getSenderDisplayName = (message: any): string => {
+        const senderId = String(message?.sender_id || '');
+        if (senderId.startsWith('ADMIN')) {
+            return t('inquiryChat.adminLabel');
+        }
+        return toDisplayParticipantId(senderId);
+    };
+
+    /**
+     * 審査対象一覧を取得します。
+     * ADMIN を participant_id として絞ることで、管理者向け受信箱のみを対象にします。
+     */
+    const fetchRequests = async () => {
+        setLoading(true);
+        try {
+            const data = await adminApi.fetch_post('/unified/chat/list', {
+                participant_id: 'ADMIN',
+                chat_type: 'SHOP_OPENING',
+                include_archived: false,
+                limit: 100,
+            });
+            setRequests(data.items || []);
+        } catch (e) {
+            console.error('failed to fetch shop opening inquiries', e);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const loadInquiryDetails = async (chatId: string) => {
+        const [chatRes, msgRes] = await Promise.all([
+            adminApi.fetch_post('/unified/chat/get', { chat_id: chatId }),
+            adminApi.fetch_post('/unified/chat/messages/get', { chat_id: chatId, limit: 200 }),
+        ]);
+        setSelectedMeta(chatRes.chat || null);
+        setSelectedMessages((msgRes.messages || []).slice().reverse());
+    };
+
+    useEffect(() => {
+        fetchRequests();
+    }, []);
+
+    /**
+     * 一覧行クリック時に詳細ダイアログを開き、meta/messages を並列取得します。
+     * messages は新しい順で返るため reverse して古い順表示に揃えます。
+     */
+    const openDetails = async (item: any) => {
+        setOpen(true);
+        setSelected(item);
+        setSelectedMeta(null);
+        setSelectedMessages([]);
+        setApproveDesignId('');
+        setRejectReason('');
+        setAdminMemo('');
+        setReplyMessage('');
+        setReplyFile(null);
+
+        try {
+            await loadInquiryDetails(item.chat_id);
+        } catch (e) {
+            console.error('failed to load inquiry details', e);
+        }
+    };
+
+    const handleSendReply = async () => {
+        const message = replyMessage.trim();
+        const hasFile = !!replyFile;
+        if (!selectedMeta?.chat_id || (!message && !hasFile) || replyLoading || replyUploading || isDecisionLocked) {
+            return;
+        }
+
+        setReplyLoading(true);
+        try {
+            let fileData: ChatFileData | null = null;
+
+            if (replyFile) {
+                setReplyUploading(true);
+                try {
+                    fileData = await uploadChatFile(adminApi.fetch_post.bind(adminApi), selectedMeta.chat_id, replyFile);
+                } finally {
+                    setReplyUploading(false);
+                }
+            }
+
+            await adminApi.fetch_post('/unified/chat/messages/send', {
+                chat_id: selectedMeta.chat_id,
+                sender_id: 'ADMIN',
+                type: fileData ? 'FILE' : 'TEXT',
+                message: message || '',
+                ...fileData,
+            });
+
+            setReplyMessage('');
+            setReplyFile(null);
+            await Promise.all([
+                loadInquiryDetails(selectedMeta.chat_id),
+                fetchRequests(),
+            ]);
+        } catch (e: any) {
+            console.error('failed to send inquiry reply', e);
+            const detail = e?.message || e?.error || e?.statusText || '';
+            alert(detail ? `${t('inquiries.detail.sendFailed')}\n${detail}` : t('inquiries.detail.sendFailed'));
+        } finally {
+            setReplyLoading(false);
+        }
+    };
+
+    /**
+     * 承認処理のトランザクション手順（アプリケーション層）:
+     * 1. admin_shop_create でショップを発行
+     * 2. admin_shop_carddesign_link_update で初期デザインを付与
+     * 3. unified_chat/messages/send で ADMIN_DECISION(APPROVED) を送信
+        * 4. unified_chat/status/update でチャットを APPROVED に更新
+     *
+     * 途中失敗時は catch で即通知し、UIは actionLoading を解除します。
+     */
+    const handleApprove = async () => {
+        if (isDecisionLocked) {
+            alert(t('inquiries.errors.decisionLocked'));
+            return;
+        }
+        if (!selectedMeta?.initiator_id?.startsWith('USER#')) {
+            alert(t('inquiries.errors.invalidInitiator'));
+            return;
+        }
+        if (!approveDesignId) {
+            alert(t('inquiries.errors.designRequired'));
+            return;
+        }
+
+        setActionLoading(true);
+        try {
+            const ownerId = selectedMeta.initiator_id.replace('USER#', '');
+            const shopName = selectedFormSnapshot?.shop_name || t('inquiries.defaultShopName');
+
+            const created = await adminApi.admin_shop_create({
+                owner_id: ownerId,
+                name: shopName,
+            });
+
+            await adminApi.admin_shop_carddesign_link_update({
+                shop_id: created.shop_id,
+                card_designs: [approveDesignId],
+            });
+
+            const reviewedAt = new Date().toISOString();
+            await adminApi.fetch_post('/unified/chat/messages/send', {
+                chat_id: selectedMeta.chat_id,
+                sender_id: 'ADMIN',
+                type: 'WORKFLOW',
+                message: t('inquiries.decision.approvedMessage'),
+                payload_type: 'ADMIN_DECISION',
+                workflow_status: 'APPROVED',
+                payload: {
+                    approved: true,
+                    reason: adminMemo || undefined,
+                    reviewer_id: 'ADMIN',
+                    reviewed_at: reviewedAt,
+                    linked_shop_id: created.shop_id,
+                    default_design_id: approveDesignId,
+                },
+            });
+
+            const latestChat = await adminApi.fetch_post('/unified/chat/get', {
+                chat_id: selectedMeta.chat_id,
+            });
+            const latestVersion = latestChat?.chat?.version;
+            if (typeof latestVersion !== 'number') {
+                throw new Error('latest chat version is missing');
+            }
+
+            await adminApi.fetch_post('/unified/chat/status/update', {
+                chat_id: selectedMeta.chat_id,
+                next_status: 'APPROVED',
+                expected_version: latestVersion,
+            });
+
+            await fetchRequests();
+            setOpen(false);
+        } catch (e: any) {
+            console.error('approval failed', e);
+            const detail = e?.message || e?.error || e?.statusText || '';
+            alert(detail ? `${t('inquiries.errors.approveFailed')}\n${detail}` : t('inquiries.errors.approveFailed'));
+        } finally {
+            setActionLoading(false);
+        }
+    };
+
+    /**
+     * 却下処理:
+     * - ADMIN_DECISION(REJECTED) メッセージを送信
+        * - チャットステータスを REJECTED に更新
+     */
+    const handleReject = async () => {
+        if (isDecisionLocked) {
+            alert(t('inquiries.errors.decisionLocked'));
+            return;
+        }
+        if (!rejectReason.trim()) {
+            alert(t('inquiries.errors.rejectReasonRequired'));
+            return;
+        }
+        if (!selectedMeta) return;
+
+        setActionLoading(true);
+        try {
+            const reviewedAt = new Date().toISOString();
+
+            await adminApi.fetch_post('/unified/chat/messages/send', {
+                chat_id: selectedMeta.chat_id,
+                sender_id: 'ADMIN',
+                type: 'WORKFLOW',
+                message: t('inquiries.decision.rejectedMessage'),
+                payload_type: 'ADMIN_DECISION',
+                workflow_status: 'REJECTED',
+                payload: {
+                    approved: false,
+                    reason: rejectReason.trim(),
+                    reviewer_id: 'ADMIN',
+                    reviewed_at: reviewedAt,
+                },
+            });
+
+            const latestChat = await adminApi.fetch_post('/unified/chat/get', {
+                chat_id: selectedMeta.chat_id,
+            });
+            const latestVersion = latestChat?.chat?.version;
+            if (typeof latestVersion !== 'number') {
+                throw new Error('latest chat version is missing');
+            }
+
+            await adminApi.fetch_post('/unified/chat/status/update', {
+                chat_id: selectedMeta.chat_id,
+                next_status: 'REJECTED',
+                expected_version: latestVersion,
+            });
+
+            await fetchRequests();
+            setOpen(false);
+        } catch (e: any) {
+            console.error('rejection failed', e);
+            const detail = e?.message || e?.error || e?.statusText || '';
+            alert(detail ? `${t('inquiries.errors.rejectFailed')}\n${detail}` : t('inquiries.errors.rejectFailed'));
+        } finally {
+            setActionLoading(false);
+        }
+    };
+
+    return (
+        <Card className="w-full">
+            <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                    <CardTitle>{t('inquiries.shopcreationformcontent')}</CardTitle>
+                    <CardDescription>{t('inquiries.description')}</CardDescription>
+                </div>
+                <Button variant="outline" onClick={fetchRequests} disabled={loading}>
+                    {loading ? t('inquiries.loading') : t('inquiries.refresh')}
+                </Button>
+            </CardHeader>
+            <CardContent>
+                <Table wrapperClassName="max-h-[65vh] overflow-auto">
+                    <TableHeader className="sticky top-0 bg-white z-10">
+                        <TableRow>
+                            <TableHead>{t('inquiries.table.updatedAt')}</TableHead>
+                            <TableHead>{t('inquiries.table.chatId')}</TableHead>
+                            <TableHead>{t('inquiries.table.status')}</TableHead>
+                            <TableHead>{t('inquiries.table.unread')}</TableHead>
+                            <TableHead>{t('inquiries.table.preview')}</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {requests.length === 0 ? (
+                            <TableRow>
+                                <TableCell colSpan={5} className="text-center text-gray-500">
+                                    {t('inquiries.empty')}
+                                </TableCell>
+                            </TableRow>
+                        ) : (
+                            requests.map((item: any) => (
+                                <TableRow key={item.chat_id} className="cursor-pointer hover:bg-gray-50" onClick={() => openDetails(item)}>
+                                    <TableCell>{item.ts_last_message_at ? new Date(item.ts_last_message_at).toLocaleString() : '-'}</TableCell>
+                                    <TableCell className="font-mono text-xs">{item.chat_id}</TableCell>
+                                    <TableCell>{item.status || '-'}</TableCell>
+                                    <TableCell>{item.unread_count_cache ?? 0}</TableCell>
+                                    <TableCell className="max-w-[420px] truncate">{item.last_message_text || '-'}</TableCell>
+                                </TableRow>
+                            ))
+                        )}
+                    </TableBody>
+                </Table>
+            </CardContent>
+
+            <Dialog open={open} onOpenChange={setOpen}>
+                <DialogContent className="max-w-5xl max-h-[90vh] overflow-hidden p-0 flex flex-col">
+                    <DialogHeader className="border-b p-6">
+                        <DialogTitle>{t('inquiries.detail.title')}</DialogTitle>
+                        <DialogDescription>{selectedMeta?.chat_id || ''}</DialogDescription>
+                    </DialogHeader>
+
+                    <div
+                        className="flex-1 min-h-0 overflow-y-auto p-6 space-y-6 overscroll-contain"
+                        style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}
+                    >
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>{t('inquiries.detail.requestInfo')}</CardTitle>
+                            </CardHeader>
+                            <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                                <div><span className="text-gray-500">{t('inquiries.detail.initiator')}:</span> {selectedMeta?.initiator_id || '-'}</div>
+                                <div><span className="text-gray-500">{t('inquiries.detail.chatStatus')}:</span> {selectedMeta?.status || '-'}</div>
+                                <div><span className="text-gray-500">{t('inquiries.detail.shopName')}:</span> {selectedFormSnapshot?.shop_name || '-'}</div>
+                                <div><span className="text-gray-500">{t('inquiries.detail.ownerName')}:</span> {selectedFormSnapshot?.owner_name || '-'}</div>
+                                <div><span className="text-gray-500">{t('inquiries.detail.contactEmail')}:</span> {selectedFormSnapshot?.contact_email || '-'}</div>
+                                <div><span className="text-gray-500">{t('inquiries.detail.notes')}:</span> {selectedFormSnapshot?.notes || '-'}</div>
+                                <div className="md:col-span-2">
+                                    <span className="text-gray-500">{t('inquiries.detail.participantsLabel')}:</span>
+                                    <div className="mt-1 space-y-1">
+                                        {selectedParticipantIds.length === 0 ? (
+                                            <div className="text-xs text-gray-500">-</div>
+                                        ) : (
+                                            selectedParticipantIds.map((id: string) => {
+                                                return (
+                                                    <div key={id} className="text-xs text-gray-700 break-all">
+                                                        {toDisplayParticipantId(id)}
+                                                    </div>
+                                                );
+                                            })
+                                        )}
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
+
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>{t('inquiries.detail.approvalTitle')}</CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                                {isDecisionLocked && (
+                                    <p className="text-sm font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
+                                        {t('inquiries.detail.decisionLocked')}
+                                    </p>
+                                )}
+                                <div className="space-y-2">
+                                    <Label>{t('inquiries.detail.defaultDesign')}</Label>
+                                    <select
+                                        className="w-full rounded-md p-2 text-sm border border-gray-200 shadow-sm text-black bg-white"
+                                        value={approveDesignId}
+                                        onChange={(e) => setApproveDesignId(e.target.value)}
+                                        disabled={actionLoading || isDecisionLocked}
+                                    >
+                                        <option value="">{t('inquiries.detail.selectDesign')}</option>
+                                        {dbCardDesigns.map((d: any) => (
+                                            <option key={d.design_id} value={d.design_id}>{d.name || d.design_id}</option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                <div className="space-y-2">
+                                    <Label>{t('inquiries.detail.adminMemo')}</Label>
+                                    <Textarea
+                                        value={adminMemo}
+                                        onChange={(e) => setAdminMemo(e.target.value)}
+                                        placeholder={t('inquiries.detail.adminMemoPlaceholder')}
+                                        disabled={actionLoading || isDecisionLocked}
+                                    />
+                                </div>
+
+                                <Button onClick={handleApprove} disabled={actionLoading || isDecisionLocked} className="w-full md:w-auto">
+                                    {actionLoading ? t('inquiries.detail.processing') : t('inquiries.detail.approve')}
+                                </Button>
+                            </CardContent>
+                        </Card>
+
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>{t('inquiries.detail.rejectTitle')}</CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-3">
+                                <Label>{t('inquiries.detail.rejectReason')}</Label>
+                                <Textarea
+                                    value={rejectReason}
+                                    onChange={(e) => setRejectReason(e.target.value)}
+                                    placeholder={t('inquiries.detail.rejectReasonPlaceholder')}
+                                    disabled={actionLoading || isDecisionLocked}
+                                />
+                                <Button variant="destructive" onClick={handleReject} disabled={actionLoading || isDecisionLocked}>
+                                    {actionLoading ? t('inquiries.detail.processing') : t('inquiries.detail.reject')}
+                                </Button>
+                            </CardContent>
+                        </Card>
+
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>{t('inquiries.detail.messageHistory')}</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <div
+                                    className="space-y-2 max-h-[300px] overflow-y-auto overscroll-contain"
+                                    style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}
+                                >
+                                    {selectedMessages.length === 0 ? (
+                                        <p className="text-sm text-gray-500">{t('inquiries.detail.noMessages')}</p>
+                                    ) : (
+                                        selectedMessages.map((msg: any) => (
+                                            <div key={msg.message_id || `${msg.seq}`} className="border rounded-md p-2 text-sm">
+                                                <div className="flex justify-between text-xs text-gray-500 mb-1">
+                                                    <span>{getSenderDisplayName(msg)}</span>
+                                                    <span>{msg.ts_created_at ? new Date(msg.ts_created_at).toLocaleString() : '-'}</span>
+                                                </div>
+                                                <div className="font-medium">{getDisplayMessage(msg.message, msg.file_url)}</div>
+                                                {msg.file_url && (
+                                                    <ChatAttachment
+                                                        fileUrl={msg.file_url}
+                                                        fileName={msg.file_name}
+                                                        fileSize={msg.file_size}
+                                                    />
+                                                )}
+                                                {msg.payload_type && (
+                                                    <pre className="mt-1 text-xs whitespace-pre-wrap text-gray-600">{JSON.stringify(msg.payload, null, 2)}</pre>
+                                                )}
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+                            </CardContent>
+                        </Card>
+
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>{t('inquiries.detail.replyTitle')}</CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-3">
+                                {isDecisionLocked ? (
+                                    <p className="text-sm text-gray-500">{t('inquiries.detail.chatClosed')}</p>
+                                ) : (
+                                    <>
+                                        <Textarea
+                                            value={replyMessage}
+                                            onChange={(e) => setReplyMessage(e.target.value)}
+                                            placeholder={t('inquiries.detail.messagePlaceholder')}
+                                            disabled={replyLoading || replyUploading || actionLoading}
+                                            rows={4}
+                                        />
+                                        {replyFile && (
+                                            <div className="flex items-center justify-between rounded-md border bg-slate-50 p-2 text-xs">
+                                                <span className="truncate">{replyFile.name}</span>
+                                                <Button
+                                                    type="button"
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    onClick={() => setReplyFile(null)}
+                                                    disabled={replyLoading || replyUploading || actionLoading}
+                                                >
+                                                    {t('cancel')}
+                                                </Button>
+                                            </div>
+                                        )}
+                                        <input
+                                            id="shopOpeningReplyFile"
+                                            type="file"
+                                            className="hidden"
+                                            onChange={(e) => {
+                                                const file = e.target.files?.[0];
+                                                if (!file) return;
+                                                                if (file.size > 30 * 1024 * 1024) {
+                                                    alert(t('inquiryChat.fileTooLarge'));
+                                                    e.currentTarget.value = '';
+                                                    return;
+                                                }
+                                                setReplyFile(file);
+                                                e.currentTarget.value = '';
+                                            }}
+                                        />
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            onClick={() => document.getElementById('shopOpeningReplyFile')?.click()}
+                                            disabled={replyLoading || replyUploading || actionLoading}
+                                        >
+                                            {t('inquiryChat.attachFile')}
+                                        </Button>
+                                        <Button
+                                            onClick={handleSendReply}
+                                            disabled={replyLoading || replyUploading || actionLoading || (!replyMessage.trim() && !replyFile)}
+                                        >
+                                            {replyUploading ? t('inquiryChat.uploading') : replyLoading ? t('inquiries.detail.sending') : t('inquiries.detail.send')}
+                                        </Button>
+                                    </>
+                                )}
+                            </CardContent>
+                        </Card>
+                    </div>
+
+                    <DialogFooter className="border-t p-4">
+                        <Button variant="outline" onClick={() => setOpen(false)}>{t('inquiries.detail.close')}</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+        </Card>
+    );
+}
+
+/**
+ * QRコード一覧セクション
+ * ステータス別の表示切り替え、キーワード検索、CSVエクスポート機能を提供します。
+ */
 function QRCodeListSection({ apiUrl, onGeneratePDF, paperFormat, cardFormat, dbCardDesigns }: {
     apiUrl: string,
     onGeneratePDF: (batch: any, paperformat: string, cardformat: string | any) => Promise<void>,
@@ -522,15 +2806,21 @@ function QRCodeListSection({ apiUrl, onGeneratePDF, paperFormat, cardFormat, dbC
     const [loading, setLoading] = useState(false);
     const [isDenseAuto, setIsDenseAuto] = useState(false);
     const [isDenseManual, setIsDenseManual] = useState<boolean | null>(null);
+    // データ取得制限（50件）を超えてまだデータがあるかどうかを管理するフラグ
+    const [hasMore, setHasMore] = useState(false);
 
+    /** 表示密度の状態（通常 / コンパクト） */
     const isDense = isDenseManual !== null ? isDenseManual : (codes.length > 30);
 
+    /**
+     * 現在表示されているQRコード一覧をCSV形式でエクスポートします。
+     */
     const handleExportCSV = () => {
         if (codes.length === 0) return;
 
         // Header for CSV
         const headers = [
-            t('list.table.uuid'),
+            t('list.table.qrId'),
             t('list.table.pin'),
             t('list.table.status'),
             t('list.table.createdAt'),
@@ -550,7 +2840,7 @@ function QRCodeListSection({ apiUrl, onGeneratePDF, paperFormat, cardFormat, dbC
 
         // Map data to rows
         const rows = codes.map(item => {
-            const uuid = item.PK.replace('QR#', '');
+            const qr_id = item.qr_id || item.PK?.replace('QR#', '');
             const statusLabel = st(item.status ? item.status.toLowerCase() : 'active');
             const updatedAt = item.ts_updated_at ? new Date(item.ts_updated_at).toLocaleString() : '-';
             const email = item.shipping_info?.email || '-';
@@ -559,7 +2849,7 @@ function QRCodeListSection({ apiUrl, onGeneratePDF, paperFormat, cardFormat, dbC
             const preferredDateTime = `${item.preferred_date ? item.preferred_date : '-'} / ${item.preferred_time ? tt(item.preferred_time) : '-'}`;
 
             return [
-                uuid,
+                qr_id,
                 item.pin || '-',
                 statusLabel,
                 updatedAt,
@@ -596,12 +2886,23 @@ function QRCodeListSection({ apiUrl, onGeneratePDF, paperFormat, cardFormat, dbC
         document.body.removeChild(link);
     };
 
+    /**
+     * 指定されたステータスまたは検索キーワードに基づいてQRコードを取得します。
+     * 表示パフォーマンスとコストのため、1回の取得を50件に制限しています。
+     */
     const fetchCodes = async (targetStatus?: string) => {
         setLoading(true);
         try {
             const currentStatus = targetStatus ?? status;
-            const data = await adminApi.admin_qr_list({ status: currentStatus, keyword });
+            // 【コスト最適化】バックエンドでの取得件数を最大50件に制限します。
+            const data = await adminApi.admin_qr_list({
+                status: currentStatus,
+                keyword,
+                limit: 50 // フロントエンドでの表示上限に合わせて50件を指定
+            });
             setCodes(data.items || []);
+            // 続きのデータが存在するかどうかのフラグを保存
+            setHasMore(data.hasMore || false);
         } catch (error) {
             console.error(error);
         } finally {
@@ -609,6 +2910,9 @@ function QRCodeListSection({ apiUrl, onGeneratePDF, paperFormat, cardFormat, dbC
         }
     };
 
+    /**
+     * BANNED ステータスのQRコードをすべて一括削除します（管理者用）。
+     */
     const handleDeleteAllBanned = async () => {
         if (status !== 'BANNED') return;
         if (!confirm(t('list.deleteBanned.confirm'))) return;
@@ -693,17 +2997,30 @@ function QRCodeListSection({ apiUrl, onGeneratePDF, paperFormat, cardFormat, dbC
                     </div>
                 </div>
 
-                <div className="bg-white border rounded-md p-4">
+                <div className="bg-white border rounded-md p-4 relative">
+                    {/* ローディングオーバーレイ: 通信中にリスト全体をグレーアウトしてスピナーを表示 */}
+                    {loading && (
+                        <div className="absolute inset-0 bg-white/50 backdrop-blur-[1px] z-20 flex items-center justify-center rounded-md">
+                            <div className="flex flex-col items-center gap-2">
+                                <Loader2 className="w-8 h-8 animate-spin text-mist-600" />
+                                <p className="text-sm font-medium text-mist-900">{t('list.loading')}</p>
+                            </div>
+                        </div>
+                    )}
                     <p className="text-sm text-gray-500 mb-2">
-                        {t('list.info', { status: t(`list.status.${status.toLowerCase()}`), count: codes.length })}
+                        {/* 50件を超えてデータがある場合は「50+ 件」のように表示してユーザーに伝えます */}
+                        {t('list.info', {
+                            status: t(`list.status.${status.toLowerCase()}`),
+                            count: hasMore ? `${codes.length}+` : codes.length
+                        })}
                     </p>
-                    <Table wrapperClassName="max-h-[70vh] overflow-auto" className="w-full table-fixed">
+                    <Table wrapperClassName="h-[70vh] overflow-auto" className="w-full table-fixed">
                         <TableHeader className="sticky top-0 bg-white z-10 shadow-sm">
                             <TableRow className={isDense ? "h-6" : "h-10"}>
                                 <TableHead className={cn("py-1 ", isDense ? "w-[90px] h-6 px-1 text-[9px]" : "w-[120px] h-8 px-2")}>{t('list.table.createdAt')}</TableHead>
                                 <TableHead className={cn("py-1 text-center", isDense ? "w-[100px] h-6 px-1 text-[9px]" : "w-[120px] h-8 px-2")}>{t('list.table.status')}</TableHead>
                                 <TableHead className={cn("py-1 w-[90px] text-center hidden sm:table-cell", isDense ? "h-6 px-1 text-[9px]" : "h-8 px-2")}>{t('list.table.pin')}</TableHead>
-                                <TableHead className={cn("py-1 min-w-[110px] break-all", isDense ? "h-6 px-1 text-[9px]" : "h-8 px-2")}>{t('list.table.uuid')}</TableHead>
+                                <TableHead className={cn("py-1 min-w-[110px] break-all", isDense ? "h-6 px-1 text-[9px]" : "h-8 px-2")}>{t('list.table.qrIdLabel')}</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -736,6 +3053,10 @@ function QRCodeListSection({ apiUrl, onGeneratePDF, paperFormat, cardFormat, dbC
     );
 }
 
+/**
+ * QRコード一覧の各行コンポーネント
+ * クリックで詳細ダイアログを表示し、各種メタデータの確認とBAN/復元が可能です。
+ */
 function QRCodeRow({ item, apiUrl, onGeneratePDF, onRefresh, paperFormat, cardFormat, dbCardDesigns, isDense }: {
     item: any;
     apiUrl: string;
@@ -751,8 +3072,19 @@ function QRCodeRow({ item, apiUrl, onGeneratePDF, onRefresh, paperFormat, cardFo
     const ts = useTranslations('Timestamp');
     const st = useTranslations('Status');
     const tt = useTranslations('Time');
+    const params = useParams();
+    const locale = params?.locale as string;
     const [open, setOpen] = useState(false);
-    const uuid = item.PK.replace('QR#', '');
+    const [copiedId, setCopiedId] = useState<string | null>(null);
+
+    const handleCopy = (id: string) => {
+        navigator.clipboard.writeText(id).then(() => {
+            setCopiedId(id);
+            setTimeout(() => setCopiedId(null), 2000);
+        });
+    };
+
+    const qr_id = item.qr_id || item.PK?.replace('QR#', '');
 
     const statusColor = (
         item.status === 'UNASSIGNED' ? 'bg-gray-100' :
@@ -782,7 +3114,7 @@ function QRCodeRow({ item, apiUrl, onGeneratePDF, onRefresh, paperFormat, cardFo
                         {item.pin}
                     </TableCell>
                     <TableCell className={cn("font-mono select-all py-0 min-w-[110px] break-all", isDense ? "text-[9px] px-1" : "text-[11px] px-2")}>
-                        {uuid}
+                        {qr_id}
                     </TableCell>
                 </TableRow>
             </DialogTrigger>
@@ -792,14 +3124,36 @@ function QRCodeRow({ item, apiUrl, onGeneratePDF, onRefresh, paperFormat, cardFo
                     <DialogDescription asChild>
                         <div className="font-mono text-sm text-gray-500 w-full flex flex-col gap-0 text-left mt-4 text-center sm:text-left">
                             <div className="flex items-center gap-2">
-                                ID:
-                                <Copy className="cursor-pointer w-4 h-4 shrink-0" onClick={() => navigator.clipboard.writeText(uuid)} />
-                                <ExternalLink className="cursor-pointer w-4 h-4 shrink-0" onClick={() => window.open(`${NEXT_PUBLIC_APP_URL}/receive/${uuid}`, '_blank')} />
-                                {uuid}
+                                {t('list.table.qrIdLabel')}:
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-6 w-6"
+                                    onClick={() => handleCopy(qr_id)}
+                                >
+                                    {copiedId === qr_id ? (
+                                        <Check className="h-3 w-3 text-green-500" />
+                                    ) : (
+                                        <Copy className="h-3 w-3" />
+                                    )}
+                                </Button>
+                                <ExternalLink className="cursor-pointer w-4 h-4 shrink-0" onClick={() => window.open(`/${locale}/receive/${qr_id}`, '_blank')} />
+                                {qr_id}
                             </div>
                             <div className="flex items-center gap-2">
                                 PIN:
-                                <Copy className="cursor-pointer w-4 h-4 shrink-0" onClick={() => navigator.clipboard.writeText(item.pin)} />
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-6 w-6"
+                                    onClick={() => handleCopy(item.pin)}
+                                >
+                                    {copiedId === item.pin ? (
+                                        <Check className="h-3 w-3 text-green-500" />
+                                    ) : (
+                                        <Copy className="h-3 w-3" />
+                                    )}
+                                </Button>
                                 {item.pin}
                             </div>
                         </div>
@@ -823,8 +3177,19 @@ function QRCodeRow({ item, apiUrl, onGeneratePDF, onRefresh, paperFormat, cardFo
                                     <span className="font-mono text-xs text-gray-600 truncate">{item.shop_id || '-'}</span>
                                     {item.shop_id && (
                                         <>
-                                            <Copy className="cursor-pointer w-3 h-3 text-mist-500 hover:text-mist-900 shrink-0" onClick={() => navigator.clipboard.writeText(item.shop_id)} />
-                                            <Link href={`/shop/${item.shop_id}`}>
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                className="h-4 w-4"
+                                                onClick={() => handleCopy(item.shop_id)}
+                                            >
+                                                {copiedId === item.shop_id ? (
+                                                    <Check className="h-3 w-3 text-green-500" />
+                                                ) : (
+                                                    <Copy className="h-3 w-3" />
+                                                )}
+                                            </Button>
+                                            <Link href={`/shop/${item.shop_id}`} target="_blank" rel="noopener noreferrer">
                                                 <ExternalLink className="w-3 h-3 text-mist-500 hover:text-mist-900 cursor-pointer shrink-0" />
                                             </Link>
                                         </>
@@ -834,7 +3199,14 @@ function QRCodeRow({ item, apiUrl, onGeneratePDF, onRefresh, paperFormat, cardFo
                                 <span className="text-gray-400 text-xs">{t('shopInfo.contact')}</span>
                                 <span className="text-gray-600 break-all">{item.shop_email || '-'}</span>
                                 <span className="text-gray-400 text-xs">{tShop('orders.productName')}</span>
-                                <span className="text-gray-600 break-all">{item.product_name || item.product_id || '-'}</span>
+                                <div className="flex items-center gap-1">
+                                    <span className="text-gray-600 break-all">{item.product_name || item.product_id || '-'}</span>
+                                    {item.product_id && (
+                                        <Button variant="ghost" size="icon" className="h-4 w-4" onClick={(e) => { e.stopPropagation(); handleCopy(item.product_id); }}>
+                                            {copiedId === item.product_id ? <Check className="h-3 w-3 text-green-500" /> : <Copy className="h-3 w-3 text-gray-400" />}
+                                        </Button>
+                                    )}
+                                </div>
                             </div>
                         </div>
 
@@ -847,31 +3219,49 @@ function QRCodeRow({ item, apiUrl, onGeneratePDF, onRefresh, paperFormat, cardFo
                         </div>
 
                         {/* Card Design */}
-                        {item.card_design && (
+                        {item.design_id && (
                             <div className="space-y-2">
                                 <div>
                                     <h4 className="text-sm font-semibold text-gray-500">{t('generate.cardFormat')}</h4>
-                                    <p className="text-sm font-medium">{item.card_design}</p>
+                                    <div className="flex items-center gap-2">
+                                        <p className="text-sm font-medium font-mono">{item.design_id}</p>
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-4 w-4"
+                                            onClick={(e) => { e.stopPropagation(); handleCopy(item.design_id); }}
+                                        >
+                                            {copiedId === item.design_id ? <Check className="h-3 w-3 text-green-500" /> : <Copy className="h-3 w-3 text-gray-400" />}
+                                        </Button>
+                                    </div>
                                 </div>
-                                {(item.thumbf || item.thumbb || cardformats[item.card_design]) && (
-                                    <div className="grid grid-cols-2 gap-2">
+                                {(item.thumbf || item.thumbb || cardformats[item.design_id]) && (
+                                    <div className="flex flex-wrap gap-4">
                                         <div className="space-y-1">
-                                            <div className="aspect-[84/52] relative rounded shadow-sm overflow-hidden border border-gray-100 bg-white">
+                                            <div
+                                                className="relative rounded shadow-sm overflow-hidden border border-gray-100 bg-white h-24"
+                                                style={{ aspectRatio: (dbCardDesigns.find(d => d.design_id === item.design_id)?.width && dbCardDesigns.find(d => d.design_id === item.design_id)?.height) ? `${dbCardDesigns.find(d => d.design_id === item.design_id).width} / ${dbCardDesigns.find(d => d.design_id === item.design_id).height}` : '84 / 52' }}
+                                            >
                                                 <img
-                                                    src={item.thumbf || dbCardDesigns.find(d => d.design_id === item.card_design)?.thumbf || dbCardDesigns.find(d => d.design_id === item.card_design)?.bgimgf || cardformats[item.card_design]?.bgimgf}
+                                                    src={item.thumbf || dbCardDesigns.find(d => d.design_id === item.design_id)?.thumbf || dbCardDesigns.find(d => d.design_id === item.design_id)?.bgimgf || cardformats[item.design_id]?.bgimgf}
                                                     alt="Front"
-                                                    className="w-full h-full object-cover"
+                                                    className="w-full h-full object-fill select-none"
+                                                    draggable={false}
                                                     crossOrigin="anonymous"
                                                 />
                                             </div>
                                             <p className="text-[9px] text-gray-400 text-center uppercase tracking-tighter">{t('generate.front')}</p>
                                         </div>
                                         <div className="space-y-1">
-                                            <div className="aspect-[84/52] relative rounded shadow-sm overflow-hidden border border-gray-100 bg-white">
+                                            <div
+                                                className="relative rounded shadow-sm overflow-hidden border border-gray-100 bg-white h-24"
+                                                style={{ aspectRatio: (dbCardDesigns.find(d => d.design_id === item.design_id)?.width && dbCardDesigns.find(d => d.design_id === item.design_id)?.height) ? `${dbCardDesigns.find(d => d.design_id === item.design_id).width} / ${dbCardDesigns.find(d => d.design_id === item.design_id).height}` : '84 / 52' }}
+                                            >
                                                 <img
-                                                    src={item.thumbb || dbCardDesigns.find(d => d.design_id === item.card_design)?.thumbb || dbCardDesigns.find(d => d.design_id === item.card_design)?.bgimgb || cardformats[item.card_design]?.bgimgb}
+                                                    src={item.thumbb || dbCardDesigns.find(d => d.design_id === item.design_id)?.thumbb || dbCardDesigns.find(d => d.design_id === item.design_id)?.bgimgb || cardformats[item.design_id]?.bgimgb}
                                                     alt="Back"
-                                                    className="w-full h-full object-cover"
+                                                    className="w-full h-full object-fill select-none"
+                                                    draggable={false}
                                                     crossOrigin="anonymous"
                                                 />
                                             </div>
@@ -887,18 +3277,62 @@ function QRCodeRow({ item, apiUrl, onGeneratePDF, onRefresh, paperFormat, cardFo
                             <div>
                                 <h4 className="text-sm font-semibold text-gray-500">{tShop('orders.recipient')}</h4>
                                 <p>{item.recipient_name || '-'}</p>
+                                {item.receiver_user_id && (
+                                    <div className="mt-2 group/userid">
+                                        <h4 className="text-[10px] font-semibold text-gray-400 uppercase tracking-tighter">{t('table.receiverUserId')}</h4>
+                                        <div className="flex items-center gap-1">
+                                            <p className="text-xs font-mono text-gray-600 truncate">{item.receiver_user_id}</p>
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                className="h-4 w-4 opacity-0 group-hover/userid:opacity-100 transition-all"
+                                                onClick={(e) => { e.stopPropagation(); handleCopy(item.receiver_user_id); }}
+                                            >
+                                                {copiedId === item.receiver_user_id ? <Check className="h-3 w-3 text-green-500" /> : <Copy className="h-3 w-3 text-gray-400" />}
+                                            </Button>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                             <div>
                                 <h4 className="text-sm font-semibold text-gray-500">{tShop('orders.contact')}</h4>
-                                <p className="break-all">{item.shipping_info?.email || '-'}</p>
-                                <p className="text-sm mt-1">{item.shipping_info?.phone || '-'}</p>
+                                <div className="flex items-center gap-1">
+                                    <p className="break-all">{item.shipping_info?.email || '-'}</p>
+                                    {item.shipping_info?.email && (
+                                        <Button variant="ghost" size="icon" className="h-4 w-4" onClick={(e) => { e.stopPropagation(); handleCopy(item.shipping_info.email); }}>
+                                            {copiedId === item.shipping_info.email ? <Check className="h-3 w-3 text-green-500" /> : <Copy className="h-3 w-3 text-gray-400" />}
+                                        </Button>
+                                    )}
+                                </div>
+                                <div className="flex items-center gap-1">
+                                    <p className="text-sm mt-1">{item.shipping_info?.phone || '-'}</p>
+                                    {item.shipping_info?.phone && (
+                                        <Button variant="ghost" size="icon" className="h-4 w-4" onClick={(e) => { e.stopPropagation(); handleCopy(item.shipping_info.phone); }}>
+                                            {copiedId === item.shipping_info.phone ? <Check className="h-3 w-3 text-green-500" /> : <Copy className="h-3 w-3 text-gray-400" />}
+                                        </Button>
+                                    )}
+                                </div>
                             </div>
                         </div>
 
                         <div>
                             <h4 className="text-sm font-semibold text-gray-500">{tShop('orders.address')}</h4>
-                            {item.postal_code && <p className="text-sm">〒{item.postal_code}</p>}
-                            <p className="whitespace-pre-wrap text-sm">{item.address || '-'}</p>
+                            {item.postal_code && (
+                                <div className="flex items-center gap-1">
+                                    <p className="text-sm">〒{item.postal_code}</p>
+                                    <Button variant="ghost" size="icon" className="h-4 w-4" onClick={(e) => { e.stopPropagation(); handleCopy(item.postal_code); }}>
+                                        {copiedId === item.postal_code ? <Check className="h-3 w-3 text-green-500" /> : <Copy className="h-3 w-3 text-gray-400" />}
+                                    </Button>
+                                </div>
+                            )}
+                            <div className="flex items-center gap-1">
+                                <p className="whitespace-pre-wrap text-sm">{item.address || '-'}</p>
+                                {item.address && (
+                                    <Button variant="ghost" size="icon" className="h-4 w-4" onClick={(e) => { e.stopPropagation(); handleCopy(item.address); }}>
+                                        {copiedId === item.address ? <Check className="h-3 w-3 text-green-500" /> : <Copy className="h-3 w-3 text-gray-400" />}
+                                    </Button>
+                                )}
+                            </div>
                         </div>
 
                         <div>
@@ -947,99 +3381,96 @@ function QRCodeRow({ item, apiUrl, onGeneratePDF, onRefresh, paperFormat, cardFo
                         {/* 生データ */}
                         <div className="mt-4">
                             <h4 className="text-sm font-semibold text-gray-500 border-b mb-2">{t('list.raw')}</h4>
-                            {Object.entries(item).map(([key, value]) => {
-                                if (key === 'shipping_info' || key.startsWith('ts_')) return null;
-                                if (key.startsWith('GSI') || key === "SK" || key === "PK") return null;
-                                return (
-                                    <div key={key} className="grid grid-cols-2 gap-1">
-                                        <h4 className="text-sm font-semibold text-gray-500">{key}</h4>
-                                        <p className="text-sm">
-                                            {value == null
-                                                ? '-'
-                                                : typeof value === 'object'
-                                                    ? JSON.stringify(value)
-                                                    : String(value)}
-                                        </p>
+                            {(Object.entries(item).filter(([k]) => !k.startsWith('ts_') && k !== 'shipping_info' && !k.startsWith('GSI') && k !== 'PK' && k !== 'SK')
+                                .concat(Object.entries(item.shipping_info || {}).map(([k, v]) => [`shipping_${k}`, v]))
+                                .concat(Object.entries(item).filter(([k]) => k.startsWith('ts_')))
+                                .concat(Object.entries(item).filter(([k]) => k.startsWith('GSI') || k === 'PK' || k === 'SK')) as [string, any][]).map(([key, value]) => (
+                                <div key={key} className="flex flex-col py-1 border-b border-gray-50 last:border-0 group/raw">
+                                    <div className="flex items-center justify-between gap-2">
+                                        <h4 className="text-[10px] font-bold text-gray-400 font-mono uppercase truncate w-24 shrink-0">{key}</h4>
+                                        <div className="flex-1 flex items-center justify-end gap-1 min-w-0">
+                                            <p className="text-[11px] font-mono text-gray-600 truncate text-right">
+                                                {value == null ? '-' : typeof value === 'object' ? JSON.stringify(value) : String(value)}
+                                            </p>
+                                            {value != null && (
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="h-5 w-5 opacity-0 group-hover/raw:opacity-100 transition-opacity shrink-0"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleCopy(typeof value === 'object' ? JSON.stringify(value) : String(value));
+                                                    }}
+                                                >
+                                                    {copiedId === (typeof value === 'object' ? JSON.stringify(value) : String(value)) ? (
+                                                        <Check className="h-3 w-3 text-green-500" />
+                                                    ) : (
+                                                        <Copy className="h-3 w-3 text-gray-400" />
+                                                    )}
+                                                </Button>
+                                            )}
+                                        </div>
                                     </div>
-                                );
-                            })}
-                            <div className="mt-0 border-t" />
-                            {item.shipping_info && Object.entries(item.shipping_info).map(([key, value]) => (
-                                <div key={`shipping_${key}`} className="grid grid-cols-2 gap-1">
-                                    <h4 className="text-sm font-semibold text-gray-500">{key}</h4>
-                                    <p className="text-sm">
-                                        {value == null
-                                            ? '-'
-                                            : typeof value === 'object'
-                                                ? JSON.stringify(value)
-                                                : String(value)}
-                                    </p>
                                 </div>
                             ))}
-                            <div className="mt-0 border-t" />
-                            {Object.entries(item).map(([key, value]) => {
-                                if (!key.startsWith('ts_')) return null;
-                                return (
-                                    <div key={key} className="grid grid-cols-2 gap-1">
-                                        <h4 className="text-sm font-semibold text-gray-500">{key}</h4>
-                                        <p className="text-sm">
-                                            {value == null
-                                                ? '-'
-                                                : typeof value === 'object'
-                                                    ? JSON.stringify(value)
-                                                    : String(value)}
-                                        </p>
-                                    </div>
-                                );
-                            })}
-                            <div className="mt-0 border-t" />
-                            {Object.entries(item).map(([key, value]) => {
-                                if (!key.startsWith('GSI') && key !== "SK" && key !== "PK") return null;
-                                return (
-                                    <div key={key} className="grid grid-cols-2 gap-1">
-                                        <h4 className="text-sm font-semibold text-gray-500">{key}</h4>
-                                        <p className="text-sm">
-                                            {value == null
-                                                ? '-'
-                                                : typeof value === 'object'
-                                                    ? JSON.stringify(value)
-                                                    : String(value)}
-                                        </p>
-                                    </div>
-                                );
-                            })}
                         </div>
                     </div>
                 )}
                 <DialogFooter className="flex flex-col sm:flex-row sm:justify-between gap-2 border-t p-6 shrink-0 bg-gray-50/50">
-                    <Button
-                        variant="outline"
-                        size="default"
-                        className="flex-1 sm:flex-none h-10"
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            const resolveDesign = (designId?: string) => {
-                                const targetId = item.card_design || cardFormat;
-                                const dbDesign = dbCardDesigns.find(d => d.design_id === targetId);
-                                if (dbDesign) return dbDesign;
-                                if (cardformats[targetId]) return targetId;
-                                const globalDesign = dbCardDesigns.find(d => d.design_id === cardFormat);
-                                return globalDesign || cardFormat;
-                            };
-                            const design = resolveDesign(item.card_design);
-                            onGeneratePDF({
-                                id: uuid,
-                                codes: [{ uuid, pin: item.pin }]
-                            }, paperFormat, design, Boolean(item.status === "PROMOTION"));
-                        }}
-                    >
-                        <QrCode className="mr-2 h-4 w-4" />
-                        {t('list.ban.pdf')}
-                    </Button>
+                    <div className="flex flex-wrap gap-2 flex-1 sm:flex-none">
+                        <Button
+                            variant="outline"
+                            size="default"
+                            className="flex-1 sm:flex-none h-10"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                const resolveDesign = (designId?: string) => {
+                                    const targetId = item.design_id || cardFormat;
+                                    const dbDesign = dbCardDesigns.find(d => d.design_id === targetId);
+                                    if (dbDesign) return dbDesign;
+                                    if (cardformats[targetId]) return targetId;
+                                    const globalDesign = dbCardDesigns.find(d => d.design_id === cardFormat);
+                                    return globalDesign || cardFormat;
+                                };
+                                const design = resolveDesign(item.design_id);
+                                onGeneratePDF({
+                                    id: qr_id,
+                                    codes: [{ qr_id, pin: item.pin }]
+                                }, paperFormat, design, Boolean(item.status === "PROMOTION"));
+                            }}
+                        >
+                            <FileText className="mr-2 h-4 w-4" />
+                            {t('list.ban.pdf')}
+                        </Button>
+                        <Button
+                            variant="outline"
+                            size="default"
+                            className="flex-1 sm:flex-none h-10"
+                            onClick={async (e) => {
+                                e.stopPropagation();
+                                const resolveDesign = (designId?: string) => {
+                                    const targetId = item.design_id || cardFormat;
+                                    const dbDesign = dbCardDesigns.find(d => d.design_id === targetId);
+                                    if (dbDesign) return dbDesign;
+                                    if (cardformats[targetId]) return targetId;
+                                    const globalDesign = dbCardDesigns.find(d => d.design_id === cardFormat);
+                                    return globalDesign || cardFormat;
+                                };
+                                const design = resolveDesign(item.design_id);
+                                await generateCSVExport({
+                                    id: qr_id,
+                                    codes: [{ qr_id, pin: item.pin }]
+                                }, design);
+                            }}
+                        >
+                            <Download className="mr-2 h-4 w-4" />
+                            {t('list.ban.image')}
+                        </Button>
+                    </div>
                     {item.status !== 'BANNED' ? (
                         <div className="flex-1 sm:flex-none">
                             <BanButton
-                                uuid={uuid}
+                                qr_id={qr_id}
                                 apiUrl={apiUrl}
                                 isBanned={false}
                                 size="default"
@@ -1053,7 +3484,7 @@ function QRCodeRow({ item, apiUrl, onGeneratePDF, onRefresh, paperFormat, cardFo
                     ) : (
                         <div className="flex flex-wrap gap-2 flex-1 sm:flex-none">
                             <BanButton
-                                uuid={uuid}
+                                qr_id={qr_id}
                                 apiUrl={apiUrl}
                                 isBanned={true}
                                 size="default"
@@ -1071,7 +3502,7 @@ function QRCodeRow({ item, apiUrl, onGeneratePDF, onRefresh, paperFormat, cardFo
                                     e.stopPropagation();
                                     if (!confirm(t('list.deleteBanned.confirm'))) return;
                                     try {
-                                        await adminApi.admin_qr_deleteban({ target: uuid });
+                                        await adminApi.admin_qr_deleteban({ target: qr_id });
                                         alert(t('list.deleteBanned.success', { count: 1 }));
                                         setOpen(false);
                                         onRefresh();
@@ -1091,8 +3522,12 @@ function QRCodeRow({ item, apiUrl, onGeneratePDF, onRefresh, paperFormat, cardFo
     );
 }
 
-function BanButton({ uuid, apiUrl, onSuccess, size = "sm", className, isBanned = false }: {
-    uuid: string,
+/**
+ * QRコードのBAN / 復元を実行するボタンコンポーネント。
+ * BAN時には理由（メモ）の入力を求めます。
+ */
+function BanButton({ qr_id, apiUrl, onSuccess, size = "sm", className, isBanned = false }: {
+    qr_id: string,
     apiUrl: string,
     onSuccess: () => void,
     size?: "default" | "sm" | "lg" | "icon",
@@ -1119,7 +3554,7 @@ function BanButton({ uuid, apiUrl, onSuccess, size = "sm", className, isBanned =
 
         setLoading(true);
         try {
-            const params: any = { uuid };
+            const params: any = { qr_id: qr_id };
             if (comment) params.reason = comment;
             await adminApi.admin_qr_ban(params);
             onSuccess();
@@ -1181,23 +3616,77 @@ function BanButton({ uuid, apiUrl, onSuccess, size = "sm", className, isBanned =
     );
 }
 
+/**
+ * システムデバッグ用データダンプセクション。
+ * 特定のプレフィックス（PK）を指定してDynamoDBのアイテムを直接参照します。
+ */
 function DataDumpSection({ apiUrl }: { apiUrl: string }) {
     const t = useTranslations('AdminPage');
-    const [userId, setUserId] = useState("");
-    const [shopId, setShopId] = useState("");
+
+    return (
+        <>
+            <DumpCard title={t('list.dump.userId')} prefix="USER#" />
+            <DumpCard title={t('list.dump.shopId')} prefix="SHOP#" />
+            <DumpCard
+                title={t('list.dump.productId')}
+                prefix="PRODUCT#"
+                skPrefix="GSI 2;PRODUCT#"
+                isGsi2
+            />
+            <DumpCard title="QR" prefix="QR#" />
+            <DumpCard
+                title="Card Order"
+                prefix="CARD_ORDER#"
+                skPrefix="GSI 2;CARD_ORDER#"
+                isGsi2
+            />
+            <DumpCard title="QR Batch" prefix="QR_BATCH#" />
+            <DumpCard
+                title="Card Design"
+                prefix="CARD_DESIGN#METADATA"
+                skPrefix="PK: CARD_DESIGN#METADATA, SK: "
+                useSk
+            />
+        </>
+    );
+}
+
+function DumpCard({
+    title,
+    prefix,
+    skPrefix,
+    defaultValue = "",
+    useSk = false,
+    isGsi2 = false
+}: {
+    title: string,
+    prefix: string,
+    skPrefix?: string,
+    defaultValue?: string,
+    useSk?: boolean,
+    isGsi2?: boolean
+}) {
+    const t = useTranslations('AdminPage');
+    const [id, setId] = useState(defaultValue);
     const [data, setData] = useState<any>(null);
     const [loading, setLoading] = useState(false);
 
     const handleDump = async () => {
-        if (!userId && !shopId) return;
+        if (!id.trim()) return;
         setLoading(true);
         try {
-            const pks: string[] = [];
-            if (userId) pks.push(`USER#${userId}`);
-            if (shopId) pks.push(`SHOP#${shopId}`);
-            const result = await adminApi.admin_dump({
-                pks
-            });
+            const val = id.trim();
+            const pk = `${prefix}${(!useSk && !isGsi2) ? val : ""}`;
+            const sk = useSk ? val : undefined;
+            const gsi2_pk = isGsi2 ? `${prefix}${val}` : undefined;
+
+            const result = await adminApi.admin_dump(
+                gsi2_pk
+                    ? { gsi2_pks: [gsi2_pk] }
+                    : sk
+                        ? { keys: [{ pk, sk }] }
+                        : { pks: [pk] }
+            );
             setData(result.items);
         } catch (e) {
             alert(t('list.dump.error'));
@@ -1206,45 +3695,73 @@ function DataDumpSection({ apiUrl }: { apiUrl: string }) {
         }
     };
 
+    const handleClear = () => {
+        setId(defaultValue);
+        setData(null);
+    };
 
     return (
-        <Card className="flex flex-col w-full">
-            <CardHeader className="flex-none">
-                <CardTitle>{t('list.dump.title')}</CardTitle>
+        <Card className={cn(
+            "flex flex-col w-full transition-all duration-300",
+            data ? "xl:col-span-2 ring-2 ring-mist-500/30" : "h-full"
+        )}>
+            <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                    <Search className="w-4 h-4 text-mist-400" />
+                    {title}
+                </CardTitle>
             </CardHeader>
-            <CardContent className="">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                        <Label htmlFor="dumpUserId">{t('list.dump.userId')}</Label>
+            <CardContent className="space-y-4 flex-1 flex flex-col">
+                <div className="space-y-2">
+                    <div className="flex border border-mist-700/30 rounded-md overflow-hidden bg-white text-black shadow-sm focus-within:ring-2 focus-within:ring-mist-500/20 focus-within:border-mist-500 transition-all">
+                        <div className="bg-mist-50 px-3 py-2 text-[10px] font-bold font-mono border-r border-mist-700/30 select-none flex items-center text-mist-600 uppercase tracking-tight whitespace-nowrap">
+                            {skPrefix || prefix}
+                        </div>
                         <Input
-                            id="dumpUserId"
-                            placeholder=""
-                            value={userId}
-                            onChange={(e) => setUserId(e.target.value)}
-                        />
-                    </div>
-                    <div className="space-y-2">
-                        <Label htmlFor="dumpShopId">{t('list.dump.shopId')}</Label>
-                        <Input
-                            id="dumpShopId"
-                            placeholder=""
-                            value={shopId}
-                            onChange={(e) => setShopId(e.target.value)}
+                            className="border-0 shadow-none focus-visible:ring-0 rounded-none h-10 px-3 py-2 text-sm flex-1 bg-transparent"
+                            placeholder="..."
+                            value={id}
+                            onChange={(e) => setId(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && handleDump()}
                         />
                     </div>
                 </div>
-                <Button onClick={handleDump} disabled={loading || (!userId && !shopId)} className="w-full sticky top-0 z-10 mt-3">
-                    {loading ? t('list.dump.loading') : t('list.dump.button')}
-                </Button>
+
+                <div className="flex gap-2">
+                    <Button
+                        onClick={handleDump}
+                        disabled={loading || !id.trim()}
+                        className="flex-1 bg-mist-800 hover:bg-mist-700 text-white font-bold h-9 text-xs"
+                    >
+                        {loading ? <Loader2 className="w-3 h-3 animate-spin mr-2" /> : <Search className="w-3 h-3 mr-2" />}
+                        {t('list.dump.button')}
+                    </Button>
+                    <Button
+                        variant="secondary"
+                        onClick={handleClear}
+                        disabled={loading || (!id && !data)}
+                        className="bg-white border text-mist-800 hover:bg-mist-50 h-9 text-xs px-3"
+                    >
+                        <Trash2 className="w-3 h-3" />
+                    </Button>
+                </div>
+
                 {data && (
-                    <div className="mt-4 ">
-                        {data.length === 0 ? (
-                            <p className="text-gray-500 text-sm">{t('list.dump.noItems')}</p>
-                        ) : (
-                            <pre className="bg-gray-100 p-4 rounded-xl text-xs font-mono overflow-auto max-h-96 text-black h-[70vh] max-h-[70vh]">
-                                {JSON.stringify(data, null, 2)}
-                            </pre>
-                        )}
+                    <div className="mt-2 flex-1 flex flex-col min-h-0 animate-in fade-in slide-in-from-top-2 duration-300">
+                        <div className="flex items-center justify-between mb-1.5 px-1">
+                            <p className="text-[10px] font-bold text-mist-500 uppercase">{data.length} records found</p>
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-5 px-1.5 text-[9px] text-mist-400 hover:text-mist-800"
+                                onClick={() => setData(null)}
+                            >
+                                Hide
+                            </Button>
+                        </div>
+                        <pre className="bg-slate-900 p-4 rounded-lg text-[12px] font-mono overflow-auto max-h-[500px] text-emerald-400 border border-slate-800 shadow-inner custom-scrollbar">
+                            {JSON.stringify(data, null, 2)}
+                        </pre>
                     </div>
                 )}
             </CardContent>
@@ -1252,6 +3769,10 @@ function DataDumpSection({ apiUrl }: { apiUrl: string }) {
     );
 }
 
+/**
+ * ショップ管理者（マネージャー）の紐付けセクション。
+ * 複数のユーザーIDと複数ショップIDを指定して一括で紐付け・紐付け解除が可能です 。
+ */
 function ManagerLinkingSection({ apiUrl }: { apiUrl: string }) {
     const t = useTranslations('AdminPage');
     const [userIdsStr, setUserIdsStr] = useState("");
@@ -1259,6 +3780,8 @@ function ManagerLinkingSection({ apiUrl }: { apiUrl: string }) {
     const [loading, setLoading] = useState(false);
     const [validationData, setValidationData] = useState<{ users: any[], shops: any[] } | null>(null);
     const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+    const [linkAction, setLinkAction] = useState<"execute" | "unlink">("execute");
+    const [resultMessage, setResultMessage] = useState<string | null>(null);
 
     const handleValidate = async () => {
         const uids = Array.from(new Set(userIdsStr.split('\n').map(s => s.trim()).filter(Boolean)));
@@ -1269,8 +3792,8 @@ function ManagerLinkingSection({ apiUrl }: { apiUrl: string }) {
         setLoading(true);
         try {
             const data = await adminApi.admin_links({
-                userIds: uids,
-                shopIds: sids,
+                user_ids: uids,
+                shop_ids: sids,
                 action: 'validate'
             });
             setValidationData(data);
@@ -1294,15 +3817,14 @@ function ManagerLinkingSection({ apiUrl }: { apiUrl: string }) {
         setLoading(true);
         try {
             await adminApi.admin_links({
-                userIds: uids,
-                shopIds: sids,
-                action: 'execute'
+                user_ids: uids,
+                shop_ids: sids,
+                action: linkAction
             });
-            alert(t('list.managerLinking.success'));
+            const msg = linkAction === 'execute' ? t('list.managerLinking.successLink') : t('list.managerLinking.successUnlink');
             setIsConfirmOpen(false);
-            setUserIdsStr("");
-            setShopIdsStr("");
             setValidationData(null);
+            setResultMessage(msg);
         } catch (e) {
             alert(t('list.managerLinking.error'));
         } finally {
@@ -1318,6 +3840,26 @@ function ManagerLinkingSection({ apiUrl }: { apiUrl: string }) {
             </CardHeader>
             <CardContent className="space-y-4">
                 <p className="text-sm text-gray-500">{t('list.managerLinking.description')}</p>
+                
+                <div className="flex items-center gap-2 p-1 bg-gray-100 rounded-lg w-fit">
+                    <Button 
+                        size="sm" 
+                        variant={linkAction === 'execute' ? 'default' : 'ghost'} 
+                        onClick={() => setLinkAction('execute')}
+                        className="h-8"
+                    >
+                        {t('list.managerLinking.actionLink')}
+                    </Button>
+                    <Button 
+                        size="sm" 
+                        variant={linkAction === 'unlink' ? 'default' : 'ghost'} 
+                        onClick={() => setLinkAction('unlink')}
+                        className="h-8"
+                    >
+                        {t('list.managerLinking.actionUnlink')}
+                    </Button>
+                </div>
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
                         <Label htmlFor="linkingUserIds">{t('list.managerLinking.userIds')}</Label>
@@ -1341,15 +3883,16 @@ function ManagerLinkingSection({ apiUrl }: { apiUrl: string }) {
                     </div>
                 </div>
                 <Button onClick={handleValidate} disabled={loading || !userIdsStr || !shopIdsStr} className="w-full">
-                    {loading ? t('list.managerLinking.validating') : t('list.managerLinking.validateButton')}
+                    {loading ? t('list.managerLinking.validating') : (linkAction === 'execute' ? t('list.managerLinking.validateButtonLink') : t('list.managerLinking.validateButtonUnlink'))}
                 </Button>
 
+                {/* Confirm Dialog */}
                 <Dialog open={isConfirmOpen} onOpenChange={setIsConfirmOpen}>
-                    <DialogContent className="max-w-2xl">
+                    <DialogContent className="max-w-2xl text-black">
                         <DialogHeader>
-                            <DialogTitle>{t('list.managerLinking.confirmTitle')}</DialogTitle>
+                            <DialogTitle>{linkAction === 'execute' ? t('list.managerLinking.confirmTitleLink') : t('list.managerLinking.confirmTitleUnlink')}</DialogTitle>
                             <DialogDescription>
-                                {t('list.managerLinking.confirmMessage')}
+                                {linkAction === 'execute' ? t('list.managerLinking.confirmMessageLink') : t('list.managerLinking.confirmMessageUnlink')}
                             </DialogDescription>
                         </DialogHeader>
                         <div className="space-y-4 py-4 max-h-[60vh] overflow-y-auto">
@@ -1358,7 +3901,7 @@ function ManagerLinkingSection({ apiUrl }: { apiUrl: string }) {
                                 <ul className="list-disc list-inside space-y-1 text-sm">
                                     {validationData?.users.map((u: any) => (
                                         <li key={u.id}>
-                                            <span className="font-mono text-xs text-gray-500 mr-2">{u.id}</span>
+                                            <span className="font-mono text-xs text-gray-400 mr-2">{u.id}</span>
                                             <span className="font-medium">{u.email}</span>
                                         </li>
                                     ))}
@@ -1369,7 +3912,7 @@ function ManagerLinkingSection({ apiUrl }: { apiUrl: string }) {
                                 <ul className="list-disc list-inside space-y-1 text-sm">
                                     {validationData?.shops.map((s: any) => (
                                         <li key={s.id}>
-                                            <span className="font-mono text-xs text-gray-500 mr-2">{s.id}</span>
+                                            <span className="font-mono text-xs text-gray-400 mr-2">{s.id}</span>
                                             <span className="font-medium">{s.name}</span>
                                             <span className="text-gray-500 text-xs ml-2">({s.email})</span>
                                         </li>
@@ -1381,8 +3924,25 @@ function ManagerLinkingSection({ apiUrl }: { apiUrl: string }) {
                             <Button variant="outline" onClick={() => setIsConfirmOpen(false)} disabled={loading}>
                                 {t('list.managerLinking.cancel')}
                             </Button>
-                            <Button onClick={handleExecute} disabled={loading}>
-                                {loading ? t('list.managerLinking.executing') : t('list.managerLinking.executeButton')}
+                            <Button onClick={handleExecute} disabled={loading} variant={linkAction === 'unlink' ? 'destructive' : 'default'}>
+                                {loading ? t('list.managerLinking.executing') : (linkAction === 'execute' ? t('list.managerLinking.executeButtonLink') : t('list.managerLinking.executeButtonUnlink'))}
+                            </Button>
+                        </div>
+                    </DialogContent>
+                </Dialog>
+
+                {/* Result Dialog */}
+                <Dialog open={!!resultMessage} onOpenChange={(open) => !open && setResultMessage(null)}>
+                    <DialogContent className="text-black">
+                        <DialogHeader>
+                            <DialogTitle>{t('list.managerLinking.resultTitle')}</DialogTitle>
+                            <DialogDescription>
+                                {resultMessage}
+                            </DialogDescription>
+                        </DialogHeader>
+                        <div className="flex justify-end">
+                            <Button onClick={() => setResultMessage(null)}>
+                                {t('list.managerLinking.closeButton')}
                             </Button>
                         </div>
                     </DialogContent>
@@ -1392,6 +3952,10 @@ function ManagerLinkingSection({ apiUrl }: { apiUrl: string }) {
     );
 }
 
+/**
+ * ショップの所有権（Owner）変更セクション。
+ * 既存のオーナーから別のユーザーへショップの管理権限を完全に移譲します。
+ */
 function ShopOwnerChangeSection({ apiUrl }: { apiUrl: string }) {
     const t = useTranslations('AdminPage');
     const [shopId, setShopId] = useState("");
@@ -1405,8 +3969,8 @@ function ShopOwnerChangeSection({ apiUrl }: { apiUrl: string }) {
         setLoading(true);
         try { // error section
             const data = await adminApi.admin_changeowner({
-                shopId: shopId.trim().replace(/^SHOP#/, ""),
-                newUserId: newUserId.trim().replace(/^USER#/, ""),
+                shop_id: shopId.trim().replace(/^SHOP#/, ""),
+                new_user_id: newUserId.trim().replace(/^USER#/, ""),
                 action: 'validate'
             });
             setValidationData(data);
@@ -1427,8 +3991,8 @@ function ShopOwnerChangeSection({ apiUrl }: { apiUrl: string }) {
         setLoading(true);
         try {
             await adminApi.admin_changeowner({
-                shopId: shopId.trim().replace(/^SHOP#/, ""),
-                newUserId: newUserId.trim().replace(/^USER#/, ""),
+                shop_id: shopId.trim().replace(/^SHOP#/, ""),
+                new_user_id: newUserId.trim().replace(/^USER#/, ""),
                 action: 'execute'
             });
             alert(t('list.ownerChange.success'));
@@ -1508,6 +4072,10 @@ function ShopOwnerChangeSection({ apiUrl }: { apiUrl: string }) {
     );
 }
 
+/**
+ * 簡易ショップ作成セクション。
+ * 指定したユーザーをオーナーとする新規ショップをデフォルト設定で作成します。
+ */
 function AdminShopCreationSection({ apiUrl }: { apiUrl: string }) {
     const t = useTranslations('AdminPage');
     const [userId, setUserId] = useState("");
@@ -1520,8 +4088,8 @@ function AdminShopCreationSection({ apiUrl }: { apiUrl: string }) {
         setLoading(true);
         try {
             const data = await adminApi.admin_links({
-                userIds: [userId.trim().replace(/^USER#/, "")],
-                shopIds: [],
+                user_ids: [userId.trim().replace(/^USER#/, "")],
+                shop_ids: [],
                 action: 'validate'
             });
             if (data.users && data.users.length > 0) {
@@ -1597,6 +4165,376 @@ function AdminShopCreationSection({ apiUrl }: { apiUrl: string }) {
                         </div>
                     </DialogContent>
                 </Dialog>
+            </CardContent>
+        </Card>
+    );
+}
+
+/**
+ * ショップに使用を許可するカードデザインを個別設定するセクション。
+ */
+function AdminShopCardDesignLinkSection({ apiUrl, dbCardDesigns }: { apiUrl: string, dbCardDesigns: any[] }) {
+    const t = useTranslations('AdminPage');
+    const tLink = useTranslations('AdminPage.list.shopCardDesignLink');
+    const [shopId, setShopId] = useState("");
+    const [shopData, setShopData] = useState<any>(null);
+    const [loading, setLoading] = useState(false);
+    const [saving, setSaving] = useState(false);
+    const [selectedDesignIds, setSelectedDesignIds] = useState<string[]>([]);
+
+    const handleLoadShop = async () => {
+        if (!shopId.trim()) return;
+        setLoading(true);
+        try {
+            const data = await adminApi.admin_shop_carddesign_link_get({ shop_id: shopId.trim() });
+            setShopData(data);
+
+            // Clean extraction strictly from card_designs field
+            const rawLinks = data.card_designs || [];
+            const ids = Array.isArray(rawLinks)
+                ? rawLinks.map((item: any) => typeof item === 'string' ? item : (item.design_id || item.id || item.SK))
+                : [];
+
+            const filteredIds = ids.filter(Boolean);
+            // console.log("AdminShopCardDesignLinkSection: extracted IDs", filteredIds);
+            setSelectedDesignIds(filteredIds);
+        } catch (e: any) {
+            alert(tLink('notFound') + ": " + (e.message || ""));
+            setShopData(null);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleSave = async () => {
+        if (!shopData) return;
+        setSaving(true);
+        try {
+            await adminApi.admin_shop_carddesign_link_update({
+                shop_id: shopData.PK.replace(/^SHOP#/, ""),
+                card_designs: selectedDesignIds
+            });
+            alert(tLink('saveSuccess'));
+        } catch (e: any) {
+            alert(tLink('saveFailed') + ": " + (e.message || ""));
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const toggleDesign = (designId: string) => {
+        setSelectedDesignIds(prev =>
+            prev.includes(designId)
+                ? prev.filter(id => id !== designId)
+                : [...prev, designId]
+        );
+    };
+
+    // Combine system designs and database designs for full coverage
+    const allAvailableDesigns = useMemo(() => {
+        const systemDesigns = Object.entries(cardformats).map(([id, data]) => ({
+            ...(data as any),
+            design_id: id,
+            SK: id,
+            isSystem: true
+        }));
+
+        const combined = [...systemDesigns];
+        dbCardDesigns.forEach(dbd => {
+            const id = dbd.design_id || dbd.SK;
+            if (id && !combined.find(c => c.design_id === id || c.SK === id)) {
+                combined.push(dbd);
+            }
+        });
+        return combined;
+    }, [dbCardDesigns]);
+
+    return (
+        <Card className={cn(
+            "flex flex-col w-full transition-all duration-300",
+            shopData ? "xl:col-span-2 ring-2 ring-mist-500/30" : "h-full"
+        )}>
+            <CardHeader>
+                <CardTitle>{tLink('title')}</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+                <p className="text-sm text-gray-500">{tLink('description')}</p>
+                <div className="flex flex-col gap-4">
+                    <div className="flex-1 space-y-2">
+                        <Label htmlFor="manageShopId">{tLink('shopIdLabel')}</Label>
+                        <Input
+                            id="manageShopId"
+                            placeholder={tLink('shopIdPlaceholder')}
+                            value={shopId}
+                            onChange={(e) => setShopId(e.target.value)}
+                            className="font-mono"
+                        />
+                    </div>
+                    <Button onClick={handleLoadShop} disabled={loading || !shopId.trim()} className="mt-auto">
+                        {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4 mr-2" />}
+                        {tLink('loadButton')}
+                    </Button>
+                </div>
+
+                {shopData && (
+                    <div className="space-y-6 pt-4 border-t animate-in fade-in duration-300">
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <Label className="text-gray-500">{tLink('shopNameLabel')}</Label>
+                                <p className="font-bold text-lg">{shopData.name}</p>
+                            </div>
+                            <div>
+                                <Label className="text-gray-500">{tLink('emailLabel')}</Label>
+                                <p>{shopData.email || "-"}</p>
+                            </div>
+                        </div>
+
+                        <div className="space-y-3">
+                            <Label className="text-gray-500">{tLink('allowedDesignsLabel')}</Label>
+                            <p className="text-xs text-gray-400 mb-2 italic">{tLink('allowedDesignsDesc')}</p>
+
+                            <div className="flex flex-wrap items-start gap-2">
+                                {allAvailableDesigns.map((design) => {
+                                    const dId = design.design_id || design.SK || "";
+                                    const isSelected = selectedDesignIds.includes(dId);
+                                    return (
+                                        <div
+                                            key={dId}
+                                            onClick={() => toggleDesign(dId)}
+                                            className={cn(
+                                                "relative cursor-pointer rounded-lg border-2 p-1 transition-all group overflow-hidden flex flex-col items-center",
+                                                isSelected
+                                                    ? "border-green-500 bg-green-50"
+                                                    : "border-transparent bg-gray-100 hover:border-gray-200"
+                                            )}
+                                        >
+                                            {isSelected && (
+                                                <div className="absolute top-0 right-0 bg-green-500 text-white px-1.5 py-0.5 text-[8px] font-bold rounded-bl shadow-sm z-10 animate-in fade-in zoom-in duration-200">
+                                                    LINK
+                                                </div>
+                                            )}
+                                            {design.isSystem && (
+                                                <div className="absolute top-0 left-0 bg-blue-500 text-white px-1.5 py-0.5 text-[7px] font-bold rounded-br shadow-sm z-10">
+                                                    SYSTEM
+                                                </div>
+                                            )}
+                                            <div
+                                                className="relative rounded overflow-hidden h-24"
+                                                style={{ aspectRatio: `${design.width || 84} / ${design.height || 52}` }}
+                                            >
+                                                <img
+                                                    src={design.thumbf || design.bgimgf}
+                                                    alt={design.description}
+                                                    className="w-full h-full object-fill select-none pointer-events-none"
+                                                    crossOrigin="anonymous"
+                                                />
+                                                {isSelected && (
+                                                    <div className="absolute inset-0 bg-green-500/10 flex items-center justify-center">
+                                                        <div className="bg-mist-500 text-white rounded-full p-1 shadow-lg">
+                                                            <Plus className="w-4 h-4 rotate-45" />
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <div className="mt-2 px-1 text-center w-full max-w-[120px]">
+                                                <p className="text-[10px] font-medium truncate text-black" title={design.name || dId}>
+                                                    {design.name || <span className="opacity-30 italic">{dId}</span>}
+                                                </p>
+                                                <p className="text-[8px] font-medium truncate text-black" title={design.description || "No Description"}>
+                                                    {design.description || <span className="opacity-30 italic">No Description</span>}
+                                                </p>
+                                                <p className="text-[8px] text-gray-500 font-mono truncate">
+                                                    {dId}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+
+                        <Button onClick={handleSave} disabled={saving} className="w-full bg-mist-600 hover:bg-mist-700">
+                            {saving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}
+                            {tLink('saveButton')}
+                        </Button>
+                    </div>
+                )}
+            </CardContent>
+        </Card>
+    );
+}
+
+
+
+/**
+ * カード注文一覧セクション
+ * 印刷所などへの発注ステータス（ORDERED, PRINTING等）を管理し、QRデータの書き出しを行います。
+ */
+function CardOrderListSection({
+    orders,
+    loading,
+    statusFilter,
+    setStatusFilter,
+    shopIdFilter,
+    setShopIdFilter,
+    onUpdateStatus,
+    onRefresh,
+    onExport,
+    isExporting,
+    dbCardDesigns,
+    paperFormat,
+    cardFormat
+}: {
+    orders: any[],
+    loading: boolean,
+    statusFilter: string,
+    setStatusFilter: (s: string) => void,
+    shopIdFilter: string,
+    setShopIdFilter: (s: string) => void,
+    onUpdateStatus: (shopId: string, orderId: string, status: string, batchId?: string) => Promise<void>,
+    onRefresh: () => void,
+    onExport: (order: any, type: 'pdf' | 'csv') => Promise<void>,
+    isExporting: string | null,
+    dbCardDesigns: any[],
+    paperFormat: string,
+    cardFormat: string
+}) {
+    const t = useTranslations('AdminPage');
+    const tc = useTranslations('AdminPage.cardOrders');
+    const st = useTranslations('Status');
+    const ts = useTranslations('Timestamp');
+    const [isProcessing, setIsProcessing] = useState<string | null>(null);
+    const [selectedOrder, setSelectedOrder] = useState<any>(null);
+
+    const filteredOrders = orders.filter(o =>
+        !shopIdFilter || (o.shop_id && o.shop_id.toLowerCase().includes(shopIdFilter.toLowerCase())) || (o.shop_name && o.shop_name.toLowerCase().includes(shopIdFilter.toLowerCase()))
+    );
+
+    return (
+        <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+                <div>
+                    <CardTitle>{tc('title')}</CardTitle>
+                </div>
+                <Button variant="outline" size="sm" onClick={onRefresh} disabled={loading}>
+                    <RotateCcw className={cn("h-4 w-4 mr-2", loading && "animate-spin")} />
+                    {t('list.refresh')}
+                </Button>
+            </CardHeader>
+            <CardContent>
+                <div className="space-y-4">
+                    <div className="flex flex-wrap gap-4 items-end">
+                        <div className="flex flex-wrap gap-1">
+                            {['ORDERED', 'PRINTING', 'SHIPPED', 'COMPLETED', `CANCELLED`, 'REJECTED'].map((s) => (
+                                <Button
+                                    key={s}
+                                    variant={statusFilter === s ? "default" : "outline"}
+                                    size="sm"
+                                    onClick={() => setStatusFilter(s)}
+                                    className="text-xs"
+                                >
+                                    {st(s.toLowerCase())}
+                                </Button>
+                            ))}
+                        </div>
+                        <div className="flex-1 min-w-[200px]">
+                            <Label htmlFor="orderShopFilter" className="text-xs text-gray-500 mb-1 block">
+                                {tc('shopIdFilter')}
+                            </Label>
+                            <div className="relative">
+                                <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                                <Input
+                                    id="orderShopFilter"
+                                    placeholder="Shop ID or Name..."
+                                    value={shopIdFilter}
+                                    onChange={(e) => setShopIdFilter(e.target.value)}
+                                    className="pl-8 h-9 text-black"
+                                />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="rounded-md border border-gray-200 overflow-hidden">
+                        <Table>
+                            <TableHeader className="bg-gray-50">
+                                <TableRow>
+                                    <TableHead className="w-[150px]">{tc('table.date')}</TableHead>
+                                    <TableHead>{tc('table.shop')}</TableHead>
+                                    <TableHead className="text-right">{tc('table.quantity')}</TableHead>
+                                    <TableHead className="text-center">{tc('table.status')}</TableHead>
+                                    <TableHead className="w-[150px]">{tc('table.dateupdated')}</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {loading ? (
+                                    <TableRow>
+                                        <TableCell colSpan={5} className="h-24 text-center">
+                                            <Loader2 className="h-6 w-6 animate-spin mx-auto text-gray-400" />
+                                        </TableCell>
+                                    </TableRow>
+                                ) : filteredOrders.length === 0 ? (
+                                    <TableRow>
+                                        <TableCell colSpan={5} className="h-24 text-center text-gray-500">
+                                            No orders found.
+                                        </TableCell>
+                                    </TableRow>
+                                ) : (
+                                    filteredOrders.map((order) => (
+                                        <TableRow
+                                            key={order.order_id}
+                                            className="text-black hover:bg-gray-100 transition-colors cursor-pointer group"
+                                            onClick={() => setSelectedOrder(order)}
+                                        >
+                                            <TableCell className="text-xs text-gray-500">
+                                                {new Date(order.ts_created_at).toLocaleString()}
+                                            </TableCell>
+                                            <TableCell>
+                                                <div className="font-medium leading-none mb-1">{order.shop_name || '-'}</div>
+                                                {order.shop_owner_email && (
+                                                    <div className="text-[10px] text-green-700 font-medium truncate max-w-[150px] mb-0.5">
+                                                        {order.shop_owner_email}
+                                                    </div>
+                                                )}
+                                                <div className="text-[9px] text-gray-400 font-mono leading-none">{order.shop_id}</div>
+                                            </TableCell>
+                                            <TableCell className="text-right font-bold">
+                                                {order.quantity}
+                                            </TableCell>
+                                            <TableCell className="text-center">
+                                                <span className={cn(
+                                                    "px-2 py-1 rounded text-[11px] font-bold inline-block min-w-[80px]",
+                                                    order.status === 'ORDERED' ? 'bg-blue-100 text-blue-800' :
+                                                        order.status === 'PRINTING' ? 'bg-yellow-100 text-yellow-800' :
+                                                            order.status === 'SHIPPED' ? 'bg-indigo-100 text-indigo-800' :
+                                                                order.status === 'COMPLETED' ? 'bg-green-100 text-green-800' :
+                                                                    order.status === 'REJECTED' ? 'bg-red-100 text-red-800' :
+                                                                        'bg-gray-100 text-gray-800'
+                                                )}>
+                                                    {st(order.status.toLowerCase())}
+                                                </span>
+                                            </TableCell>
+                                            <TableCell className="text-xs text-gray-500">
+                                                {new Date(order.ts_updated_at).toLocaleString()}
+                                            </TableCell>
+                                        </TableRow>
+                                    ))
+                                )}
+                            </TableBody>
+                        </Table>
+                    </div>
+                </div>
+                {selectedOrder && (
+                    <OrderDetailsDialog
+                        order={selectedOrder}
+                        isOpen={!!selectedOrder}
+                        onClose={() => setSelectedOrder(null)}
+                        onUpdateStatus={onUpdateStatus}
+                        onExport={onExport}
+                        isExporting={isExporting}
+                        dbCardDesigns={dbCardDesigns}
+                        paperFormat={paperFormat}
+                    />
+                )}
             </CardContent>
         </Card>
     );

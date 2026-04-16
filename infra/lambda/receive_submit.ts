@@ -1,181 +1,193 @@
 /**
- * 概要: ギフト配送先情報の登録
- * 詳細: ユーザーが入力した氏名、住所等の配送先情報を保存し、ギフトのステータスを USED (使用済み) に変更します。
- * エンドポイント: POST /receive/submit
- * リクエストボディ:
- *  - qr_id: ギフト（QR）のUUID (必須)
- *  - pin_code: 4桁のPINコード (必須)
- *  - shipping_info: { name, address, zipCode, ... } 配送先情報オブジェクト (必須)
- *  - password: 二要素認証用のパスワード (オプション)
+ * @file receive_submit.ts
+ * @role ゲスト用：ギフト受取・配送先登録（チェックアウト）ハンドラー
+ * @responsibility
+ *  - 被贈答者が配送先住所を入力し、ギフト券を「使用済み」にして商品の配送を確定させます。
+ *  - 【トランザクションによる整合性】
+ *    - `TransactWrite`:
+ *      1. `QR#METADATA`: ステータスを `ACTIVE` から `USED` へ遷移させ、パスワード保護（任意）を設定。
+ *      2. `QR#ORDER`: 配送先情報（住所・氏名・希望日時）を持つオーダーレコードを新規作成。
+ *    - これにより、住所登録されたのにステータスが更新されない、といった不整合を防ぎます。
+ *  - 【遅延評価による最終防衛】
+ *    - 登録の直前で `checkAndExpire` を実行し、入力中に期限が切れたギフトを確実にブロックします。
+ *  - 【受取履歴への自動追加】
+ *    - 被贈答者がログイン済みの場合、ギフト ID を `RECEIVEDLOG` へ追加し、自分の履歴からいつでもチャットを見返せるようにします。
+ *  - 【購読と通知のマルチキャスト】
+ *    - 受取人の Email をチャットの通知リストへ自動登録（Subscribe）し、登録完了メールを送信。
+ *    - 同時にショップオーナーに対しても、新しい注文が入ったことを通知します。
+ * @context
+ *  - ギフトを受け取るという体験のクライマックスであり、最もデータ整合性が求められるポイントです。
  */
+
 import { APIGatewayProxyHandler } from 'aws-lambda';
-import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
-import { DynamoDBDocumentClient, TransactWriteCommand, GetCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
+import { TransactWriteCommand, GetCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
 import { CognitoIdentityProviderClient, AdminGetUserCommand } from '@aws-sdk/client-cognito-identity-provider';
+import * as bcrypt from 'bcryptjs';
 import { sendLocalizedEmail } from './templates/email';
-import { isLocked, getRateLimitUpdate } from './utils/rate-limit';
 import { checkAndExpire } from './utils/expiration';
+import { successResponse, errorResponse } from './utils/response';
+import { ddb, TABLE_NAME } from './share/db';
+import { getQrId, getPIN, getUserId } from './utils/request';
+import { appendToHistory } from './utils/history';
+import { ReceiveApiSchema } from '@shared/api-types';
 
-const client = new DynamoDBClient({});
 const cognito = new CognitoIdentityProviderClient({});
-const ddb = DynamoDBDocumentClient.from(client, {
-    marshallOptions: {
-        removeUndefinedValues: true,
-        convertEmptyValues: true
-    }
-});
-const TABLE_NAME = process.env.TABLE_NAME || '';
-
-const corsHeaders = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type,Authorization,X-QR-UUID,X-QR-PIN',
-    'Access-Control-Allow-Methods': 'OPTIONS,POST'
-};
+const USER_POOL_ID = process.env.USER_POOL_ID || '';
 
 export const handler: APIGatewayProxyHandler = async (event) => {
     try {
-        if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers: corsHeaders, body: '' };
-        if (event.httpMethod !== 'POST') {
-            return { statusCode: 405, headers: corsHeaders, body: JSON.stringify({ message: 'Method Not Allowed' }) };
+        if (event.httpMethod === 'OPTIONS') return successResponse();
+
+        const body = JSON.parse(event.body || '{}') as ReceiveApiSchema['receive_submit'];
+        const qr_id = getQrId(event, body);
+        const pin = getPIN(event, body);
+
+        // フロントエンドの入れ子構造(shipping_info)を使用
+        const shipping = body.shipping_info || {};
+        const { name, address, zip_code, phone, email, preferred_date, preferred_time, client_timestamp } = shipping;
+        const password = body.password;
+
+        if (!qr_id || !pin || !name || !address) {
+            return errorResponse(400, 'Missing required fields (qr_id, pin, name, or address)');
         }
 
-        const body = JSON.parse(event.body || '{}');
-        const { qr_id, pin_code, shipping_info, password } = body;
-
-        if (!qr_id || !pin_code || !shipping_info) {
-            return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Missing required fields' }) };
-        }
-
-        const { name, address, zipCode } = shipping_info;
-        if (!name || !address || !zipCode) {
-            return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Missing required address fields (name, address, zipCode)' }) };
-        }
-
-        // 【DB操作: GetItem】
-        // - 目的: UUIDに基づくQRコードの状態取得。本当にACTIVE(受取可能)状態であるか、PINが一致するかを最終確認する
-        // - テーブル: TABLE_NAME
-        // - リクエストキー: { PK: `QR#${qr_id}`, SK: 'METADATA' }
-        // - 取得カラム: ALL (status, pin, failed_attempts, ts_expired_at, shop_id, product_id 等)
-        const getRes = await ddb.send(new GetCommand({
-            TableName: TABLE_NAME,
-            Key: { PK: `QR#${qr_id}`, SK: 'METADATA' }
+        // 【確認フェーズ 1: QRコードの状態確認】
+        // Note: PINとレートリミットは receiveAuthorizer.ts で検証済みです。
+        const qrRes = await ddb.send(new GetCommand({
+            TableName: TABLE_NAME, Key: { PK: `QR#${qr_id}`, SK: 'METADATA' }
         }));
+        if (!qrRes.Item) return errorResponse(404, 'QR Code not found');
 
-        if (!getRes.Item) {
-            return { statusCode: 404, headers: corsHeaders, body: JSON.stringify({ message: 'QR Code not found' }) };
-        }
+        const item = qrRes.Item;
 
-        const item = getRes.Item;
-
-        // 期限切れチェック (共通ユーティリティ)
-        const status = await checkAndExpire(ddb, TABLE_NAME, qr_id, item as any);
-        if (status === 'EXPIRED') {
-            return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'QR Code has expired' }) };
-        }
 
         // 状態チェック
-        if (status !== 'ACTIVE') {
-            const msg = status === 'EXPIRED' ? 'QR Code has expired' : (status === 'BANNED' ? 'QR Code is banned' : 'QR Code is not active');
-            return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: msg }) };
-        }
-
-        // レートリミット/PIN検証 (Authorizerと重複するがロジック維持)
-        if (isLocked(item)) return { statusCode: 403, headers: corsHeaders, body: JSON.stringify({ message: 'Too many attempts. Please try again later.' }) };
-        if (item.pin !== pin_code) {
-            const { UpdateExpression, ExpressionAttributeValues, ExpressionAttributeNames } = getRateLimitUpdate(item);
-            // 【DB操作: UpdateItem】
-            // - 目的: PIN不一致時の失敗回数更新
-            await ddb.send(new UpdateCommand({
-                TableName: TABLE_NAME, Key: { PK: `QR#${qr_id}`, SK: 'METADATA' },
-                UpdateExpression, ExpressionAttributeValues, ExpressionAttributeNames
-            }));
-            return { statusCode: 403, headers: corsHeaders, body: JSON.stringify({ message: 'Invalid PIN' }) };
-        }
-
-        // 二要素認証パスワードのハッシュ化
-        let password_hash: string | undefined;
-        if (password) {
-            const bcrypt = await import('bcryptjs');
-            password_hash = await bcrypt.hash(password, await bcrypt.genSalt(10));
+        if (item.status !== 'ACTIVE') {
+            const msg = item.status === 'EXPIRED' ? 'QR Code has expired' : 'QR Code is not active or already used';
+            return errorResponse(400, msg);
         }
 
         const now = new Date();
         const nowIso = now.toISOString();
 
-        // 【DB操作: TransactWriteItems】
-        // - 目的: QRコードのステータス更新(USEDへの遷移)と、配送先情報の登録をアトミックに実行
-        // - テーブル: TABLE_NAME
-        // - 処理1(Update): METADATAに対し status='USED', GSIキー更新, PIN失敗カウントのクリア
-        // - 処理2(Put):    SK='ORDER' に対してユーザーが入力した配送情報を新規保存
+        // 期限切れチェック (遅延評価)
+        const currentStatus = await checkAndExpire(ddb, TABLE_NAME, qr_id, item as any);
+        if (currentStatus === 'EXPIRED') {
+            return errorResponse(400, 'QR Code has expired');
+        }
+
+        // 【確認フェーズ 3: パスワードハッシュ化 (設定されている場合)】
+        let password_hash: string | undefined;
+        if (password) {
+            password_hash = await bcrypt.hash(password, await bcrypt.genSalt(10));
+        }
+
+        // 【受取体験の継続】ログイン中のユーザーであれば ID を記録し RECEIVEDLOG に自動追加
+        const userId = getUserId(event);
+
+        // ====================================================================
+        // 実施フェーズ: アトミックなステータス更新とオーダー作成
+        // ====================================================================
         await ddb.send(new TransactWriteCommand({
             TransactItems: [
                 {
                     Update: {
                         TableName: TABLE_NAME,
                         Key: { PK: `QR#${qr_id}`, SK: 'METADATA' },
-                        UpdateExpression: 'SET #status = :used, GSI1_PK = :gsi_pk, ts_updated_at = :now, ts_submitted_at = :now' + (password_hash ? ', password_hash = :ph' : '') + ' REMOVE #fa, #lu',
+                        UpdateExpression: 'SET #status = :used, GSI1_PK = :gsi_pk, GSI1_SK = :now, ts_submitted_at = :now, ts_updated_at = :now' +
+                            (password_hash ? ', password_hash = :ph' : '') + 
+                            (userId ? ', receiver_user_id = :rid' : '') +
+                            ' REMOVE #fa, #lu',
                         ConditionExpression: '#status = :active',
                         ExpressionAttributeNames: { '#status': 'status', '#fa': 'failed_attempts', '#lu': 'locked_until' },
-                        ExpressionAttributeValues: { ':used': 'USED', ':active': 'ACTIVE', ':gsi_pk': 'QR#USED', ':now': nowIso, ...(password_hash ? { ':ph': password_hash } : {}) }
+                        ExpressionAttributeValues: {
+                            ':used': 'USED', ':active': 'ACTIVE', ':gsi_pk': 'QR#USED', ':now': nowIso,
+                            ...(password_hash ? { ':ph': password_hash } : {}),
+                            ...(userId ? { ':rid': userId } : {})
+                        }
                     }
                 },
                 {
                     Put: {
                         TableName: TABLE_NAME,
-                        Item: { PK: `QR#${qr_id}`, SK: 'ORDER', ...shipping_info, ts_submitted_at: nowIso, ts_updated_at: nowIso }
+                        Item: {
+                            PK: `QR#${qr_id}`, SK: 'ORDER',
+                            name, address, zip_code, phone, preferred_date, preferred_time, email,
+                            ts_submitted_at: nowIso, ts_updated_at: nowIso,
+                            ...(userId ? { receiver_user_id: userId } : {})
+                        }
                     }
                 }
             ]
         }));
 
-        // 通知処理（通知購読・自動登録）
-        if (shipping_info.email) {
+        if (userId) {
             try {
-                // 【DB操作: UpdateItem x 2】
-                // - 目的: チャットメーリングリスト(CHATレコード)に受取人のメアドを追加登録
+                await appendToHistory(ddb, TABLE_NAME, userId, 'RECEIVEDLOG', qr_id);
+            } catch (e) {
+                console.error('Failed to append to RECEIVEDLOG:', e);
+            }
+        }
+
+
+        // ====================================================================
+        // 副作用処理 (通知と購読)
+        // ====================================================================
+
+        // 1. 被贈答者の自動購読と確認メール
+        if (email) {
+            try {
+                // 通知リストへ追加
                 await ddb.send(new UpdateCommand({
                     TableName: TABLE_NAME, Key: { PK: `QR#${qr_id}`, SK: 'CHAT' },
                     UpdateExpression: 'ADD notification_emails :new_email SET email_preferences = if_not_exists(email_preferences, :empty_map)',
-                    ExpressionAttributeValues: { ':new_email': new Set([shipping_info.email]), ':empty_map': {} }
+                    ExpressionAttributeValues: { ':new_email': new Set([email]), ':empty_map': {} }
                 }));
                 await ddb.send(new UpdateCommand({
                     TableName: TABLE_NAME, Key: { PK: `QR#${qr_id}`, SK: 'CHAT' },
                     UpdateExpression: 'SET email_preferences.#em = :lang',
-                    ExpressionAttributeNames: { '#em': shipping_info.email },
+                    ExpressionAttributeNames: { '#em': email },
                     ExpressionAttributeValues: { ':lang': 'ja' }
                 }));
-                // 受取人への確認メール
-                await sendLocalizedEmail({ type: 'ADDRESS_REGISTRATION_CONFIRMATION', to: shipping_info.email, params: { uuid: qr_id, pin: pin_code }, lang: 'ja' });
-            } catch (e) { console.error('Auto-subscribe failed', e); }
+                // 確認メール送信
+                await sendLocalizedEmail({
+                    type: 'ADDRESS_REGISTRATION_CONFIRMATION',
+                    to: email,
+                    params: { qr_id, pin },
+                    lang: 'ja'
+                });
+            } catch (e) { console.error('Recipient notification/subscription failed', e); }
         }
 
-        // ショップ側への通知
+        // 2. ショップ側への通知
         const shopId = item.shop_id;
         const productId = item.product_id;
         if (shopId) {
             try {
-                // 【DB操作: GetItem x 2】
-                // - 目的: ショップ情報と商品名を取得し、管理者に通知メールを送信
                 const [shopRes, productRes] = await Promise.all([
                     ddb.send(new GetCommand({ TableName: TABLE_NAME, Key: { PK: `SHOP#${shopId}`, SK: 'METADATA' } })),
                     productId ? ddb.send(new GetCommand({ TableName: TABLE_NAME, Key: { PK: `SHOP#${shopId}`, SK: `PRODUCT#${productId}` } })) : { Item: undefined }
                 ]);
 
+                // ショップ個別の Email がなければオーナー（Cognito）の Email を使用
                 let shopEmail = shopRes.Item?.email;
-                if (!shopEmail && shopRes.Item?.owner_id) {
-                    const userRes = await cognito.send(new AdminGetUserCommand({ UserPoolId: process.env.USER_POOL_ID!, Username: shopRes.Item.owner_id }));
+                if (!shopEmail && shopRes.Item?.owner_id && USER_POOL_ID) {
+                    const userRes = await cognito.send(new AdminGetUserCommand({
+                        UserPoolId: USER_POOL_ID, Username: shopRes.Item.owner_id
+                    }));
                     shopEmail = userRes.UserAttributes?.find(attr => attr.Name === 'email')?.Value;
                 }
 
                 if (shopEmail) {
                     await sendLocalizedEmail({
-                        type: 'ADDRESS_REGISTRATION_NOTIFICATION', to: shopEmail,
-                        params: { 
-                            shopName: shopRes.Item?.name || '不明なショップ', 
-                            productName: productRes.Item?.name || '不明な商品', 
-                            qr_id, 
-                            shopId, 
-                            timestamp: shipping_info.client_timestamp || new Date(nowIso).toLocaleString() 
+                        type: 'ADDRESS_REGISTRATION_NOTIFICATION',
+                        to: shopEmail,
+                        params: {
+                            shopName: shopRes.Item?.name || '不明なショップ',
+                            productName: productRes.Item?.name || '不明な商品',
+                            qr_id: qr_id,
+                            shopId: shopId,
+                            timestamp: client_timestamp || now.toLocaleString('ja-JP')
                         },
                         lang: 'ja'
                     });
@@ -183,11 +195,13 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             } catch (e) { console.error('Shop notification failed', e); }
         }
 
-        return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ message: 'Address submitted successfully', order_id: `ORDER#${qr_id}` }) };
+        return successResponse({ message: 'Address submitted successfully', order_id: `ORDER#${qr_id}` });
 
     } catch (error: any) {
-        console.error(error);
-        if (error.name === 'TransactionCanceledException') return { statusCode: 409, headers: corsHeaders, body: JSON.stringify({ message: 'Transaction failed (possibly already used)' }) };
-        return { statusCode: 500, headers: corsHeaders, body: JSON.stringify({ message: 'Internal Server Error' }) };
+        console.error('Receive submit error:', error);
+        if (error.name === 'TransactionCanceledException') {
+            return errorResponse(409, 'Conflict detected. Order might be already submitted or QR state changed.');
+        }
+        return errorResponse(500, 'Internal Server Error', error.message);
     }
 };

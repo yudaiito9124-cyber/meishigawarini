@@ -1,160 +1,152 @@
 /**
- * 概要: カードデザイン（背景画像、サムネイルなど）の管理を行う。
- * 詳細: デザインの一覧取得、新規作成、更新、削除、およびS3への画像アップロード用URLの生成を担当する。
- * エンドポイント:
- *  - POST /admin/carddesigns/list: 全デザインの一覧取得
- *  - POST /admin/carddesigns/create: 新規作成 (body: { design: { ... } })
- *  - POST /admin/carddesigns/uploadurl: アップロードURL発行 (body: { filename, contentType, design_id })
- *  - POST /admin/carddesigns/update: 更新 (body: { design_id, design: { ... } })
- *  - POST /admin/carddesigns/delete: 削除 (body: { design_id })
+ * @file admin_carddesigns.ts
+ * @role 管理者用：カードデザイン管理ハンドラー
+ * @responsibility
+ *  - サービスの核となる「カードデザイン（テンプレート）」の登録・編集・削除を管理します。
+ *  - デザインメタデータ（PK: CARD_DESIGN#METADATA）の DynamoDB 管理。
+ *  - 【アセット管理】アップロードされた一時的な画像ファイルを、デザイン ID に基づく恒久的なディレクトリへ移動・正規化（localize）します。
+ *  - 【削除安全】デザイン削除時、関連する全画像（表面、裏面、サムネイル）を S3 から一括削除し、ストレージのクリーンネスを維持します。
+ * @context
+ *  - ここで登録されたデザインが、各ショップのギフト設定やユーザーのカード選択画面に反映されます。
  */
+
 import { APIGatewayProxyHandler } from 'aws-lambda';
-import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
-import { DynamoDBDocumentClient, PutCommand, QueryCommand, GetCommand, UpdateCommand, DeleteCommand } from '@aws-sdk/lib-dynamodb';
-import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
+import { PutCommand, QueryCommand, GetCommand, UpdateCommand, DeleteCommand } from '@aws-sdk/lib-dynamodb';
+import { PutObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { generateId } from './utils/id';
-import { stripSignature, signUrlIfS3, localizeS3Image, deleteFolderFromS3, getPresignedViewUrl } from './utils/s3';
-
-const client = new DynamoDBClient({});
-const ddb = DynamoDBDocumentClient.from(client);
-const s3 = new S3Client({});
-
-const TABLE_NAME = process.env.TABLE_NAME || '';
-const BUCKET_NAME = process.env.BUCKET_NAME || '';
-
-const corsHeaders = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type,Authorization',
-    'Access-Control-Allow-Methods': 'POST,OPTIONS'
-};
+import { signUrlIfS3, stripSignature, deleteFileByUrl, localizeS3Image, getPresignedViewUrl, deleteFolderFromS3, s3Client } from './utils/s3';
+import { successResponse, errorResponse, apiResponse } from './utils/response';
+import { ddb, TABLE_NAME, BUCKET_NAME } from './share/db';
+import { getAction, getUserId } from './utils/request';
+import { AdminApiSchema } from '@shared/api-types';
 
 export const handler: APIGatewayProxyHandler = async (event) => {
     try {
-        if (event.httpMethod === 'OPTIONS') {
-            return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ message: 'OK' }) };
-        }
-        if (event.httpMethod !== 'POST') {
-            return { statusCode: 405, headers: corsHeaders, body: JSON.stringify({ message: 'Method Not Allowed' }) };
-        }
+        if (event.httpMethod === 'OPTIONS') return successResponse();
 
-        const path = event.path;
+        const body = JSON.parse(event.body || '{}');
+        const userId = getUserId(event);
+        let action = getAction(event, body);
 
-        // 1. List All Designs (POST /admin/carddesigns/list)
-        if (path.endsWith('/list')) {
-            const body = JSON.parse(event.body || '{}');
-            // 全てのカードデザインのメタデータを検索
-            // - 検索条件: PK = "CARD_DESIGN#METADATA" (全デザイン共通のPK)
-            // - 取得カラム: 項目の全ての属性 (背景画像URL、タイトル等)
+        if (!userId) return errorResponse(401, 'Unauthorized');
+
+        // パスベースのルーティング互換性（Admin UI からの移行対応）
+        const resPath = event.resource;
+        if (resPath.endsWith('/list')) action = 'list';
+        else if (resPath.endsWith('/create')) action = 'create';
+        else if (resPath.endsWith('/update')) action = 'update';
+        else if (resPath.endsWith('/delete')) action = 'delete';
+        else if (resPath.endsWith('/uploadurl')) action = 'uploadurl';
+
+        const now = new Date().toISOString();
+
+        // --------------------------------------------------------------------
+        // ACTION: list (全デザインの一覧取得)
+        // --------------------------------------------------------------------
+        // 目的: 登録されている全てのカードデザインを取得し、画像を表示可能（署名付き）にして返却します。
+        // --------------------------------------------------------------------
+        if (action === 'list') {
             const res = await ddb.send(new QueryCommand({
                 TableName: TABLE_NAME,
                 KeyConditionExpression: 'PK = :pk',
-                ExpressionAttributeValues: {
-                    ':pk': 'CARD_DESIGN#METADATA'
-                }
+                ExpressionAttributeValues: { ':pk': 'CARD_DESIGN#METADATA' }
             }));
+
             const items = res.Items || [];
 
-            // Sign URLs for preview
-            for (const item of items) {
-                if (item.bgimgf) item.bgimgf = await signUrlIfS3(item.bgimgf, BUCKET_NAME);
-                if (item.bgimgb) item.bgimgb = await signUrlIfS3(item.bgimgb, BUCKET_NAME);
-                if (item.thumbf) item.thumbf = await signUrlIfS3(item.thumbf, BUCKET_NAME);
-                if (item.thumbb) item.thumbb = await signUrlIfS3(item.thumbb, BUCKET_NAME);
-            }
+            const signedItems = await Promise.all(items.map(async (item) => {
+                const d = { ...item };
+                // S3 パスを一時的な署名付き URL に変換（UI 表示用）
+                if (d.thumbf) d.thumbf = await signUrlIfS3(d.thumbf, BUCKET_NAME);
+                if (d.thumbb) d.thumbb = await signUrlIfS3(d.thumbb, BUCKET_NAME);
+                if (d.bgimgf) d.bgimgf = await signUrlIfS3(d.bgimgf, BUCKET_NAME);
+                if (d.bgimgb) d.bgimgb = await signUrlIfS3(d.bgimgb, BUCKET_NAME);
+                return d;
+            }));
 
-            return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ items }) };
+            return successResponse({ items: signedItems });
         }
 
-        // 2. Create Design (POST /admin/carddesigns/create)
-        if (path.endsWith('/create')) {
-            const body = JSON.parse(event.body || '{}');
-            const designId = body.design_id || generateId();
-            const design = body.design;
-            if (!designId || !design) {
-                return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Missing params' }) };
-            }
-            const now = new Date().toISOString();
+        // --------------------------------------------------------------------
+        // ACTION: create (新規デザイン作成)
+        // --------------------------------------------------------------------
+        // 目的: 新しいデザインメタデータを保存し、画像を恒久パスへ移動します。
+        // ローカリゼーション: localizeS3Image() により、temp ディレクトリの画像を admin/card-designs/<id>/ へ自動移動。
+        // --------------------------------------------------------------------
+        if (action === 'create') {
+            const { design, design_id } = body as AdminApiSchema['admin_carddesigns_create'];
+            const finalDesignId = design_id || generateId();
+            if (!design) return errorResponse(400, 'Missing design data');
 
-            const item = {
+            const item: any = {
                 ...design,
                 PK: 'CARD_DESIGN#METADATA',
-                SK: designId,
-                design_id: designId,
+                SK: finalDesignId,
+                design_id: finalDesignId,
                 ts_created_at: now,
                 ts_updated_at: now
             };
 
-            // Clean signatures and localize images to standardized paths
-            if (item.bgimgf) item.bgimgf = await localizeS3Image(item.bgimgf, BUCKET_NAME, designId, 'front');
-            if (item.bgimgb) item.bgimgb = await localizeS3Image(item.bgimgb, BUCKET_NAME, designId, 'back');
-            if (item.thumbf) item.thumbf = await localizeS3Image(item.thumbf, BUCKET_NAME, designId, 'thumbf');
-            if (item.thumbb) item.thumbb = await localizeS3Image(item.thumbb, BUCKET_NAME, designId, 'thumbb');
+            // 画像のローカライズ (デザインIDごとの恒久ディレクトリへ移動)
+            // これにより、一時ディレクトリのクレンジングを不要にし、アセットの所有権を明確にします。
+            if (item.bgimgf) item.bgimgf = await localizeS3Image(item.bgimgf, BUCKET_NAME, finalDesignId, 'front');
+            if (item.bgimgb) item.bgimgb = await localizeS3Image(item.bgimgb, BUCKET_NAME, finalDesignId, 'back');
+            if (item.thumbf) item.thumbf = await localizeS3Image(item.thumbf, BUCKET_NAME, finalDesignId, 'thumbf');
+            if (item.thumbb) item.thumbb = await localizeS3Image(item.thumbb, BUCKET_NAME, finalDesignId, 'thumbb');
 
-            try {
-                // カードデザインのメタデータを新規作成または上書き
-                // - PK: "CARD_DESIGN#METADATA" (全デザイン共通のPK)
-                // - SK: designId (各デザイン固有のID)
-                // - 登録項目 (Item): designオブジェクトの各属性、design_id、作成日時(ts_created_at)、更新日時(ts_updated_at)
-                await ddb.send(new PutCommand({
-                    TableName: TABLE_NAME,
-                    Item: item
-                }));
-            } catch (err: any) {
-                console.error("DynamoDB Put Error:", err);
-                return {
-                    statusCode: 500,
-                    headers: corsHeaders,
-                    body: JSON.stringify({ message: 'Database creation failed', error: err.message })
-                };
-            }
+            await ddb.send(new PutCommand({
+                TableName: TABLE_NAME,
+                Item: item
+            }));
 
-            return { statusCode: 201, headers: corsHeaders, body: JSON.stringify({ design_id: designId, message: 'Design created' }) };
+            return apiResponse(201, { design_id: finalDesignId, message: 'Card design created' });
         }
 
-        // 3. Get Upload URL (POST /admin/carddesigns/uploadurl)
-        if (path.endsWith('/uploadurl')) {
-            const body = JSON.parse(event.body || '{}');
-            const { filename, contentType, design_id } = body;
-            if (!filename || !contentType || !design_id) {
-                return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Missing params' }) };
-            }
+        // --------------------------------------------------------------------
+        // ACTION: uploadurl (アップロード用 URL の取得)
+        // --------------------------------------------------------------------
+        // 目的: S3 へのセーフな画像アップロードを許可するため、Presigned URL を発行します。
+        // 格納先: まずは `temp/` 領域に保存され、保存(create/update)アクション時に `admin/` 領域へ移動されます。
+        // --------------------------------------------------------------------
+        if (action === 'uploadurl') {
+            const { filename, content_type, design_id } = body as AdminApiSchema['admin_carddesigns_uploadurl'];
+            if (!filename || !content_type || !design_id) return errorResponse(400, 'Missing params');
 
             const tempId = generateId();
             const key = `temp/card-designs/${design_id}/${tempId}_${filename}`;
             const command = new PutObjectCommand({
                 Bucket: BUCKET_NAME,
                 Key: key,
-                ContentType: contentType
+                ContentType: content_type
             });
 
-            const uploadUrl = await getSignedUrl(s3, command, { expiresIn: 300 });
-
-            // Also get a signed VIEW URL so the frontend can show it immediately
+            const uploadUrl = await getSignedUrl(s3Client, command, { expiresIn: 300 });
             const signedViewUrl = await getPresignedViewUrl(BUCKET_NAME, key, 3600);
 
-            return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ uploadUrl, publicUrl: signedViewUrl }) };
+            return successResponse({ uploadUrl, publicUrl: signedViewUrl });
         }
 
-        // 4. Update Design (POST /admin/carddesigns/update)
-        if (path.endsWith('/update')) {
-            const body = JSON.parse(event.body || '{}');
-            const designId = body.design_id;
-            const design = body.design;
-            if (!designId || !design) {
-                return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Missing params' }) };
-            }
-            const now = new Date().toISOString();
+        // --------------------------------------------------------------------
+        // ACTION: update (既存デザインの更新)
+        // --------------------------------------------------------------------
+        // 目的: メタデータの変更、および画像の差し替えを処理します。
+        // 動的生成: 入力があったフィールドのみを SET 句に含めることで、不必要なデータの上書き・削除を防止します。
+        // --------------------------------------------------------------------
+        if (action === 'update') {
+            const { design_id, design } = body as AdminApiSchema['admin_carddesigns_update'];
+            if (!design_id || !design) return errorResponse(400, 'Missing design_id or design data');
 
-            // Localize images and strip signatures
-            if (design.bgimgf) design.bgimgf = await localizeS3Image(design.bgimgf, BUCKET_NAME, designId, 'front');
-            if (design.bgimgb) design.bgimgb = await localizeS3Image(design.bgimgb, BUCKET_NAME, designId, 'back');
-            if (design.thumbf) design.thumbf = await localizeS3Image(design.thumbf, BUCKET_NAME, designId, 'thumbf');
-            if (design.thumbb) design.thumbb = await localizeS3Image(design.thumbb, BUCKET_NAME, designId, 'thumbb');
+            // 差し替え画像のローカライズ
+            if (design.bgimgf) design.bgimgf = await localizeS3Image(design.bgimgf, BUCKET_NAME, design_id, 'front');
+            if (design.bgimgb) design.bgimgb = await localizeS3Image(design.bgimgb, BUCKET_NAME, design_id, 'back');
+            if (design.thumbf) design.thumbf = await localizeS3Image(design.thumbf, BUCKET_NAME, design_id, 'thumbf');
+            if (design.thumbb) design.thumbb = await localizeS3Image(design.thumbb, BUCKET_NAME, design_id, 'thumbb');
 
+            // 更新式の動的構築
             const updateExprParts: string[] = [];
             const attrValues: any = { ':now': now };
-            const attrNames: any = {};
+            const attrNames: any = { '#ts_up': 'ts_updated_at' };
 
             Object.entries(design).forEach(([key, value]) => {
                 if (['PK', 'SK', 'design_id', 'ts_created_at', 'ts_updated_at'].includes(key)) return;
@@ -163,64 +155,48 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 const valKey = `:${key}`;
                 updateExprParts.push(`${attrKey} = ${valKey}`);
                 attrNames[attrKey] = key;
-                attrValues[valKey] = value === "" ? null : value; // Convert empty strings to null for DynamoDB safety
+                attrValues[valKey] = value === "" ? null : value;
             });
 
-            attrNames['#ts_updated_at'] = 'ts_updated_at';
+            if (updateExprParts.length === 0) return errorResponse(400, 'No fields to update');
 
-            try {
-                // 既存のカードデザインのメタデータを一部更新
-                // - 検索条件: PK = "CARD_DESIGN#METADATA", SK = designId
-                // - 更新内容: リクエストに含まれるdesignオブジェクトの各属性 (属性名の競合回避のため ExpressionAttributeNames を使用)
-                // - 必須更新カラム: ts_updated_at (最終更新日時を現在時刻に設定)
-                await ddb.send(new UpdateCommand({
-                    TableName: TABLE_NAME,
-                    Key: { PK: 'CARD_DESIGN#METADATA', SK: designId },
-                    UpdateExpression: `SET ${updateExprParts.length > 0 ? updateExprParts.join(', ') + ', ' : ''} #ts_updated_at = :now`,
-                    ExpressionAttributeNames: attrNames,
-                    ExpressionAttributeValues: attrValues
-                }));
-            } catch (err: any) {
-                console.error("DynamoDB Update Error:", err);
-                return {
-                    statusCode: 500,
-                    headers: corsHeaders,
-                    body: JSON.stringify({ message: 'Database update failed', error: err.message, details: err.stack })
-                };
-            }
-
-            return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ message: 'Design updated' }) };
-        }
-
-        // 5. Delete Design (DELETE /admin/carddesigns/delete)
-        if (path.endsWith('/delete')) {
-            const body = JSON.parse(event.body || '{}');
-            const designId = body.design_id;
-            if (!designId) {
-                return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Missing params' }) };
-            }
-            // 指定したIDのカードデザインを削除
-            // - 検索条件: PK = "CARD_DESIGN#METADATA", SK = designId
-            // - 削除対象: 当該メタデータ項目全体
-            await ddb.send(new DeleteCommand({
+            await ddb.send(new UpdateCommand({
                 TableName: TABLE_NAME,
-                Key: { PK: 'CARD_DESIGN#METADATA', SK: designId }
+                Key: { PK: 'CARD_DESIGN#METADATA', SK: design_id },
+                UpdateExpression: `SET ${updateExprParts.join(', ')}, #ts_up = :now`,
+                ExpressionAttributeNames: attrNames,
+                ExpressionAttributeValues: attrValues
             }));
 
-            // Recursive S3 deletion of the design folder
-            await deleteFolderFromS3(BUCKET_NAME, `admin/card-designs/${designId}/`);
-
-            return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ message: 'Design deleted' }) };
+            return successResponse({ message: 'Card design updated' });
         }
 
-        return { statusCode: 405, headers: corsHeaders, body: JSON.stringify({ message: 'Method Not Allowed' }) };
+        // --------------------------------------------------------------------
+        // ACTION: delete (デザインの物理削除)
+        // --------------------------------------------------------------------
+        // 目的: メタデータと S3 ストレージの両方からデザインを削除します。
+        // ストレージクリーンアップ: deleteFolderFromS3() により、そのデザイン専用の S3 サブディレクトリを再帰的に全消去します。
+        // --------------------------------------------------------------------
+        if (action === 'delete') {
+            const { design_id } = body as AdminApiSchema['admin_carddesigns_delete'];
+            if (!design_id) return errorResponse(400, 'Missing design_id');
+
+            // 1. DB レコード消去
+            await ddb.send(new DeleteCommand({
+                TableName: TABLE_NAME,
+                Key: { PK: 'CARD_DESIGN#METADATA', SK: design_id }
+            }));
+
+            // 2. S3 ストレージ消去 (再帰削除)
+            await deleteFolderFromS3(BUCKET_NAME, `admin/card-designs/${design_id}/`);
+
+            return successResponse({ message: 'Card design deleted' });
+        }
+
+        return errorResponse(404, 'Unknown action');
 
     } catch (error: any) {
-        console.error(error);
-        return {
-            statusCode: 500,
-            headers: corsHeaders,
-            body: JSON.stringify({ message: 'Internal Server Error', error: error.message })
-        };
+        console.error('Admin card designs error:', error);
+        return errorResponse(500, 'Internal Server Error', error.message);
     }
 };

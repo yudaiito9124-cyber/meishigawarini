@@ -1,6 +1,21 @@
+/**
+ * ファイル概要: 管理者用ヘルプ動的レンダリングページ (Dynamic Admin Help)
+ * 
+ * 役割:
+ * マニュアルの実体（Markdown）を読み込み、メタデータおよびコンテンツをレンダリングします。
+ * スラッグに基づいたディレクトリ検索を行い、存在しない場合は 404 を返します。
+ * 管理画面のダークテーマに合わせたスタイリングが適用されます。
+ * 
+ * 主要機能:
+ * 1. Markdownファイルの読み込みとFrontmatter（gray-matter）の解析。
+ * 2. `MarkdownRenderer` によるリッチなドキュメント表示（アイコン、Mermaid対応）。
+ * 3. 動的なメタデータ生成。
+ * 4. 親ディレクトリへの自動的なブレッドクラムリンク。
+ */
+
 import { getTranslations } from 'next-intl/server';
 import { Link } from '@/i18n/routing';
-import { ArrowLeft, Home } from 'lucide-react';
+import { ArrowLeft, Home, Crown, CreditCard, Printer, Paintbrush, Store, Wrench, BookOpen, Waypoints, Search } from 'lucide-react';
 import fs from 'fs/promises';
 import path from 'path';
 import matter from 'gray-matter';
@@ -46,35 +61,43 @@ export default async function AdminHelpPage({ params }: Props) {
   }
 
   const { data, content } = matter(fileContent);
+  const slugKey = slug[0];
+
+  const IconMap: Record<string, any> = {
+    qrcodes: CreditCard,
+    cardorders: Printer,
+    designs: Paintbrush,
+    shops: Store,
+    tools: Wrench,
+    overview: BookOpen,
+    flow: Waypoints,
+    whereisid: Search,
+  };
+
+  const CategoryIcon = IconMap[slugKey] || Crown;
 
   // Parent link logic
   const parentSlug = slug.slice(0, -1);
-  const parentPath = parentSlug.length > 0 ? `/admin/help/${parentSlug.join('/')}` : '/admin';
+  const parentPath = parentSlug.length > 0 ? `/admin/help/${parentSlug.join('/')}` : '/admin/help';
 
   return (
-    <div className="min-h-screen bg-mist-900 text-white pb-20 pt-10 px-4 sm:px-6 lg:px-10">
+    <div className="dark min-h-screen bg-mist-900 text-white pb-20 pt-10 px-4 sm:px-6 lg:px-10">
       <div className="max-w-4xl mx-auto">
         {/* Breadcrumb / Navigation */}
         <div className="flex justify-between items-center mb-10">
           <Link href={parentPath}>
             <Button variant="ghost" className="text-white/60 hover:text-white hover:bg-white/5">
               <ArrowLeft className="mr-2 h-4 w-4" />
-              {parentSlug.length > 0 ? 'Back' : 'Back to Dashboard'}
+              戻る
             </Button>
           </Link>
-          <h1 className="text-xl font-bold opacity-40">Admin Documentation</h1>
+          <h1 className="text-xl font-bold opacity-40">管理者用ドキュメント</h1>
         </div>
 
         {/* Content Section */}
         <div className="bg-mist-200/10 border border-white/5 rounded-3xl p-8 sm:p-12 backdrop-blur-xl shadow-2xl overflow-hidden">
-          <div className="mb-8 border-b border-white/10 pb-6">
-            <h2 className="text-4xl font-extrabold tracking-tight bg-gradient-to-r from-white to-white/60 bg-clip-text text-transparent">
-              {data.title || slug[slug.length - 1]}
-            </h2>
-          </div>
-
-          <div className="prose prose-invert max-w-none ">
-            <MarkdownRenderer content={content} />
+          <div className="prose prose-invert max-w-none">
+            <MarkdownRenderer content={content} categoryIcon={CategoryIcon} mermaidVariant="dark" />
           </div>
         </div>
 
@@ -83,7 +106,7 @@ export default async function AdminHelpPage({ params }: Props) {
           <Link href="/admin">
             <Button variant="outline" className="bg-white/5 border-white/10 text-white/70 hover:bg-white/10 hover:text-white rounded-full px-8">
               <Home className="mr-2 h-4 w-4" />
-              Admin Dashboard
+              管理者ダッシュボードに戻る
             </Button>
           </Link>
         </div>

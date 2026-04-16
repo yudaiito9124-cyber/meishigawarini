@@ -1,3 +1,14 @@
+/**
+ * @file ADDRESS_REGISTRATION_NOTIFICATION.ts (en)
+ * @description Notification to the shop owner about recipient address registration (English)
+ * @placeholders
+ *  - {{shopName}}: Shop name
+ *  - {{productName}}: Product name
+ *  - {{qr_id}}: Order ID (QR_ID)
+ *  - {{timestamp}}: Registration time
+ *  - {{baseUrl}}: App base URL
+ *  - {{shopId}}: Shop ID
+ */
 export const body = `
 Dear Shop Owner,
 

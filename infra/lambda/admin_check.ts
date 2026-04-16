@@ -1,15 +1,41 @@
 /**
- * 概要: 管理者認証の有効性を確認するためのチェック用エンドポイント。
- * 詳細: API Gatewayのオーソライザー経由で呼び出され、管理者が正しく認証されている場合に成功レスポンスを返す。
- * エンドポイント: GET /admin
+ * @file admin_check.ts
+ * @role 管理者認証確認ハンドラー
+ * @responsibility
+ *  - Admin UI からの「ログイン状態と権限」の最終確認に応答します。
+ *  - API Gateway Authorizer が正しく機能し、管理者の識別子（principalId）が解決できているかを検証します。
+ * @context
+ *  - フロントエンドの AdminLayout 等で、ページ遷移時や起動時の権限チェックに使用されます。
  */
-import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 
-export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
-    // --- ここに管理者だけができる処理を書く ---
-    return {
-        statusCode: 200,
-        body: JSON.stringify({ message: "Authenticated as Admin" }),
-        headers: { 'Access-Control-Allow-Origin': '*' }
-    };
+import { APIGatewayProxyHandler } from 'aws-lambda';
+import { successResponse, errorResponse } from './utils/response';
+
+/**
+ * 管理者認証の有効性確認。
+ * 
+ * @description
+ * オーソライザー（adminAuthorizer）によって検証済みのリクエストのみがここに到達します。
+ * 到達時点で「JWT は有効」「Administrators グループ所属」「MFA 済み」が保証されているため、
+ * ここでは単に principalId を返すことで、フロントエンドへ認可成功を通知します。
+ */
+export const handler: APIGatewayProxyHandler = async (event) => {
+    try {
+        if (event.httpMethod === 'OPTIONS') return successResponse();
+
+        // Authorizer によって抽出された principalId (Cognito sub) を確認
+        const authorizer = event.requestContext?.authorizer;
+        if (!authorizer || !authorizer.principalId) {
+            return errorResponse(401, 'Unauthorized');
+        }
+
+        return successResponse({ 
+            message: "Authenticated as Admin",
+            admin_id: authorizer.principalId
+        });
+
+    } catch (error: any) {
+        console.error('Admin check error:', error);
+        return errorResponse(500, 'Internal Server Error', error.message);
+    }
 };

@@ -1,0 +1,7 @@
+browser-use==0.12.6
+playwright
+langchain-google-genai
+python-dotenv
+google-genai
+Pillow
+langchain_ollama

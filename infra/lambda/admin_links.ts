@@ -1,243 +1,245 @@
 /**
- * 概要: ユーザーをショップの「ゼネラルマネージャー（GM）」として紐付ける。
- * 詳細: ユーザーとショップの存在を確認し、双方向の参照関係（ユーザー側には`gm_shop_ids`、ショップ側には`gm_ids`）を更新して権限を付与する。
- * エンドポイント: POST /admin/links
- * リクエストボディ:
- *  - shopIds: 紐付け対象のショップID配列
- *  - userIds: 紐付け対象のユーザーID配列
- *  - action: "validate" (ID存在確認のみ) | "execute" (紐付け実行)
+ * @file admin_links.ts
+ * @role 管理者用：ショップ管理権限（GM）一括設定ハンドラー
+ * @responsibility
+ *  - 「オーナーではないが管理権限を持つユーザー（ゼネラルマネージャー / GM）」の一括紐付け・解除を管理します。
+ *  - 【二重管理】以下の 2 つのレコードを同期的に更新します。
+ *    1. ユーザーレコード (`USER#ID`, `SK:SHOP`): `gm_shop_ids` 配列にショップを追加し、`GENERAL_MANAGER` ロールを付与。
+ *    2. ショップレコード (`SHOP#ID`, `SK:METADATA`): `gm_ids` 配列にユーザー ID を追加。
+ *  - 【整合性フィルタ】既にオーナー権限を持つユーザーは GM リストから自動除外され、循環参照や権限の重複定義を防止します。
+ * @context
+ *  - 大規模ショップにおいて、店舗スタッフや委託先に管理画面へのアクセス権を付与する際に使用されます。
  */
 
 import { APIGatewayProxyHandler } from 'aws-lambda';
-import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
-import { DynamoDBDocumentClient, GetCommand, UpdateCommand, BatchGetCommand } from '@aws-sdk/lib-dynamodb';
-
-const client = new DynamoDBClient({});
-const ddb = DynamoDBDocumentClient.from(client);
-const TABLE_NAME = process.env.TABLE_NAME || '';
-
-const corsHeaders = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type,Authorization',
-    'Access-Control-Allow-Methods': 'POST,OPTIONS'
-};
+import { GetCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
+import { successResponse, errorResponse } from './utils/response';
+import { ddb, TABLE_NAME } from './share/db';
+import { getUserId, getAction } from './utils/request';
+import { AdminApiSchema } from '@shared/api-types';
 
 export const handler: APIGatewayProxyHandler = async (event) => {
     try {
-        if (event.httpMethod === 'OPTIONS') {
-            return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ message: 'OK' }) };
-        }
-        if (event.httpMethod !== 'POST') {
-            return { statusCode: 405, headers: corsHeaders, body: JSON.stringify({ message: 'Method Not Allowed' }) };
-        }
+        if (event.httpMethod === 'OPTIONS') return successResponse();
 
         const body = JSON.parse(event.body || '{}');
-        let { shopIds, userIds, action } = body;
+        const userId = getUserId(event);
+        const action = getAction(event, body);
 
-        if (Array.isArray(shopIds)) shopIds = Array.from(new Set(shopIds));
-        if (Array.isArray(userIds)) userIds = Array.from(new Set(userIds));
-
-        if (!Array.isArray(shopIds) || !Array.isArray(userIds) || !action) {
-            return {
-                statusCode: 400,
-                headers: corsHeaders,
-                body: JSON.stringify({ message: 'Missing required fields: shopIds, userIds, action' })
-            };
-        }
-
+        // --------------------------------------------------------------------
+        // ACTION: validate (紐付け前の事前チェック)
+        // --------------------------------------------------------------------
+        // 目的: 指定された全てのユーザー ID とショップ ID が実在するかを確認し、存在しない ID が混じっている場合はエラーを返します。
+        // --------------------------------------------------------------------
         if (action === 'validate') {
+            let { shop_ids, user_ids } = body as AdminApiSchema['admin_links'];
+            
+            if (Array.isArray(shop_ids)) shop_ids = Array.from(new Set(shop_ids));
+            if (Array.isArray(user_ids)) user_ids = Array.from(new Set(user_ids));
+
+            if (!Array.isArray(shop_ids) || !Array.isArray(user_ids) || !action) {
+                return errorResponse(400, 'Missing required fields: shop_ids, user_ids, action');
+            }
+
             const userMetadataList = [];
             const shopMetadataList = [];
             const missingIds = [];
 
-            // Validate Users
-            for (const userId of userIds) {
-                // ユーザー情報の存在確認
-                // - 検索条件: PK = USER#{userId}, SK = "SHOP"
-                // - 取得カラム: email
+            // 1. ユーザーの存在確認
+            for (const uid of user_ids) {
                 const res = await ddb.send(new GetCommand({
                     TableName: TABLE_NAME,
-                    Key: { PK: `USER#${userId}`, SK: 'SHOP' }
+                    Key: { PK: `USER#${uid}`, SK: 'SHOP' }
                 }));
                 if (res.Item) {
-                    userMetadataList.push({ id: userId, email: res.Item.email });
+                    userMetadataList.push({ id: uid, email: res.Item.email });
                 } else {
-                    missingIds.push(`USER#${userId}`);
+                    missingIds.push(`USER#${uid}`);
                 }
             }
 
-            // Validate Shops
-            for (const shopId of shopIds) {
-                // ショップ情報の存在確認
-                // - 検索条件: PK = SHOP#{shopId}, SK = "METADATA"
-                // - 取得カラム: name, owner_id, email (オーナーのアドレス)
+            // 2. ショップの存在確認
+            for (const sid of shop_ids) {
                 const res = await ddb.send(new GetCommand({
                     TableName: TABLE_NAME,
-                    Key: { PK: `SHOP#${shopId}`, SK: 'METADATA' }
+                    Key: { PK: `SHOP#${sid}`, SK: 'METADATA' }
                 }));
                 if (res.Item) {
-                    shopMetadataList.push({
-                        id: shopId,
-                        name: res.Item.name,
-                        owner_id: res.Item.owner_id,
-                        email: res.Item.email // Owner contact email
-                    });
+                    shopMetadataList.push({ id: sid, name: res.Item.name, owner_id: res.Item.owner_id, email: res.Item.email });
                 } else {
-                    missingIds.push(`SHOP#${shopId}`);
+                    missingIds.push(`SHOP#${sid}`);
                 }
             }
 
             if (missingIds.length > 0) {
-                return {
-                    statusCode: 400,
-                    headers: corsHeaders,
-                    body: JSON.stringify({
-                        message: 'Some IDs not found',
-                        missingIds,
-                        missingIdsFormatted: missingIds.join(', ')
-                    })
-                };
+                return errorResponse(400, 'Some IDs not found', { missingIds, missingIdsFormatted: missingIds.join(', ') });
             }
 
-            return {
-                statusCode: 200,
-                headers: corsHeaders,
-                body: JSON.stringify({
-                    users: userMetadataList,
-                    shops: shopMetadataList
-                })
-            };
+            return successResponse({ users: userMetadataList, shops: shopMetadataList });
         }
 
+        // --------------------------------------------------------------------
+        // ACTION: execute (紐付けの実行)
+        // --------------------------------------------------------------------
+        // 目的: ユーザーとショップの双方向リンクを構築し、適切な管理ロールを付与します。
+        // 備考: 複数エンティティの更新を含むため、各 ID ごとに UpdateItem を発行します。
+        // --------------------------------------------------------------------
         if (action === 'execute') {
+            let { shop_ids, user_ids } = body as AdminApiSchema['admin_links'];
+            
+            if (Array.isArray(shop_ids)) shop_ids = Array.from(new Set(shop_ids));
+            if (Array.isArray(user_ids)) user_ids = Array.from(new Set(user_ids));
+
+            if (!Array.isArray(shop_ids) || !Array.isArray(user_ids) || !action) {
+                return errorResponse(400, 'Missing required fields: shop_ids, user_ids, action');
+            }
+
             const now = new Date().toISOString();
 
-            // 1. Update Users
-            for (const userId of userIds) {
-                // Fetch current user to check owner_shop_ids
-                // 権限更新のため現在のユーザー状態を取得
-                // - 検索条件: PK = USER#{userId}, SK = "SHOP"
-                // - 取得カラム: owner_shop_ids, gm_shop_ids
-                const userRes = await ddb.send(new GetCommand({
-                    TableName: TABLE_NAME,
-                    Key: { PK: `USER#${userId}`, SK: 'SHOP' }
-                }));
-
-                if (!userRes.Item) continue; // Should not happen if validated
+            // 1. ユーザー側の更新 (全選択ユーザーに対してループ)
+            for (const uid of user_ids) {
+                const userRes = await ddb.send(new GetCommand({ TableName: TABLE_NAME, Key: { PK: `USER#${uid}`, SK: 'SHOP' } }));
+                if (!userRes.Item) continue;
 
                 const ownerShopIds = userRes.Item.owner_shop_ids || [];
                 const currentGmShopIds = userRes.Item.gm_shop_ids || [];
 
-                // Filter out shopIds that the user is already owner of
-                const shopIdsToLink = shopIds.filter(id => !ownerShopIds.includes(id));
+                // フィルタ: 既にオーナー権限を持っている、または既に GM であるショップはスキップ
+                const finalShopIdsToLink = shop_ids.filter(id => !ownerShopIds.includes(id) && !currentGmShopIds.includes(id));
 
-                if (shopIdsToLink.length > 0) {
-                    // Filter out already linked gm shop ids for list_append (to avoid duplicates if already partially linked)
-                    // Note: contains check in ConditionExpression is safer for single updates, 
-                    // but for bulk linking here we might need a more complex loop or just accept potential duplicates if we don't check.
-                    // Actually, the request says "already included, ignore". 
-                    // So we should filter out those already in gm_shop_ids too.
-                    const finalShopIdsToLink = shopIdsToLink.filter(id => !currentGmShopIds.includes(id));
-
-                    if (finalShopIdsToLink.length > 0) {
-                        // ユーザーのGMショップリストにショップIDを追加
-                        // - 検索条件: PK = USER#{userId}, SK = "SHOP"
-                        // - 更新カラム:
-                        //   - gm_shop_ids: リクエストで指定されたショップIDリストを末尾に追加 (list_append)
-                        //   - ts_updated_at: 現在時刻
-                        await ddb.send(new UpdateCommand({
-                            TableName: TABLE_NAME,
-                            Key: { PK: `USER#${userId}`, SK: 'SHOP' },
-                            UpdateExpression: 'SET gm_shop_ids = list_append(if_not_exists(gm_shop_ids, :empty_list), :new_shop_list), ts_updated_at = :now',
-                            ExpressionAttributeValues: {
-                                ':new_shop_list': finalShopIdsToLink,
-                                ':empty_list': [],
-                                ':now': now
-                            }
-                        }));
-                    }
-                }
-
-                // Ensure GENERAL_MANAGER role
-                try {
-                    // ユーザーに GENERAL_MANAGER ロールを付与
-                    // - 検索条件: PK = USER#{userId}, SK = "SHOP"
-                    // - 更新カラム: roles (リストに "GENERAL_MANAGER" を追加)
-                    // - 実行条件: 既にロールを持っていない場合のみ実行 (重複防止)
+                if (finalShopIdsToLink.length > 0) {
+                    // GM 管理対象リストへのアペンド
                     await ddb.send(new UpdateCommand({
                         TableName: TABLE_NAME,
-                        Key: { PK: `USER#${userId}`, SK: 'SHOP' },
+                        Key: { PK: `USER#${uid}`, SK: 'SHOP' },
+                        UpdateExpression: 'SET gm_shop_ids = list_append(if_not_exists(gm_shop_ids, :empty_list), :new_shop_list), ts_updated_at = :now',
+                        ExpressionAttributeValues: { ':new_shop_list': finalShopIdsToLink, ':empty_list': [], ':now': now }
+                    }));
+                }
+
+                // 「GENERAL_MANAGER」ロールの条件付き付与
+                try {
+                    await ddb.send(new UpdateCommand({
+                        TableName: TABLE_NAME,
+                        Key: { PK: `USER#${uid}`, SK: 'SHOP' },
                         UpdateExpression: 'SET #roles = list_append(if_not_exists(#roles, :empty_list), :gm_role_list)',
                         ConditionExpression: 'attribute_not_exists(#roles) OR NOT contains(#roles, :gm_role_str)',
                         ExpressionAttributeNames: { '#roles': 'roles' },
-                        ExpressionAttributeValues: {
-                            ':gm_role_list': ['GENERAL_MANAGER'],
-                            ':gm_role_str': 'GENERAL_MANAGER',
-                            ':empty_list': []
-                        }
+                        ExpressionAttributeValues: { ':gm_role_list': ['GENERAL_MANAGER'], ':gm_role_str': 'GENERAL_MANAGER', ':empty_list': [] }
                     }));
                 } catch (e: any) {
-                    if (e.name !== 'ConditionalCheckFailedException') {
-                        throw e;
-                    }
+                    // 既にロールを持っている場合は ConditionalCheckFailedException が発生するが、問題ないので無視する
+                    if (e.name !== 'ConditionalCheckFailedException') throw e;
                 }
             }
 
-            // 2. Update Shops
-            for (const shopId of shopIds) {
-                // 権限更新のため現在のショップ情報を取得
-                // - 検索条件: PK = SHOP#{shopId}, SK = "METADATA"
-                // - 取得カラム: owner_id, gm_ids
-                const shopRes = await ddb.send(new GetCommand({
-                    TableName: TABLE_NAME,
-                    Key: { PK: `SHOP#${shopId}`, SK: 'METADATA' }
-                }));
-
+            // 2. ショップ側の更新 (全選択ショップに対してループ)
+            for (const sid of shop_ids) {
+                const shopRes = await ddb.send(new GetCommand({ TableName: TABLE_NAME, Key: { PK: `SHOP#${sid}`, SK: 'METADATA' } }));
                 if (!shopRes.Item) continue;
 
                 const ownerId = shopRes.Item.owner_id;
                 const currentGmIds = shopRes.Item.gm_ids || [];
 
-                // Filter out userIds that are the owner
-                const userIdsToLink = userIds.filter(id => id !== ownerId);
-                // Filter out userIds already in gm_ids
-                const finalUserIdsToLink = userIdsToLink.filter(id => !currentGmIds.includes(id));
+                // フィルタ: オーナー自身を GM リストに加えない
+                const finalUserIdsToLink = user_ids.filter(id => id !== ownerId && !currentGmIds.includes(id));
 
                 if (finalUserIdsToLink.length > 0) {
-                    // ショップのGMリストにユーザーIDを追加
-                    // - 検索条件: PK = SHOP#{shopId}, SK = "METADATA"
-                    // - 更新カラム: gm_ids (ユーザーIDリストを末尾に追加)
+                    // GM ID リストのリモートアペンド
                     await ddb.send(new UpdateCommand({
                         TableName: TABLE_NAME,
-                        Key: { PK: `SHOP#${shopId}`, SK: 'METADATA' },
+                        Key: { PK: `SHOP#${sid}`, SK: 'METADATA' },
                         UpdateExpression: 'SET gm_ids = list_append(if_not_exists(gm_ids, :empty_list), :new_gm_list)',
-                        ExpressionAttributeValues: {
-                            ':new_gm_list': finalUserIdsToLink,
-                            ':empty_list': []
-                        }
+                        ExpressionAttributeValues: { ':new_gm_list': finalUserIdsToLink, ':empty_list': [] }
                     }));
                 }
             }
 
-            return {
-                statusCode: 200,
-                headers: corsHeaders,
-                body: JSON.stringify({ message: 'Updates completed successfully' })
-            };
+            return successResponse({ message: 'Updates completed successfully' });
         }
 
-        return {
-            statusCode: 400,
-            headers: corsHeaders,
-            body: JSON.stringify({ message: 'Invalid action' })
-        };
+        // --------------------------------------------------------------------
+        // ACTION: unlink (紐付けの解除)
+        // --------------------------------------------------------------------
+        // 目的: ユーザーとショップの双方向リンクを削除し、必要に応じて管理ロールを剥奪します。
+        // --------------------------------------------------------------------
+        if (action === 'unlink') {
+            let { shop_ids, user_ids } = body as AdminApiSchema['admin_links'];
+            
+            if (Array.isArray(shop_ids)) shop_ids = Array.from(new Set(shop_ids));
+            if (Array.isArray(user_ids)) user_ids = Array.from(new Set(user_ids));
 
-    } catch (error) {
-        console.error(error);
-        return {
-            statusCode: 500,
-            headers: corsHeaders,
-            body: JSON.stringify({ message: 'Internal Server Error', error: String(error) })
-        };
+            if (!Array.isArray(shop_ids) || !Array.isArray(user_ids) || !action) {
+                return errorResponse(400, 'Missing required fields: shop_ids, user_ids, action');
+            }
+
+            const now = new Date().toISOString();
+
+            // 1. ユーザー側の更新 (全選択ユーザーに対してループ)
+            // 目的: ユーザーの GM 対象ショップリストから指定されたショップを削除。
+            // 全ての管理対象ショップがなくなった場合、GM ロール自体も剥奪します。
+            for (const uid of user_ids) {
+                const userRes = await ddb.send(new GetCommand({ TableName: TABLE_NAME, Key: { PK: `USER#${uid}`, SK: 'SHOP' } }));
+                if (!userRes.Item) continue;
+
+                const currentGmShopIds = userRes.Item.gm_shop_ids || [];
+                // 指定されたショップを除外
+                const newGmShopIds = currentGmShopIds.filter((id: string) => !shop_ids.includes(id));
+
+                if (currentGmShopIds.length !== newGmShopIds.length) {
+                    // ID リストの更新
+                    await ddb.send(new UpdateCommand({
+                        TableName: TABLE_NAME,
+                        Key: { PK: `USER#${uid}`, SK: 'SHOP' },
+                        UpdateExpression: 'SET gm_shop_ids = :new_list, ts_updated_at = :now',
+                        ExpressionAttributeValues: { ':new_list': newGmShopIds, ':now': now }
+                    }));
+                }
+
+                // 「GENERAL_MANAGER」ロールの剥奪判定
+                // 管理対象が一つもなくなった場合、権限としてのロールフラグを削除します（フールプルーフ）。
+                if (newGmShopIds.length === 0) {
+                    const currentRoles = userRes.Item.roles || [];
+                    if (currentRoles.includes('GENERAL_MANAGER')) {
+                        const newRoles = currentRoles.filter((r: string) => r !== 'GENERAL_MANAGER');
+                        await ddb.send(new UpdateCommand({
+                            TableName: TABLE_NAME,
+                            Key: { PK: `USER#${uid}`, SK: 'SHOP' },
+                            UpdateExpression: 'SET #roles = :new_roles',
+                            ExpressionAttributeNames: { '#roles': 'roles' },
+                            ExpressionAttributeValues: { ':new_roles': newRoles }
+                        }));
+                    }
+                }
+            }
+
+            // 2. ショップ側の更新 (全選択ショップに対してループ)
+            // 目的: ショップの権限者（gm_ids）リストから指定されたユーザーを削除します。
+            for (const sid of shop_ids) {
+                const shopRes = await ddb.send(new GetCommand({ TableName: TABLE_NAME, Key: { PK: `SHOP#${sid}`, SK: 'METADATA' } }));
+                if (!shopRes.Item) continue;
+
+                const currentGmIds = shopRes.Item.gm_ids || [];
+                // 指定されたユーザーを除外
+                const newGmIds = currentGmIds.filter((id: string) => !user_ids.includes(id));
+
+                if (currentGmIds.length !== newGmIds.length) {
+                    await ddb.send(new UpdateCommand({
+                        TableName: TABLE_NAME,
+                        Key: { PK: `SHOP#${sid}`, SK: 'METADATA' },
+                        UpdateExpression: 'SET gm_ids = :new_list',
+                        ExpressionAttributeValues: { ':new_list': newGmIds }
+                    }));
+                }
+            }
+
+            return successResponse({ message: 'Unlinking completed successfully' });
+        }
+
+        return errorResponse(400, 'Invalid action');
+
+    } catch (error: any) {
+        console.error('Admin links error:', error);
+        return errorResponse(500, "Internal Server Error", error.message);
     }
 };

@@ -1,3 +1,13 @@
+/**
+ * @file MESSAGE_NOTIFICATION.ts (en)
+ * @description Template for new message notifications (English)
+ * @placeholders
+ *  - {{username}}: Sender's name
+ *  - {{message}}: Message content
+ *  - {{baseUrl}}: App base URL
+ *  - {{qr_id}}: QR code ID
+ *  - {{pin}}: Access PIN
+ */
 export const body = `
 You have a new message from {{username}}.
 ----------------------------------
@@ -5,6 +15,6 @@ You have a new message from {{username}}.
 ----------------------------------
 
 Check here:
-{{baseUrl}}/receive/{{uuid}}
+{{baseUrl}}/receive/{{qr_id}}
 PIN: {{pin}}
 `.trim();

@@ -1,3 +1,14 @@
+/**
+ * @file receive-api.ts
+ * @role ギフト受取人 API 構築コンストラクト
+ * @responsibility
+ *  - ギフトを受け取ったゲスト会員向けの REST API エンドポイントを定義します。
+ *  - 【非会員認可】`receiveAuthorizer` を使用し、Cognito ログインなしで QR-ID と PIN によるセッションベースのアクセス制御を実現します。
+ *  - 【限定的な公開性】`/share/{qr_id}` エンドポイントのみ、SNS シェアや一般閲覧のために完全公開（Authorizer なし）として構成します。
+ * @context
+ *  - `InfraStack` からインスタンス化され、`/receive/*` および `/share/*` 配下のルーティングを管理します。
+ */
+
 import * as cdk from 'aws-cdk-lib';
 import { Construct } from 'constructs';
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
@@ -8,30 +19,50 @@ import * as apigateway from 'aws-cdk-lib/aws-apigateway';
 import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as path from 'path';
+import { RECEIVE_ALLOW_HEADERS } from '../../../shared/constants';
 
 export interface ReceiveApiProps {
   table: dynamodb.ITable;
   bucket: s3.IBucket;
   userPool: cognito.IUserPool;
+  userPoolClient: cognito.IUserPoolClient;
   api: apigateway.RestApi;
   commonProps: any;
+  allowedOrigins: string[];
   grantTablePermissions: (fn: lambda.IFunction, write?: boolean) => void;
 }
 
-export class ReceiveApi extends Construct {
-  constructor(scope: Construct, id: string, props: ReceiveApiProps) {
+/**
+ * 受取・シェア用 API サブシステム。
+ * 
+ * @description
+ * 贈り主から届いたギフトの閲覧、配送先情報の入力、チャット機能、
+ * およびギフト内容の外部シェア機能を提供するためのエンドポイントを構成します。
+ */
+export class ReceiveApi extends cdk.NestedStack {
+  public readonly receiveResource: apigateway.Resource;
+
+  constructor(scope: cdk.Stack, id: string, props: ReceiveApiProps) {
     super(scope, id);
 
-    const { table, bucket, userPool, api, commonProps, grantTablePermissions } = props;
+    const { table, bucket, userPool, userPoolClient, api, commonProps, allowedOrigins, grantTablePermissions } = props;
 
-    // Helper for lambda paths
     const lampath = (name: string) => path.join(__dirname, `../../lambda/${name}.ts`);
+    const authpath = (name: string) => path.join(__dirname, `../../lambda/authorizer/${name}.ts`);
 
-    // --- Receive Authorizer (Custom Lambda Authorizer) ---
+    /**
+     * ゲスト用認証 (ReceiveAuthorizer)
+     * - ギフト受取人はアカウントを持たずログインもしないため、QR コードに付随する ID と PIN を
+     *   リクエストヘッダー (`x-qr-id`, `x-qr-pin`) から取得して認証します。
+     * - `resultsCacheTtl` を 0 秒に設定し、リアルタイムの PIN 無効化・BAN 状態が即座に
+     *   反映されるようにしています。
+     */
     const receive_authorizer_fn = new nodejs.NodejsFunction(this, 'receive_authorizer_fn', {
-      entry: lampath('receiveAuthorizer'),
+      entry: authpath('receiveAuthorizer'),
       environment: {
         TABLE_NAME: table.tableName,
+        USER_POOL_ID: userPool.userPoolId,
+        CLIENT_ID: userPoolClient.userPoolClientId,
       },
     });
     grantTablePermissions(receive_authorizer_fn, true);
@@ -39,10 +70,10 @@ export class ReceiveApi extends Construct {
     const authorizer = new apigateway.RequestAuthorizer(this, 'receive_authorizer', {
       handler: receive_authorizer_fn,
       identitySources: [
-        apigateway.IdentitySource.header('X-QR-UUID'),
-        apigateway.IdentitySource.header('X-QR-PIN'),
+        apigateway.IdentitySource.header('x-qr-id'),
+        apigateway.IdentitySource.header('x-qr-pin'),
       ],
-      resultsCacheTtl: cdk.Duration.minutes(5),
+      resultsCacheTtl: cdk.Duration.seconds(0),
     });
 
     // --- Lambda Definitions ---
@@ -74,17 +105,33 @@ export class ReceiveApi extends Construct {
         ...fnProps.environment,
         SENDER_EMAIL: process.env.SENDER_EMAIL || '',
         USER_POOL_ID: userPool.userPoolId,
+        CLIENT_ID: userPoolClient.userPoolClientId,
       }
     });
 
     const receive_completed = new nodejs.NodejsFunction(this, 'receive_completed', { entry: lampath('receive_completed'), ...fnProps });
     const receive_chat = new nodejs.NodejsFunction(this, 'receive_chat', { entry: lampath('receive_chat'), ...fnProps });
     const receive_subscription = new nodejs.NodejsFunction(this, 'receive_subscription', { entry: lampath('receive_subscription'), ...fnProps });
-    const receive_sender = new nodejs.NodejsFunction(this, 'receive_sender', { entry: lampath('receive_sender'), ...fnProps });
+
+    const receive_sender = new nodejs.NodejsFunction(this, 'receive_sender', {
+      entry: lampath('receive_sender'),
+      ...fnProps,
+      environment: {
+        ...fnProps.environment,
+        USER_POOL_ID: userPool.userPoolId,
+        CLIENT_ID: userPoolClient.userPoolClientId,
+      }
+    });
+
     const receive_upload_url = new nodejs.NodejsFunction(this, 'receive_upload_url', { entry: lampath('receive_upload_url'), ...fnProps });
 
-    // Grant Permissions
-    const allLambdas = [receive_verify, receive_submit, receive_completed, receive_chat, receive_subscription, receive_sender, receive_upload_url];
+    const share_get = new nodejs.NodejsFunction(this, 'share_get', {
+      entry: lampath('share_get'),
+      ...fnProps,
+    });
+
+    // --- Permissions ---
+    const allLambdas = [receive_verify, receive_submit, receive_completed, receive_chat, receive_subscription, receive_sender, receive_upload_url, share_get];
     allLambdas.forEach(fn => {
       grantTablePermissions(fn, true);
       bucket.grantRead(fn);
@@ -96,25 +143,59 @@ export class ReceiveApi extends Construct {
       }));
     });
 
-    // --- Routes ---
-    const receiveRes = api.root.addResource('receive');
+    /**
+     * ルーティングの構築
+     * `/receive/*` 配下（保護対象）および `/share/*` 配下（公開対象）を定義します。
+     */
+    const addResourceWithCors = (parent: apigateway.IResource, pathPart: string): apigateway.Resource => {
+      const res = parent.addResource(pathPart) as apigateway.Resource;
+      res.addCorsPreflight({
+        allowOrigins: allowedOrigins,
+        allowMethods: apigateway.Cors.ALL_METHODS,
+        allowHeaders: RECEIVE_ALLOW_HEADERS,
+      });
+      return res;
+    };
+
+    // /receive (受取トップレベル)
+    this.receiveResource = new apigateway.Resource(this, 'ReceiveTopResource', {
+      parent: api.root,
+      pathPart: 'receive'
+    });
+    this.receiveResource.addCorsPreflight({
+      allowOrigins: allowedOrigins,
+      allowMethods: apigateway.Cors.ALL_METHODS,
+      allowHeaders: RECEIVE_ALLOW_HEADERS,
+    });
+
     const routeOptions = { authorizer, authorizationType: apigateway.AuthorizationType.CUSTOM };
 
-    receiveRes.addResource('verify').addMethod('POST', new apigateway.LambdaIntegration(receive_verify));
-    receiveRes.addResource('submit').addMethod('POST', new apigateway.LambdaIntegration(receive_submit), routeOptions);
-    receiveRes.addResource('completed').addMethod('POST', new apigateway.LambdaIntegration(receive_completed), routeOptions);
+    addResourceWithCors(this.receiveResource, 'verify').addMethod('POST', new apigateway.LambdaIntegration(receive_verify), routeOptions);
+    addResourceWithCors(this.receiveResource, 'submit').addMethod('POST', new apigateway.LambdaIntegration(receive_submit), routeOptions);
+    addResourceWithCors(this.receiveResource, 'completed').addMethod('POST', new apigateway.LambdaIntegration(receive_completed), routeOptions);
 
-    const chatRes = receiveRes.addResource('chat');
-    chatRes.addResource('get').addMethod('POST', new apigateway.LambdaIntegration(receive_chat), routeOptions);
-    chatRes.addResource('send').addMethod('POST', new apigateway.LambdaIntegration(receive_chat), routeOptions);
+    const chatRes = addResourceWithCors(this.receiveResource, 'chat');
+    addResourceWithCors(chatRes, 'get').addMethod('POST', new apigateway.LambdaIntegration(receive_chat), routeOptions);
+    addResourceWithCors(chatRes, 'send').addMethod('POST', new apigateway.LambdaIntegration(receive_chat), routeOptions);
 
-    receiveRes.addResource('subscription').addMethod('POST', new apigateway.LambdaIntegration(receive_subscription), routeOptions);
+    addResourceWithCors(this.receiveResource, 'subscription').addMethod('POST', new apigateway.LambdaIntegration(receive_subscription), routeOptions);
 
-    const senderRes = receiveRes.addResource('sender');
-    senderRes.addResource('update').addMethod('POST', new apigateway.LambdaIntegration(receive_sender), routeOptions);
-    senderRes.addResource('load').addMethod('POST', new apigateway.LambdaIntegration(receive_sender), routeOptions);
-    senderRes.addResource('save').addMethod('POST', new apigateway.LambdaIntegration(receive_sender), routeOptions);
+    const senderRes = addResourceWithCors(this.receiveResource, 'sender');
+    addResourceWithCors(senderRes, 'update').addMethod('POST', new apigateway.LambdaIntegration(receive_sender), routeOptions);
+    addResourceWithCors(senderRes, 'load').addMethod('POST', new apigateway.LambdaIntegration(receive_sender), routeOptions);
+    addResourceWithCors(senderRes, 'save').addMethod('POST', new apigateway.LambdaIntegration(receive_sender), routeOptions);
+    addResourceWithCors(senderRes, 'delete-images').addMethod('POST', new apigateway.LambdaIntegration(receive_sender), routeOptions);
 
-    receiveRes.addResource('uploadurl').addResource('get').addMethod('POST', new apigateway.LambdaIntegration(receive_upload_url), routeOptions);
+    const uploadUrlRoot = addResourceWithCors(this.receiveResource, 'uploadurl');
+    addResourceWithCors(uploadUrlRoot, 'get').addMethod('POST', new apigateway.LambdaIntegration(receive_upload_url), routeOptions);
+
+    /**
+     * --- Share エンドポイント (完全公開) ---
+     * このリソースは Authorizer を通さないパブリックな閲覧用です。
+     * シェアされたギフトの内容（メッセージ、画像など）を表示するために使用されます。
+     */
+    const shareResource = api.root.addResource('share');
+    const shareQrIdResource = shareResource.addResource('{qr_id}');
+    shareQrIdResource.addMethod('GET', new apigateway.LambdaIntegration(share_get));
   }
 }

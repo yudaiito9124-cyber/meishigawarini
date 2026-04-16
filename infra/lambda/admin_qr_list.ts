@@ -1,248 +1,179 @@
 /**
- * 概要: 管理者用QRコード一覧の取得および検索を行う。
- * 詳細: ステータス別のフィルタリングやUUID/PINによるQRコードの検索を行い、そのQRコードに関連するショップ情報や配送先住所、デザイン情報などの紐付け（Enrichment）を行って返す。
- * エンドポイント: POST /admin/qr/list
- * リクエストボディ:
- *  - status: [任意のQRコードのstatus] | "SEARCH"
- *  - keyword: 検索キーワード (statusがSEARCHの場合に使用)
+ * @file admin_qr_list.ts
+ * @role 管理者用：QR コード / ギフト一覧および検索ハンドラー
+ * @responsibility
+ *  - 全ての QR コードのステータス別一覧取得、およびキーワード（ID、PIN）による横断検索を提供します。
+ *  - 【データ・エンリッチメント】 DynamoDB の「薄い」データを、以下の関連情報と結合してリッチなレスポンスを生成します。
+ *    1. ショップ情報: `shop_id` から名前、連絡先を結合。
+ *    2. 配送・住所情報: `PK=QR#ID, SK=ORDER` レコードから受取人情報を結合。
+ *    3. デザイン情報: デザイン ID から S3 署名付きのサムネイル URL（前面・背面）を生成。
+ *  - 【検索アルゴリズム】
+ *    1. 完全一致: `QR#` から始まる UUID の場合は GetItem で最速解決。
+ *    2. 部分一致/PIN 検索: Scan を用いて属性 `pin` または `PK` の部分一致を検索。
+ *  - 【期限切れの遅延評価】リスト取得のタイミングで各アイテムの有効期限を `checkAndExpire` ユーティリティで検証し、必要に応じて DB ステータスを `EXPIRED` へ同期・自動更新します。
+ * @context
+ *  - カスタマーサポートがギフトの配送状況を確認したり、特定コードのステータスを調査する際の一次ソースです。
  */
 
 import { APIGatewayProxyHandler } from 'aws-lambda';
-import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
-import { DynamoDBDocumentClient, QueryCommand, ScanCommand, BatchGetCommand } from '@aws-sdk/lib-dynamodb';
+import { QueryCommand, ScanCommand, BatchGetCommand, GetCommand } from '@aws-sdk/lib-dynamodb';
 import { CognitoIdentityProviderClient, AdminGetUserCommand } from '@aws-sdk/client-cognito-identity-provider';
 import { signUrlIfS3 } from './utils/s3';
+import { getSystemDesign } from './utils/designs';
+import { checkAndExpire } from './utils/expiration';
+import { successResponse, errorResponse } from './utils/response';
+import { ddb, TABLE_NAME, BUCKET_NAME, USER_POOL_ID } from './share/db';
+import { AdminApiSchema } from '@shared/api-types';
 
-const client = new DynamoDBClient({});
-const ddb = DynamoDBDocumentClient.from(client);
 const cognito = new CognitoIdentityProviderClient({});
-const TABLE_NAME = process.env.TABLE_NAME || '';
-const USER_POOL_ID = process.env.USER_POOL_ID || '';
-const BUCKET_NAME = process.env.BUCKET_NAME || '';
 const INDEX_NAME = 'GSI1';
-
-const corsHeaders = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type,Authorization',
-    'Access-Control-Allow-Methods': 'POST,OPTIONS'
-};
 
 export const handler: APIGatewayProxyHandler = async (event) => {
     try {
-        if (event.httpMethod === 'OPTIONS') {
-            return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ message: 'OK' }) };
-        }
-        if (event.httpMethod !== 'POST') {
-            return { statusCode: 405, headers: corsHeaders, body: JSON.stringify({ message: 'Method Not Allowed' }) };
-        }
+        if (event.httpMethod === 'OPTIONS') return successResponse();
+        if (event.httpMethod !== 'POST') return errorResponse(405, 'Method Not Allowed');
 
-        const body = JSON.parse(event.body || '{}');
+        const body = JSON.parse(event.body || '{}') as AdminApiSchema['admin_qr_list'];
         const status = body.status || 'UNASSIGNED';
-        const keyword = body.keyword || '';
+        const limit = Number(body.limit) || 50;
+        const keyword = (body.keyword || '').trim();
 
         let result;
 
-        if (status === 'SEARCH') {
-            const trimmedKeyword = keyword.trim();
-            console.log(`Searching for keyword: "${trimmedKeyword}"`);
+        // --------------------------------------------------------------------
+        // 1. データの抽出（一覧取得 or 検索）
+        // --------------------------------------------------------------------
+        if (status === 'SEARCH' && keyword) {
+            let searchId = keyword;
+            if (searchId.toLowerCase().startsWith('qr#')) searchId = 'QR#' + searchId.substring(3);
+            else if (!searchId.startsWith('QR#')) searchId = `QR#${searchId}`;
 
-            // UUIDs are lowercase, so let's search lowercased keyword against PK
-            // PIN is numeric string, acceptable to search as is (lowercase doesn't change digits)
+            // A. 完全一致検索（高速パス）
+            const exactRes = await ddb.send(new GetCommand({ TableName: TABLE_NAME, Key: { PK: searchId, SK: 'METADATA' } }));
 
-            // キーワード（UUIDの一部またはPIN）に一致するQRコードを全件スキャン
-            // - フィルタ条件:
-            //   - PK がキーワードを含む OR PIN がキーワードを含む
-            //   - PK が "QR#" で始まる
-            //   - SK が "METADATA" である
-            // - 取得カラム: 一致した項目の全属性
-            result = await ddb.send(new ScanCommand({
-                TableName: TABLE_NAME,
-                FilterExpression: '(contains(PK, :kw) OR contains(pin, :kw)) AND begins_with(PK, :prefix) AND SK = :sk',
-                ExpressionAttributeValues: {
-                    ':kw': trimmedKeyword.toLowerCase(),
-                    ':prefix': 'QR#',
-                    ':sk': 'METADATA'
-                }
-            }));
+            if (exactRes.Item) {
+                result = { Items: [exactRes.Item] };
+            } else {
+                // B. 部分一致/PIN 検索（Scan パス）
+                const scanKeyword = keyword.toLowerCase().replace(/^qr#/, '');
+                const scanParams: any = {
+                    TableName: TABLE_NAME,
+                    FilterExpression: '(contains(PK, :kw) OR contains(pin, :kw)) AND begins_with(PK, :prefix) AND SK = :sk',
+                    ExpressionAttributeValues: { ':kw': scanKeyword, ':prefix': 'QR#', ':sk': 'METADATA' },
+                    Limit: Math.min(limit * 2, 100)
+                };
+                result = await ddb.send(new ScanCommand(scanParams));
+            }
         } else {
-            // 特定ステータスのQRコードをインデックスから最新順に取得
-            // - 検索条件: GSI1_PK = QR#{status}
-            // - 取得カラム: ステータス別の全QR属性
-            // - ソート: 作成日時の降順 (ScanIndexForward: false)
+            // C. ステータス別一覧（GSI1 インデックスによる効率的な Query）
             result = await ddb.send(new QueryCommand({
-                TableName: TABLE_NAME,
-                IndexName: INDEX_NAME,
+                TableName: TABLE_NAME, IndexName: INDEX_NAME,
                 KeyConditionExpression: 'GSI1_PK = :pk',
-                ExpressionAttributeValues: {
-                    ':pk': `QR#${status}`
-                },
-                ScanIndexForward: false, // Descending by ts_created_at
-                // Limit: 50 // soft listing limit for now
+                ExpressionAttributeValues: { ':pk': `QR#${status}` },
+                ScanIndexForward: false, // 降順（最新順）
+                Limit: limit
             }));
         }
 
         const items = result.Items || [];
 
-        // Enrich with Shop Info
-        const shopIds = [...new Set(items.map((item: any) => item.shop_id).filter(Boolean))];
+        // 互換性維持: レガシーな design_id フィールド名を正規化
+        items.forEach((item: any) => {
+            if (!item.design_id && item.card_design) {
+                item.design_id = item.card_design;
+            }
+        });
+
+        // --------------------------------------------------------------------
+        // 2. データ・エンリッチメント（関連情報の並列バッチ取得）
+        // --------------------------------------------------------------------
         const shopMap = new Map<string, any>();
-
-        if (shopIds.length > 0) {
-            // BatchGet has a limit of 100 items (and 16MB) - chunk it if necessary
-            // For simplicity, assuming < 100 unique shops per page for now or implementing simple chunking
-            const chunkedShopIds = [];
-            for (let i = 0; i < shopIds.length; i += 100) {
-                chunkedShopIds.push(shopIds.slice(i, i + 100));
-            }
-
-            for (const chunk of chunkedShopIds) {
-                const keys = chunk.map(id => ({ PK: `SHOP#${id}`, SK: 'METADATA' }));
-
-                // 一覧に含まれるショップ詳細を一括取得
-                // - 検索条件: PK = SHOP#{id}, SK = "METADATA"
-                // - 取得カラム: PK, name, email, owner_id
-                const batchRes = await ddb.send(new BatchGetCommand({
-                    RequestItems: {
-                        [TABLE_NAME]: {
-                            Keys: keys,
-                            ProjectionExpression: 'PK, #name, email, owner_id', // Fetch owner_id for Cognito lookup
-                            ExpressionAttributeNames: { '#name': 'name' }
-                        }
-                    }
-                }));
-
-                if (batchRes.Responses && batchRes.Responses[TABLE_NAME]) {
-                    for (const shop of batchRes.Responses[TABLE_NAME]) {
-                        const sid = shop.PK.replace('SHOP#', '');
-                        shopMap.set(sid, shop);
-                    }
-                }
-            }
-
-            // Fallback: If shop email is missing, try to fetch from Cognito using owner_id
-            for (const shop of Array.from(shopMap.values())) {
-                if (!shop.email && shop.owner_id) {
-                    try {
-                        const userRes = await cognito.send(new AdminGetUserCommand({
-                            UserPoolId: USER_POOL_ID,
-                            Username: shop.owner_id
-                        }));
-                        const emailAttr = userRes.UserAttributes?.find(attr => attr.Name === 'email');
-                        if (emailAttr) {
-                            shop.email = emailAttr.Value;
-                        }
-                    } catch (e) {
-                        console.warn(`Failed to fetch email for owner ${shop.owner_id}`, e);
-                    }
-                }
-            }
-        }
-
-        // Fetch Order Details (SK=ORDER) for Recipient Info
-        // Similar strategy: chunk keys and BatchGet
-        const orderKeys = items.filter((i: any) => i.status !== 'UNASSIGNED').map((i: any) => ({
-            PK: i.PK,
-            SK: 'ORDER'
-        }));
-
         const orderMap = new Map<string, any>();
-
-        if (orderKeys.length > 0) {
-            const chunkedOrderKeys = [];
-            for (let i = 0; i < orderKeys.length; i += 100) {
-                chunkedOrderKeys.push(orderKeys.slice(i, i + 100));
-            }
-
-            for (const chunk of chunkedOrderKeys) {
-                // QRコードに紐付く配送先・注文情報を一括取得
-                // - 検索条件: PK = QR#{uuid}, SK = "ORDER"
-                // - 取得カラム: 項目の全属性
-                const batchRes = await ddb.send(new BatchGetCommand({
-                    RequestItems: {
-                        [TABLE_NAME]: {
-                            Keys: chunk
-                        }
-                    }
-                }));
-
-                if (batchRes.Responses && batchRes.Responses[TABLE_NAME]) {
-                    for (const order of batchRes.Responses[TABLE_NAME]) {
-                        orderMap.set(order.PK, order);
-                    }
-                }
-            }
-        }
-
-        // Fetch Card Design Info (PK=CARD_DESIGN#METADATA, SK=design_id)
-        const designIds = [...new Set(items.map((i: any) => i.card_design).filter(Boolean))];
         const designMap = new Map<string, any>();
 
-        if (designIds.length > 0) {
-            const chunkedDesignIds = [];
-            for (let i = 0; i < designIds.length; i += 100) {
-                chunkedDesignIds.push(designIds.slice(i, i + 100));
-            }
-
-            for (const chunk of chunkedDesignIds) {
-                const keys = chunk.map(id => ({ PK: 'CARD_DESIGN#METADATA', SK: id }));
-                // 使用されているカードデザインの情報を一括取得
-                // - 検索条件: PK = "CARD_DESIGN#METADATA", SK = designId
-                // - 取得カラム: SK, thumbf, thumbb (サムネイル情報)
-                const batchRes = await ddb.send(new BatchGetCommand({
-                    RequestItems: {
-                        [TABLE_NAME]: {
-                            Keys: keys,
-                            ProjectionExpression: 'SK, thumbf, thumbb'
-                        }
-                    }
-                }));
-
-                if (batchRes.Responses && batchRes.Responses[TABLE_NAME]) {
-                    for (const design of batchRes.Responses[TABLE_NAME]) {
-                        // Sign URLs for preview
-                        if (design.thumbf) design.thumbf = await signUrlIfS3(design.thumbf, BUCKET_NAME);
-                        if (design.thumbb) design.thumbb = await signUrlIfS3(design.thumbb, BUCKET_NAME);
-                        designMap.set(design.SK, design);
-                    }
+        // ① ショップ情報の取得
+        const shopIds = [...new Set(items.map((i: any) => i.shop_id).filter(Boolean))];
+        if (shopIds.length > 0) {
+            const keys = shopIds.map(id => ({ PK: `SHOP#${id}`, SK: 'METADATA' }));
+            const batchRes = await ddb.send(new BatchGetCommand({
+                RequestItems: { [TABLE_NAME]: { Keys: keys, ProjectionExpression: 'PK, #name, email, owner_id', ExpressionAttributeNames: { '#name': 'name' } } }
+            }));
+            const rawShops = batchRes.Responses?.[TABLE_NAME] || [];
+            for (const s of rawShops) {
+                const sid = s.PK.replace('SHOP#', '');
+                // 補完: コアデータにメールがない場合のみ Cognito から取得（マイグレーション途上のデータ用）
+                if (!s.email && s.owner_id) {
+                    try {
+                        const userRes = await cognito.send(new AdminGetUserCommand({ UserPoolId: USER_POOL_ID!, Username: s.owner_id }));
+                        s.email = userRes.UserAttributes?.find(a => a.Name === 'email')?.Value;
+                    } catch (e) { }
                 }
+                shopMap.set(sid, s);
             }
         }
 
-        const enrichedItems = items.map((item: any) => {
+        // ② 住所/配送情報の取得
+        const orderKeys = items.filter((i: any) => i.status !== 'UNASSIGNED').map((i: any) => ({ PK: i.PK, SK: 'ORDER' }));
+        if (orderKeys.length > 0) {
+            const batchRes = await ddb.send(new BatchGetCommand({ RequestItems: { [TABLE_NAME]: { Keys: orderKeys } } }));
+            for (const o of (batchRes.Responses?.[TABLE_NAME] || [])) orderMap.set(o.PK, o);
+        }
+
+        // ③ デザイン/サムネイル情報の取得
+        const designIds = [...new Set(items.map((i: any) => i.design_id).filter(Boolean))];
+        if (designIds.length > 0) {
+            const keys = designIds.map(id => ({ PK: 'CARD_DESIGN#METADATA', SK: id }));
+            const batchRes = await ddb.send(new BatchGetCommand({ RequestItems: { [TABLE_NAME]: { Keys: keys, ProjectionExpression: 'SK, thumbf, thumbb' } } }));
+            for (const d of (batchRes.Responses?.[TABLE_NAME] || [])) {
+                // S3 アセットの場合は一時的な署名付き URL を発行（有効期限付き）
+                if (d.thumbf) d.thumbf = await signUrlIfS3(d.thumbf, BUCKET_NAME);
+                if (d.thumbb) d.thumbb = await signUrlIfS3(d.thumbb, BUCKET_NAME);
+                designMap.set(d.SK, d);
+            }
+        }
+
+        // --------------------------------------------------------------------
+        // 3. 最終結合とステータス最終判定（マッピング）
+        // --------------------------------------------------------------------
+        // 全項目のマージおよび遅延評価(期限切れチェック)
+        const enrichedItems = await Promise.all(items.map(async (item: any) => {
+            const qr_id = item.PK.replace('QR#', '');
+
+            // 【確認フェーズ: 期限切れチェック (遅延評価)】
+            const currentStatus = await checkAndExpire(ddb, TABLE_NAME, qr_id, item);
+
             const shop = item.shop_id ? shopMap.get(item.shop_id) : null;
             const order = orderMap.get(item.PK);
-            const design = item.card_design ? designMap.get(item.card_design) : null;
+            const designId = item.design_id;
+            const design = designId ? (designMap.get(designId) || getSystemDesign(designId)) : null;
 
             return {
                 ...item,
-                shop_name: shop ? shop.name : undefined,
-                shop_email: shop ? shop.email : undefined,
-                // Accessors for admin/page.tsx
-                recipient_name: order?.name || undefined,
-                postal_code: order?.zipCode || order?.postal_code || undefined,
-                address: order?.address || undefined,
-                shipping_info: order || undefined, // Pass full order object as shipping_info to match shop page structure if needed, or just specific fields
+                qr_id, // Add unified qr_id
+                design_id: designId, // Ensure design_id is present
+                status: currentStatus, // 最新の判定結果を反映
+                shop_name: shop?.name,
+                shop_email: shop?.email,
+                recipient_name: order?.name || order?.recipient_name,
+                postal_code: order?.zipCode || order?.zip_code || order?.postal_code,
+                address: order?.address,
+                phone: order?.phone,
+                zip_code: order?.zipCode || order?.zip_code, // normalization
+                preferred_date: order?.preferredDate || order?.preferred_date,
+                preferred_time: order?.preferredTime || order?.preferred_time,
+                submitted_email: order?.email,
+                receiver_user_id: item.receiver_user_id || order?.receiver_user_id,
+                ts_submitted_at: item.ts_submitted_at || order?.ts_submitted_at,
+                shipping_info: order,
                 thumbf: design?.thumbf,
                 thumbb: design?.thumbb
             };
-        });
+        }));
 
-        return {
-            statusCode: 200,
-            headers: corsHeaders,
-            body: JSON.stringify({
-                status,
-                count: result.Count,
-                items: enrichedItems
-            })
-        };
+        return successResponse({ status, count: enrichedItems.length, hasMore: !!result.LastEvaluatedKey, items: enrichedItems });
 
-    } catch (error) {
-        console.error(error);
-        return {
-            statusCode: 500,
-            headers: corsHeaders,
-            body: JSON.stringify({ message: 'Internal Server Error', error: String(error) })
-        };
+    } catch (error: any) {
+        console.error('Admin QR list error:', error);
+        return errorResponse(500, 'Internal Server Error', error.message);
     }
 };

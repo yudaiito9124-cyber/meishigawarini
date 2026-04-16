@@ -1,91 +1,63 @@
 /**
- * 概要: ギフトUUIDとPINの検証、およびギフト情報の取得
- * 詳細: ユーザーが入力したUUIDとPINが正しいか検証し、紐付いている商品情報やショップ情報を返します。
- * エンドポイント: POST /receive/verify
- * リクエストボディ:
- *  - uuid: ギフト（QR）のUUID (必須)
- *  - pin: 4桁のPINコード (必須)
- *  - password: 二要素認証用のパスワード (オプション)
+ * @file receive_verify.ts
+ * @role ゲスト用：ギフト券認証・初期データ取得ハンドラー
+ * @responsibility
+ *  - QR スキャンの第一到達点として、PIN および任意のパスワードによる認証を行い、ギフトの詳細情報を返却します。
+ *  - 【二段階認証】
+ *    1. `PIN`: 物理カードに記載された 4 桁の番号（ Authorizer で一括検証）。
+ *    2. `Password`: 受取人が追加設定した（または管理者による）任意のパスワード。`bcrypt` で安全に照合します。
+ *  - 【広域データ集約（Wide Enrichment）】
+ *    `BatchGetCommand` を用い、ギフトに関連する「ショップ」「商品」「カードデザイン」「発送情報（ORDER）」を 1 回のクエリで並行取得します。
+ *  - 【セキュアな情報開示】
+ *    パスワード認証の状態（`isAuthorizedByPassword`）に応じて、追跡番号や管理者メモなどの機密情報の露出を制御します。
+ *  - 【プロモーション対応】
+ *    `PROMOTION` ステータスのギフトについては、PIN が不明な場合でも限定的な情報の開示を許可する例外ロジックを含みます。
+ * @context
+ *  - ギフト受取画面のレンダリングに必要な情報のほぼ全てを供給する、最も重要な読み取り API です。
  */
+
 import { APIGatewayProxyHandler } from 'aws-lambda';
-import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
-import { DynamoDBDocumentClient, GetCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
+import { GetCommand, UpdateCommand, BatchGetCommand } from '@aws-sdk/lib-dynamodb';
 import { CognitoIdentityProviderClient, AdminGetUserCommand } from '@aws-sdk/client-cognito-identity-provider';
 import * as bcrypt from 'bcryptjs';
-import { isLocked, getRateLimitUpdate, getResetRateLimitUpdate } from './utils/rate-limit';
 import { signUrlIfS3, signUrlsInHtml } from './utils/s3';
+
+import { getSystemDesign } from './utils/designs';
 import { checkAndExpire } from './utils/expiration';
+import { successResponse, errorResponse } from './utils/response';
+import { ddb, TABLE_NAME, BUCKET_NAME } from './share/db';
+import { getQrId, getPIN } from './utils/request';
+import { ReceiveApiSchema } from '@shared/api-types';
 
-const client = new DynamoDBClient({});
-const ddb = DynamoDBDocumentClient.from(client, {
-    marshallOptions: {
-        removeUndefinedValues: true,
-        convertEmptyValues: true
-    }
-});
 const cognito = new CognitoIdentityProviderClient({});
-const TABLE_NAME = process.env.TABLE_NAME || '';
 const USER_POOL_ID = process.env.USER_POOL_ID || '';
-const BUCKET_NAME = process.env.BUCKET_NAME || '';
-
-const corsHeaders = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type,Authorization,X-QR-UUID,X-QR-PIN',
-    'Access-Control-Allow-Methods': 'OPTIONS,POST'
-};
 
 export const handler: APIGatewayProxyHandler = async (event) => {
     try {
-        if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers: corsHeaders, body: '' };
-        if (event.httpMethod !== 'POST') {
-            return { statusCode: 405, headers: corsHeaders, body: JSON.stringify({ message: 'Method Not Allowed' }) };
-        }
+        if (event.httpMethod === 'OPTIONS') return successResponse();
+        if (event.httpMethod !== 'POST') return errorResponse(405, 'Method Not Allowed');
 
-        const body = JSON.parse(event.body || '{}');
-        const { uuid, pin, password } = body;
+        const body = JSON.parse(event.body || '{}') as ReceiveApiSchema['receive_verify'];
+        const qr_id = getQrId(event, body);
+        const pin = getPIN(event, body);
+        const { password } = body;
 
-        if (!uuid || !pin) {
-            return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Missing UUID or PIN' }) };
-        }
+        if (!qr_id || !pin) return errorResponse(400, 'Missing qr_id or pin');
 
-        // 【DB操作: GetItem】
-        // - 目的: 入力されたUUIDに基づくQRコード自体の存在確認と状態(メタデータ)取得
-        // - テーブル: TABLE_NAME
-        // - リクエストキー: { PK: `QR#${uuid}`, SK: 'METADATA' }
-        // - 取得カラム: ALL (状態, PIN, 失敗回数等を後続で検証)
-        const getRes = await ddb.send(new GetCommand({
-            TableName: TABLE_NAME,
-            Key: { PK: `QR#${uuid}`, SK: 'METADATA' }
+        // 1. QR メタデータの取得
+        // Note: PIN 認証および連続試行制限は Authorizer で既に検証済みです。
+        const qrRes = await ddb.send(new GetCommand({
+            TableName: TABLE_NAME, Key: { PK: `QR#${qr_id}`, SK: 'METADATA' }
         }));
 
-        if (!getRes.Item) return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Invalid Gift or PIN' }) };
-        const item = getRes.Item;
-
-        // レートリミット管理
-        if (isLocked(item)) return { statusCode: 403, headers: corsHeaders, body: JSON.stringify({ message: 'Too many attempts.' }) };
-
-        // PIN検証
-        if (String(item.pin) !== String(pin)) {
-            const { UpdateExpression, ExpressionAttributeValues, ExpressionAttributeNames } = getRateLimitUpdate(item);
-            // 【DB操作: UpdateItem】
-            // - 目的: PIN入力失敗回数のインクリメント、および上限到達時のロック(レートリミット)処理
-            await ddb.send(new UpdateCommand({
-                TableName: TABLE_NAME, Key: { PK: `QR#${uuid}`, SK: 'METADATA' },
-                UpdateExpression, ExpressionAttributeValues, ExpressionAttributeNames
-            }));
-            return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Invalid Gift or PIN' }) };
+        // プロモーション用ギフトを除き、PIN が不一致の場合はリジェクト
+        if (!qrRes.Item || String(qrRes.Item.pin) !== String(pin) && qrRes.Item.status !== 'PROMOTION') {
+            return errorResponse(404, 'Invalid Gift or PIN');
         }
 
-        // 成功時にカウンタリセット
-        if (item.failed_attempts || item.locked_until) {
-            const { UpdateExpression, ExpressionAttributeNames } = getResetRateLimitUpdate();
-            await ddb.send(new UpdateCommand({
-                TableName: TABLE_NAME, Key: { PK: `QR#${uuid}`, SK: 'METADATA' },
-                UpdateExpression, ExpressionAttributeNames
-            })).catch(e => console.error("Reset failed", e));
-        }
+        const item = qrRes.Item;
 
-        // パスワード保護の検証
+        // 2. パスワード保護の検証（設定されている場合）
         let isAuthorizedByPassword = true;
         let isPasswordProtected = false;
         if (item.password_hash) {
@@ -97,73 +69,74 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             }
         }
 
-        const { product_id, shop_id } = item;
-        
-        // 期限切れチェック (共通ユーティリティ)
-        const status = await checkAndExpire(ddb, TABLE_NAME, uuid, item as any);
+        // 3. 期限切れのリアルタイム判定（Lazy Expiration）
+        const status = await checkAndExpire(ddb, TABLE_NAME, qr_id, item as any);
 
-        // 商品情報の取得
-        let product = null;
-        if (shop_id && product_id) {
-            // 【DB操作: GetItem】
-            // - 目的: QRコードに紐付いている具体的な商品(PRODUCT)の情報を取得
-            const prodRes = await ddb.send(new GetCommand({ TableName: TABLE_NAME, Key: { PK: `SHOP#${shop_id}`, SK: `PRODUCT#${product_id}` } }));
-            product = prodRes.Item;
-            if (product) {
-                if (product.image_url) product.image_url = await signUrlIfS3(product.image_url, BUCKET_NAME);
-                if (product.detail_html) product.detail_html = await signUrlsInHtml(product.detail_html, BUCKET_NAME);
-            }
+        // 4. 各種関連エンティティのバルク取得（Enrichment）
+        const shopId = item.shop_id;
+        const productId = item.product_id;
+        const designId = item.design_id || (item as any).card_design;
+
+        const keys = [];
+        if (shopId) keys.push({ PK: `SHOP#${shopId}`, SK: 'METADATA' });
+        if (shopId && productId) keys.push({ PK: `SHOP#${shopId}`, SK: `PRODUCT#${productId}` });
+        if (designId) keys.push({ PK: 'CARD_DESIGN#METADATA', SK: designId });
+        // パスワード認証成功時かつ発送済みの時のみ、オーダー（発送追跡）情報を取得
+        if (isAuthorizedByPassword && status === 'SHIPPED') keys.push({ PK: `QR#${qr_id}`, SK: 'ORDER' });
+
+        const batchRes = await ddb.send(new BatchGetCommand({
+            RequestItems: { [TABLE_NAME]: { Keys: keys } }
+        }));
+        const responses = batchRes.Responses?.[TABLE_NAME] || [];
+
+        const shop = responses.find(r => r.PK === `SHOP#${shopId}` && r.SK === 'METADATA');
+        const product = responses.find(r => r.PK === `SHOP#${shopId}` && r.SK === `PRODUCT#${productId}`);
+        const designMeta = responses.find(r => r.PK === 'CARD_DESIGN#METADATA' && r.SK === designId);
+        const design = designMeta || (designId ? getSystemDesign(designId) : null);
+        const order = responses.find(r => r.PK === `QR#${qr_id}` && r.SK === 'ORDER');
+
+        // ショップオーナーの Email フォールバック（Cognito から取得）
+        let shopEmail = shop?.email;
+        if (!shopEmail && shop?.owner_id && USER_POOL_ID) {
+            const user = await cognito.send(new AdminGetUserCommand({
+                UserPoolId: USER_POOL_ID, Username: shop.owner_id
+            })).catch(() => null);
+            shopEmail = user?.UserAttributes?.find(attr => attr.Name === 'email')?.Value;
         }
 
-        // ショップ情報の取得
-        let shop_email = undefined, shop_name = undefined, shop_detail_html = undefined;
-        if (shop_id && isAuthorizedByPassword) {
-            // 【DB操作: GetItem】
-            // - 目的: 提供元ショップのメタデータを取得
-            const shopRes = await ddb.send(new GetCommand({ TableName: TABLE_NAME, Key: { PK: `SHOP#${shop_id}`, SK: 'METADATA' } }));
-            if (shopRes.Item) {
-                shop_email = shopRes.Item.email;
-                shop_name = shopRes.Item.name;
-                shop_detail_html = await signUrlsInHtml(shopRes.Item.detail_html, BUCKET_NAME);
-
-                // Email不在時のCognitoフォールバック
-                if (!shop_email && shopRes.Item.owner_id && USER_POOL_ID) {
-                    const user = await cognito.send(new AdminGetUserCommand({ UserPoolId: USER_POOL_ID, Username: shopRes.Item.owner_id })).catch(() => null);
-                    shop_email = user?.UserAttributes?.find(attr => attr.Name === 'email')?.Value;
-                }
-            }
-        }
-
-        // 発送済みの場合の追跡情報取得
-        let delivery_company = undefined, tracking_number = undefined;
-        if (isAuthorizedByPassword && status === 'SHIPPED') {
-            // 【DB操作: GetItem】
-            // - 目的: 発送済み(SHIPPED)の場合、配送情報を取得
-            const orderRes = await ddb.send(new GetCommand({ TableName: TABLE_NAME, Key: { PK: `QR#${uuid}`, SK: 'ORDER' } }));
-            if (orderRes.Item) {
-                delivery_company = orderRes.Item.delivery_company;
-                tracking_number = orderRes.Item.tracking_number;
-            }
-        }
-
-        return {
-            statusCode: 200,
-            headers: corsHeaders,
-            body: JSON.stringify({
-                uuid, status, product_id, shop_id, product, shop_email, shop_name, shop_detail_html,
-                delivery_company: isAuthorizedByPassword ? delivery_company : undefined,
-                tracking_number: isAuthorizedByPassword ? tracking_number : undefined,
-                memo_for_users: isAuthorizedByPassword ? item.memo_for_users : undefined,
-                ts_expired_at: item.ts_expired_at,
-                ts_completed_at: item.ts_completed_at,
-                ts_submitted_at: item.ts_submitted_at,
-                is_password_protected: isPasswordProtected,
-                is_authorized: isAuthorizedByPassword
-            })
+        // 表示用レスポンスの構築とアセットの閲覧用署名
+        const result: any = {
+            qr_id, status, shop_id: shopId, product_id: productId,
+            shop_name: shop?.name,
+            shop_detail_html: shop?.detail_html ? await signUrlsInHtml(shop.detail_html, BUCKET_NAME) : undefined,
+            shop_email: shopEmail,
+            product: product ? {
+                ...product,
+                image_url: product.image_url ? await signUrlIfS3(product.image_url, BUCKET_NAME) : undefined,
+                detail_html: product.detail_html ? await signUrlsInHtml(product.detail_html, BUCKET_NAME) : undefined
+            } : null,
+            design: design ? {
+                design_id: designId,
+                // システム標準デザイン（パス始まり）か S3 デザインかを判別して署名
+                thumbf: design.thumbf?.startsWith('/') ? design.thumbf : await signUrlIfS3(design.thumbf, BUCKET_NAME),
+                thumbb: design.thumbb?.startsWith('/') ? design.thumbb : await signUrlIfS3(design.thumbb, BUCKET_NAME),
+                bgimgf: design.bgimgf?.startsWith('/') ? design.bgimgf : await signUrlIfS3(design.bgimgf, BUCKET_NAME)
+            } : null,
+            // 【セキュリティ】認証状態に応じて機密情報を出し分け
+            delivery_company: isAuthorizedByPassword ? order?.delivery_company : undefined,
+            tracking_number: isAuthorizedByPassword ? order?.tracking_number : undefined,
+            memo_for_users: isAuthorizedByPassword ? item.memo_for_users : undefined,
+            ts_expired_at: item.ts_expired_at,
+            ts_completed_at: item.ts_completed_at,
+            ts_submitted_at: item.ts_submitted_at,
+            is_password_protected: isPasswordProtected,
+            is_authorized: isAuthorizedByPassword
         };
 
+        return successResponse(result);
+
     } catch (error: any) {
-        console.error(error);
-        return { statusCode: 500, headers: corsHeaders, body: JSON.stringify({ message: 'Internal Server Error' }) };
+        console.error('Receive verify error:', error);
+        return errorResponse(500, 'Internal Server Error', error.message);
     }
 };

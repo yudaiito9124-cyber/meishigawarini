@@ -1,310 +1,253 @@
 /**
- * 概要: 新規QRコードとPINをバッチで一括生成する。
- * 詳細: 指定された件数のQRコードを生成し、オプションに応じた属性（ショップID、商品ID、有効期限、デザイン等）を設定してDynamoDBに登録する。
- * エンドポイント: POST /admin/qr/generate
- * リクエストボディ:
- *  - count: 生成件数 (最大100)
- *  - card_design: カードデザインID (必須)
- *  - shopId, productId, expiry_date, owner_uuid, sender_info, senderId: 各種属性（オプション）
- *  - activate_now: trueの場合、即座に有効状態で生成
+ * @file admin_qr_generate.ts
+ * @role 管理者用：QR コード / ギフト券一括生成ハンドラー
+ * @responsibility
+ *  - `admin_card_orders`（発注）を起点に、物理的なカードに印字するための QR コード ID と PIN コードをバッチ生成します。
+ *  - 【状態遷移】発注レコード（CARD_ORDER）を `ORDERED` から `PRINTING`（印刷中）へ更新し、`batch_id` を紐付けます。これにより、一つの注文に対して二重に QR が生成されることを防ぎます。
+ *  - 【セキュリティ】一意の UUID（QR_ID）に加え、推測困難な 8 桁の PIN コードを発行します（ゾロ目や単純連番を排除するフィルタ付き）。
+ *  - 【柔軟な初期状態】
+ *    1. `ACTIVE`: 到着後すぐに利用可能。受取人の住所入力フローをスキップする場合に使用。
+ *    2. `LINKED`: 送信者が決まっているが、受取人のアクションが必要な状態。
+ *    3. `UNASSIGNED`: 在庫として生成される未割当状態。
+ *  - 【バッチ書き込み】DynamoDB の 25 件制限を考慮し、生成された全エンティティ（QR メタデータ、チャット、バッチ情報）を分割して永続化します。
+ * @context
+ *  - カード制作会社への入稿データ作成の根幹となるプロセスです。
  */
+
 import { APIGatewayProxyHandler } from 'aws-lambda';
-import { DynamoDBClient, BatchWriteItemCommand } from '@aws-sdk/client-dynamodb';
-import { DynamoDBDocumentClient, GetCommand, QueryCommand } from '@aws-sdk/lib-dynamodb';
+import { BatchWriteCommand, UpdateCommand, QueryCommand } from '@aws-sdk/lib-dynamodb';
 import * as crypto from 'crypto';
 import { generateId } from './utils/id';
-import { checkUserShopPermission } from './share/shop-auth';
-import { stripSignaturesInHtml, stripSignature } from './utils/s3';
-
-const client = new DynamoDBClient({});
-const ddbDocClient = DynamoDBDocumentClient.from(client);
-const TABLE_NAME = process.env.TABLE_NAME || '';
-const BUCKET_NAME = process.env.BUCKET_NAME || '';
-
-const corsHeaders = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type,Authorization',
-    'Access-Control-Allow-Methods': 'POST,OPTIONS'
-};
+import { validateQRParams } from './utils/qr-validation';
+import { successResponse, errorResponse } from './utils/response';
+import { ddb, TABLE_NAME, BUCKET_NAME } from './share/db';
+import { getUserId } from './utils/request';
+import { AdminApiSchema } from '@shared/api-types';
 
 export const handler: APIGatewayProxyHandler = async (event) => {
     try {
-        if (event.httpMethod === 'OPTIONS') {
-            return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ message: 'OK' }) };
-        }
-        if (event.httpMethod !== 'POST') {
-            return { statusCode: 405, headers: corsHeaders, body: JSON.stringify({ message: 'Method Not Allowed' }) };
-        }
+        if (event.httpMethod === 'OPTIONS') return successResponse();
 
-        const body = JSON.parse(event.body || '{}');
-        const count = body.count || 1; //required
-        const shopId = body.shopId;  //optional
-        const productId = body.productId;  //optional
-        const expiryDate = body.expiry_date;  //optional
-        const ownerUuid = body.owner_uuid;  //optional
-        const senderInfo = body.sender_info;  //optional
-        let senderId = body.senderId;  //optional
-        const activateNow = body.activate_now === true;  //optional
-        const cardDesign = body.card_design;  //required
+        const body = JSON.parse(event.body || '{}') as AdminApiSchema['admin_qr_generate'];
+        const order_id = body.order_id;
 
-
-        // Limit max count for safety
-        if (count > 100) { // DynamoDB BatchWrite limit is 25 items
-            return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Max 100 items per batch', detail: { count } }) };
+        // --------------------------------------------------------------------
+        // 1. 生成対象の発注レコード（CARD_ORDER）の特定と検証
+        // --------------------------------------------------------------------
+        if (!order_id) {
+            return errorResponse(400, 'order_id is required. Manual generation without order_id is no longer supported.');
         }
 
-        // Validate owner_uuid if provided
-        let user_shop_ids: string[] = [];
-        if (ownerUuid) {
-            // オーナー指定がある場合、ユーザー情報の存在と権限を確認
-            // - 検索条件: PK = USER#{ownerUuid}, SK = "SHOP"
-            // - 取得カラム: owner_shop_ids, gm_shop_ids
-            const userRes = await ddbDocClient.send(new GetCommand({
-                TableName: TABLE_NAME,
-                Key: { PK: `USER#${ownerUuid}`, SK: 'SHOP' }
-            }));
-            if (!userRes.Item) {
-                return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'User ID not found', detail: { ownerUuid } }) };
-            }
-            user_shop_ids = [
-                ...(userRes.Item.owner_shop_ids || []),
-                ...(userRes.Item.gm_shop_ids || [])
-            ];
-        }
+        let cardOrderPK = '';
+        let cardOrderSK = '';
+        let targetItem: any = null;
 
-        // If productID is also provided, verify ownership
-        let product_shopids = [];
-        if (productId) {
-            // 商品指定がある場合、その商品の情報を取得（所属ショップ確認用）
-            // - 検索条件: GSI2_PK = PRODUCT#{productId}
-            // - 取得カラム: PK (所属ショップのID)
-            const prodRes = await ddbDocClient.send(new QueryCommand({
+        try {
+            // GSI2 を用いて order_id から発注レコードを逆引き
+            const lookup = await ddb.send(new QueryCommand({
                 TableName: TABLE_NAME,
                 IndexName: 'GSI2',
                 KeyConditionExpression: 'GSI2_PK = :pk',
-                ExpressionAttributeValues: {
-                    ':pk': `PRODUCT#${productId}`
-                }
+                ExpressionAttributeValues: { ':pk': `CARD_ORDER#${order_id}` }
             }));
-            if (!prodRes.Items || prodRes.Items.length === 0) {
-                return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Product ID not found', detail: { productId } }) };
+
+            targetItem = lookup.Items?.[0];
+            if (!targetItem) {
+                return errorResponse(404, 'Card order not found');
             }
 
-            product_shopids = prodRes.Items.map((item: any) => item.PK.replace(/^SHOP#/, ""));
+            // フールプルーフ: 重複生成の防止（既に作成済みまたはキャンセル済みの場合は拒否）
+            if (targetItem.batch_id || targetItem.status !== 'ORDERED') {
+                return errorResponse(400, 'QR codes already generated for this order', {
+                    order_id,
+                    status: targetItem.status,
+                    batch_id: targetItem.batch_id
+                });
+            }
+
+            cardOrderPK = targetItem.PK;
+            cardOrderSK = targetItem.SK;
+        } catch (err: any) {
+            console.error('Failed to pre-check card order:', err);
+            return errorResponse(500, 'Failed to verify card order status');
         }
 
-        if (shopId) {
-            // Verify if the shop exists
-            // ショップ指定がある場合、ショップ情報の存在を確認
-            // - 検索条件: PK = SHOP#{shopId}, SK = "METADATA"
-            // - 取得カラム: 項目の全属性
-            const shopRes = await ddbDocClient.send(new GetCommand({
-                TableName: TABLE_NAME,
-                Key: {
-                    PK: `SHOP#${shopId}`,
-                    SK: 'METADATA'
-                }
-            }));
-            if (!shopRes.Item) {
-                return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Shop ID not found', detail: { shopId } }) };
-            }
+        // --------------------------------------------------------------------
+        // 2. 発注情報に基づく生成パラメータの抽出
+        // --------------------------------------------------------------------
+        const count = targetItem.quantity;
+        const shopId = targetItem.shop_id;
+        const productId = targetItem.product_id;
+        const expiryDate = targetItem.expiration_date;
+        const owner_id = targetItem.shop_user_id;
+        const senderId = targetItem.sender_user_id;
+        const designId = targetItem.design_id;
+        const activateNow = !!targetItem.activate_now;
+        const senderInfo = null; // senderId 経由の解決に任せる
+
+        if (count > 100) {
+            return errorResponse(400, 'Max 100 items per batch', { count });
         }
 
+        // ショップ、商品、送信者の有効性を一括チェック
+        const validationResult: any = await validateQRParams(ddb, TABLE_NAME, BUCKET_NAME, {
+            shopId, productId, owner_id, activateNow, senderId, senderInfo
+        }).catch((err: any) => {
+            if (err.statusCode) return err;
+            throw err;
+        });
 
-        let isLinkeable = false;
-        if (shopId && productId && ownerUuid) {
-            if (!product_shopids.includes(shopId)) {
-                return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Invalid shop and product ID combination', detail: { shopids_fromproductid: product_shopids, shopId } }) };
-            }
-            if (!user_shop_ids.includes(shopId)) {
-                return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Unauthorized for target shop', detail: { user_shop_ids, shopId } }) };
-            }
-            isLinkeable = true;
-        } else if (shopId && productId) {
-            if (!product_shopids.includes(shopId)) {
-                return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Invalid shop and product ID combination', detail: { shopids_fromproductid: product_shopids, shopId } }) };
-            }
-            isLinkeable = true;
-        } else if (shopId && ownerUuid) {
-            if (!user_shop_ids.includes(shopId)) {
-                return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Unauthorized for target shop', detail: { user_shop_ids, shopId } }) };
-            }
-        } else if (productId && ownerUuid) {
-            let set_shopids_fromproductid = new Set(product_shopids);
-            if (!user_shop_ids.some((item: any) => set_shopids_fromproductid.has(item))) {
-                return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Product is not associated with any authorized shop', detail: { user_shop_ids, shopids_fromproductid: product_shopids } }) };
-            }
+        if (validationResult.statusCode) {
+            return errorResponse(validationResult.statusCode, validationResult.message, validationResult.detail);
         }
 
-        if (activateNow && !isLinkeable) {
-            return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Activation requires both shop ID and product ID', detail: { activateNow, isLinkeable } }) };
-        }
+        const { processedSenderInfo, isLinkeable, validDays } = validationResult;
 
-        let validDays = 180; // Default
-        if (activateNow) {
-            // Fetch product to get valid_days
-            // 即時有効化する場合、商品の詳細設定（有効期間等）を取得
-            // - 検索条件: PK = SHOP#{shopId}, SK = PRODUCT#{productId}
-            // - 取得カラム: valid_days (有効日数)
-            const prodRes = await ddbDocClient.send(new GetCommand({
-                TableName: TABLE_NAME,
-                Key: { PK: `SHOP#${shopId}`, SK: `PRODUCT#${productId}` }
-            }));
-            if (prodRes.Item) {
-                validDays = prodRes.Item.valid_days || 180;
-            }
-        }
-
-
-        let processedSenderInfo = null;
-        if (senderId) {
-            senderId = senderId.replace(/^USER#/, "");
-            // Load sender info from ID (Format: USER#[uuid])
-            // 送り主IDの情報を取得
-            // - 検索条件: PK = USER#{senderId}, SK = "SENDER"
-            // - 取得カラム: 項目の全ての属性 (名称、ロゴ等)
-            const senderRes = await ddbDocClient.send(new GetCommand({
-                TableName: TABLE_NAME,
-                Key: { PK: `USER#${senderId}`, SK: 'SENDER' }
-            }));
-            if (!senderRes?.Item) {
-                return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ message: 'Sender ID not found', detail: { senderId } }) };
-            }
-            const info = { ...senderRes.Item };
-            delete info.PK;
-            delete info.SK;
-            processedSenderInfo = info;
-            processedSenderInfo.sender_id = senderId;
-        } else if (senderInfo) {
-            processedSenderInfo = { ...senderInfo };
-        }
-
-        if (processedSenderInfo) {
-            processedSenderInfo = {
-                ...processedSenderInfo,
-                card_image_url: stripSignature(processedSenderInfo.card_image_url),
-                html_image_urls: (processedSenderInfo.html_image_urls || []).map((url: string) => stripSignature(url)),
-                detail_html: stripSignaturesInHtml(processedSenderInfo.detail_html, BUCKET_NAME)
-            };
-        }
-
-
+        // --------------------------------------------------------------------
+        // 3. QR コードおよび PIN のバルク生成ロジック
+        // --------------------------------------------------------------------
         const ids = [];
         const batch_id = generateId();
-
-        const items = [];
+        const writeRequests = [];
 
         for (let i = 0; i < count; i++) {
-            const uuid = generateId();
+            const qr_id = generateId();
             let pin = '';
             do {
-                // Cryptographically secure random number
+                // セキュアな 8 桁 PIN の生成
+                // フィルタ: 全て同じ数字（11111111）や単純連番（12345678）は、印刷後の耐タンパー性に影響するため除外。
                 pin = crypto.randomInt(10000000, 100000000).toString();
-            } while (/^(\d)\1+$/.test(pin)); // 8 digit PIN, avoid repdigits
+            } while (/^(\d)\1+$/.test(pin) || pin === "12345678");
 
             const now = new Date().toISOString();
 
+            // QR エンティティの構築
             const item: any = {
-                PK: { S: `QR#${uuid}` },
-                SK: { S: 'METADATA' },
-                pin: { S: pin },
-                batch_id: { S: batch_id }, // Store the batch ID
-                ts_created_at: { S: now },
-                ts_updated_at: { S: now }
+                PK: `QR#${qr_id}`,
+                SK: 'METADATA',
+                pin: pin,
+                batch_id: batch_id,
+                ts_created_at: now,
+                ts_updated_at: now
             };
 
-            if (expiryDate) {
-                item.ts_expired_at = { S: expiryDate };
-            }
-            if (ownerUuid) {
-                item.owner_id = { S: ownerUuid };
-            }
+            if (expiryDate) item.ts_expired_at = expiryDate;
+            if (owner_id) item.owner_id = owner_id;
             if (shopId) {
-                item.shop_id = { S: shopId };
-                item.GSI2_PK = { S: `SHOP#${shopId}` };
-                item.GSI2_SK = { S: now };
+                item.shop_id = shopId;
+                item.GSI2_PK = `SHOP#${shopId}`;
+                item.GSI2_SK = now;
             }
-            if (productId) {
-                item.product_id = { S: productId };
-            }
-            if (cardDesign) {
-                item.card_design = { S: cardDesign };
-            }
+            if (productId) item.product_id = productId;
+            if (designId) item.design_id = designId;
+
+            // ステータスとインデックス(GSI1)の割り当て
             if (activateNow) {
+                // 即時有効化モード: ギフト内容が確定している場合
                 const activationDate = new Date();
                 const expirationDate = new Date(activationDate);
                 expirationDate.setDate(expirationDate.getDate() + validDays);
 
-                item.GSI1_PK = { S: 'QR#ACTIVE' };
-                item.GSI1_SK = { S: now };
-                item.status = { S: 'ACTIVE' };
-                item.ts_activated_at = { S: now };
-                if (!expiryDate) {
-                    item.ts_expired_at = { S: expirationDate.toISOString() };
-                }
+                item.GSI1_PK = 'QR#ACTIVE';
+                item.GSI1_SK = now;
+                item.status = 'ACTIVE';
+                item.ts_activated_at = now;
+                if (!expiryDate) item.ts_expired_at = expirationDate.toISOString();
             } else if (isLinkeable) {
-                item.GSI1_PK = { S: 'QR#LINKED' };
-                item.GSI1_SK = { S: now };
-                item.status = { S: 'LINKED' };
-                item.ts_linked_at = { S: now };
+                // リンク済みモード: 送信者は決まっているが受取人の入力が必要な場合
+                item.GSI1_PK = 'QR#LINKED';
+                item.GSI1_SK = now;
+                item.status = 'LINKED';
+                item.ts_linked_at = now;
             } else {
-                item.GSI1_PK = { S: 'QR#UNASSIGNED' };
-                item.GSI1_SK = { S: now };
-                item.status = { S: 'UNASSIGNED' };
+                // 未割当モード: 在庫分として生成
+                item.GSI1_PK = 'QR#UNASSIGNED';
+                item.GSI1_SK = now;
+                item.status = 'UNASSIGNED';
             }
 
-            items.push({
-                PutRequest: {
-                    Item: item
-                }
-            });
+            writeRequests.push({ PutRequest: { Item: item } });
 
+            // 送信者が特定されている場合、CHAT レコード（コンテキスト管理）を自動生成
             if (processedSenderInfo) {
-                items.push({
+                writeRequests.push({
                     PutRequest: {
                         Item: {
-                            PK: { S: `QR#${uuid}` },
-                            SK: { S: 'CHAT' },
-                            sender_id: { S: processedSenderInfo.sender_id },
-                            ts_created_at: { S: now },
-                            ts_updated_at: { S: now }
+                            PK: `QR#${qr_id}`,
+                            SK: 'CHAT',
+                            sender_id: processedSenderInfo.sender_id,
+                            ts_created_at: now,
+                            ts_updated_at: now
                         }
                     }
                 });
             }
 
-            ids.push({ uuid, pin });
+            ids.push({ qr_id, pin });
         }
 
-        // DynamoDB BatchWriteItem has a limit of 25 items per request
-        for (let i = 0; i < items.length; i += 25) {
-            const chunk = items.slice(i, i + 25);
-            // 生成したQRコードデータを一括登録 (25件ずつのバッチ実行)
-            // - 登録内容: 各種ステータス、生成されたUUID/PIN、有効期限、関連ID等
-            await client.send(new BatchWriteItemCommand({
-                RequestItems: {
-                    [TABLE_NAME]: chunk
+        // --------------------------------------------------------------------
+        // 4. バッチ情報の永続化（履歴管理）
+        // --------------------------------------------------------------------
+        const batchTimestamp = new Date().toISOString();
+        writeRequests.push({
+            PutRequest: {
+                Item: {
+                    PK: `QR_BATCH#${batch_id}`,
+                    SK: `METADATA#${batchTimestamp}`,
+                    data: ids,
+                    order_id: order_id,
+                    ts_created_at: batchTimestamp
                 }
+            }
+        });
+
+        // BatchWrite による一括書き込み（25 件ずつ分割）
+        for (let i = 0; i < writeRequests.length; i += 25) {
+            const chunk = writeRequests.slice(i, i + 25);
+            await ddb.send(new BatchWriteCommand({
+                RequestItems: { [TABLE_NAME]: chunk }
             }));
         }
 
-        return {
-            statusCode: 200,
-            headers: corsHeaders,
-            body: JSON.stringify({
-                message: 'QR Codes generated',
-                count: ids.length,
-                batch_id: batch_id,
-                data: ids
-            })
-        };
+        // --------------------------------------------------------------------
+        // 5. 発注レコード（CARD_ORDER）のステータス更新
+        // --------------------------------------------------------------------
+        if (order_id && cardOrderPK && cardOrderSK) {
+            const now = new Date().toISOString();
+            const adminUserId = getUserId(event);
+            try {
+                await ddb.send(new UpdateCommand({
+                    TableName: TABLE_NAME,
+                    Key: { PK: cardOrderPK, SK: cardOrderSK },
+                    UpdateExpression: 'SET batch_id = :bid, user_id_create = :uid, #status = :status, GSI1_PK = :gsi_pk, GSI1_SK = :now, ts_qr_generated_at = :now, ts_updated_at = :now',
+                    ConditionExpression: 'attribute_not_exists(batch_id)', // 二重生成防止の要
+                    ExpressionAttributeNames: { '#status': 'status' },
+                    ExpressionAttributeValues: {
+                        ':bid': batch_id,
+                        ':uid': adminUserId,
+                        ':status': 'PRINTING',
+                        ':gsi_pk': 'CARD_ORDER#PRINTING',
+                        ':now': now
+                    }
+                }));
+            } catch (err: any) {
+                console.error('Failed to update card order status:', err);
+                if (err.name === 'ConditionalCheckFailedException') {
+                    return errorResponse(400, 'QR codes were already generated concurrently');
+                }
+            }
+        }
+
+        return successResponse({
+            message: 'QR Codes generated',
+            count: ids.length,
+            batch_id: batch_id,
+            data: ids
+        });
 
     } catch (error: any) {
-        console.error(error);
-        return {
-            statusCode: 500,
-            headers: corsHeaders,
-            body: JSON.stringify({ message: 'Internal Server Error', error: error.message || String(error) })
-        };
+        console.error('QR generate error:', error);
+        return errorResponse(500, 'Internal Server Error', error.message || String(error));
     }
 };
