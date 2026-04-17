@@ -288,7 +288,18 @@ export default function ReceivePage() {
             data.sender_id = importId;
             if (data.sender_info) {
                 // Sanitize: Convert null values to empty strings
-                const sanitizedInfo = { ...data.sender_info };
+                let rawSenderInfo = data.sender_info;
+                // 二重文字列化などの異常系にも対応する強力なパース
+                while (typeof rawSenderInfo === 'string' && rawSenderInfo.trim().startsWith('{')) {
+                    try {
+                        rawSenderInfo = JSON.parse(rawSenderInfo);
+                    } catch (e) {
+                        console.error("Failed to parse sender_info string during load:", e);
+                        break;
+                    }
+                }
+
+                const sanitizedInfo = { ...(typeof rawSenderInfo === 'object' ? rawSenderInfo : {}) };
                 Object.keys(sanitizedInfo).forEach(key => {
                     if (sanitizedInfo[key] === null) sanitizedInfo[key] = "";
                 });
@@ -299,7 +310,7 @@ export default function ReceivePage() {
                     import_id: "" // Clear on success
                 };
 
-                setSenderForm(newInfo);
+                setSenderForm(prev => ({ ...prev, ...newInfo }));
                 setSenderInfo({ ...newInfo, sender_id: cleanId }); // Keep sender_id in UI state to hide edit button
 
                 if (sanitizedInfo.html_image_urls) {
@@ -611,12 +622,28 @@ export default function ReceivePage() {
                 setShowRoleSelection(false);
                 handleImportFromId(data.sender_id, true);
             } else if (data.sender_info) {
-                setHtmlImageUrls(data.sender_info.html_image_urls || []);
-                const sanitizedInfo = { ...data.sender_info };
+                // スナップショット（未登録/ゲスト編集）情報のロード
+                let rawSenderInfo = data.sender_info;
+                // 二重文字列化などの異常系にも対応する強力なパース
+                while (typeof rawSenderInfo === 'string' && rawSenderInfo.trim().startsWith('{')) {
+                    try {
+                        rawSenderInfo = JSON.parse(rawSenderInfo);
+                    } catch (e) {
+                        console.error("Failed to parse sender_info string during message load:", e);
+                        break;
+                    }
+                }
+
+                const sanitizedInfo = { ...(typeof rawSenderInfo === 'object' ? rawSenderInfo : {}) };
                 Object.keys(sanitizedInfo).forEach(key => {
                     if (sanitizedInfo[key] === null) sanitizedInfo[key] = "";
                 });
-                setSenderInfo({ ...sanitizedInfo, sender_id: data.sender_id });
+
+                // 【重要】senderInfo (表示用) と senderForm (編集・テキスト表示用) の両方を更新
+                const finalInfo = { ...sanitizedInfo, sender_id: data.sender_id };
+                setSenderInfo(finalInfo);
+                setSenderForm(prev => ({ ...prev, ...sanitizedInfo })); // テキストフィールドを表示するために同期
+                setHtmlImageUrls(sanitizedInfo.html_image_urls || []);
                 setShowRoleSelection(false);
             } else {
                 setSenderInfo(null);
@@ -1044,7 +1071,7 @@ export default function ReceivePage() {
                 <>
                     {/* 1. 全体の背景色と内側シャドウ (最背面) */}
                     <div className="fixed inset-0 z-[-1] bg-olive-300 shadow-[inset_0_0_500px_rgba(0,0,0,0.8)] animate-in fade-in duration-1000" />
-                    
+
                     {/* 2. セピアフィルターレイヤー (中央) - デザイン上の演出のため操作は制限しない */}
                     <div className="fixed inset-0 z-40 backdrop-sepia-[.2] pointer-events-none animate-in fade-in duration-1000" />
                 </>
@@ -2551,23 +2578,23 @@ export default function ReceivePage() {
             {
                 step !== "PIN" && gift && (gift.shop_detail_html) && (
                     <Card className="w-full mt-20 flex flex-col items-center max-w-xl bg-white ">
-                        <CardTitle className="w-full flex flex-col items-center justify-center gap-2">
-                            <div className="w-full flex items-center justify-center text-xl text-center gap-2">
-                                <ShoppingBasket className="w-5 h-5 text-gray-600" />
-                                {t('shopinfo')}
-                            </div>
-                            <div className="w-full flex items-center justify-center text-xs text-center text-gray-500">
-                                {t('shopinfo_description')}
-                            </div>
-                        </CardTitle>
-                        <CardContent className="min-h-0 flex flex-1 p-0 w-full p-4"> {/* w-fullを追加 */}
-                            <div className="w-full mt-0 mr-0 ml-0 p-0 relative rounded-2xl overflow-hidden border border-gray-100 shadow-sm bg-white">
-                                {/* コンテンツ */}
-                                <SandboxedHtml html={gift.shop_detail_html} />
-                                {/* Overly to "gather" the corners */}
-                                <div className="absolute inset-0 pointer-events-none rounded-2xl ring-1 ring-black/5 ring-inset" />
-                            </div>
-                        </CardContent>
+                        {/* <CardTitle className="w-full flex flex-col items-center justify-center gap-2">
+                         <div className="w-full flex items-center justify-center text-xl text-center gap-2">
+                             <ShoppingBasket className="w-5 h-5 text-gray-600" />
+                             {t('shopinfo')}
+                         </div>
+                         <div className="w-full flex items-center justify-center text-xs text-center text-gray-500">
+                             {t('shopinfo_description')}
+                         </div>
+                     </CardTitle>
+                     <CardContent className="min-h-0 flex flex-1 p-0 w-full p-4"> w-fullを追加 */}
+                        <div className="w-full mt-0 mr-0 ml-0 p-0 relative rounded-2xl overflow-hidden">
+                            {/* コンテンツ */}
+                            <SandboxedHtml html={gift.shop_detail_html} />
+                            {/* Overly to "gather" the corners */}
+                            {/* <div className="absolute inset-0 pointer-events-none rounded-2xl ring-1 ring-black/5 ring-inset" /> */}
+                        </div>
+                        {/*      </CardContent> */}
                     </Card>
                 )
             }

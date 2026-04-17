@@ -345,11 +345,11 @@ function HtmlEditor({ shopDetailRef, defaultHtml, debouncedPreviewHtml, onUpdate
                     </div>
                     <div className="flex-1 overflow-y-auto p-4 flex flex-col items-center">
                         <Card className="w-full mt-10 bg-white p-4">
-                            <div className="flex flex-col items-center gap-2 mb-4">
+                            {/* <div className="flex flex-col items-center gap-2 mb-4">
                                 <div className="flex items-center gap-2 text-lg font-bold"><ShoppingBasket className="w-5 h-5" />{tr('shopinfo')}</div>
                                 <div className="text-xs text-gray-500">{tr('shopinfo_description')}</div>
-                            </div>
-                            <div className="rounded-2xl overflow-hidden border shadow-sm bg-white min-h-[200px]">
+                            </div> */}
+                            <div className="rounded-2xl overflow-hidden bg-white min-h-[200px]">
                                 <SandboxedHtml html={debouncedPreviewHtml} />
                             </div>
                         </Card>

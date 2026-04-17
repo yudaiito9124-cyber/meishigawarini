@@ -45,25 +45,34 @@ export async function getPresignedViewUrl(bucket: string, key: string, expiresIn
  * @returns 署名済み URL。条件に合致しない場合は元の文字列を返します。
  */
 export async function signUrlIfS3(url: string | undefined, bucketName: string): Promise<string | undefined> {
-    if (!url || !url.includes(bucketName)) return url;
+    if (!url) return url;
+    // バケット名が含まれていない、かつ S3 URL 形式でもない場合はそのまま返す
+    if (!url.includes(bucketName) && !url.includes('.s3.') && !url.startsWith('s3://')) return url;
 
     let key = '';
+    let targetBucket = bucketName;
+
     try {
         if (url.startsWith('s3://')) {
-            key = url.replace(`s3://${bucketName}/`, '');
+            const temp = url.substring(5);
+            targetBucket = temp.split('/')[0];
+            key = temp.substring(targetBucket.length + 1);
         } else if (url.includes('.s3.')) {
             const urlObj = new URL(url);
+            targetBucket = urlObj.hostname.split('.')[0];
             key = decodeURIComponent(urlObj.pathname.substring(1));
             // パスが /bucket/key のようになっている場合に正規化
-            if (key.startsWith(`${bucketName}/`)) {
-                key = key.substring(bucketName.length + 1);
+            if (key.startsWith(`${targetBucket}/`)) {
+                key = key.substring(targetBucket.length + 1);
             }
         } else {
-            return url;
+            // URL に bucketName が含まれているが特定の形式ではない場合（旧来の互換性用）
+            key = url.split(bucketName).pop() || '';
+            if (key.startsWith('/')) key = key.substring(1);
         }
 
         if (!key) return url;
-        return await getPresignedViewUrl(bucketName, key);
+        return await getPresignedViewUrl(targetBucket, key);
     } catch (e) {
         console.error("Failed to sign S3 URL:", url, e);
         return url;
@@ -146,7 +155,7 @@ export async function deleteFileByUrl(url: string | undefined, bucketName: strin
 export async function signUrlsInHtml(html: string | undefined, bucketName: string): Promise<string | undefined> {
     if (!html) return html;
 
-    const s3UrlPattern = new RegExp(`https://${bucketName}\\.s3\\.[a-z0-9-]+\\.amazonaws\\.com/[^"\\s<>]+`, 'g');
+    const s3UrlPattern = /https?:\/\/[a-z0-9.-]+(?:\.s3[.-][a-z0-9-]+)?\.amazonaws\.com\/[^"\s<>]+/g;
     const matches = html.match(s3UrlPattern);
     if (!matches) return html;
 
@@ -188,7 +197,7 @@ export async function copyS3Object(bucket: string, sourceKey: string, destKey: s
 export function stripSignaturesInHtml(html: string | undefined, bucketName: string): string | undefined {
     if (!html) return html;
 
-    const s3UrlPattern = new RegExp(`https://${bucketName}\\.s3\\.[a-z0-9-]+\\.amazonaws\\.com/[^"\\s<>]+`, 'g');
+    const s3UrlPattern = /https?:\/\/[a-z0-9.-]+(?:\.s3[.-][a-z0-9-]+)?\.amazonaws\.com\/[^"\s<>]+/g;
 
     return html.replace(s3UrlPattern, (match) => {
         return stripSignature(match) || match;

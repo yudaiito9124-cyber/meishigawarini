@@ -336,79 +336,23 @@ async function createChat(body: UnifiedChatApiSchema['unified_chat_create'], cal
     }
 
     const shard = calcShard(chat_id);
-    const meta: ChatMeta = {
-        PK: toChatPk(chat_id),
-        SK: 'META',
-        chat_id,
-        participants,
-        initiator_id: initiatorId,
-        chat_type: body.chat_type,
-        status: initialStatus,
-        ts_created_at: now,
-        ts_updated_at: now,
-        ts_last_message_at: now,
-        last_message_id: '',
-        last_message_seq: 0,
-        last_message_text: '',
-        version: 1,
-        GSI1_PK: buildGsi1Pk(body.chat_type, initialStatus, shard),
-        GSI1_SK: `TS#${now}#CHAT#${chat_id}`,
-    };
+    const hasInitialMessage = !!body.initial_message;
+    let msgId = '';
+    let preview = '';
+    const seq = 1;
 
-    const transactItems: any[] = [
-        {
-            Put: {
-                TableName: TABLE_NAME,
-                Item: meta,
-                ConditionExpression: 'attribute_not_exists(PK) AND attribute_not_exists(SK)',
-            },
-        },
-    ];
-
-    // 参加者ごとに inbox 行（PK=participant, SK=CHAT#...）を作成
-    // これにより participant 単位で一覧取得ができる
-    for (const participantId of participants) {
-        transactItems.push({
-            Put: {
-                TableName: TABLE_NAME,
-                Item: {
-                    PK: participantId,
-                    SK: `CHAT#${chat_id}`,
-                    chat_id,
-                    participant_id: participantId,
-                    joined_at: now,
-                    last_read_seq: 0,
-                    ts_last_read_at: now,
-                    ts_last_message_at: now,
-                    last_message_text: '',
-                    unread_count_cache: 0,
-                    is_muted: false,
-                    is_archived: false,
-                    chat_type: body.chat_type,
-                    status: initialStatus,
-                    GSI2_PK: `CHAT_INBOX#${participantId}`,
-                    GSI2_SK: `TS#${toReverseEpochMs(now)}#CHAT#${chat_id}`,
-                },
-                ConditionExpression: 'attribute_not_exists(PK) AND attribute_not_exists(SK)',
-            },
-        });
-    }
-
-    if (body.initial_message) {
+    // 初期メッセージ情報の事前準備
+    if (hasInitialMessage && body.initial_message) {
         // 初期メッセージを保存する場合は認証済みユーザー必須
         const authError = requireAuthenticatedUser(callerUserId);
         if (authError) {
             return authError;
         }
 
-        const msgId = generateId();
-        const preview = makePreview(body.initial_message.message, body.initial_message.payload_type);
-        const seq = 1;
+        msgId = generateId();
+        preview = makePreview(body.initial_message.message, body.initial_message.payload_type);
 
         // WORKFLOW 初期メッセージの payload を契約に沿って検証
-        // - SHOP_OPENING + FORM_SUBMITTED の場合のみ form_snapshot を META に複写
-        // - CARD_DESIGN + FORM_SUBMITTED の場合も form_snapshot を認可（簡易版、META複写なし）
-        // - その他の workflow event はメッセージのみ保存
         if (body.initial_message.type === 'WORKFLOW') {
             if (!body.initial_message.payload_type) {
                 return errorResponse(400, 'payload_type is required for WORKFLOW initial_message');
@@ -429,7 +373,73 @@ async function createChat(body: UnifiedChatApiSchema['unified_chat_create'], cal
         } else if (body.initial_message.payload_type !== undefined || body.initial_message.payload !== undefined) {
             return errorResponse(400, 'payload_type/payload are only allowed for WORKFLOW initial_message');
         }
+    }
 
+    const meta: ChatMeta = {
+        PK: toChatPk(chat_id),
+        SK: 'META',
+        chat_id,
+        participants,
+        initiator_id: initiatorId,
+        chat_type: body.chat_type,
+        status: initialStatus,
+        ts_created_at: now,
+        ts_updated_at: now,
+        ts_last_message_at: now,
+        last_message_id: hasInitialMessage ? msgId : '',
+        last_message_seq: hasInitialMessage ? seq : 0,
+        last_message_text: hasInitialMessage ? preview : '',
+        version: 1,
+        GSI1_PK: buildGsi1Pk(body.chat_type, initialStatus, shard),
+        GSI1_SK: `TS#${now}#CHAT#${chat_id}`,
+        // 申請フォーム内容は後続管理画面の参照負荷を下げるため META 側にも保持
+        ...(shopOpeningFormSnapshot ? { shop_opening_form_snapshot: shopOpeningFormSnapshot } : {}),
+    };
+
+    const transactItems: any[] = [
+        {
+            Put: {
+                TableName: TABLE_NAME,
+                Item: meta,
+                ConditionExpression: 'attribute_not_exists(PK) AND attribute_not_exists(SK)',
+            },
+        },
+    ];
+
+    // 参加者ごとに inbox 行（PK=participant, SK=CHAT#...）を作成
+    // これにより participant 単位で一覧取得ができる
+    for (const participantId of participants) {
+        const isInitiator = participantId === initiatorId;
+        const unreadCount = hasInitialMessage && !isInitiator ? 1 : 0;
+        const lastReadSeq = hasInitialMessage && isInitiator ? 1 : 0;
+
+        transactItems.push({
+            Put: {
+                TableName: TABLE_NAME,
+                Item: {
+                    PK: participantId,
+                    SK: `CHAT#${chat_id}`,
+                    chat_id,
+                    participant_id: participantId,
+                    joined_at: now,
+                    last_read_seq: lastReadSeq,
+                    ts_last_read_at: now,
+                    ts_last_message_at: now,
+                    last_message_text: hasInitialMessage ? preview : '',
+                    unread_count_cache: unreadCount,
+                    is_muted: false,
+                    is_archived: false,
+                    chat_type: body.chat_type,
+                    status: initialStatus,
+                    GSI2_PK: `CHAT_INBOX#${participantId}`,
+                    GSI2_SK: `TS#${toReverseEpochMs(now)}#CHAT#${chat_id}`,
+                },
+                ConditionExpression: 'attribute_not_exists(PK) AND attribute_not_exists(SK)',
+            },
+        });
+    }
+
+    if (hasInitialMessage && body.initial_message) {
         transactItems.push({
             Put: {
                 TableName: TABLE_NAME,
@@ -452,21 +462,6 @@ async function createChat(body: UnifiedChatApiSchema['unified_chat_create'], cal
                 ConditionExpression: 'attribute_not_exists(PK) AND attribute_not_exists(SK)',
             },
         });
-
-        transactItems[0] = {
-            Put: {
-                TableName: TABLE_NAME,
-                Item: {
-                    ...meta,
-                    last_message_id: msgId,
-                    last_message_seq: seq,
-                    last_message_text: preview,
-                    // 申請フォーム内容は後続管理画面の参照負荷を下げるため META 側にも保持
-                    ...(shopOpeningFormSnapshot ? { shop_opening_form_snapshot: shopOpeningFormSnapshot } : {}),
-                },
-                ConditionExpression: 'attribute_not_exists(PK) AND attribute_not_exists(SK)',
-            },
-        };
     }
 
     // META + 参加者inbox(+初期メッセージ)を単一トランザクションで確定します。

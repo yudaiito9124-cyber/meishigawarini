@@ -148,7 +148,8 @@ export const handler = async (event: APIGatewayRequestAuthorizerEvent): Promise<
 
             const allowedPaths = [
                 'receive/chat/get',
-                'receive/sender/load'
+                'receive/sender/load',
+                'receive/verify'
             ];
 
             if (!allowedPaths.includes(path)) {

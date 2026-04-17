@@ -133,7 +133,7 @@
         "submittedAt": "申請日時",
         "rawJson": "JSONを表示"
       },
-      "messagePlaceholder": "メッセージを入力... (Enterで送信、Shift+Enterで改行)",
+      "messagePlaceholder": "メッセージを入力...",
       "sendButton": "送信",
       "attachFile": "ファイル添付",
       "fileTooLarge": "ファイルサイズは30MB以下にしてください",
@@ -438,7 +438,7 @@
         "no": "いいえ",
         "rawJson": "JSONを表示"
       },
-      "messagePlaceholder": "メッセージを入力... (Enterで送信、Shift+Enterで改行)",
+      "messagePlaceholder": "メッセージを入力...",
       "attachFile": "ファイル添付",
       "fileTooLarge": "ファイルサイズは30MB以下にしてください",
       "uploading": "アップロード中...",

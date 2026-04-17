@@ -62,15 +62,38 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             }
 
             // 【Enrichment】スナップショットされた送り主情報の S3 アセットに署名を付与
-            const sender_info = chatLog.sender_info;
-            if (sender_info) {
-                if (sender_info.card_image_url) sender_info.card_image_url = await signUrlIfS3(sender_info.card_image_url, BUCKET_NAME);
-                if (sender_info.detail_html) sender_info.detail_html = await signUrlsInHtml(sender_info.detail_html, BUCKET_NAME);
+            let sender_info = chatLog.sender_info;
+
+            // 強力なパース処理（二重文字列化などの異常系にも対応）
+            while (typeof sender_info === 'string' && sender_info.trim().startsWith('{')) {
+                try {
+                    sender_info = JSON.parse(sender_info);
+                } catch (e) {
+                    console.error("Failed to parse sender_info string:", e);
+                    break;
+                }
+            }
+
+            if (sender_info && typeof sender_info === 'object') {
+                // Null値の除去（フロントエンドでの文字列操作を安全にするため）
+                Object.keys(sender_info).forEach(key => {
+                    if (sender_info[key] === null) sender_info[key] = "";
+                });
+
+                if (sender_info.card_image_url) {
+                    sender_info.card_image_url = await signUrlIfS3(sender_info.card_image_url, BUCKET_NAME);
+                }
+                if (sender_info.detail_html) {
+                    sender_info.detail_html = await signUrlsInHtml(sender_info.detail_html, BUCKET_NAME);
+                }
                 if (sender_info.html_image_urls && Array.isArray(sender_info.html_image_urls)) {
                     sender_info.html_image_urls = await Promise.all(
                         sender_info.html_image_urls.map((url: string) => signUrlIfS3(url, BUCKET_NAME))
                     );
                 }
+            } else if (sender_info && typeof sender_info !== 'object') {
+                // オブジェクトでない（パース失敗した文字列など）場合は、フロントエンドの誤動作を防ぐため空オブジェクトにする
+                sender_info = {};
             }
 
             return successResponse({

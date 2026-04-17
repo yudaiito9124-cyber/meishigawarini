@@ -24,7 +24,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, Plus, X, Globe, Copy, Check, Trash2, SendHorizontal, Pencil, User, Image as ImageIcon, FileIcon, ChevronDown, Sparkles } from "lucide-react";
+import { Loader2, Plus, X, Globe, Copy, Check, Trash2, SendHorizontal, Pencil, User, Image as ImageIcon, FileIcon, ChevronDown, Sparkles, Download } from "lucide-react";
 import { SiX, SiInstagram, SiYoutube, SiFacebook, SiLine, SiTiktok, SiThreads, SiLinktree, SiEight } from '@icons-pack/react-simple-icons';
 import { cn } from "@/lib/utils";
 import SandboxedHtml from "@/components/SandboxedHtml";
@@ -444,6 +444,21 @@ export default function UserProfilePage() {
                                                 <Sparkles className="w-4 h-4 text-blue-500" />
                                                 {t(`senderInfo.labels.detail_html`)}
                                             </Label>
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() => {
+                                                    const link = document.createElement('a');
+                                                    link.href = '/prompts/landing-page-prompt.md';
+                                                    link.download = 'landing-page-prompt.md';
+                                                    link.click();
+                                                }}
+                                                className="h-8 px-3 text-[10px] gap-2 bg-white border-blue-200 text-blue-600 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300 rounded-full"
+                                            >
+                                                <Download className="w-3.5 h-3.5" />
+                                                {t('senderInfo.labels.detail_html-downloadPrompt')}
+                                            </Button>
                                         </div>
                                         <div className="flex flex-col w-full gap-6">
                                             <div className="w-full">

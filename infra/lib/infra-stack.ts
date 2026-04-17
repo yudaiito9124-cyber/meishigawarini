@@ -203,49 +203,55 @@ export class InfraStack extends cdk.Stack {
       cfnUserPool.userPoolTier = 'ESSENTIALS';
     }
 
-    const userPoolClient = new cognito.UserPoolClient(this, 'MeishiGawariniUserPoolClient', {
-      userPool,
-      authFlows: { userSrp: true },
-      idTokenValidity: cdk.Duration.hours(1),
-      accessTokenValidity: cdk.Duration.hours(1),
-      refreshTokenValidity: cdk.Duration.days(30),
-      supportedIdentityProviders: [
-        cognito.UserPoolClientIdentityProvider.COGNITO
-        // ,
-        // cognito.UserPoolClientIdentityProvider.GOOGLE,
-        // cognito.UserPoolClientIdentityProvider.AMAZON,
-      ],
-      oAuth: {
-        flows: {
-          authorizationCodeGrant: true,
-        },
-        callbackUrls: [
-          ...allowedOrigins.map(origin => `${origin}/`),
-          ...allowedOrigins.map(origin => `${origin}/ja/`),
-          ...allowedOrigins.map(origin => `${origin}/en/`),
-          ...allowedOrigins.map(origin => `${origin}/login/`),
-        ],
-        logoutUrls: [
-          ...allowedOrigins.map(origin => `${origin}/`),
-          ...allowedOrigins.map(origin => `${origin}/ja/`),
-          ...allowedOrigins.map(origin => `${origin}/en/`),
-          ...allowedOrigins.map(origin => `${origin}/login/`),
-        ],
-        scopes: [
-          cognito.OAuthScope.EMAIL,
-          cognito.OAuthScope.OPENID,
-          cognito.OAuthScope.PROFILE,
-          cognito.OAuthScope.COGNITO_ADMIN,
-        ],
-      },
-    });
+    const sharedUserPoolClientId = process.env.SHARED_USER_POOL_CLIENT_ID;
+    let userPoolClient: cognito.IUserPoolClient;
 
-    const cfnUserPoolClient = userPoolClient.node.defaultChild as cognito.CfnUserPoolClient;
-    cfnUserPoolClient.explicitAuthFlows = [
-      'ALLOW_USER_SRP_AUTH',
-      'ALLOW_REFRESH_TOKEN_AUTH',
-      'ALLOW_USER_AUTH' // WebAuthn (Passkeys) 用
-    ];
+    if (isProd && sharedUserPoolId && sharedUserPoolClientId) {
+      // 既存のアプリケーションクライアントをインポート
+      userPoolClient = cognito.UserPoolClient.fromUserPoolClientId(this, 'ImportedUserPoolClient', sharedUserPoolClientId);
+    } else {
+      // 新規アプリケーションクライアント作成
+      userPoolClient = new cognito.UserPoolClient(this, 'MeishiGawariniUserPoolClient', {
+        userPool,
+        authFlows: { userSrp: true },
+        idTokenValidity: cdk.Duration.hours(1),
+        accessTokenValidity: cdk.Duration.hours(1),
+        refreshTokenValidity: cdk.Duration.days(30),
+        supportedIdentityProviders: [
+          cognito.UserPoolClientIdentityProvider.COGNITO
+        ],
+        oAuth: {
+          flows: {
+            authorizationCodeGrant: true,
+          },
+          callbackUrls: [
+            ...allowedOrigins.map(origin => `${origin}/`),
+            ...allowedOrigins.map(origin => `${origin}/ja/`),
+            ...allowedOrigins.map(origin => `${origin}/en/`),
+            ...allowedOrigins.map(origin => `${origin}/login/`),
+          ],
+          logoutUrls: [
+            ...allowedOrigins.map(origin => `${origin}/`),
+            ...allowedOrigins.map(origin => `${origin}/ja/`),
+            ...allowedOrigins.map(origin => `${origin}/en/`),
+            ...allowedOrigins.map(origin => `${origin}/login/`),
+          ],
+          scopes: [
+            cognito.OAuthScope.EMAIL,
+            cognito.OAuthScope.OPENID,
+            cognito.OAuthScope.PROFILE,
+            cognito.OAuthScope.COGNITO_ADMIN,
+          ],
+        },
+      });
+
+      const cfnUserPoolClient = userPoolClient.node.defaultChild as cognito.CfnUserPoolClient;
+      cfnUserPoolClient.explicitAuthFlows = [
+        'ALLOW_USER_SRP_AUTH',
+        'ALLOW_REFRESH_TOKEN_AUTH',
+        'ALLOW_USER_AUTH' // WebAuthn (Passkeys) 用
+      ];
+    }
 
     ////////////////////////////////////////////////////////////////////////////////
     /**

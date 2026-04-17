@@ -218,6 +218,24 @@ async function enrichLogs(logs: Array<{ qr_id: string, timestamp: string }>) {
             const order = itemMap.get(`QR#${qr_id}#ORDER`) || {};
             const chat = itemMap.get(`QR#${qr_id}#CHAT`) || {};
 
+            // 互換性：スナップショットされた送り主情報が JSON 文字列の場合があるためパースを試行
+            let sinfo = chat.sender_info;
+            while (typeof sinfo === 'string' && sinfo.trim().startsWith('{')) {
+                try {
+                    sinfo = JSON.parse(sinfo);
+                } catch (e) {
+                    console.error("Failed to parse sender_info string in history:", e);
+                    break;
+                }
+            }
+            if (sinfo && typeof sinfo === 'object') {
+                Object.keys(sinfo).forEach(key => {
+                    if (sinfo[key] === null) sinfo[key] = "";
+                });
+            } else if (sinfo) {
+                sinfo = {};
+            }
+
             results.push({
                 qr_id, status: currentStatus, pin: meta.pin,
                 product_id: meta.product_id, product_name: product?.name,
@@ -230,7 +248,7 @@ async function enrichLogs(logs: Array<{ qr_id: string, timestamp: string }>) {
                 bgimgf: design ? await signUrlIfS3(design.bgimgf, BUCKET_NAME) : null,
                 bgimgb: design ? await signUrlIfS3(design.bgimgb, BUCKET_NAME) : null,
                 recipient_name: order.name,
-                sender_info: chat.sender_info, // スナップショットされた送り主情報
+                sender_info: sinfo, // スナップショットされた送り主情報
                 ts_created_at: meta.ts_created_at, ts_updated_at: meta.ts_updated_at,
                 timestamp: logs.find(l => l.qr_id === qr_id)?.timestamp
             });
@@ -238,5 +256,5 @@ async function enrichLogs(logs: Array<{ qr_id: string, timestamp: string }>) {
     }
 
     // 最後に履歴追加日時（timestamp）で再ソート
-    return results.sort((a, b) => new Date(b.timestamp!).getTime() - new Date(a.timestamp!).getTime());
-}
+    return results.sort((a, b) => new Date((b as any).timestamp!).getTime() - new Date((a as any).timestamp!).getTime());
+};
