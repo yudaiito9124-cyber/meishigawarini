@@ -5,8 +5,7 @@
  *  - ゲスト（受取人）からショップオーナーへの直接的な問い合わせ機能を処理します。
  *  - 【マルチチャネル通知】
  *    1. ショップオーナーのメールアドレス（Cognito または SHOP メタデータ）へ通知メールを送信 (Resend)。
- *    2. ギフト固有のチャット (SK=CHAT) に問い合わせ内容を記録。
- *    3. ショップオーナーの管理画面（Unified Chat）に通知用の履歴を生成。
+ *    2. ショップオーナーの管理画面（Unified Chat）に通知用の履歴を生成。
  */
 
 import { APIGatewayProxyHandler } from 'aws-lambda';
@@ -92,27 +91,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             }));
         }
 
-        // 3.2. ギフト固有チャット (SK=CHAT) への記録
-        const inquiryMessageText = `【お問い合わせ】\n返信先: ${reply_email}${phone ? `\n電話番号: ${phone}` : ''}\n\n${content}`;
-        const inquiryMessage = {
-            id: generateId(),
-            role: 'RECEIVER',
-            username: 'Guest (Inquiry)',
-            message: inquiryMessageText,
-            type: 'text',
-            ts_created_at: now
-        };
-
-        promises.push(ddb.send(new UpdateCommand({
-            TableName: TABLE_NAME,
-            Key: { PK: `QR#${qr_id}`, SK: 'CHAT' },
-            UpdateExpression: 'SET messages = list_append(if_not_exists(messages, :empty_list), :msg), ts_updated_at = :now',
-            ExpressionAttributeValues: {
-                ':msg': [inquiryMessage], ':empty_list': [], ':now': now
-            }
-        })));
-
-        // 3.3. ショップオーナー向け Unified Chat 通知 (即クローズ)
+        // 3.2. ショップオーナー向け Unified Chat 通知 (即クローズ)
         const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://meishigawarini.com';
         const shopName = shopRes.Item.name || 'Shop';
         const shopAdminUrl = `${baseUrl}/shop/${shopId}`;

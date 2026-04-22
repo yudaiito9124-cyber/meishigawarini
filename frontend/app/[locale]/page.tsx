@@ -424,12 +424,11 @@ export default function HomePage() {
    */
   const handleAuthRedirect = async () => {
     try {
+      // aws-amplify の signInWithRedirect は options.lang を直接サポートしている。
+      // queryParams は型定義に存在しないため使用不可。lang プロパティを直接渡す。
       await signInWithRedirect({
         options: {
-          queryParams: {
-            lang: locale as string,
-            ui_locales: locale as string
-          }
+          lang: locale as string,
         }
       });
     } catch (err) {
