@@ -1,4 +1,4 @@
-# [名刺がわりに] プロジェクト構成リファレンス (Project Structure Reference)
+# [名刺代わりに] プロジェクト構成リファレンス (Project Structure Reference)
 
 本プロジェクトのディレクトリ構成と、それぞれの役割についての解説です。開発時のファイルの配置場所や、目的のファイルを探す際の参考にしてください。
 
@@ -17,6 +17,7 @@
 | `README.md` | プロジェクトの概要とクイックスタートガイド。 |
 | `TODO.md` | 現在進行中のタスクや将来の改善予定リスト。 |
 | `amplify.yml` | AWS Amplify ホスティングのビルド設定ファイル。 |
+| `icon/` | アプリケーション用アイコン素材。 |
 
 ---
 
@@ -61,6 +62,7 @@ AWS CDK (v2) を使用したサーバーレスアーキテクチャの定義で�
 | `lib/` | AWS リソース（API GW, DynamoDB, S3, Cognito 等）の定義。 |
 | `lambda/` | バックエンドの実際のロジック（TypeScript）。 |
 | 　├ `authorizer/` | API Gateway の認可ロジック。 |
+| 　├ `receive_inquiry.ts` | 受取人からのお問い合わせハンドラー。 |
 | 　└ `utils/` | Lambda 間共通のユーティリティ。 |
 | `scripts/` | デプロイやデータ操作用の補助スクリプト。 |
 | `cdk.json` | CDK の構成設定（コンテキスト、機能フラグ等）。 |
@@ -74,6 +76,7 @@ AWS CDK (v2) を使用したサーバーレスアーキテクチャの定義で�
 | ファイル | 役割 |
 | :--- | :--- |
 | `api-types.ts` | API のリクエスト/レスポンス、DB モデルの型定義。 |
+| `unified-chat-workflows.ts` | 汎用チャットのワークフロー・ペイロード定義（SSOT）。 |
 | `constants.ts` | CORS 設定や環境固有の値などの共通定数。 |
 
 ---

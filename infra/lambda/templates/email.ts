@@ -25,6 +25,8 @@ import * as jaAddressConfirmation from './locales/ja/ADDRESS_REGISTRATION_CONFIR
 import * as enAddressConfirmation from './locales/en/ADDRESS_REGISTRATION_CONFIRMATION';
 import * as jaAddressNotification from './locales/ja/ADDRESS_REGISTRATION_NOTIFICATION';
 import * as enAddressNotification from './locales/en/ADDRESS_REGISTRATION_NOTIFICATION';
+import * as jaInquiryNotification from './locales/ja/INQUIRY_NOTIFICATION';
+import * as enInquiryNotification from './locales/en/INQUIRY_NOTIFICATION';
 
 /** システムで利用可能な通知メールのタイプ */
 export type EmailType =
@@ -32,7 +34,8 @@ export type EmailType =
     | 'SYSTEM_NOTIFICATION'
     | 'SHIPPING_NOTIFICATION'
     | 'ADDRESS_REGISTRATION_CONFIRMATION'
-    | 'ADDRESS_REGISTRATION_NOTIFICATION';
+    | 'ADDRESS_REGISTRATION_NOTIFICATION'
+    | 'INQUIRY_NOTIFICATION';
 
 /** 言語別の件名マッピング */
 const subjects: Record<string, any> = {
@@ -47,14 +50,16 @@ const bodies: Record<string, Record<string, string>> = {
         SYSTEM_NOTIFICATION: jaSystemNotification.body,
         SHIPPING_NOTIFICATION: jaShippingNotification.body,
         ADDRESS_REGISTRATION_CONFIRMATION: jaAddressConfirmation.body,
-        ADDRESS_REGISTRATION_NOTIFICATION: jaAddressNotification.body
+        ADDRESS_REGISTRATION_NOTIFICATION: jaAddressNotification.body,
+        INQUIRY_NOTIFICATION: jaInquiryNotification.body
     },
     en: {
         MESSAGE_NOTIFICATION: enMessageNotification.body,
         SYSTEM_NOTIFICATION: enSystemNotification.body,
         SHIPPING_NOTIFICATION: enShippingNotification.body,
         ADDRESS_REGISTRATION_CONFIRMATION: enAddressConfirmation.body,
-        ADDRESS_REGISTRATION_NOTIFICATION: enAddressNotification.body
+        ADDRESS_REGISTRATION_NOTIFICATION: enAddressNotification.body,
+        INQUIRY_NOTIFICATION: enInquiryNotification.body
     }
 };
 
@@ -80,6 +85,8 @@ interface SendLocalizedEmailParams {
     params: Record<string, string>;
     /** 言語設定 (デフォルト 'ja') */
     lang?: 'ja' | 'en';
+    /** 返信用メールアドレス（オプション） */
+    reply_to?: string;
 }
 
 /**
@@ -88,7 +95,7 @@ interface SendLocalizedEmailParams {
  * @param options - 送信先、タイプ、言語、各種パラメータ。
  */
 export async function sendLocalizedEmail(options: SendLocalizedEmailParams) {
-    const { type, to, params, lang = 'ja' } = options;
+    const { type, to, params, lang = 'ja', reply_to } = options;
     // リンク生成に使用するベース URL (環境変数から取得)
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://meishigawarini.com';
 
@@ -108,6 +115,7 @@ export async function sendLocalizedEmail(options: SendLocalizedEmailParams) {
     return await sendEmail({
         to,
         subject,
-        text: bodyText
+        text: bodyText,
+        reply_to
     });
 }

@@ -44,23 +44,55 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         // 1. データの抽出（一覧取得 or 検索）
         // --------------------------------------------------------------------
         if (status === 'SEARCH' && keyword) {
-            let searchId = keyword;
-            if (searchId.toLowerCase().startsWith('qr#')) searchId = 'QR#' + searchId.substring(3);
-            else if (!searchId.startsWith('QR#')) searchId = `QR#${searchId}`;
+            // --------------------------------------------------------------------
+            // 1. キーワードの正規化 (Normalization)
+            // 先頭の 'QR#' プレフィックスを除去してクリーンな ID 部分のみを抽出します。
+            // --------------------------------------------------------------------
+            let cleanId = keyword.trim();
+            if (cleanId.toLowerCase().startsWith('qr#')) {
+                cleanId = cleanId.substring(3);
+            }
 
-            // A. 完全一致検索（高速パス）
-            const exactRes = await ddb.send(new GetCommand({ TableName: TABLE_NAME, Key: { PK: searchId, SK: 'METADATA' } }));
+            // 完全一致検索用の Partition Key を構築 ('QR#' を再付与)
+            const targetPK = `QR#${cleanId}`;
+
+            // --------------------------------------------------------------------
+            // 2. 完全一致検索（高速パス: GetItem）
+            // 大文字小文字の差異を考慮し、まずは入力通り、次に小文字化した ID で試行します。
+            // --------------------------------------------------------------------
+            let exactRes = await ddb.send(new GetCommand({ 
+                TableName: TABLE_NAME, 
+                Key: { PK: targetPK, SK: 'METADATA' } 
+            }));
+
+            // 指定されたケースで見つからない場合、小文字でも試行（IDがUUID/Timestampベースである標準仕様に合わせる）
+            if (!exactRes.Item && targetPK !== targetPK.toLowerCase()) {
+                exactRes = await ddb.send(new GetCommand({ 
+                    TableName: TABLE_NAME, 
+                    Key: { PK: targetPK.toLowerCase(), SK: 'METADATA' } 
+                }));
+            }
 
             if (exactRes.Item) {
                 result = { Items: [exactRes.Item] };
             } else {
-                // B. 部分一致/PIN 検索（Scan パス）
-                const scanKeyword = keyword.toLowerCase().replace(/^qr#/, '');
+                // --------------------------------------------------------------------
+                // 3. 部分一致検索（スキャンパス: Scan）
+                // カード印字用の 16 文字指定などに対応するため、PK の部分一致検索を行います。
+                // 【重要】従来設定されていた Limit: 100 を削除し、全件スキャンを可能にすることで
+                // データ量が多い環境でも確実に検索結果がヒットするように修正しました。
+                // --------------------------------------------------------------------
+                const scanKeyword = cleanId.toLowerCase();
                 const scanParams: any = {
                     TableName: TABLE_NAME,
-                    FilterExpression: '(contains(PK, :kw) OR contains(pin, :kw)) AND begins_with(PK, :prefix) AND SK = :sk',
-                    ExpressionAttributeValues: { ':kw': scanKeyword, ':prefix': 'QR#', ':sk': 'METADATA' },
-                    Limit: Math.min(limit * 2, 100)
+                    // PK にキーワードが含まれ、かつ QR コードのメタデータであるものを抽出（PIN 検索は要件に基づき除外）
+                    FilterExpression: 'contains(PK, :kw) AND begins_with(PK, :prefix) AND SK = :sk',
+                    ExpressionAttributeValues: { 
+                        ':kw': scanKeyword, 
+                        ':prefix': 'QR#', 
+                        ':sk': 'METADATA' 
+                    }
+                    // Limit は指定せず、Lambda タイムアウトの許す限りスキャンを継続します。
                 };
                 result = await ddb.send(new ScanCommand(scanParams));
             }

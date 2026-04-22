@@ -105,6 +105,7 @@ export type ShopOpeningDraftSavedPayload = {
         shop_name?: string;
         owner_name?: string;
         contact_email?: string;
+        representative_phone?: string;
         notes?: string;
     };
 };
@@ -114,6 +115,7 @@ export type ShopOpeningSubmittedPayload = {
         shop_name: string;
         owner_name: string;
         contact_email: string;
+        representative_phone: string;
         notes?: string;
     };
     submitted_at: string;
@@ -128,6 +130,15 @@ export type ShopOpeningAdminDecisionPayload = {
     default_design_id?: string;
 };
 
+export type InquirySubmittedPayload = {
+    qr_id: string;
+    reply_email: string;
+    phone?: string;
+    content: string;
+    shopId?: string;
+    shopName?: string;
+};
+
 function isShopOpeningDraftSavedPayload(value: unknown): value is ShopOpeningDraftSavedPayload {
     if (!isRecord(value) || !isRecord(value.form_snapshot)) {
         return false;
@@ -138,7 +149,7 @@ function isShopOpeningDraftSavedPayload(value: unknown): value is ShopOpeningDra
     }
 
     const snapshot = value.form_snapshot;
-    if (!hasOnlyKeys(snapshot, ['shop_name', 'owner_name', 'contact_email', 'notes'])) {
+    if (!hasOnlyKeys(snapshot, ['shop_name', 'owner_name', 'contact_email', 'representative_phone', 'notes'])) {
         return false;
     }
 
@@ -146,6 +157,7 @@ function isShopOpeningDraftSavedPayload(value: unknown): value is ShopOpeningDra
         isOptionalString(snapshot.shop_name) &&
         isOptionalString(snapshot.owner_name) &&
         isOptionalString(snapshot.contact_email) &&
+        isOptionalString(snapshot.representative_phone) &&
         isOptionalString(snapshot.notes)
     );
 }
@@ -160,7 +172,7 @@ function isShopOpeningSubmittedPayload(value: unknown): value is ShopOpeningSubm
     }
 
     const snapshot = value.form_snapshot;
-    if (!hasOnlyKeys(snapshot, ['shop_name', 'owner_name', 'contact_email', 'notes'])) {
+    if (!hasOnlyKeys(snapshot, ['shop_name', 'owner_name', 'contact_email', 'representative_phone', 'notes'])) {
         return false;
     }
 
@@ -168,6 +180,7 @@ function isShopOpeningSubmittedPayload(value: unknown): value is ShopOpeningSubm
         isString(snapshot.shop_name) &&
         isString(snapshot.owner_name) &&
         isString(snapshot.contact_email) &&
+        isString(snapshot.representative_phone) &&
         isOptionalString(snapshot.notes) &&
         isString(value.submitted_at)
     );
@@ -189,6 +202,25 @@ function isShopOpeningAdminDecisionPayload(value: unknown): value is ShopOpening
         isString(value.reviewed_at) &&
         isOptionalString(value.linked_shop_id) &&
         isOptionalString(value.default_design_id)
+    );
+}
+
+function isInquirySubmittedPayload(value: unknown): value is InquirySubmittedPayload {
+    if (!isRecord(value)) {
+        return false;
+    }
+
+    if (!hasOnlyKeys(value, ['qr_id', 'reply_email', 'phone', 'content', 'shopId', 'shopName'])) {
+        return false;
+    }
+
+    return (
+        isString(value.qr_id) &&
+        isString(value.reply_email) &&
+        isOptionalString(value.phone) &&
+        isString(value.content) &&
+        isOptionalString(value.shopId) &&
+        isOptionalString(value.shopName)
     );
 }
 
@@ -321,8 +353,19 @@ export const WORKFLOW_REGISTRY = defineWorkflowRegistry({
     SHOP_SUPPORT: {
         chatType: 'SHOP_SUPPORT',
         initialStatus: 'OPEN',
-        statuses: ['OPEN', 'RESOLVED', 'CANCELLED'],
+        statuses: ['OPEN', 'RESOLVED', 'CANCELLED', 'NOTIFICATION'],
         events: {}
+    },
+    GIFT_RECEIVER_SUPPORT: {
+        chatType: 'GIFT_RECEIVER_SUPPORT',
+        initialStatus: 'OPEN',
+        statuses: ['OPEN', 'RESOLVED', 'CANCELLED', 'NOTIFICATION'],
+        events: {
+            INQUIRY_SUBMITTED: {
+                validate: isInquirySubmittedPayload,
+                nextStatuses: ['OPEN', 'RESOLVED', 'NOTIFICATION']
+            }
+        }
     },
     SHOP_DESIGN: {
         chatType: 'SHOP_DESIGN',
@@ -333,7 +376,7 @@ export const WORKFLOW_REGISTRY = defineWorkflowRegistry({
     MISC: {
         chatType: 'MISC',
         initialStatus: 'OPEN',
-        statuses: ['OPEN', 'RESOLVED', 'CANCELLED'],
+        statuses: ['OPEN', 'RESOLVED', 'CANCELLED', 'NOTIFICATION'],
         events: {}
     },
     CARD_DESIGN: {

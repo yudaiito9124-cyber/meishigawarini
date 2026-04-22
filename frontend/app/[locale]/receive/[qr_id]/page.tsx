@@ -47,7 +47,7 @@ import { fetchAuthSession, getCurrentUser } from "aws-amplify/auth";
 import { userApi } from "@/lib/api/user";
 import { ShareDialog } from "@/components/ShareDialog";
 import { useBackendError } from "@/hooks/useBackendError";
-import { isValidPhone, isValidZip, sanitizePhoneForInput, sanitizeZipForInput } from "@/lib/validation/contact";
+import { isValidPhone, isValidZip, isValidEmail, sanitizePhoneForInput, sanitizeZipForInput } from "@/lib/validation/contact";
 
 
 const NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || "";
@@ -261,12 +261,30 @@ export default function ReceivePage() {
     /** コピー完了表示用 ID */
     const [copiedId, setCopiedId] = useState<string | null>(null);
 
+    // --- お問い合わせ関連の状態 ---
+    /** お問い合わせ：返信用メールアドレス */
+    const [inquiryEmail, setInquiryEmail] = useState("");
+    /** お問い合わせ：返信用メールアドレス（確認） */
+    const [inquiryEmailConfirm, setInquiryEmailConfirm] = useState("");
+    /** お問い合わせ：電話番号 */
+    const [inquiryPhone, setInquiryPhone] = useState("");
+    /** お問い合わせ：内容 */
+    const [inquiryContent, setInquiryContent] = useState("");
+    /** お問い合わせ送信中フラグ */
+    const [inquiryLoading, setInquiryLoading] = useState(false);
+    /** お問い合わせ送信完了フラグ */
+    const [inquirySuccess, setInquirySuccess] = useState(false);
+
     /**
      * 送り主プロフィールフォームの更新処理
      * ユーザーIDによるインポート処理のトリガーも兼ねています。
      */
     const updateSenderForm = (field: string, value: string) => {
-        setSenderForm(prev => ({ ...prev, [field]: value }));
+        let finalValue = value;
+        if (field === 'phone' || field === 'phone_direct') {
+            finalValue = sanitizePhoneForInput(value, (senderForm as any)[field] || "");
+        }
+        setSenderForm(prev => ({ ...prev, [field]: finalValue }));
         if (field === 'import_id' && value.trim().startsWith('USER#') && value.includes(', SENDER')) {
             handleImportFromId(value.trim());
         }
@@ -520,6 +538,11 @@ export default function ReceivePage() {
             alert(t('errors.passwordMismatch'));
             return;
         }
+        if (email && !isValidEmail(email)) {
+            alert(t('errors.invalidEmail'));
+            return;
+        }
+
         if (email !== email2) {
             alert(t('formStep.email-mismatch-error'));
             return;
@@ -647,9 +670,10 @@ export default function ReceivePage() {
                 setShowRoleSelection(false);
             } else {
                 setSenderInfo(null);
-                // 送り主データが一切ない場合にのみ役割選択を表示
+                // 送り主データが一切ない場合でも、とりあえず受け取り主とする (一旦役割選択は非表示)
                 if (authUser) {
-                    setShowRoleSelection(true);
+                    setUserRole('receiver');
+                    setShowRoleSelection(false);
                 }
             }
 
@@ -811,6 +835,20 @@ export default function ReceivePage() {
      * @param fields 明示的に更新したいフィールド（省略時はフォームの現在値を使用）
      */
     const handleSenderInfoUpdate = async (fields?: any) => {
+        const formToValidate = fields || senderForm;
+        if (formToValidate.email && !isValidEmail(formToValidate.email)) {
+            alert(t('errors.invalidEmail'));
+            return;
+        }
+        if (formToValidate.phone && !isValidPhone(formToValidate.phone)) {
+            alert(t('errors.invalidPhone'));
+            return;
+        }
+        if (formToValidate.phone_direct && !isValidPhone(formToValidate.phone_direct)) {
+            alert(t('errors.invalidPhone'));
+            return;
+        }
+
         setSenderInfoLoading(true);
         try {
             if (fields && "import_id" in fields) {
@@ -989,9 +1027,7 @@ export default function ReceivePage() {
     const handleSubscribe = async () => {
         if (!notificationEmail) return;
 
-        // Email Validation
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRegex.test(notificationEmail)) {
+        if (!isValidEmail(notificationEmail)) {
             alert(t('errors.invalidEmailFormat'));
             return;
         }
@@ -1011,8 +1047,55 @@ export default function ReceivePage() {
         }
     };
 
+    /**
+     * お問い合わせフォームの送信
+     */
+    const handleInquirySubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!inquiryEmail || !inquiryContent || !inquiryPhone) {
+            alert(t('errors.requiredField'));
+            return;
+        }
+
+        if (!isValidEmail(inquiryEmail)) {
+            alert(t('errors.invalidEmailFormat'));
+            return;
+        }
+
+        if (inquiryEmail !== inquiryEmailConfirm) {
+            alert(t('errors.emailMismatch'));
+            return;
+        }
+
+        if (inquiryPhone && !isValidPhone(inquiryPhone)) {
+            alert(t('errors.invalidPhone'));
+            return;
+        }
+
+        setInquiryLoading(true);
+        try {
+            await receiveApi.receive_inquiry(qr_id, pin, {
+                reply_email: inquiryEmail,
+                phone: inquiryPhone,
+                content: inquiryContent
+            });
+            setInquirySuccess(true);
+            setInquiryContent("");
+            setInquiryPhone("");
+        } catch (error) {
+            console.error('Inquiry submission failed:', error);
+            alert(t('contactInfo.error'));
+        } finally {
+            setInquiryLoading(false);
+        }
+    };
+
     const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         setPhone((prev) => sanitizePhoneForInput(e.target.value, prev));
+    };
+
+    const handleInquiryPhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        setInquiryPhone((prev) => sanitizePhoneForInput(e.target.value, prev));
     };
 
     const handleZipCodeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1809,7 +1892,7 @@ export default function ReceivePage() {
                                                 </DialogDescription>
                                             </DialogHeader>
                                             <div className="space-y-4 py-4">
-                                                <div className="space-y-2">
+                                                {/* <div className="space-y-2">
                                                     <Label className="text-xs text-gray-500">{t('contactInfo.orderId')}</Label>
                                                     <div className="p-3 bg-gray-50 rounded-md border border-gray-200 font-mono text-sm select-all text-center">
                                                         {qr_id}
@@ -1832,7 +1915,72 @@ export default function ReceivePage() {
                                                             </a>
                                                         </div>
                                                     </div>
-                                                )}
+                                                )} */}
+
+                                                <div className="pt-4 border-t border-gray-100">
+                                                    {inquirySuccess ? (
+                                                        <div className="p-4 bg-green-50 text-green-700 rounded-lg text-center text-sm font-medium animate-in fade-in zoom-in duration-300">
+                                                            {t('contactInfo.success')}
+                                                        </div>
+                                                    ) : (
+                                                        <form onSubmit={handleInquirySubmit} className="space-y-4">
+                                                            <div className="space-y-2">
+                                                                <Label className="text-xs text-gray-500">{t('contactInfo.replyEmail')}</Label>
+                                                                <Input
+                                                                    type="email"
+                                                                    required
+                                                                    value={inquiryEmail}
+                                                                    onChange={(e) => setInquiryEmail(e.target.value)}
+                                                                    placeholder="your@email.address"
+                                                                    className="text-sm"
+                                                                />
+                                                            </div>
+                                                            <div className="space-y-2">
+                                                                <Label className="text-xs text-gray-500">{t('contactInfo.replyEmailConfirm')}</Label>
+                                                                <Input
+                                                                    type="email"
+                                                                    required
+                                                                    value={inquiryEmailConfirm}
+                                                                    onChange={(e) => setInquiryEmailConfirm(e.target.value)}
+                                                                    placeholder="your@email.address"
+                                                                    className="text-sm"
+                                                                />
+                                                            </div>
+                                                            <div className="space-y-2">
+                                                                <Label className="text-xs text-gray-500">{t('contactInfo.phone')}</Label>
+                                                                <Input
+                                                                    type="tel"
+                                                                    value={inquiryPhone}
+                                                                    onChange={handleInquiryPhoneChange}
+                                                                    placeholder={t('contactInfo.phonePlaceholder')}
+                                                                    className="text-sm"
+                                                                />
+                                                            </div>
+                                                            <div className="space-y-2">
+                                                                <Label className="text-xs text-gray-500">{t('contactInfo.content')}</Label>
+                                                                <Textarea
+                                                                    required
+                                                                    value={inquiryContent}
+                                                                    onChange={(e) => setInquiryContent(e.target.value)}
+                                                                    placeholder={t('contactInfo.placeholder')}
+                                                                    className="text-sm min-h-[100px]"
+                                                                />
+                                                            </div>
+                                                            <Button
+                                                                type="submit"
+                                                                className="w-full"
+                                                                disabled={inquiryLoading}
+                                                            >
+                                                                {inquiryLoading ? (
+                                                                    <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                                                                ) : (
+                                                                    <SendHorizontal className="w-4 h-4 mr-2" />
+                                                                )}
+                                                                {inquiryLoading ? t('contactInfo.sending') : t('contactInfo.send')}
+                                                            </Button>
+                                                        </form>
+                                                    )}
+                                                </div>
                                             </div>
                                         </DialogContent>
                                     </Dialog>
@@ -1849,7 +1997,7 @@ export default function ReceivePage() {
             {/* ========== 送り主プロフィールセクション (デジタル名刺) ========== */}
             {
                 // 送り主情報を追加するボタン
-                (step === "FORM" && !isLoggedIn && !isEditingSender && EmptySenderInfo(senderInfo) && gift?.status === 'ACTIVE') && (
+                (false && step === "FORM" && !isLoggedIn && !isEditingSender && EmptySenderInfo(senderInfo) && gift?.status === 'ACTIVE') && (
                     <div>
                         <Card className="w-full max-w-xl mt-20 flex flex-col items-center justify-center cursor-pointer p-6 border-3 border-dashed border-black-100 rounded-xl bg-gray-50/50 hover:bg-blue-200/50  hover:border-blue-200 transition-colors"
                             onClick={() => {
@@ -2357,7 +2505,7 @@ export default function ReceivePage() {
 
             {/* ========== チャットセクション (ステータスに応じたコミュニケーション) ========== */}
             {
-                step !== "PIN" && (
+                step !== "PIN" && (isEditingSender || !EmptySenderInfo(senderInfo)) && (
                     <Card className={cn("w-full max-w-xl mt-20 flex flex-col", step !== "COMPLETED" && "max-h-[calc(100vh-12rem)] min-h-[800px] overflow-hidden")}>
 
                         <CardHeader className=" items-center">

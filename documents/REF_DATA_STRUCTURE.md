@@ -66,6 +66,10 @@ classDiagram
         +String name (ショップ名)
         +String owner_id (オーナーID)
         +Array card_designs (許可デザイン)
+        +String shop_postal_code
+        +String shop_address
+        +String shop_phone
+        +String shop_recipient_name
     }
 
     class Product_Catalog["商品カタログ (Product)"] {
@@ -210,6 +214,16 @@ classDiagram
     User_Identity "1" -- "*" Chat_Membership : 個人として参加 (USER#)
     Shop_Metadata "1" -- "*" Chat_Membership : ショップとして参加 (SHOP#)
 ```
+
+> [!TIP]
+> **Workflow Payloads (構造化データ)**
+>
+> チャット種別が `SHOP_OPENING` や `CARD_DESIGN`, `GIFT_RECEIVER_SUPPORT` の場合、`Chat_Message` の `payload` 属性には、業務固有の構造化データが格納されます。
+>
+> - **SHOP_OPENING**: ショップ開設申請フォームの内容（`shop_name`, `representative_phone` 等）。
+> - **GIFT_RECEIVER_SUPPORT**: 受取人からのお問い合わせ内容（`reply_email`, `phone`, `content` 等）。
+>
+> これらのペイロードの型定義とバリデーションロジックは、[`shared/unified-chat-workflows.ts`](../shared/unified-chat-workflows.ts) に集約されています。
 ---
 
 ## 5. Overall ER Diagram (全体的な実体関連図)

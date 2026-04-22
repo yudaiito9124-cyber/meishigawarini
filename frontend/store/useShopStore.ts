@@ -43,7 +43,7 @@ const initialListState = {
     searchQrId: '',                 // QR ID 検索文字列
     isColumnSettingsOpen: false,    // カラム表示設定ダイアログの開閉
     orderSortConfig: null as { key: string, direction: 'asc' | 'desc' } | null, // ソート設定
-    visibleOrderColumns: ['id', 'status', 'ts_updated_at', 'ts_created_at', 'product_id'], // 表示カラム
+    visibleOrderColumns: ['ts_updated_at', 'product_id', 'status', 'memo_for_shop'], // 表示カラム
     shippingOrderId: null as string | null, // 配送処理中の注文ID
     copiedId: null as string | null, // クリップボードにコピーされた最新のID
     subRefreshing: false,           // 一覧の再取得中フラグ

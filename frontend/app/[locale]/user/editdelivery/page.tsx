@@ -23,6 +23,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Loader2, Save, ChevronDown, Truck } from 'lucide-react';
 import { userApi } from '@/lib/api/user';
+import { sanitizePhoneForInput, sanitizeZipForInput, isValidZip, isValidPhone, isValidEmail } from '@/lib/validation/contact';
 
 /**
  * 配送先設定ページコンポーネント
@@ -123,17 +124,19 @@ export default function DeliverySettingsPage() {
             return;
         }
 
-        // 郵便番号と電話番号のカスタムバリデーション（桁数チェック）
-        const zipDigits = zip_code.replace(/\D/g, '').length;
-        const phoneDigits = phone.replace(/\D/g, '').length;
-
-        if (zipDigits !== 7) {
+        if (!isValidZip(zip_code)) {
             alert(te('invalidZip'));
             return;
         }
 
-        if (phoneDigits < 10 || phoneDigits > 11) {
+        if (!isValidPhone(phone)) {
             alert(te('invalidPhone'));
+            return;
+        }
+
+        // メールアドレス形式チェック
+        if (email && !isValidEmail(email)) {
+            alert(te('invalidEmail'));
             return;
         }
 
@@ -168,12 +171,7 @@ export default function DeliverySettingsPage() {
      * 全角の半角変換、数字とハイフン以外の除去、桁数制限を行います。
      */
     const handleZipCodeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        let rawValue = e.target.value;
-        let converted = rawValue.replace(/[０-９]/g, (s) => String.fromCharCode(s.charCodeAt(0) - 0xFEE0)).replace(/[ー‐―－]/g, "-");
-        let filtered = converted.replace(/[^0-9-]/g, "");
-        const digitsOnly = filtered.replace(/-/g, "");
-        if (digitsOnly.length > 7) return;
-        setZipCode(filtered);
+        setZipCode(sanitizeZipForInput(e.target.value, zip_code));
     };
 
     /**
@@ -181,12 +179,7 @@ export default function DeliverySettingsPage() {
      * 全角の半角変換、数字とハイフン以外の除去、桁数制限を行います。
      */
     const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        let rawValue = e.target.value;
-        let converted = rawValue.replace(/[０-９]/g, (s) => String.fromCharCode(s.charCodeAt(0) - 0xFEE0)).replace(/[ー‐―－]/g, "-");
-        let filtered = converted.replace(/[^0-9-]/g, "");
-        const digitsOnly = filtered.replace(/-/g, "");
-        if (digitsOnly.length > 11) return;
-        setPhone(filtered);
+        setPhone(sanitizePhoneForInput(e.target.value, phone));
     };
 
     if (loading) {

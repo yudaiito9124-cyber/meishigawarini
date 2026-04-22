@@ -6,7 +6,9 @@
     "all": "All",
     "cancel": "Cancel",
     "unitCard": "cards",
-    "loading": "Loading..."
+    "loading": "Loading...",
+    "language": "Language",
+    "email": "Email Address"
   },
   "Site": {
     "name": "Meishigawarini"
@@ -50,15 +52,16 @@
   },
   "HomePage": {
     "title": "Welcome to meishigawarini",
-    "shopAdmin": "Shop Admin",
+    "shopAdmin": "Login / Sign Up",
+    "signUp": "Sign Up",
     "heroTitle": "Instead of a business card,",
     "heroSubtitle": "give a heart.",
     "description": "\"Meishigawarini\" is a digital gift service that adds a small gift to your encounter. You can specify the recipient of the gift from the QR code."
   },
   "UserProfilePage": {
     "title": "My Page",
-    "editProfile": "Edit Profile Information",
-    "editProfileDesc": "Edit the profile information you share instead of a business card.",
+    "editProfile": "Your Profile",
+    "editProfileDesc": "Edit the profile information that gift recipients will see.",
     "sendList": "Sent Gifts",
     "sendListDesc": "View the gifts you have sent or exchanged.",
     "receiveList": "Received Gifts",
@@ -125,6 +128,7 @@
         "designReady": "Design Finalized",
         "referenceUrls": "Reference URLs",
         "contactEmail": "Contact Email",
+        "representativePhone": "Representative Phone",
         "notes": "Notes",
         "submittedAt": "Submitted At",
         "yes": "Yes",
@@ -143,6 +147,7 @@
         "shopOpening": "Shop Opening Request",
         "userSupport": "General Inquiry",
         "shopSupport": "Shop Operations Support",
+        "giftReceiverSupport": "Inquiry from Gift Recipient",
         "shopDesign": "Shop Design Consultation",
         "cardDesign": "Card Design Request",
         "misc": "Other"
@@ -160,7 +165,8 @@
         "pending": "Pending",
         "verified": "Verified",
         "expired": "Expired",
-        "failed": "Failed"
+        "failed": "Failed",
+        "notification": "Notification"
       },
       "createGeneral": "Chat with Operations",
       "createShopOpening": "Shop Opening Request",
@@ -194,6 +200,8 @@
       "contactEmailLabel": "Contact Email",
       "contactEmailPlaceholder": "e.g. info@example.com",
       "contactEmailFixed": "Contact email is fixed to the logged-in user's email address.",
+      "representativePhoneLabel": "Representative Phone Number (Required)",
+      "representativePhonePlaceholder": "e.g. 03-XXXX-XXXX",
       "notesLabel": "Notes",
       "notesPlaceholder": "Add any additional information if needed.",
       "submit": "Submit",
@@ -202,6 +210,8 @@
       "success": "Your application has been submitted. Please wait for review.",
       "errors": {
         "required": "Please fill in the required fields.",
+        "invalidPhone": "Invalid phone number format.",
+        "invalidEmail": "Invalid email address format.",
         "noUserId": "Failed to get user information. Please reload and try again.",
         "noUserEmail": "Failed to get the user's email address. Please reload and try again.",
         "invalidPayload": "Invalid application payload format. Please check your input and try again.",
@@ -279,7 +289,9 @@
     "helpAdminPage": "Admin Help (Initial Setup)",
     "signInWithAWS": "Sign in with AWS (Standard)",
     "forgotPassword": "Forgot your password?",
-    "userId": "User ID"
+    "userId": "User ID",
+    "checkingSession": "Checking session...",
+    "additionalStepRequired": "Additional step required: {step}"
   },
   "RegisterPage": {
     "title": "Create Account",
@@ -398,6 +410,7 @@
         "designReady": "Design Finalized",
         "referenceUrls": "Reference URLs",
         "contactEmail": "Contact Email",
+        "representativePhone": "Representative Phone",
         "notes": "Notes",
         "submittedAt": "Submitted At",
         "yes": "Yes",
@@ -416,6 +429,7 @@
         "shopOpening": "Shop Opening Request",
         "userSupport": "General Inquiry",
         "shopSupport": "Shop Operations Support",
+        "giftReceiverSupport": "Inquiry from Gift Recipient",
         "shopDesign": "Shop Design Consultation",
         "cardDesign": "Card Design Request",
         "misc": "Other"
@@ -433,7 +447,8 @@
         "pending": "Pending",
         "verified": "Verified",
         "expired": "Expired",
-        "failed": "Failed"
+        "failed": "Failed",
+        "notification": "Notification"
       },
       "createGeneral": "Chat with Operations",
       "createShopOpening": "Shop Opening Request",
@@ -467,6 +482,8 @@
       "contactEmailLabel": "Contact Email",
       "contactEmailPlaceholder": "e.g. info@example.com",
       "contactEmailFixed": "Contact email is fixed to the logged-in user's email address.",
+      "representativePhoneLabel": "Representative Phone Number (Required)",
+      "representativePhonePlaceholder": "e.g. 03-XXXX-XXXX",
       "notesLabel": "Notes",
       "notesPlaceholder": "Add any additional information if needed.",
       "submit": "Submit",
@@ -475,6 +492,8 @@
       "success": "Your application has been submitted. Please wait for review.",
       "errors": {
         "required": "Please fill in the required fields.",
+        "invalidPhone": "Invalid phone number format.",
+        "invalidEmail": "Invalid email address format.",
         "noUserId": "Failed to get user information. Please reload and try again.",
         "noUserEmail": "Failed to get the user's email address. Please reload and try again.",
         "invalidPayload": "Invalid application payload format. Please check your input and try again.",
@@ -521,11 +540,12 @@
       "link": "Linked to card",
       "product": "Product",
       "deliveryAddressTitle": "Delivery Address",
+      "deliveryRecipientName": "Recipient Name",
       "deliveryPostalCode": "Postal Code",
       "deliveryAddress": "Address",
       "deliveryPhone": "Phone Number",
       "confirmDeliveryAddress": "Deliver to this address",
-      "deliveryAddressMissing": "Delivery address is not configured. Please set postal code, address, and phone number in Shop Settings.",
+      "deliveryAddressMissing": "Delivery address is not configured. Please set recipient name, postal code, address, and phone number in Shop Settings.",
       "card front": "Card Front Design",
       "card back": "Card Back Design",
       "historyTitle": "Order History",
@@ -718,6 +738,8 @@
       "shopAddressPlaceholder": "1-1 Meishigawarini St., Akita",
       "shopPhone": "Card Delivery Phone Number",
       "shopPhonePlaceholder": "090-XXXX-XXXX",
+      "shopRecipientName": "Recipient Name for Card Delivery",
+      "shopRecipientNamePlaceholder": "John Doe",
       "detailHtml": "Shop Description (HTML)",
       "detailHtmlPlaceholder": "Enter description in HTML format...",
       "submit": "Save Shop Settings",
@@ -819,7 +841,9 @@
       "unlockFailed": "Failed to unlock",
       "invalidEmailFormat": "Invalid email format",
       "uploadFailed": "Failed to upload",
-      "receiveFailed": "Failed to receive the gift."
+      "receiveFailed": "Failed to receive the gift.",
+      "requiredField": "Please fill in the required fields.",
+      "emailMismatch": "Email addresses do not match."
     },
     "chat": {
       "title": "Chat",
@@ -852,7 +876,17 @@
       "orderId": "Order ID",
       "shopName": "Shop Name",
       "shopEmail": "Shop Contact",
-      "note": "Please include your Order ID when contacting the shop. Address changes after shipment may not be possible."
+      "note": "Please include your Order ID when contacting the shop. Address changes after shipment may not be possible.",
+      "replyEmail": "Reply-to Email",
+      "replyEmailConfirm": "Reply-to Email (Confirm)",
+      "phone": "Phone Number",
+      "phonePlaceholder": "090-XXXX-XXXX",
+      "content": "Inquiry Content",
+      "placeholder": "Enter your inquiry...",
+      "send": "Send",
+      "sending": "Sending...",
+      "success": "Inquiry sent successfully.",
+      "error": "Failed to send inquiry."
     },
     "senderInfo": {
       "title": "Sender Info",
@@ -995,6 +1029,7 @@
         "shopName": "Shop Name",
         "ownerName": "Applicant Name",
         "contactEmail": "Contact Email",
+        "representativePhone": "Representative Phone",
         "notes": "Notes",
         "approvalTitle": "Approval",
         "decisionLocked": "This request has already been processed. Approval or rejection cannot be run again.",
@@ -1100,12 +1135,14 @@
         "pending": "Pending",
         "verified": "Verified",
         "expired": "Expired",
-        "failed": "Failed"
+        "failed": "Failed",
+        "notification": "Notification"
       },
       "chatTypes": {
         "shopOpening": "Shop Opening Request",
         "userSupport": "General Inquiry",
         "shopSupport": "Shop Operations Support",
+        "giftReceiverSupport": "Inquiry from Gift Recipient",
         "shopDesign": "Shop Design Consultation",
         "cardDesign": "Card Design Request",
         "misc": "Other"
@@ -1315,6 +1352,11 @@
         "quantity": "Quantity",
         "createdAt": "Created At",
         "updatedAt": "Updated At",
+        "shippingInfo": "Shipping Information",
+        "recipientName": "Recipient Name",
+        "postalCode": "Postal Code",
+        "address": "Address",
+        "phone": "Phone Number",
         "productId": "Product ID",
         "shopUserId": "Shop User ID",
         "senderId": "Sender ID",

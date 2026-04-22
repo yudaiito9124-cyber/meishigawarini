@@ -49,3 +49,9 @@ export function isValidPhone(value: string): boolean {
     const digits = countDigits(value);
     return digits >= 10 && digits <= 11;
 }
+
+export function isValidEmail(value: string): boolean {
+    if (!value) return false;
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(value);
+}

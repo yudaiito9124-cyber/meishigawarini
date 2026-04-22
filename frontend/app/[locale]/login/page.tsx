@@ -36,7 +36,6 @@ import { HelpCircle, Crown, Store, Loader2, User, LogOut } from 'lucide-react';
  * 認証状態、MFA、およびユーザー権限（管理者判定）を管理します。
  */
 export default function LoginPage() {
-    /** 翻訳用フック */
     const t = useTranslations('LoginPage');
     const router = useRouter();
 
@@ -132,9 +131,18 @@ export default function LoginPage() {
 
     const { locale } = useParams();
 
+
     const handleHostedUILogin = async () => {
         try {
-            await signInWithRedirect();
+            await signInWithRedirect({
+                options: {
+                    queryParams: {
+                        lang: locale as string,
+                        // 念のため OIDC 標準の ui_locales も追加
+                        ui_locales: locale as string
+                    }
+                }
+            });
         } catch (err) {
             console.error('Hosted UI login error', err);
             setError(t('errors.default'));
@@ -176,7 +184,7 @@ export default function LoginPage() {
                     // MFA入力画面を表示
                     setShowMfa(true);
                 } else {
-                    setError(`Additional step required: ${nextStep.signInStep}`);
+                    setError(t('additionalStepRequired', { step: nextStep.signInStep }));
                 }
             }
         } catch (err: any) {
@@ -198,6 +206,7 @@ export default function LoginPage() {
 
     return (
         <div className={cn("flex flex-col items-center justify-center bg-gray-100 p-4 pt-16 sm:pt-4", isAdmin && "bg-mist-900")}>
+
             <div className="w-full min-h-screen">
                 {isLoggedIn && (
                     <div className={cn("w-full pt-0 flex flex-wrap gap-4", (isAdmin ? "justify-between" : "justify-end"))}>
@@ -254,7 +263,7 @@ export default function LoginPage() {
                             <CardContent>
                                 <div className="flex flex-col items-center justify-center py-12 gap-4">
                                     <Loader2 className="w-10 h-10 animate-spin text-gray-400" />
-                                    <p className="text-sm text-gray-500">Checking session...</p>
+                                    <p className="text-sm text-gray-500">{t('checkingSession')}</p>
                                 </div>
                             </CardContent>
                         </Card>

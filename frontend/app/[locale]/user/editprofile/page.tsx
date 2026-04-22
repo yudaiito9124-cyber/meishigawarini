@@ -162,7 +162,7 @@ export default function UserProfilePage() {
                 try {
                     uploadFile = await resizeImage(file);
                     finalFilename = `${generateId()}.webp`; // Force WebP extension
-                } catch (err) {}
+                } catch (err) { }
             }
 
             const { uploadUrl, publicUrl } = await userApi.user_profile_uploadurl({
@@ -208,7 +208,7 @@ export default function UserProfilePage() {
                 try {
                     uploadFile = await resizeImage(file);
                     finalFilename = `${generateId()}.webp`; // Force WebP extension
-                } catch (err) {}
+                } catch (err) { }
             }
 
             const { uploadUrl, publicUrl } = await userApi.user_profile_uploadurl({
@@ -303,48 +303,53 @@ export default function UserProfilePage() {
     return (
         <div ref={containerRef} className="min-h-screen bg-slate-50 flex flex-col items-center py-12 px-4 font-sans">
             <div className="w-full max-w-xl flex justify-start mb-6">
-                 <Button 
-                    variant="outline" 
-                    size="sm" 
+                <Button
+                    variant="outline"
+                    size="sm"
                     className="rounded-full bg-white/50 backdrop-blur-sm border-gray-200 text-gray-500 hover:text-gray-900 shadow-sm h-9 px-4"
                     onClick={() => router.push('/user')}
-                 >
+                >
                     <ChevronDown className="h-4 w-4 mr-1 rotate-90" /> {tUser('back')}
-                 </Button>
+                </Button>
             </div>
 
-            <Card className="w-full max-w-xl flex flex-col mt-2 shadow-2xl border-none rounded-[2rem] overflow-hidden bg-white/80 backdrop-blur-xl animate-in fade-in zoom-in-95 duration-500">
-                <CardHeader className="flex flex-row justify-between items-center bg-gradient-to-r from-blue-600 to-indigo-700 text-white p-8">
-                    <CardTitle className="text-2xl font-black tracking-tight text-center flex items-center justify-left gap-3 text-white">
-                        <div className="p-2 bg-white/20 rounded-xl">
-                            <User className="w-6 h-6 text-white" />
+            <Card className="w-full max-w-xl flex flex-col shadow-2xl border-none rounded-[2rem] overflow-hidden bg-white/80 backdrop-blur-xl animate-in fade-in zoom-in-95 duration-500">
+                <CardHeader className="bg-gradient-to-r from-blue-600 to-indigo-700 p-10 text-white flex flex-col gap-4">
+                    <div className="flex flex-row items-center justify-between gap-4">
+                        <div className="flex flex-row items-center gap-4">
+                            <div className="p-3 bg-white/20 rounded-2xl shadow-inner">
+                                <User className="w-8 h-8 text-white" />
+                            </div>
+                            <div>
+                                <CardTitle className="text-3xl font-black text-white tracking-tight">{tUser('editProfile')}</CardTitle>
+                                <p className="text-blue-100/80 mt-1 font-bold uppercase tracking-widest text-sm">{tUser('editProfileDesc')}</p>
+                            </div>
                         </div>
-                        {t('senderInfo.title')}
-                    </CardTitle>
-                    <div className="flex flex-row items-center gap-3">
-                        {(senderInfo && senderInfo.ts_updated_at) && (
-                            <span className="text-[10px] text-blue-100 font-bold uppercase tracking-widest hidden sm:block">
-                                {new Date(senderInfo.ts_updated_at).toLocaleDateString()} {t('senderInfo.updated')}
-                            </span>
-                        )}
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-10 w-10 text-white hover:bg-white/20 rounded-full"
-                            onClick={() => setIsEditingSender(!isEditingSender)}
-                        >
-                            {isEditingSender ? <X className="h-5 w-5" /> : <Pencil className="h-5 w-5" />}
-                        </Button>
+                        <div className="flex flex-row items-center gap-3">
+                            {(senderInfo && senderInfo.ts_updated_at) && (
+                                <span className="text-[10px] text-blue-100 font-bold uppercase tracking-widest hidden sm:block">
+                                    {new Date(senderInfo.ts_updated_at).toLocaleDateString()} {t('senderInfo.updated')}
+                                </span>
+                            )}
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-10 w-10 text-white hover:bg-white/20 rounded-full"
+                                onClick={() => setIsEditingSender(!isEditingSender)}
+                            >
+                                {isEditingSender ? <X className="h-5 w-5" /> : <Pencil className="h-5 w-5" />}
+                            </Button>
+                        </div>
                     </div>
                 </CardHeader>
                 <CardContent className="min-h-0 flex flex-col animate-in fade-in slide-in-from-bottom-2 relative group/card p-0">
-                    
+
                     {/* 編集箇所 (ReceivePageと完全一致) */}
                     {isEditingSender ? (
                         <div className="space-y-8 p-8 animate-in slide-in-from-top-4 duration-500">
-                            <div className="w-full flex items-center justify-center text-xs text-center text-gray-400 font-bold uppercase tracking-widest bg-slate-50 py-3 rounded-xl border border-slate-100">
+                            {/* <div className="w-full flex items-center justify-center text-xs text-center text-gray-400 font-bold uppercase tracking-widest bg-slate-50 py-3 rounded-xl border border-slate-100">
                                 {t('senderInfo.description')}
-                            </div>
+                            </div> */}
                             <div
                                 className="aspect-[1.6/1] w-full flex flex-col items-center justify-center gap-4 cursor-pointer p-8 border-2 border-dashed border-slate-200 rounded-3xl bg-slate-50/50 hover:bg-white hover:border-blue-400 hover:shadow-xl transition-all group/upload"
                                 onClick={() => document.getElementById('senderCardUpload')?.click()}
@@ -479,7 +484,7 @@ export default function UserProfilePage() {
                                                         {t(`senderInfo.labels.detail_html-images`)}
                                                     </span>
                                                 </div>
-                                                
+
                                                 {htmlImageUrls.length === 0 ? (
                                                     <div className="p-8 border-2 border-dashed border-slate-100 rounded-3xl text-center bg-slate-50/30">
                                                         <p className="text-[10px] text-gray-400 font-bold uppercase tracking-tighter">{t('senderInfo.labels.detail_html-noimages')}</p>
@@ -534,15 +539,15 @@ export default function UserProfilePage() {
                                                     <Plus className="w-4 h-4" />
                                                     {t(`senderInfo.labels.detail_html-addimage`)}
                                                 </Button>
-                                                
+
                                                 <div className="bg-blue-600 p-6 rounded-[2rem] text-white shadow-xl shadow-blue-200 overflow-hidden relative">
-                                                     <div className="absolute top-0 right-0 p-4 opacity-20">
-                                                         <Sparkles className="w-16 h-16" />
-                                                     </div>
-                                                     <p className="text-[10px] font-black uppercase tracking-[0.2em] mb-2 opacity-80">{t('senderInfo.usage')}</p>
-                                                     <p className="text-sm font-bold leading-relaxed relative z-10">
+                                                    <div className="absolute top-0 right-0 p-4 opacity-20">
+                                                        <Sparkles className="w-16 h-16" />
+                                                    </div>
+                                                    <p className="text-[10px] font-black uppercase tracking-[0.2em] mb-2 opacity-80">{t('senderInfo.usage')}</p>
+                                                    <p className="text-sm font-bold leading-relaxed relative z-10">
                                                         {t('senderInfo.usageDesc1')} <code className="bg-white/20 px-1.5 py-0.5 rounded font-mono text-xs">&lt;img src="..."&gt;</code> {t('senderInfo.usageDesc2')}
-                                                     </p>
+                                                    </p>
                                                 </div>
                                             </div>
                                             <input
@@ -640,20 +645,25 @@ export default function UserProfilePage() {
                                             field !== 'import_id' && field !== 'sender_id' &&
                                             field !== 'html_image_urls' && typeof value === 'string' &&
                                             !field.startsWith("SNS_") && !field.startsWith("Service_")) {
-                                                return (
-                                                    <div key={field} className={cn("flex flex-col border-b border-gray-50 pb-2 mb-2", (field === 'memo' || field === 'address') && "sm:col-span-2")}>
-                                                        <span className="text-[10px] font-bold text-gray-400 uppercase">
-                                                            {t(`senderInfo.labels.${field}`)}
-                                                        </span>
-                                                        <span className={cn("text-gray-800 break-words", (field === 'memo' || field === 'address') && "whitespace-pre-wrap text-sm")}>
-                                                            {field === 'HP' || field === 'memo' ? renderTextWithLinks(value) : value}
-                                                        </span>
-                                                    </div>
-                                                );
+                                            return (
+                                                <div key={field} className={cn("flex flex-col border-b border-gray-50 pb-2 mb-2", (field === 'memo' || field === 'address') && "sm:col-span-2")}>
+                                                    <span className="text-[10px] font-bold text-gray-400 uppercase">
+                                                        {t(`senderInfo.labels.${field}`)}
+                                                    </span>
+                                                    <span className={cn("text-gray-800 break-words", (field === 'memo' || field === 'address') && "whitespace-pre-wrap text-sm")}>
+                                                        {field === 'HP' || field === 'memo' ? renderTextWithLinks(value) : value}
+                                                    </span>
+                                                </div>
+                                            );
                                         }
                                         return null;
                                     })}
                                 </div>
+
+
+
+
+
 
                                 {/* LINK (SNS/Webサービス) */}
                                 {!EmptySenderInfoWithLinks(senderInfo) && (

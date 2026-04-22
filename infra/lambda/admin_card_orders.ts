@@ -67,8 +67,13 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                         RequestItems: {
                             [TABLE_NAME]: {
                                 Keys: shopKeys,
-                                ProjectionExpression: 'PK, #name, owner_id',
-                                ExpressionAttributeNames: { '#name': 'name' }
+                                ProjectionExpression: 'PK, #name, owner_id, shop_postal_code, #address, #phone, #recipient',
+                                ExpressionAttributeNames: { 
+                                    '#name': 'name',
+                                    '#address': 'shop_address',
+                                    '#phone': 'shop_phone',
+                                    '#recipient': 'shop_recipient_name'
+                                }
                             }
                         }
                     }));
@@ -103,6 +108,14 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                     for (const item of items) {
                         if (item.shop_id && shopMap[item.shop_id]) {
                             item.shop_name = shopMap[item.shop_id].name;
+                            const sid = item.shop_id;
+                            const shopMeta = batchRes.Responses?.[TABLE_NAME]?.find((s: any) => (s.PK as string).replace('SHOP#', '') === sid);
+                            if (shopMeta) {
+                                item.shop_postal_code = shopMeta.shop_postal_code;
+                                item.shop_address = shopMeta.shop_address;
+                                item.shop_phone = shopMeta.shop_phone;
+                                item.shop_recipient_name = shopMeta.shop_recipient_name;
+                            }
                             const ownerId = shopMap[item.shop_id].owner_id;
                             if (ownerId && emailMap[ownerId]) {
                                 item.shop_owner_email = emailMap[ownerId];
@@ -320,6 +333,10 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 }));
                 if (shopRes.Item) {
                     item.shop_name = shopRes.Item.name;
+                    item.shop_postal_code = shopRes.Item.shop_postal_code;
+                    item.shop_address = shopRes.Item.shop_address;
+                    item.shop_phone = shopRes.Item.shop_phone;
+                    item.shop_recipient_name = shopRes.Item.shop_recipient_name;
                     if (shopRes.Item.owner_id) {
                         const ownerRes = await ddb.send(new GetCommand({
                             TableName: TABLE_NAME,

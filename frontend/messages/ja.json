@@ -6,7 +6,9 @@
     "all": "すべて",
     "cancel": "キャンセル",
     "unitCard": "枚",
-    "loading": "読み込み中..."
+    "loading": "読み込み中...",
+    "language": "言語",
+    "email": "メールアドレス"
   },
   "Site": {
     "name": "名刺代わりに。"
@@ -52,7 +54,8 @@
   },
   "HomePage": {
     "title": "名刺代わりにへようこそ",
-    "shopAdmin": "ログイン",
+    "shopAdmin": "ログイン / 新規登録",
+    "signUp": "新規登録",
     "heroTitle": "名刺代わりに、",
     "heroSubtitle": "心を贈ろう。",
     "description": "”名刺代わりに。” は出会いにちょっとした贈りものを添えるデジタルギフトサービス。 ギフトの送り先はQRコードから指定できます。"
@@ -62,13 +65,13 @@
     "save": "保存する",
     "deliverySettingsSuccess": "配送先情報の既定値を保存しました。",
     "editProfile": "あなたのプロフィール",
-    "editProfileDesc": "渡すギフトに添える自分のプロフィール情報を編集します。",
+    "editProfileDesc": "ギフトを受け取った相手に表示されるあなたの情報を編集します。",
     "sendList": "贈ったギフト",
     "sendListDesc": "これまでに贈ったギフトを確認します。",
     "receiveList": "受け取ったギフト",
     "receiveListDesc": "これまでに受け取ったギフトを確認します。",
-    "sendGift": "ギフトを贈る前に",
-    "sendGiftDesc": "ギフトを渡す前に、贈り主としてあなたのプロフィール情報を登録します。",
+    "sendGift": "贈る前に",
+    "sendGiftDesc": "贈り主があなたであることをギフトに登録します。",
     "deliverySettings": "いつもの受け取り住所",
     "deliverySettingsDesc": "ギフトを受け取るときの既定の配送先情報を設定します。",
     "logout": "ログアウト",
@@ -76,7 +79,7 @@
     "userId": "ユーザーID",
     "userEmail": "メールアドレス",
     "createMyShop": "ショップを開設する",
-    "createMyShopConfirm": "本当にショップを開設しますか？これは、「名刺がわりに」で商品を販売したい場合に必要な手続きです。ギフトを渡したり、受け取ったりする場合は不要です。",
+    "createMyShopConfirm": "本当にショップを開設しますか？これは、「名刺代わりに」で商品を販売したい場合に必要な手続きです。ギフトを渡したり、受け取ったりする場合は不要です。",
     "notifications": {
       "button": "申請・チャット",
       "title": "申請・チャット一覧",
@@ -129,6 +132,7 @@
         "shopName": "ショップ名",
         "ownerName": "申請者名",
         "contactEmail": "連絡先メール",
+        "representativePhone": "店舗代表電話",
         "notes": "備考",
         "submittedAt": "申請日時",
         "rawJson": "JSONを表示"
@@ -145,6 +149,7 @@
         "shopOpening": "ショップ開設申請",
         "userSupport": "一般問い合わせ",
         "shopSupport": "ショップ運営サポート",
+        "giftReceiverSupport": "ギフト受取人からのお問い合わせ",
         "shopDesign": "ショップデザイン相談",
         "cardDesign": "カードデザイン追加申請",
         "misc": "その他"
@@ -162,7 +167,8 @@
         "pending": "保留",
         "verified": "認証済み",
         "expired": "期限切れ",
-        "failed": "失敗"
+        "failed": "失敗",
+        "notification": "通知"
       },
       "createGeneral": "運営とチャット",
       "createShopOpening": "ショップ開設申請",
@@ -196,6 +202,8 @@
       "contactEmailLabel": "連絡先メールアドレス",
       "contactEmailPlaceholder": "例: info@example.com",
       "contactEmailFixed": "連絡先メールアドレスはログイン中ユーザーのメールに固定されます。",
+      "representativePhoneLabel": "店舗の代表電話番号",
+      "representativePhonePlaceholder": "例: 03-XXXX-XXXX",
       "notesLabel": "備考",
       "notesPlaceholder": "補足事項があれば記載してください。",
       "submit": "送信する",
@@ -203,7 +211,9 @@
       "cancel": "キャンセル",
       "success": "申請を送信しました。運営側の確認をお待ちください。",
       "errors": {
-        "required": "必須項目を入力してください。",
+        "required": "全ての項目を入力してください。",
+        "invalidPhone": "電話番号の形式が正しくありません。",
+        "invalidEmail": "メールアドレスの形式が正しくありません。",
         "noUserId": "ユーザー情報の取得に失敗しました。再読み込みしてからお試しください。",
         "noUserEmail": "ユーザーのメールアドレスを取得できませんでした。再読み込みしてからお試しください。",
         "invalidPayload": "申請データ形式が不正です。入力内容を確認して再度お試しください。",
@@ -304,7 +314,9 @@
     "helpAdminPage": "管理者ヘルプ(初期設定)",
     "signInWithAWS": "AWS標準画面でログイン",
     "forgotPassword": "パスワードを忘れた方はこちら",
-    "userId": "ユーザーID"
+    "userId": "ユーザーID",
+    "checkingSession": "セッションを確認中...",
+    "additionalStepRequired": "追加の認証ステップが必要です: {step}"
   },
   "RegisterPage": {
     "title": "アカウント作成",
@@ -381,7 +393,7 @@
     },
     "notifications": {
       "button": "申請・チャット",
-      "title": "申請・申請・チャット一覧",
+      "title": "申請・チャット一覧",
       "description": "このショップに紐づくチャット状態の一覧です。行をクリックすると詳細を表示します。",
       "listTitle": "通知一覧",
       "detailTitle": "通知詳細",
@@ -432,6 +444,7 @@
         "designReady": "デザイン確定済み",
         "referenceUrls": "参考URL",
         "contactEmail": "連絡先メール",
+        "representativePhone": "店舗代表電話",
         "notes": "備考",
         "submittedAt": "申請日時",
         "yes": "はい",
@@ -450,6 +463,7 @@
         "shopOpening": "ショップ開設申請",
         "userSupport": "一般問い合わせ",
         "shopSupport": "ショップ運営サポート",
+        "giftReceiverSupport": "ギフト受取人からのお問い合わせ",
         "shopDesign": "ショップデザイン相談",
         "cardDesign": "カードデザイン追加申請",
         "misc": "その他"
@@ -467,7 +481,8 @@
         "pending": "保留",
         "verified": "認証済み",
         "expired": "期限切れ",
-        "failed": "失敗"
+        "failed": "失敗",
+        "notification": "通知"
       },
       "createGeneral": "運営とチャット",
       "createShopOpening": "ショップ開設申請",
@@ -501,6 +516,8 @@
       "contactEmailLabel": "連絡先メールアドレス",
       "contactEmailPlaceholder": "例: info@example.com",
       "contactEmailFixed": "連絡先メールアドレスはログイン中ユーザーのメールに固定されます。",
+      "representativePhoneLabel": "店舗の代表電話番号 (必須)",
+      "representativePhonePlaceholder": "例: 03-XXXX-XXXX",
       "notesLabel": "備考",
       "notesPlaceholder": "補足事項があれば記載してください。",
       "submit": "送信する",
@@ -509,6 +526,8 @@
       "success": "申請を送信しました。運営側の確認をお待ちください。",
       "errors": {
         "required": "必須項目を入力してください。",
+        "invalidPhone": "電話番号の形式が正しくありません。",
+        "invalidEmail": "メールアドレスの形式が正しくありません。",
         "noUserId": "ユーザー情報の取得に失敗しました。再読み込みしてからお試しください。",
         "noUserEmail": "ユーザーのメールアドレスを取得できませんでした。再読み込みしてからお試しください。",
         "invalidPayload": "申請データ形式が不正です。入力内容を確認して再度お試しください。",
@@ -555,11 +574,12 @@
       "link": "専用に設定",
       "product": "商品",
       "deliveryAddressTitle": "お届け先住所",
+      "deliveryRecipientName": "宛名",
       "deliveryPostalCode": "郵便番号",
       "deliveryAddress": "住所",
       "deliveryPhone": "電話番号",
       "confirmDeliveryAddress": "発注したカードは、ショップの設定画面で設定した、上記の住所に配送されることを理解しました",
-      "deliveryAddressMissing": "お届け先住所が未設定です。設定画面で郵便番号・住所・電話番号を設定してください。",
+      "deliveryAddressMissing": "お届け先住所が未設定です。設定画面(上部歯車⚙️アイコン)で宛名・郵便番号・住所・電話番号を設定してください。",
       "card front": "カード表面デザイン",
       "card back": "カード裏面デザイン",
       "historyTitle": "発注履歴",
@@ -808,7 +828,9 @@
       "shopAddress": "ショップ・カード配送先の住所",
       "shopAddressPlaceholder": "秋田県秋田市名刺代わりに町1-1",
       "shopPhone": "ショップ・カード配送先の電話番号",
-      "shopPhonePlaceholder": "090-XXXX-XXXX等(ハイフンなしでも可)",
+      "shopPhonePlaceholder": "090-0000-0000",
+      "shopRecipientName": "ショップ・カード配送先の宛名",
+      "shopRecipientNamePlaceholder": "山田 太郎",
       "detailHtml": "ショップ紹介(HTML)",
       "detailHtmlPlaceholder": "HTML(CSS)形式で入力してください(googlemap,youtube埋め込み可能です)。書き方がわからない場合は生成AI用のプロンプトファイルも用意しております。右上のボタンからダウンロードし、参考にするホームページのURLや作成したいイメージとともに生成AIに渡してください。",
       "submit": "保存",
@@ -866,13 +888,15 @@
     "formStep": {
       "title": "配送先情報",
       "name": "お名前",
-      "name-placeholder": "名刺がわりに 太郎",
+      "name-placeholder": "名刺代わりに 太郎",
       "address": "配送先住所",
       "address-placeholder": "秋田県秋田市名刺代わりに町1-1",
       "zip_code": "〒郵便番号",
       "zip_code-placeholder": "010-XXXX等(ハイフンなしでも可)",
       "phone": "電話番号",
       "phone-placeholder": "090-XXXX-XXXX等(ハイフンなしでも可)",
+      "shopRecipientName": "ショップ・カード配送先の宛名",
+      "shopRecipientNamePlaceholder": "山田 太郎",
       "email": "メールアドレス (任意)",
       "email-placeholder": "your@email.address",
       "email-confirm-placeholder": "もう一度入力してください",
@@ -921,7 +945,9 @@
       "uploadFailed": "アップロードに失敗しました",
       "receiveFailed": "ギフトの受け取り処理に失敗しました。",
       "invalidZip": "郵便番号の形式が正しくありません",
-      "invalidPhone": "電話番号の形式が正しくありません"
+      "invalidPhone": "電話番号の形式が正しくありません",
+      "requiredField": "必須項目を入力してください",
+      "emailMismatch": "メールアドレスが一致しません"
     },
     "chat": {
       "title": "メッセージチャット",
@@ -968,7 +994,17 @@
       "orderId": "注文ID",
       "shopName": "ショップ名",
       "shopEmail": "担当ショップの連絡先",
-      "note": "※ショップへ問い合わせる際には，下記「注文ID」と「ショップ名」を明記してください。発送後の住所変更など対応ができない場合があるため、あらかじめご了承ください。"
+      "note": "下記のフォームへ入力していただくと、ショップ担当者からメールまたは電話で連絡させていただきます。発送後の住所変更など対応ができない場合があるため、あらかじめご了承ください。",
+      "replyEmail": "(必須)返信用メールアドレス",
+      "replyEmailConfirm": "(必須)返信用メールアドレス (確認)",
+      "phone": "(必須)電話番号",
+      "phonePlaceholder": "090-XXXX-XXXX",
+      "content": "(必須)お問い合わせ内容",
+      "placeholder": "お問い合わせ内容を入力してください...",
+      "send": "送信",
+      "sending": "送信中...",
+      "success": "お問い合わせを送信しました。",
+      "error": "送信に失敗しました。"
     },
     "senderInfo": {
       "title": "送り主",
@@ -1117,6 +1153,7 @@
         "shopName": "ショップ名",
         "ownerName": "申請者名",
         "contactEmail": "連絡先メール",
+        "representativePhone": "代表電話番号",
         "notes": "備考",
         "approvalTitle": "承認処理",
         "decisionLocked": "この申請はすでに処理済みです。承認・却下の再実行はできません。",
@@ -1223,12 +1260,14 @@
         "pending": "保留",
         "verified": "認証済み",
         "expired": "期限切れ",
-        "failed": "失敗"
+        "failed": "失敗",
+        "notification": "通知"
       },
       "chatTypes": {
         "shopOpening": "ショップ開設申請",
         "userSupport": "一般問い合わせ",
         "shopSupport": "ショップ運営サポート",
+        "giftReceiverSupport": "ギフト受取人からのお問い合わせ",
         "shopDesign": "ショップデザイン相談",
         "cardDesign": "カードデザイン追加申請",
         "misc": "その他"
@@ -1464,6 +1503,11 @@
         "quantity": "発注枚数",
         "createdAt": "作成日時",
         "updatedAt": "更新日時",
+        "shippingInfo": "配送先情報",
+        "recipientName": "宛名",
+        "postalCode": "郵便番号",
+        "address": "住所",
+        "phone": "電話番号",
         "productId": "商品ID",
         "shopUserId": "ショップユーザーID",
         "senderId": "送り主ID",

@@ -75,13 +75,13 @@ export function ShareDialog({ qr_id, product, card, shop }: ShareDialogProps) {
      */
     const generateShareUrl = () => {
         const url = new URL(`${baseUrl}/${locale}/share/${qr_id}`);
-        const params: string[] = [];
-        if (includeProduct) params.push('product');
-        if (includeCard) params.push('card');
-        if (includeShop) params.push('shop');
+        const searchParams = new URLSearchParams();
+        if (includeProduct) searchParams.set('product', 'true');
+        if (includeCard) searchParams.set('card', 'true');
+        if (includeShop) searchParams.set('shop', 'true');
 
-        const queryString = params.length > 0 ? `?${params.join('&')}` : '';
-        return `${url.origin}${url.pathname}${queryString}`;
+        const queryString = searchParams.toString();
+        return `${url.origin}${url.pathname}${queryString ? `?${queryString}` : ''}`;
     };
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

@@ -1,6 +1,6 @@
 # データベース仕様および操作一覧
 
-本プロジェクト（名刺がわりに）では、AWS CDKを使用して構築された **Amazon DynamoDB** (テーブル名: `MeishiGawariniTableV2`) のシングルテーブルデザインが採用されています。様々な種類のデータが、`PK` (パーティションキー) と `SK` (ソートキー)、および2つのGSI (グローバルセカンダリインデックス) を活用して一つのテーブルに格納されています。
+本プロジェクト（名刺代わりに）では、AWS CDKを使用して構築された **Amazon DynamoDB** (テーブル名: `MeishiGawariniTableV2`) のシングルテーブルデザインが採用されています。様々な種類のデータが、`PK` (パーティションキー) と `SK` (ソートキー)、および2つのGSI (グローバルセカンダリインデックス) を活用して一つのテーブルに格納されています。
 
 以下に、データベース内に存在するデータの種類（エンティティ）と、各項目についての一覧表をまとめます。
 論理的な関係性については 👉 **[データ構造 (REF_DATA_STRUCTURE.md)](./REF_DATA_STRUCTURE.md)**  
@@ -134,11 +134,14 @@
 | `owner_id` | String | オーナーのCognitoユーザーID （[User](#21-user-ユーザー権限情報) の `sub` 属性） |
 | `gm_ids` | Array<String> | マネージャーのCognitoユーザーIDのリスト （[User](#21-user-ユーザー権限情報) の `sub` 属性） |
 | `card_designs` | Array<String> | ショップが利用可能な [カードデザインID](#211-card-design-metadata-カードデザイン) のリスト |
+| `shop_postal_code` | String | ショップ・カード配送先の郵便番号 |
+| `shop_address` | String | ショップ・カード配送先の住所 |
+| `shop_phone` | String | ショップ・カード配送先の電話番号 |
+| `shop_recipient_name` | String | ショップ・カード配送先の宛名 |
 | `ts_created_at` | String | 作成日時 （ISO 8601形式のUTC日時文字列、例: `2024-03-01T12:00:00.000Z`） |
 | `GSI2_PK` | String | `USER#{owner_id}` （オーナーのショップ一覧取得用、[User](#21-user-ユーザー権限情報) への逆引き用） |
 | `GSI2_SK` | String | ソートキー。**オーナーID (`GSI2_PK`) が変更された際のみ**、現在時刻 (ISO 8601) に更新されます。 |
 | `html_image_urls` | Array<String> | ショップ詳細HTML内で使用される画像のURL配列 |
-| `card_designs` | Array<String> | ショップが利用可能なカードデザインIDのリスト |
 
 ### 2.7 Product (商品情報)
 各ショップに紐づく商品カタログ情報です。
@@ -312,8 +315,8 @@ QRコードのライフサイクルや注文ステータス、商品との紐付
 | `chat_id` | String | チャットID（UUID） |
 | `participants` | Array<String> | 参加者のプレフィックス付きIDリスト (例: `USER#{user_id}`, `SHOP#{shop_id}`, `ADMIN`)。現行実装では重複除去・正規化済みの集合として扱い、順序には意味を持たせません。 |
 | `initiator_id` | String | 開始主体（順序ではなくこの属性を正本として判定） |
-| `chat_type` | String | チャット種別 (`MISC`, `USER_SUPPORT`, `SHOP_OPENING`, `SHOP_DESIGN`, `SHOP_SUPPORT`, `CARD_DESIGN`) |
-| `status` | String | チャット状態。`SHOP_OPENING` は (`OPEN`, `APPROVED`, `REJECTED`, `CANCELLED`)、`USER_SUPPORT` / `SHOP_SUPPORT` / `SHOP_DESIGN` / `MISC` / `CARD_DESIGN` は (`OPEN`, `RESOLVED`, `CANCELLED`) |
+| `chat_type` | String | チャット種別 (`MISC`, `USER_SUPPORT`, `SHOP_OPENING`, `SHOP_DESIGN`, `SHOP_SUPPORT`, `GIFT_RECEIVER_SUPPORT`, `CARD_DESIGN`)。`GIFT_RECEIVER_SUPPORT` はゲスト（受取人）からの直接お問い合わせ通知に使用されます。 |
+| `status` | String | チャット状態。`SHOP_OPENING` は (`OPEN`, `APPROVED`, `REJECTED`, `CANCELLED`)、`USER_SUPPORT` / `SHOP_SUPPORT` / `SHOP_DESIGN` / `MISC` / `CARD_DESIGN` / `GIFT_RECEIVER_SUPPORT` は (`OPEN`, `RESOLVED`, `CANCELLED`, `NOTIFICATION`) |
 | `ts_created_at` | String | 作成日時 (ISO 8601) |
 | `ts_updated_at` | String | 更新日時 (ISO 8601) |
 | `ts_last_message_at` | String | 最終メッセージ送信日時 (ソート用・ISO 8601) |
@@ -378,8 +381,8 @@ QRコードのライフサイクルや注文ステータス、商品との紐付
 | `username` | String | 表示名スナップショット |
 | `message` | String | テキスト本文 |
 | `type` | String | `TEXT`, `IMAGE`, `FILE`, `SYSTEM` |
-| `payload_type` | String | ワークフローイベント種別（例: `FORM_SUBMITTED`, `ADMIN_DECISION`, `VERIFICATION_COMPLETED`） |
-| `payload` | Map | イベントごとの構造化データ（型は `shared/unified-chat-workflows.ts` のレジストリで定義） |
+| `payload_type` | String | ワークフローイベント種別（例: `FORM_SUBMITTED`, `ADMIN_DECISION`, `VERIFICATION_COMPLETED`, `INQUIRY_SUBMITTED`） |
+| `payload` | Map | イベントごとの構造化データ（型は `shared/unified-chat-workflows.ts` のレジストリで定義）。例: `SHOP_OPENING` では `representative_phone` (代表者電話番号)、`INQUIRY_SUBMITTED` では `reply_email`, `phone`, `content` などが含まれます。 |
 | `workflow_status` | String | ワークフローステータス（例: `OPEN`, `APPROVED`, `REJECTED`, `RESOLVED`, `CANCELLED`） |
 | `file_url` | String | 添付URL（任意） |
 | `file_name` | String | 添付ファイル名（任意） |

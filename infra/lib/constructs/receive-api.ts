@@ -124,6 +124,14 @@ export class ReceiveApi extends cdk.NestedStack {
     });
 
     const receive_upload_url = new nodejs.NodejsFunction(this, 'receive_upload_url', { entry: lampath('receive_upload_url'), ...fnProps });
+    const receive_inquiry = new nodejs.NodejsFunction(this, 'receive_inquiry', {
+      entry: lampath('receive_inquiry'),
+      ...fnProps,
+      environment: {
+        ...fnProps.environment,
+        USER_POOL_ID: userPool.userPoolId,
+      }
+    });
 
     const share_get = new nodejs.NodejsFunction(this, 'share_get', {
       entry: lampath('share_get'),
@@ -131,7 +139,7 @@ export class ReceiveApi extends cdk.NestedStack {
     });
 
     // --- Permissions ---
-    const allLambdas = [receive_verify, receive_submit, receive_completed, receive_chat, receive_subscription, receive_sender, receive_upload_url, share_get];
+    const allLambdas = [receive_verify, receive_submit, receive_completed, receive_chat, receive_subscription, receive_sender, receive_upload_url, share_get, receive_inquiry];
     allLambdas.forEach(fn => {
       grantTablePermissions(fn, true);
       bucket.grantRead(fn);
@@ -188,6 +196,8 @@ export class ReceiveApi extends cdk.NestedStack {
 
     const uploadUrlRoot = addResourceWithCors(this.receiveResource, 'uploadurl');
     addResourceWithCors(uploadUrlRoot, 'get').addMethod('POST', new apigateway.LambdaIntegration(receive_upload_url), routeOptions);
+
+    addResourceWithCors(this.receiveResource, 'inquiry').addMethod('POST', new apigateway.LambdaIntegration(receive_inquiry), routeOptions);
 
     /**
      * --- Share エンドポイント (完全公開) ---

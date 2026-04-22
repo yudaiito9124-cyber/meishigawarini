@@ -51,6 +51,7 @@ type ChatMeta = {
         shop_name: string;
         owner_name: string;
         contact_email: string;
+        representative_phone: string;
         notes?: string;
     };
     GSI1_PK: string;

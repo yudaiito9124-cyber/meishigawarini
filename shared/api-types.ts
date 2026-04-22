@@ -71,6 +71,7 @@ export type ShopApiSchema = {
         shop_postal_code?: string;
         shop_address?: string;
         shop_phone?: string;
+        shop_recipient_name?: string;
     };
     shop_admins: { shop_id: string };
     shop_delete_images: { shop_id: string; keys?: string[]; urls?: string[] };
@@ -120,6 +121,7 @@ export type ReceiveApiSchema = {
     receive_sender_save: { sender_info: any; id?: string };
     receive_sender_delete_images: { urls: string[] };
     receive_uploadurl_get: { filename: string; content_type: string; file_size: number; folder?: string };
+    receive_inquiry: { reply_email: string; phone: string; content: string };
 };
 
 // ==========================================

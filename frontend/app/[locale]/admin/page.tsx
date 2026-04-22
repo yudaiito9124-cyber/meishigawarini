@@ -76,6 +76,7 @@ function isStrictShopOpeningSnapshot(value: unknown): value is {
     shop_name: string;
     owner_name: string;
     contact_email: string;
+    representative_phone: string;
     notes?: string;
 } {
     if (!value || typeof value !== 'object') {
@@ -84,7 +85,7 @@ function isStrictShopOpeningSnapshot(value: unknown): value is {
 
     const v = value as Record<string, unknown>;
     const keys = Object.keys(v);
-    const allowed = ['shop_name', 'owner_name', 'contact_email', 'notes'];
+    const allowed = ['shop_name', 'owner_name', 'contact_email', 'representative_phone', 'notes'];
     if (!keys.every((k) => allowed.includes(k))) {
         return false;
     }
@@ -93,6 +94,7 @@ function isStrictShopOpeningSnapshot(value: unknown): value is {
         typeof v.shop_name === 'string' &&
         typeof v.owner_name === 'string' &&
         typeof v.contact_email === 'string' &&
+        typeof v.representative_phone === 'string' &&
         (v.notes === undefined || typeof v.notes === 'string')
     );
 }
@@ -1115,7 +1117,7 @@ function AdminInquiryChatSection({ dbCardDesigns }: { dbCardDesigns: any[] }) {
     const [rejectReason, setRejectReason] = useState('');
     const [adminMemo, setAdminMemo] = useState('');
     const [shopOpenActionLoading, setShopOpenActionLoading] = useState(false);
-    const TERMINAL_STATUSES = useMemo(() => new Set(['APPROVED', 'REJECTED', 'CANCELLED', 'RESOLVED', 'CLOSED']), []);
+    const TERMINAL_STATUSES = useMemo(() => new Set(['APPROVED', 'REJECTED', 'CANCELLED', 'RESOLVED', 'CLOSED', 'NOTIFICATION']), []);
 
     const getChatTypeLabel = (chatType?: string): string => {
         if (!chatType) return '-';
@@ -1125,6 +1127,7 @@ function AdminInquiryChatSection({ dbCardDesigns }: { dbCardDesigns: any[] }) {
             SHOP_SUPPORT: t('inquiryChat.chatTypes.shopSupport'),
             SHOP_DESIGN: t('inquiryChat.chatTypes.shopDesign'),
             CARD_DESIGN: t('inquiryChat.chatTypes.cardDesign'),
+            GIFT_RECEIVER_SUPPORT: t('inquiryChat.chatTypes.giftReceiverSupport'),
             MISC: t('inquiryChat.chatTypes.misc'),
         };
         return labels[chatType] || chatType;
@@ -1148,6 +1151,7 @@ function AdminInquiryChatSection({ dbCardDesigns }: { dbCardDesigns: any[] }) {
             VERIFIED: t('inquiryChat.statuses.verified'),
             EXPIRED: t('inquiryChat.statuses.expired'),
             FAILED: t('inquiryChat.statuses.failed'),
+            NOTIFICATION: t('inquiryChat.statuses.notification'),
         };
         return labels[status] || status;
     };
@@ -1198,7 +1202,7 @@ function AdminInquiryChatSection({ dbCardDesigns }: { dbCardDesigns: any[] }) {
     const isTerminalStatus = (status?: string) => TERMINAL_STATUSES.has(normalizeStatus(status));
 
     const isSupportChatType = (chatType?: string) => {
-        return ['USER_SUPPORT', 'SHOP_SUPPORT', 'SHOP_DESIGN', 'CARD_DESIGN', 'MISC'].includes(String(chatType || '').toUpperCase());
+        return ['USER_SUPPORT', 'SHOP_SUPPORT', 'SHOP_DESIGN', 'CARD_DESIGN', 'GIFT_RECEIVER_SUPPORT', 'MISC'].includes(String(chatType || '').toUpperCase());
     };
 
     const getAvailableTransitions = (chat: any): string[] => {
@@ -1759,13 +1763,13 @@ function AdminInquiryChatSection({ dbCardDesigns }: { dbCardDesigns: any[] }) {
                     <Button variant="outline" size="sm" onClick={fetchNotifications} disabled={notificationLoading}>
                         {notificationLoading ? t('inquiryChat.loading') : t('inquiryChat.refresh')}
                     </Button>
-                            <Button variant="outline" size="sm" onClick={handleFetchPastChats} disabled={pastLoading}>
-                                {pastLoading
-                                    ? t('inquiryChat.loading')
-                                    : showPastChats
-                                        ? t('inquiryChat.fetchMorePast')
-                                        : t('inquiryChat.showPast')}
-                            </Button>
+                    <Button variant="outline" size="sm" onClick={handleFetchPastChats} disabled={pastLoading}>
+                        {pastLoading
+                            ? t('inquiryChat.loading')
+                            : showPastChats
+                                ? t('inquiryChat.fetchMorePast')
+                                : t('inquiryChat.showPast')}
+                    </Button>
                 </div>
             </CardHeader>
 
@@ -1910,7 +1914,7 @@ function AdminInquiryChatSection({ dbCardDesigns }: { dbCardDesigns: any[] }) {
                                                 selectedParticipantIds.map((id: string) => {
                                                     return (
                                                         <div key={id} className="text-xs text-gray-700 break-all">
-                                                                {toDisplayParticipantId(id)}
+                                                            {toDisplayParticipantId(id)}
                                                         </div>
                                                     );
                                                 })
@@ -1930,6 +1934,7 @@ function AdminInquiryChatSection({ dbCardDesigns }: { dbCardDesigns: any[] }) {
                                             <div><span className="text-gray-500">{t('inquiries.detail.shopName')}:</span> {selectedFormSnapshot?.shop_name || '-'}</div>
                                             <div><span className="text-gray-500">{t('inquiries.detail.ownerName')}:</span> {selectedFormSnapshot?.owner_name || '-'}</div>
                                             <div><span className="text-gray-500">{t('inquiries.detail.contactEmail')}:</span> {selectedFormSnapshot?.contact_email || '-'}</div>
+                                            <div><span className="text-gray-500">{t('inquiries.detail.representativePhone')}:</span> {selectedFormSnapshot?.representative_phone || '-'}</div>
                                             <div className="min-w-0">
                                                 <span className="text-gray-500">{t('inquiries.detail.notes')}:</span>
                                                 <div className="mt-1 whitespace-pre-wrap break-all">{selectedFormSnapshot?.notes || '-'}</div>
@@ -2009,7 +2014,7 @@ function AdminInquiryChatSection({ dbCardDesigns }: { dbCardDesigns: any[] }) {
 
 
                                 <div className="border-t border-gray-200"></div>
-                                <div className="text-md font-semibold mb-0 ml-2">{t('inquiryChat.chat')}</div> 
+                                <div className="text-md font-semibold mb-0 ml-2">{t('inquiryChat.chat')}</div>
 
                                 <div
                                     className="space-y-2 flex-1 min-h-0 max-h-[45vh] overflow-y-auto pr-1 overscroll-contain xl:max-h-none border rounded-md bg-gray-50 p-3"
@@ -2129,16 +2134,15 @@ function AdminInquiryChatSection({ dbCardDesigns }: { dbCardDesigns: any[] }) {
                             <CardHeader>
                                 <CardTitle>{t('inquiries.detail.requestInfo')}</CardTitle>
                             </CardHeader>
-                            <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                            <CardContent className="grid grid-cols-1 gap-3 text-sm">
                                 <div><span className="text-gray-500">{t('inquiries.detail.initiator')}:</span> {selectedChat?.initiator_id || '-'}</div>
                                 <div><span className="text-gray-500">{t('inquiries.detail.chatStatus')}:</span> {selectedChat?.status || '-'}</div>
                                 <div><span className="text-gray-500">{t('inquiries.detail.shopName')}:</span> {selectedFormSnapshot?.shop_name || '-'}</div>
                                 <div><span className="text-gray-500">{t('inquiries.detail.ownerName')}:</span> {selectedFormSnapshot?.owner_name || '-'}</div>
                                 <div className="min-w-0 break-all"><span className="text-gray-500">{t('inquiries.detail.contactEmail')}:</span> {selectedFormSnapshot?.contact_email || '-'}</div>
-                                <div className="md:col-span-2 min-w-0">
-                                    <span className="text-gray-500">{t('inquiries.detail.notes')}:</span>{' '}
-                                    <span className="whitespace-pre-wrap break-all">{selectedFormSnapshot?.notes || '-'}</span>
-                                </div>
+                                <div><span className="text-gray-500">{t('inquiries.detail.representativePhone')}:</span> {selectedFormSnapshot?.representative_phone || '-'}</div>
+                                <div><span className="text-gray-500">{t('inquiries.detail.notes')}:</span>{' '}</div>
+                                <div><span className="whitespace-pre-wrap break-all">{selectedFormSnapshot?.notes || '-'}</span></div>
                             </CardContent>
                         </Card>
 
@@ -2594,6 +2598,7 @@ function ShopOpeningInquirySection({ dbCardDesigns }: { dbCardDesigns: any[] }) 
                                 <div><span className="text-gray-500">{t('inquiries.detail.shopName')}:</span> {selectedFormSnapshot?.shop_name || '-'}</div>
                                 <div><span className="text-gray-500">{t('inquiries.detail.ownerName')}:</span> {selectedFormSnapshot?.owner_name || '-'}</div>
                                 <div><span className="text-gray-500">{t('inquiries.detail.contactEmail')}:</span> {selectedFormSnapshot?.contact_email || '-'}</div>
+                                <div><span className="text-gray-500">{t('inquiries.detail.representativePhone')}:</span> {selectedFormSnapshot?.representative_phone || '-'}</div>
                                 <div><span className="text-gray-500">{t('inquiries.detail.notes')}:</span> {selectedFormSnapshot?.notes || '-'}</div>
                                 <div className="md:col-span-2">
                                     <span className="text-gray-500">{t('inquiries.detail.participantsLabel')}:</span>
@@ -2746,7 +2751,7 @@ function ShopOpeningInquirySection({ dbCardDesigns }: { dbCardDesigns: any[] }) 
                                             onChange={(e) => {
                                                 const file = e.target.files?.[0];
                                                 if (!file) return;
-                                                                if (file.size > 30 * 1024 * 1024) {
+                                                if (file.size > 30 * 1024 * 1024) {
                                                     alert(t('inquiryChat.fileTooLarge'));
                                                     e.currentTarget.value = '';
                                                     return;
@@ -3385,34 +3390,34 @@ function QRCodeRow({ item, apiUrl, onGeneratePDF, onRefresh, paperFormat, cardFo
                                 .concat(Object.entries(item.shipping_info || {}).map(([k, v]) => [`shipping_${k}`, v]))
                                 .concat(Object.entries(item).filter(([k]) => k.startsWith('ts_')))
                                 .concat(Object.entries(item).filter(([k]) => k.startsWith('GSI') || k === 'PK' || k === 'SK')) as [string, any][]).map(([key, value]) => (
-                                <div key={key} className="flex flex-col py-1 border-b border-gray-50 last:border-0 group/raw">
-                                    <div className="flex items-center justify-between gap-2">
-                                        <h4 className="text-[10px] font-bold text-gray-400 font-mono uppercase truncate w-24 shrink-0">{key}</h4>
-                                        <div className="flex-1 flex items-center justify-end gap-1 min-w-0">
-                                            <p className="text-[11px] font-mono text-gray-600 truncate text-right">
-                                                {value == null ? '-' : typeof value === 'object' ? JSON.stringify(value) : String(value)}
-                                            </p>
-                                            {value != null && (
-                                                <Button
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    className="h-5 w-5 opacity-0 group-hover/raw:opacity-100 transition-opacity shrink-0"
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        handleCopy(typeof value === 'object' ? JSON.stringify(value) : String(value));
-                                                    }}
-                                                >
-                                                    {copiedId === (typeof value === 'object' ? JSON.stringify(value) : String(value)) ? (
-                                                        <Check className="h-3 w-3 text-green-500" />
-                                                    ) : (
-                                                        <Copy className="h-3 w-3 text-gray-400" />
-                                                    )}
-                                                </Button>
-                                            )}
+                                    <div key={key} className="flex flex-col py-1 border-b border-gray-50 last:border-0 group/raw">
+                                        <div className="flex items-center justify-between gap-2">
+                                            <h4 className="text-[10px] font-bold text-gray-400 font-mono uppercase truncate w-24 shrink-0">{key}</h4>
+                                            <div className="flex-1 flex items-center justify-end gap-1 min-w-0">
+                                                <p className="text-[11px] font-mono text-gray-600 truncate text-right">
+                                                    {value == null ? '-' : typeof value === 'object' ? JSON.stringify(value) : String(value)}
+                                                </p>
+                                                {value != null && (
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        className="h-5 w-5 opacity-0 group-hover/raw:opacity-100 transition-opacity shrink-0"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleCopy(typeof value === 'object' ? JSON.stringify(value) : String(value));
+                                                        }}
+                                                    >
+                                                        {copiedId === (typeof value === 'object' ? JSON.stringify(value) : String(value)) ? (
+                                                            <Check className="h-3 w-3 text-green-500" />
+                                                        ) : (
+                                                            <Copy className="h-3 w-3 text-gray-400" />
+                                                        )}
+                                                    </Button>
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
-                            ))}
+                                ))}
                         </div>
                     </div>
                 )}
@@ -3840,19 +3845,19 @@ function ManagerLinkingSection({ apiUrl }: { apiUrl: string }) {
             </CardHeader>
             <CardContent className="space-y-4">
                 <p className="text-sm text-gray-500">{t('list.managerLinking.description')}</p>
-                
+
                 <div className="flex items-center gap-2 p-1 bg-gray-100 rounded-lg w-fit">
-                    <Button 
-                        size="sm" 
-                        variant={linkAction === 'execute' ? 'default' : 'ghost'} 
+                    <Button
+                        size="sm"
+                        variant={linkAction === 'execute' ? 'default' : 'ghost'}
                         onClick={() => setLinkAction('execute')}
                         className="h-8"
                     >
                         {t('list.managerLinking.actionLink')}
                     </Button>
-                    <Button 
-                        size="sm" 
-                        variant={linkAction === 'unlink' ? 'default' : 'ghost'} 
+                    <Button
+                        size="sm"
+                        variant={linkAction === 'unlink' ? 'default' : 'ghost'}
                         onClick={() => setLinkAction('unlink')}
                         className="h-8"
                     >

@@ -44,10 +44,16 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             return res.Item?.email || 'Unknown';
         };
 
-        const [ownerEmail, ...managerEmails] = await Promise.all([
+        const [ownerEmailResult, ...managerEmails] = await Promise.all([
             fetchUserEmail(ownerId),
             ...gmIds.map((id: string) => fetchUserEmail(id))
         ]);
+
+        // オーナーのメールアドレスが取得できなかった場合のフォールバック
+        // ショップメタデータ自体に記録されているメールアドレスを優先的に使用します。
+        const ownerEmail = (ownerEmailResult === 'Unknown') 
+            ? (shopMetadata.email || 'Unknown') 
+            : ownerEmailResult;
 
         return successResponse({ 
             owner_email: ownerEmail,

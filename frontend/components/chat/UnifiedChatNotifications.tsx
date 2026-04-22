@@ -28,6 +28,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { sanitizePhoneForInput, isValidPhone } from '@/lib/validation/contact';
 import { Label } from '@/components/ui/label';
 import { isValidWorkflowPayload } from '@shared/unified-chat-workflows';
 import { getDisplayMessage } from '@/lib/chatMessage';
@@ -224,6 +225,8 @@ export const UnifiedChatNotifications = React.forwardRef<
     const [shopOpenOwnerName, setShopOpenOwnerName] = useState('');
     /** ショップ開設フォーム: 備考 */
     const [shopOpenNotes, setShopOpenNotes] = useState('');
+    /** ショップ開設フォーム: 代表電話 */
+    const [shopOpenPhone, setShopOpenPhone] = useState('');
     /** ショップ開設フォーム: エラー表示 */
     const [shopOpenError, setShopOpenError] = useState('');
     /** ショップ開設フォーム用のメールアドレス（ログイン中メールで固定表示） */
@@ -320,6 +323,7 @@ export const UnifiedChatNotifications = React.forwardRef<
             SHOP_OPENING: t('notifications.chatTypes.shopOpening'),
             USER_SUPPORT: t('notifications.chatTypes.userSupport'),
             SHOP_SUPPORT: t('notifications.chatTypes.shopSupport'),
+            GIFT_RECEIVER_SUPPORT: t('notifications.chatTypes.giftReceiverSupport'),
             SHOP_DESIGN: t('notifications.chatTypes.shopDesign'),
             CARD_DESIGN: t('notifications.chatTypes.cardDesign'),
             MISC: t('notifications.chatTypes.misc'),
@@ -343,6 +347,7 @@ export const UnifiedChatNotifications = React.forwardRef<
             VERIFIED: t('notifications.statuses.verified'),
             EXPIRED: t('notifications.statuses.expired'),
             FAILED: t('notifications.statuses.failed'),
+            NOTIFICATION: t('notifications.statuses.notification'),
         };
         return labels[status] || status;
     };
@@ -421,6 +426,12 @@ export const UnifiedChatNotifications = React.forwardRef<
                         <span className="text-gray-500">{t('notifications.formSubmitted.contactEmail')}:</span>{' '}
                         {formSnapshot?.contact_email || '-'}
                     </div>
+                    {formSnapshot?.representative_phone && (
+                        <div>
+                            <span className="text-gray-500">{t('notifications.formSubmitted.representativePhone')}:</span>{' '}
+                            {formSnapshot.representative_phone}
+                        </div>
+                    )}
                     <div>
                         <span className="text-gray-500">{t('notifications.formSubmitted.notes')}:</span>{' '}
                         {formSnapshot?.notes || '-'}
@@ -451,10 +462,10 @@ export const UnifiedChatNotifications = React.forwardRef<
      * 0 の場合はバッジを表示しません。
      */
     /**
-     * 完了ステータス（APPROVED / REJECTED / CANCELLED / RESOLVED / CLOSED）かどうか。
+     * 完了ステータス（APPROVED / REJECTED / CANCELLED / RESOLVED / CLOSED / NOTIFICATION）かどうか。
      * チャットが封じられている間はメッセージ入力欄を非表示にします。
      */
-    const TERMINAL_STATUSES = new Set(['APPROVED', 'REJECTED', 'CANCELLED', 'RESOLVED', 'CLOSED']);
+    const TERMINAL_STATUSES = new Set(['APPROVED', 'REJECTED', 'CANCELLED', 'RESOLVED', 'CLOSED', 'NOTIFICATION']);
     const isChatClosed = useMemo(
         () => TERMINAL_STATUSES.has((selectedChat?.status || '').toUpperCase()),
         [selectedChat],
@@ -774,8 +785,13 @@ export const UnifiedChatNotifications = React.forwardRef<
     const handleSubmitShopOpening = async (e: React.FormEvent) => {
         e.preventDefault();
 
-        if (!shopOpenShopName.trim() || !shopOpenOwnerName.trim()) {
+        if (!shopOpenShopName.trim() || !shopOpenOwnerName.trim() || !shopOpenPhone.trim()) {
             setShopOpenError(t('shopOpenForm.errors.required'));
+            return;
+        }
+
+        if (!isValidPhone(shopOpenPhone)) {
+            setShopOpenError(t('shopOpenForm.errors.invalidPhone'));
             return;
         }
         if (!userEmail.trim()) {
@@ -790,6 +806,7 @@ export const UnifiedChatNotifications = React.forwardRef<
                     shop_name: shopOpenShopName.trim(),
                     owner_name: shopOpenOwnerName.trim(),
                     contact_email: userEmail.trim(),
+                    representative_phone: shopOpenPhone.trim(),
                     notes: shopOpenNotes.trim() || undefined,
                 },
                 submitted_at: new Date().toISOString(),
@@ -877,6 +894,7 @@ export const UnifiedChatNotifications = React.forwardRef<
             setShopOpenShopName('');
             setShopOpenOwnerName('');
             setShopOpenNotes('');
+            setShopOpenPhone('');
             setShopOpenError('');
             setCreateFormData({ chat_type: 'SHOP_OPENING', initial_message: '' });
             setIsCreateDialogOpen(true);
@@ -1452,6 +1470,17 @@ export const UnifiedChatNotifications = React.forwardRef<
                                     value={shopOpenOwnerName}
                                     onChange={(e) => setShopOpenOwnerName(e.target.value)}
                                     placeholder={t('shopOpenForm.ownerNamePlaceholder')}
+                                    disabled={creatingChat}
+                                />
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label htmlFor="shop-open-phone">{t('shopOpenForm.representativePhoneLabel')}</Label>
+                                <Input
+                                    id="shop-open-phone"
+                                    value={shopOpenPhone}
+                                    onChange={(e) => setShopOpenPhone(sanitizePhoneForInput(e.target.value, shopOpenPhone))}
+                                    placeholder={t('shopOpenForm.representativePhonePlaceholder')}
                                     disabled={creatingChat}
                                 />
                             </div>

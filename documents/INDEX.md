@@ -1,4 +1,4 @@
-# [名刺がわりに] ドキュメント・インデックス (Documentation Index)
+# [名刺代わりに] ドキュメント・インデックス (Documentation Index)
 
 本プロジェクトのすべての仕様・構成・手順を集約するメイン・ポータルです。
 目的（構築・仕様確認・参照）に合わせてドキュメントを選択してください。
@@ -57,6 +57,8 @@
   セキュリティ方針、API Stealth 設計、認証認可の仕様。
 - 💡 **[SPEC_LOGGING.md](./SPEC_LOGGING.md)**  
   CloudWatch Logs による監視と、ログ出力・保存の設計ルール。
+- 🎨 **[SPEC_CARD_DESIGN_GUIDELINES.md](./SPEC_CARD_DESIGN_GUIDELINES.md)**  
+  物理カードのデザイン作成時の基本仕様と配置上の注意事項。
 
 ---
 

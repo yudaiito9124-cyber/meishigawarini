@@ -393,7 +393,7 @@ UI を構築する際、どの部品を使うべきかのクイックリファ�
 2. 上記がない場合、本システム全体として保存されている **「プロフィール氏名 (`profileData.profile.name`)」** を取得。
 3. いずれかが存在した場合、その値を `chatName` の初期状態として State にセット。
 
-これにより、「名刺がわりに」を頻繁に利用するユーザーは、毎回名前を手入力する手間が省かれUXが向上します。
+これにより、「名刺代わりに」を頻繁に利用するユーザーは、毎回名前を手入力する手間が省かれUXが向上します。
 
 ### 2.12 多言語対応 (i18n) の設計と運用
 
@@ -567,6 +567,68 @@ API 由来のエラーは、可能な限り UI 文言として翻訳して提示
 製品マニュアルやヘルプページで使用するスクリーンショットの撮影を、AI Agent（Playwright + browser-use）を用いて自動化しています。これにより、UIの変更に追従したマニュアルの更新コストを最小化しています。
 - **詳細設計**: [SPEC_HELP_CMS.md](./SPEC_HELP_CMS.md) を参照してください。
 - **実行方法**: [ATFIRST_DEVELOPER_GUIDE.md](./ATFIRST_DEVELOPER_GUIDE.md) のツール索引を参照してください。
+
+### 2.15 Cognito Managed Login の多言語対応制御 (Amplify v6)
+
+当プロジェクトでは、認証基盤として Amazon Cognito の **「マネージドログイン（Managed Login / 旧 Hosted UI）」** を採用しています。
+
+#### A. システム構成の前提
+- **マネージドログインの利用**: 標準ログインやソーシャルログインの際、ユーザーは AWS がホストする専用のログイン画面へ一度リダイレクトされます。
+- **制御の必要性**: ログイン画面自体は AWS 側のリソースであるため、React コンポーネントのように直接コードで UI を操作することはできません。そのため、画面の表示言語を制御するには、リダイレクト時の URL パラメータ（`lang` 等）を介して明示的に言語を指定する必要があります。
+
+#### B. リダイレクトの動作原理（OAuth 2.0 / OIDC フロー）
+Amplify の `signInWithRedirect` が実行されると、内部的に以下のプロセスが走ります：
+
+1.  **認可リクエストの開始**:
+    - アプリケーション（Client）が Cognito（Authorization Server）に対し、「ログインさせてください」というリクエストを投げます。
+    - この際、セキュリティ担保のため `state`（リクエストの同一性確認用）や `code_verifier`（PKCE 用）が生成され、ブラウザの `localStorage` に一時保存されます。
+2.  **URL の構築**:
+    - Amplify は設定されたドメイン（`meishigawarini.auth.[region].amazoncognito.com`）の `/authorize` エンドポイントへの URL を構築します。
+    - ここに `client_id`, `redirect_uri`, `scope`, `response_type=code` 等の必須項目が並びます。
+3.  **カスタムパラメータの注入**:
+    - `options.queryParams` に指定した値（`lang`, `ui_locales`）が、この URL の末尾にクエリ文字列として結合されます。
+    - **生成される URL 例**: `https://.../authorize?client_id=...&lang=ja&ui_locales=ja&...`
+4.  **Cognito による言語判定**:
+    - ブラウザが構築された URL に遷移（リダイレクト）すると、Cognito は受け取った URL の `lang` パラメータを解析します。
+    - Cognito の設定（Managed Login の言語設定）に `ja` が含まれていれば、内部の翻訳辞書を適用した日本語の UI をレンダリングしてブラウザに応答します。
+
+#### C. Amplify v6 における技術的解決策
+- **旧来の課題**: Amplify v5 までは `urlOpener` というフックで URL を直接文字列操作できましたが、v6 のブラウザ環境ではセキュリティと標準化の観点からこのフックが廃止（または無視）されました。
+- **解決策**: v6.3.0 以降で正式サポートされた `options.queryParams` オプションを使用します。これは、Amplify が URL を構築する「最終段階」で安全にカスタムパラメータを合流させるための公式な窓口です。
+
+#### D. 実装コード例
+ログインページ（`frontend/app/[locale]/login/page.tsx`）での実装例です：
+
+```typescript
+import { signInWithRedirect } from 'aws-amplify/auth';
+import { useParams } from 'next/navigation';
+
+export default function LoginPage() {
+  // Next.js のパスから現在のロケール（ja / en）を取得
+  const { locale } = useParams();
+
+  const handleLogin = async () => {
+    // 認可リクエストのオプションに言語パラメータを含める
+    await signInWithRedirect({
+      options: {
+        queryParams: {
+          lang: locale as string,       // Cognito Hosted UI (Managed Login) 専用
+          ui_locales: locale as string  // OIDC (OpenID Connect) 標準
+        }
+      }
+    });
+  };
+}
+```
+
+#### E. 設計のポイント
+1. **SSO / セッションの継続**: `lang` パラメータは一回のリダイレクトに対して有効ですが、Cognito 側でセッションが確立されると、その後のパスワード変更画面なども同じロケールで維持される傾向があります（設定に依存）。
+2. **ui_locales の併記**: `lang` は Cognito 独自ですが、`ui_locales` は OIDC の標準パラメータです。サードパーティの IdP（Google 等）にさらにリダイレクトされる際、この値が参照される可能性があるため、併記が推奨されます。
+3. **責務の分離**:
+    - `ConfigureAmplify.tsx`: ドメインや Origin などのプロジェクト全体で不変の構成を定義。
+    - `LoginPage.tsx`: ユーザーの操作状態（現在の言語設定）に合わせて、遷移時の動的なオプションを適用。
+
+---
 
 ---
 

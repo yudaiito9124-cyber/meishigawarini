@@ -15,11 +15,14 @@
 
 import { APIGatewayProxyHandler } from 'aws-lambda';
 import { GetCommand, QueryCommand, BatchGetCommand, PutCommand } from '@aws-sdk/lib-dynamodb';
+import { CognitoIdentityProviderClient, AdminGetUserCommand } from '@aws-sdk/client-cognito-identity-provider';
 import { generateId } from './utils/id';
 import { successResponse, errorResponse } from './utils/response';
-import { ddb, TABLE_NAME } from './share/db';
+import { ddb, TABLE_NAME, USER_POOL_ID } from './share/db';
 import { getUserId } from './utils/request';
 import { ShopApiSchema } from '@shared/api-types';
+
+const cognito = new CognitoIdentityProviderClient({});
 
 export const handler: APIGatewayProxyHandler = async (event) => {
     try {
@@ -54,11 +57,23 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             const legacyIds = legacyRes.Items?.map(i => i.PK.replace('SHOP#', '')) || [];
 
             if (legacyIds.length > 0) {
+                // 最新のメールアドレスを Cognito から取得
+                let email = null;
+                if (USER_POOL_ID) {
+                    try {
+                        const userRes = await cognito.send(new AdminGetUserCommand({ UserPoolId: USER_POOL_ID, Username: userId }));
+                        email = userRes.UserAttributes?.find(a => a.Name === 'email')?.Value;
+                    } catch (e) {
+                        console.warn(`Failed to fetch email for user: ${userId}`, e);
+                    }
+                }
+
                 // 発見されたショップ情報を元に権限レコードを新規作成（移行完了）
                 await ddb.send(new PutCommand({
                     TableName: TABLE_NAME,
                     Item: {
                         PK: `USER#${userId}`, SK: 'SHOP',
+                        email,
                         roles: ['SHOP_MANAGER'], owner_shop_ids: legacyIds, gm_shop_ids: [],
                         ts_created_at: new Date().toISOString()
                     }

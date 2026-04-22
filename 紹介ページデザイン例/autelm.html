@@ -1,0 +1,289 @@
+<style>
+    /* --- 共通・スコープ限定CSS --- */
+    .autelm-final-rich-root,
+    .autelm-final-rich-root * {
+        box-sizing: border-box !important;
+        margin: 0;
+        padding: 0;
+        font-family: "Noto Sans JP", "Helvetica Neue", Arial, sans-serif;
+    }
+
+    .autelm-final-rich-root {
+        max-width: 560px;
+        margin: 20px auto;
+        background-color: #fffde7;
+        /* サイト背景の薄いオレンジ */
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 4px 25px rgba(230, 81, 0, 0.15);
+        color: #333333;
+        line-height: 1.8;
+        height: auto;
+        border: 1px solid #e65100;
+    }
+
+    /* --- ヘッダー --- */
+    .autelm-v-header {
+        padding: 15px 20px;
+        background: #ffffff;
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        border-bottom: 4px solid #e65100;
+    }
+
+    .autelm-v-logo {
+        width: 48px;
+        height: auto;
+        display: block;
+    }
+
+    .autelm-v-header-text {
+        font-size: 13px;
+        font-weight: bold;
+        color: #333;
+        line-height: 1.4;
+    }
+
+    /* --- ヒーロービジュアル --- */
+    .autelm-v-hero-img {
+        width: 100%;
+        height: auto;
+        display: block;
+    }
+
+    /* --- コンテンツエリア --- */
+    .autelm-v-body {
+        padding: 30px 20px;
+    }
+
+    .autelm-v-section-title {
+        font-size: 20px;
+        font-weight: bold;
+        color: #e65100;
+        margin-bottom: 25px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .autelm-v-section-title::before {
+        content: "";
+        display: inline-block;
+        width: 6px;
+        height: 26px;
+        background-color: #ff8f00;
+        /* 鮮やかなオレンジ */
+        border-radius: 3px;
+    }
+
+    /* --- 活動紹介：リッチカード形式（ご提示の原文を一字一句採用） --- */
+    .autelm-v-activity-stack {
+        display: grid;
+        gap: 25px;
+        margin-bottom: 40px;
+    }
+
+    .autelm-v-card {
+        background: #ffffff;
+        padding: 25px;
+        border-radius: 12px;
+        border: 1px solid #ffcc80;
+        box-shadow: 0 4px 12px rgba(230, 81, 0, 0.05);
+    }
+
+    .autelm-v-card-label {
+        display: inline-block;
+        background-color: #ff8f00;
+        color: #fff;
+        font-size: 11px;
+        font-weight: bold;
+        padding: 2px 12px;
+        border-radius: 4px;
+        margin-bottom: 12px;
+    }
+
+    .autelm-v-card-title {
+        font-size: 17px;
+        font-weight: bold;
+        color: #e65100;
+        margin-bottom: 15px;
+        line-height: 1.4;
+        display: block;
+    }
+
+    .autelm-v-card-text {
+        font-size: 14px;
+        color: #444;
+        text-align: justify;
+        border-top: 1px solid #fff3e0;
+        padding-top: 15px;
+    }
+
+    /* --- 埋め込み区画 --- */
+    .autelm-v-embed-box {
+        position: relative;
+        width: 100%;
+        height: 0;
+        padding-top: 56.25%;
+        background: #000;
+        border-radius: 10px;
+        overflow: hidden;
+        margin-bottom: 30px;
+        border: 1px solid #ffcc80;
+    }
+
+    .autelm-v-embed-box iframe {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        border: none;
+    }
+
+    /* --- SNSアイコン --- */
+    .autelm-v-sns-grid {
+        display: flex;
+        justify-content: center;
+        gap: 20px;
+        margin-bottom: 35px;
+    }
+
+    .autelm-v-sns-link {
+        width: 46px;
+        height: 46px;
+        background: #ffffff;
+        border: 1px solid #ffcc80;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: transform 0.2s;
+    }
+
+    .autelm-v-sns-link:hover {
+        transform: translateY(-3px);
+    }
+
+    .autelm-v-sns-icon {
+        width: 26px;
+        height: 26px;
+    }
+
+    /* --- ホームボタン --- */
+    .autelm-v-home-btn {
+        display: block;
+        width: 240px;
+        margin: 0 auto;
+        padding: 18px;
+        background: linear-gradient(135deg, #ff8f00 0%, #e65100 100%);
+        color: #ffffff !important;
+        text-align: center;
+        text-decoration: none;
+        font-weight: bold;
+        border-radius: 50px;
+        font-size: 16px;
+        box-shadow: 0 4px 15px rgba(230, 81, 0, 0.3);
+    }
+
+    .autelm-v-footer {
+        text-align: center;
+        padding: 30px 20px 40px;
+        font-size: 11px;
+        color: #a1887f;
+    }
+</style>
+
+<div class="autelm-final-rich-root">
+    <div class="autelm-v-header">
+        <img src="https://infrastack-productimagebucketdce10e3f-qmgx3s9tvlno.s3.ap-northeast-1.amazonaws.com/shop/20260416030730zoq-3416d59a-3ae6-4a60-9ef8-342c5725d391/shopcontent/20260416031451vex-ea47a7f8-d3f7-40ed-ba71-b7cde0418852.webp?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=ASIAYTMSSPW4D7P4QDMW%2F20260422%2Fap-northeast-1%2Fs3%2Faws4_request&X-Amz-Date=20260422T044921Z&X-Amz-Expires=3600&X-Amz-Security-Token=IQoJb3JpZ2luX2VjEH0aDmFwLW5vcnRoZWFzdC0xIkgwRgIhALJKD3S3%2B7erhghDtVXPh2u7ZICDCGssEVF5GpkfM9JtAiEAzmlqrGZ9J4qXmgfXVxyJ6Gb1HcNL0v0FuoS%2FD13slV8qgAUIRhAAGgw1OTE0MDIyNzAxMzYiDK5LTctRn4AujuZlVSrdBJzVLouF2bJj%2FdBr1n5gv3FtW2R2F7ZYvPGtvIQaeXDTPD409YXIWVz6lPnioZ4hL%2FOhNHu8hlmeec%2FcFbqiTQBWS%2F5hQnA0Si579F%2FTMcxBDa7c9YTML4JUkWYjNb1NtXaV5NEgT9VC82haTyY4osAuDEKQCoFQqSz5wQ5J2Yxda7%2BqYLyBA5OvTha0LILzBZfUbAiMG1heWwX1%2FODvD3qYbsywMyeS0FlJgQtnaIqw%2FhNyej5a8jt0YpGTG0azrdxgX4X3TQ%2Fnwp5q0Sot3n%2BOjdI3SNOwtGvNl4fe%2FXGxMboeFTUyI2FbybX3uCqTposCUz6IS0GXOrxdeWnd6CiNtt2IdT0JdSR%2FqU94MNnH6ilkq%2BqZU%2BFw5rnVHYKpACSPEezUIdA2kDV6UivoItjLhxzcHPO6zjtHumRzY18F%2F1%2F1vc5f3LcdMH4Vs5YQtnZ9aWrN75AsjDjZdv8xQn9ps5%2BSYdTOozj9IbsHM7Unxu%2BiE7%2FkSaAMLn8UtU%2BDaayYcXHRWtIkLJxVZzFp6ui7g2jr1%2FUZ1U22EnZiB9z%2BVHA82JO3RjURLJmtBPxwGsO2awQPDjwQXEEa1ILSM0VU1ZGFX8gS%2FnaCPBoCjnotecjqbHktCoBjKNrunu2hWhYORm6i2GV6b1aouhy%2FQIXkWxDiG4%2B0CKbkdNTchXYE673Y%2FXOgkECIF5KHV0YenQA1smjhFdpfFZy6%2FrHzd%2BkMqK0aaEUXQ%2BXXsqzd80P5rcfX7yKiw%2BGUNLQ59BLMGQGAXJlG4KWCNKpuQlPaDoMhPa4IqtRr8QVWCkdrMNCmoc8GOqIB63uTjh0xvYjmXhT6HdbToQpPiDpfBJqlz%2FhXrHbLxRKWNp%2Bw5AcQutHg7hrFsqTZd65XyG%2FLCbG1Q%2BpaoVdl8BpdPZ8zTxhB%2F5kkZWIdduk%2FhwBBgKSXM3EGsPxqcL7XrL3akcocqWyH078j%2FXFGiL%2FjljthmlMd1DHlQ4PKAl0j%2FEKVPF0sk0R0muPkZbtq%2FPM6GZlaMti%2FVnKAb1lYpFv7&X-Amz-Signature=b525e37134353f437dd53ff081e265e42b38ce43aa0505e335b3f215b47a8a25&X-Amz-SignedHeaders=host&x-amz-checksum-mode=ENABLED&x-id=GetObject"
+            alt="AUTELMロゴ" class="autelm-v-logo">
+        <div class="autelm-v-header-text">
+            秋田大学医学部附属病院<br>医療DXセンター 遠隔医療推進部門
+        </div>
+    </div>
+
+    <img src="https://infrastack-productimagebucketdce10e3f-qmgx3s9tvlno.s3.ap-northeast-1.amazonaws.com/shop/20260416030730zoq-3416d59a-3ae6-4a60-9ef8-342c5725d391/shopcontent/20260416031538fjg-aa0f0e3a-35b4-4043-a0d9-17aaa7785c2c.webp?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=ASIAYTMSSPW4D7P4QDMW%2F20260422%2Fap-northeast-1%2Fs3%2Faws4_request&X-Amz-Date=20260422T044922Z&X-Amz-Expires=3600&X-Amz-Security-Token=IQoJb3JpZ2luX2VjEH0aDmFwLW5vcnRoZWFzdC0xIkgwRgIhALJKD3S3%2B7erhghDtVXPh2u7ZICDCGssEVF5GpkfM9JtAiEAzmlqrGZ9J4qXmgfXVxyJ6Gb1HcNL0v0FuoS%2FD13slV8qgAUIRhAAGgw1OTE0MDIyNzAxMzYiDK5LTctRn4AujuZlVSrdBJzVLouF2bJj%2FdBr1n5gv3FtW2R2F7ZYvPGtvIQaeXDTPD409YXIWVz6lPnioZ4hL%2FOhNHu8hlmeec%2FcFbqiTQBWS%2F5hQnA0Si579F%2FTMcxBDa7c9YTML4JUkWYjNb1NtXaV5NEgT9VC82haTyY4osAuDEKQCoFQqSz5wQ5J2Yxda7%2BqYLyBA5OvTha0LILzBZfUbAiMG1heWwX1%2FODvD3qYbsywMyeS0FlJgQtnaIqw%2FhNyej5a8jt0YpGTG0azrdxgX4X3TQ%2Fnwp5q0Sot3n%2BOjdI3SNOwtGvNl4fe%2FXGxMboeFTUyI2FbybX3uCqTposCUz6IS0GXOrxdeWnd6CiNtt2IdT0JdSR%2FqU94MNnH6ilkq%2BqZU%2BFw5rnVHYKpACSPEezUIdA2kDV6UivoItjLhxzcHPO6zjtHumRzY18F%2F1%2F1vc5f3LcdMH4Vs5YQtnZ9aWrN75AsjDjZdv8xQn9ps5%2BSYdTOozj9IbsHM7Unxu%2BiE7%2FkSaAMLn8UtU%2BDaayYcXHRWtIkLJxVZzFp6ui7g2jr1%2FUZ1U22EnZiB9z%2BVHA82JO3RjURLJmtBPxwGsO2awQPDjwQXEEa1ILSM0VU1ZGFX8gS%2FnaCPBoCjnotecjqbHktCoBjKNrunu2hWhYORm6i2GV6b1aouhy%2FQIXkWxDiG4%2B0CKbkdNTchXYE673Y%2FXOgkECIF5KHV0YenQA1smjhFdpfFZy6%2FrHzd%2BkMqK0aaEUXQ%2BXXsqzd80P5rcfX7yKiw%2BGUNLQ59BLMGQGAXJlG4KWCNKpuQlPaDoMhPa4IqtRr8QVWCkdrMNCmoc8GOqIB63uTjh0xvYjmXhT6HdbToQpPiDpfBJqlz%2FhXrHbLxRKWNp%2Bw5AcQutHg7hrFsqTZd65XyG%2FLCbG1Q%2BpaoVdl8BpdPZ8zTxhB%2F5kkZWIdduk%2FhwBBgKSXM3EGsPxqcL7XrL3akcocqWyH078j%2FXFGiL%2FjljthmlMd1DHlQ4PKAl0j%2FEKVPF0sk0R0muPkZbtq%2FPM6GZlaMti%2FVnKAb1lYpFv7&X-Amz-Signature=872604bf2526d2079ab5a9555c4582649662a6683d3fb10b595898719a89c7f0&X-Amz-SignedHeaders=host&x-amz-checksum-mode=ENABLED&x-id=GetObject"
+        alt="医療DXでつなぐ未来" class="autelm-v-hero-img">
+
+    <div class="autelm-v-body">
+
+        <h2 class="autelm-v-section-title">部門紹介</h2>
+        <div class="autelm-v-activity-stack">
+            <div class="autelm-v-card">
+                秋田県のように限界集落を多く抱え、診療所の廃業が相次ぐ広域医療過疎地域では、遠隔医療の推進が県民の健康を保つ重要な役割を果たします。本部門の使命は、広域医療過疎地域における新しい医療の在り方を模索および実装することです。
+            </div>
+        </div>
+
+
+        <h2 class="autelm-v-section-title">活動紹介</h2>
+
+        <div class="autelm-v-activity-stack">
+            <div class="autelm-v-card">
+                <span class="autelm-v-card-label">PROJECT 01</span>
+                <span class="autelm-v-card-title">1.MaaS（マース）型オンライン診療プロジェクト</span>
+                <p class="autelm-v-card-text">
+                    大学病院から遠方の医療過疎地域に居住し、高齢や難病のために通院が困難な患者さんに対し、MaaS車両（検査機器と通信機器を装備した車両）を用いて近隣公民館または居宅に赴き医療活動を行います。搭載検査器具によって患者さんの状態を評価し、通信機器を用いた専門医師とオンラインでの対話を通じて専門的医療を提供します。
+                </p>
+            </div>
+
+            <div class="autelm-v-card">
+                <span class="autelm-v-card-label">PROJECT 02</span>
+                <span class="autelm-v-card-title">2.定点型オンライン診療プロジェクト</span>
+                <p class="autelm-v-card-text">
+                    検査等が必要でない患者さんに対して、近隣の公的施設（公民館や郵便局など）の設置型通信設備または居宅の個人所有通信設備を用いてオンラインによる専門的医療活動を行います。患者さんの状態変化や別疾病が発見された場合に備え、必要に応じて近隣病院へ紹介するシステムを構築します。また専門的知識を持つ看護師が患者さんとオンラインで対話することによって、患者さんの全身状態を把握し、日常生活における看護上のポイントに関して丁寧に説明する方法を確立します。
+                </p>
+            </div>
+
+            <div class="autelm-v-card">
+                <span class="autelm-v-card-label">PROJECT 03</span>
+                <span class="autelm-v-card-title">3.診療情報共有クラウド型ネットワークプロジェクト</span>
+                <p class="autelm-v-card-text">
+                    県内の中核病院および地域の診療所が患者さんの診療情報を共有することができるようにするシステム（電子カルテ閲覧可能なクラウド型ネットワーク）の構築を目指します。また診療のための医師同士または多職種によるカンファレンスを可能にさせ医療の質の向上と効率化を図ります。
+                </p>
+            </div>
+        </div>
+
+        <h2 class="autelm-v-section-title">紹介動画</h2>
+        <div class="autelm-v-embed-box">
+            <iframe width="560" height="315" src="https://www.youtube.com/embed/g37CsTf6GdI?si=lQB1SfYIcFBYEO62"
+                title="YouTube video player" frameborder="0"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+        </div>
+
+        <h2 class="autelm-v-section-title">所在地</h2>
+        <div class="autelm-v-embed-box" style="padding-top: 75%;">
+            <iframe
+                src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d4926.594479668804!2d140.15029856285238!3d39.729326131766186!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x5f8fe82245405dff%3A0xe8796d078d782ec1!2z56eL55Sw5aSn5a2m5Yy75a2m6YOo6ZmE5bGe55eF6Zmi!5e1!3m2!1sja!2sjp!4v1776826755193!5m2!1sja!2sjp"
+                width="600" height="450" style="border:0;" allowfullscreen="" loading="lazy"
+                referrerpolicy="no-referrer-when-downgrade"></iframe>
+        </div>
+
+        <div class="autelm-v-sns-grid">
+            <a href="https://linktr.ee/autelm" target="_blank" class="autelm-v-sns-link">
+                <img class="autelm-v-sns-icon" src="https://cdn.simpleicons.org/linktree/e65100" alt="Linktree">
+            </a>
+            <a href="https://www.instagram.com/autelm2023" target="_blank" class="autelm-v-sns-link">
+                <img class="autelm-v-sns-icon" src="https://cdn.simpleicons.org/instagram/e65100" alt="Instagram">
+            </a>
+            <a href="https://www.threads.com/@autelm2023" target="_blank" class="autelm-v-sns-link">
+                <img class="autelm-v-sns-icon" src="https://cdn.simpleicons.org/threads/e65100" alt="Threads">
+            </a>
+            <a href="https://www.facebook.com/profile.php?id=61572149993553" target="_blank" class="autelm-v-sns-link">
+                <img class="autelm-v-sns-icon" src="https://cdn.simpleicons.org/facebook/e65100" alt="Facebook">
+            </a>
+            <a href="https://www.youtube.com/@%E9%81%A0%E9%9A%94%E5%8C%BB%E7%99%82%E3%83%8A%E3%83%93" target="_blank"
+                class="autelm-v-sns-link">
+                <img class="autelm-v-sns-icon" src="https://cdn.simpleicons.org/youtube/e65100" alt="YouTube">
+            </a>
+        </div>
+
+        <a href="https://np2015.xsrv.jp/AUTELM/" target="_blank" class="autelm-v-home-btn">ホームページ</a>
+    </div>
+
+    <div class="autelm-v-footer">
+        © 秋田大学医学部附属病院 医療DXセンター 遠隔医療推進部門
+    </div>
+</div>

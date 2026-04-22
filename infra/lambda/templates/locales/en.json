@@ -3,5 +3,6 @@
   "SYSTEM_NOTIFICATION": "[Meishigawarini] System Notification",
   "SHIPPING_NOTIFICATION": "[Meishigawarini] Shipping Notification",
   "ADDRESS_REGISTRATION_CONFIRMATION": "[Meishigawarini] Address Registration Completed",
-  "ADDRESS_REGISTRATION_NOTIFICATION": "[Meishigawarini] Recipient Address Registered"
+  "ADDRESS_REGISTRATION_NOTIFICATION": "[Meishigawarini] Recipient Address Registered",
+  "INQUIRY_NOTIFICATION": "[Meishigawarini] New Inquiry Received"
 }

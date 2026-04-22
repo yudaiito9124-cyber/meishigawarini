@@ -73,7 +73,7 @@
 | 送り主情報読込 | 過去の送り主データの取得 | `/receive/sender/load` | `GetCommand` (User SENDER) + `UpdateCommand` (Chat SenderID) | [receive_sender.ts](../infra/lambda/receive_sender.ts) |
 | 送り主保存 | 送り主情報のユーザー保存 | `/receive/sender/save` | `UpdateCommand` (Upsert Master Profile) + `S3 CopyObject` | [receive_sender.ts](../infra/lambda/receive_sender.ts) |
 | 画像URL発行 | S3画像アップロード用URL発行 | `/receive/uploadurl/get` | - (S3 Presigned URL) | [receive_upload_url.ts](../infra/lambda/receive_upload_url.ts) |
-| 画像URL発行 | S3画像アップロード用URL発行 | `/receive/uploadurl/get` | - (S3 Presigned URL) | [receive_upload_url.ts](../infra/lambda/receive_upload_url.ts) |
+| ショップへのお問い合わせ | メール送信と管理用チャット通知 | `/receive/inquiry` | `GetCommand` + `TransactWriteCommand` (Unified Chat Notification) | [receive_inquiry.ts](../infra/lambda/receive_inquiry.ts) |
 
 ---
 > [!NOTE]
@@ -153,6 +153,19 @@
 | `payload.default_design_id` | `string` | 割り当てられたデフォルトカードデザインのID |
 | `payload.reason` | `string` | 審査コメント（却下理由など） |
 | `payload.reviewed_at` | `string` | 審査日時（ISO 8601形式） |
+
+### メッセージのペイロード構造（お問い合わせ: INQUIRY_SUBMITTED）
+
+ゲスト（受取人）からショップへのお問い合わせメッセージの `payload` フィールドには以下が含まれます:
+
+| フィールド | 型 | 説明 |
+| :--- | :--- | :--- |
+| `payload.qr_id` | `string` | お問い合わせの契機となったギフト（カード）のID |
+| `payload.shopId` | `string` | 宛先ショップのID |
+| `payload.shopName` | `string` | 宛先ショップの名称 |
+| `payload.reply_email` | `string` | ユーザーが指定した返信先メールアドレス |
+| `payload.phone` | `string` | ユーザーが指定した連絡先電話番号 |
+| `payload.content` | `string` | お問い合わせ内容の本文 |
 
 ### フロントエンド通知コンポーネント
 

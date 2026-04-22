@@ -13,10 +13,13 @@
 
 import { APIGatewayProxyHandler } from 'aws-lambda';
 import { GetCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
+import { CognitoIdentityProviderClient, AdminGetUserCommand } from '@aws-sdk/client-cognito-identity-provider';
 import { successResponse, errorResponse } from './utils/response';
-import { ddb, TABLE_NAME } from './share/db';
+import { ddb, TABLE_NAME, USER_POOL_ID } from './share/db';
 import { getUserId, getAction } from './utils/request';
 import { AdminApiSchema } from '@shared/api-types';
+
+const cognito = new CognitoIdentityProviderClient({});
 
 export const handler: APIGatewayProxyHandler = async (event) => {
     try {
@@ -108,12 +111,23 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 const finalShopIdsToLink = shop_ids.filter(id => !ownerShopIds.includes(id) && !currentGmShopIds.includes(id));
 
                 if (finalShopIdsToLink.length > 0) {
+                    // ユーザーの最新のメールアドレスを取得（同期用）
+                    let userEmail = userRes.Item.email;
+                    if (!userEmail && USER_POOL_ID) {
+                        try {
+                            const cognitoRes = await cognito.send(new AdminGetUserCommand({ UserPoolId: USER_POOL_ID, Username: uid }));
+                            userEmail = cognitoRes.UserAttributes?.find(a => a.Name === 'email')?.Value;
+                        } catch (e) {
+                            console.warn(`Failed to fetch email for GM user: ${uid}`, e);
+                        }
+                    }
+
                     // GM 管理対象リストへのアペンド
                     await ddb.send(new UpdateCommand({
                         TableName: TABLE_NAME,
                         Key: { PK: `USER#${uid}`, SK: 'SHOP' },
-                        UpdateExpression: 'SET gm_shop_ids = list_append(if_not_exists(gm_shop_ids, :empty_list), :new_shop_list), ts_updated_at = :now',
-                        ExpressionAttributeValues: { ':new_shop_list': finalShopIdsToLink, ':empty_list': [], ':now': now }
+                        UpdateExpression: 'SET gm_shop_ids = list_append(if_not_exists(gm_shop_ids, :empty_list), :new_shop_list), email = :email, ts_updated_at = :now',
+                        ExpressionAttributeValues: { ':new_shop_list': finalShopIdsToLink, ':empty_list': [], ':email': userEmail || null, ':now': now }
                     }));
                 }
 

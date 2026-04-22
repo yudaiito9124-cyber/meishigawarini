@@ -25,7 +25,8 @@ export function ConfirmOrderDialog() {
     const hasDeliveryAddress = Boolean(
         shop?.shop_postal_code?.trim() &&
         shop?.shop_address?.trim() &&
-        shop?.shop_phone?.trim()
+        shop?.shop_phone?.trim() &&
+        shop?.shop_recipient_name?.trim()
     );
 
     const { 
@@ -111,6 +112,7 @@ export function ConfirmOrderDialog() {
                 <div className="w-full mt-6 rounded-xl border border-gray-200 bg-gray-50 p-4 space-y-3">
                     <p className="text-sm font-bold text-gray-900">{t('cardOrder.deliveryAddressTitle')}</p>
                     <div className="text-sm text-gray-700 space-y-1">
+                        <div>{t('cardOrder.deliveryRecipientName')}: {shop?.shop_recipient_name || '-'}</div>
                         <div>{t('cardOrder.deliveryPostalCode')}: {shop?.shop_postal_code || '-'}</div>
                         <div>{t('cardOrder.deliveryAddress')}: {shop?.shop_address || '-'}</div>
                         <div>{t('cardOrder.deliveryPhone')}: {shop?.shop_phone || '-'}</div>

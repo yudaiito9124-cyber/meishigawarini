@@ -2,6 +2,8 @@
  * ファイル概要: アプリケーションのトップページ
  * 目的: ユーザーに対するサービスの簡単な説明と、ショップ管理者向けページへの遷移リンクを提供します。
  */
+'use client';
+
 // import Link from 'next/link';
 // import { useTranslations } from 'next-intl';
 
@@ -190,6 +192,9 @@
  * 7. Shop Owners: ショップ開設のメリット。
  */
 
+import { signInWithRedirect } from 'aws-amplify/auth';
+import { useParams } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import Link from 'next/link'
 import {
   Store,
@@ -405,13 +410,33 @@ function SectionHeading({ children }: { children: string }) {
 // ─── ページ本体 (HomePage) ────────────────────────────────────────────────────
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-import { useTranslations } from 'next-intl';
-
 export default function HomePage() {
   /** ページ固有の翻訳リソース */
   const t = useTranslations('HomePage');
   /** サイト全体（サイト名等）の翻訳リソース */
   const ts = useTranslations('Site');
+
+  const { locale } = useParams();
+
+  /**
+   * Managed Login (Hosted UI) を呼び出す共通ハンドラー
+   * @param screenHint 'signup' を指定するとサインアップ画面を表示
+   */
+  const handleAuthRedirect = async () => {
+    try {
+      await signInWithRedirect({
+        options: {
+          queryParams: {
+            lang: locale as string,
+            ui_locales: locale as string
+          }
+        }
+      });
+    } catch (err) {
+      console.error('Auth redirect error:', err);
+    }
+  };
+
 
   return (
     <main className="bg-white text-black">
@@ -419,16 +444,17 @@ export default function HomePage() {
       {/* ━━━ Nav ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
       <nav className="fixed top-0 w-full flex justify-between items-center px-8 py-5 z-50 bg-white/80 backdrop-blur-sm border-b border-gray-50">
         <a href="#" className="font-black text-lg tracking-tight hover:opacity-80 transition-opacity">{ts("name")}</a>
-        <div className="flex items-center gap-6">
-          <a href="#howto" className="hidden md:block text-sm text-gray-500 hover:text-black transition-colors">使い方</a>
-          <a href="#shops" className="hidden md:block text-sm text-gray-500 hover:text-black transition-colors">ショップ一覧</a>
-          <a href="#for-shops" className="hidden md:block text-sm text-gray-500 hover:text-black transition-colors">ショップ開設</a>
-          <Link
-            href="/login"
+        <div className="flex items-center gap-4">
+          <a href="#howto" className="hidden lg:block text-sm text-gray-500 hover:text-black transition-colors">使い方</a>
+          <a href="#shops" className="hidden lg:block text-sm text-gray-500 hover:text-black transition-colors">ショップ一覧</a>
+          <a href="#for-shops" className="hidden lg:block text-sm text-gray-500 hover:text-black transition-colors">ショップ開設</a>
+          
+          <button
+            onClick={() => handleAuthRedirect()}
             className="ml-2 bg-black text-white px-5 py-2 rounded-full text-sm font-medium hover:bg-gray-800 transition-colors"
           >
             {t('shopAdmin')}
-          </Link>
+          </button>
         </div >
       </nav >
 
@@ -453,17 +479,17 @@ export default function HomePage() {
         </p>
 
         <div className="flex flex-col sm:flex-row gap-4">
-          <a
-            href="#howto"
+          <button
+            onClick={() => handleAuthRedirect()}
             className="bg-black text-white px-8 py-4 rounded-full text-base font-medium hover:bg-gray-800 transition-colors"
           >
-            使い方を見る
-          </a>
+            {t('shopAdmin')}
+          </button>
           <a
-            href="#for-shops"
+            href="#howto"
             className="border border-gray-300 px-8 py-4 rounded-full text-base font-medium hover:border-black transition-colors"
           >
-            ショップ開設はこちら
+            使い方を見る
           </a>
         </div>
 
@@ -622,12 +648,12 @@ export default function HomePage() {
               </div>
             ))}
           </div>
-          {/* <Link
-            href="/register"
+          <button
+            onClick={() => handleAuthRedirect()}
             className="inline-block bg-white text-black px-8 py-4 rounded-full text-base font-medium hover:bg-gray-100 transition-colors"
           >
-            ショップを開設する
-          </Link> */}
+            {t('shopAdmin')}
+          </button>
         </div>
       </section >
 

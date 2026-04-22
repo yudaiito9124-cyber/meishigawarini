@@ -40,7 +40,9 @@ interface SendEmailParams {
     /** HTML 形式のメール本文（オプション） */
     html?: string;
     /** 送信元メールアドレスのオーバーライド（オプション） */
-    from?: string; 
+    from?: string;
+    /** 返信用メールアドレス（オプション） */
+    reply_to?: string;
 }
 
 /**
@@ -49,7 +51,7 @@ interface SendEmailParams {
  * @param params - 送信先、件名、本文等を含むパラメータ。
  * @returns Resend API からのレスポンス（成功時）または例外。
  */
-export async function sendEmail({ to, subject, text, html, from }: SendEmailParams) {
+export async function sendEmail({ to, subject, text, html, from, reply_to }: SendEmailParams) {
     if (!RESEND_API_KEY) {
         console.error("Cannot send email: RESEND_API_KEY is not configured.");
         return;
@@ -75,6 +77,7 @@ export async function sendEmail({ to, subject, text, html, from }: SendEmailPara
             subject: subject,
             text: text,
             html: html,
+            replyTo: reply_to,
         });
 
         if (data.error) {

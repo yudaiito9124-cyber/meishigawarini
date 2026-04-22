@@ -158,7 +158,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 
             if (newUserRes.Item) {
                 transactItems.push({
-                    Update: { TableName: TABLE_NAME, Key: { PK: `USER#${cleanNewUserId}`, SK: 'SHOP' }, UpdateExpression: 'SET owner_shop_ids = :new_owner_list, gm_shop_ids = :new_gm_list, #roles = :new_roles, ts_updated_at = :now', ExpressionAttributeNames: { '#roles': 'roles' }, ExpressionAttributeValues: { ':new_owner_list': updatedNewUserOwnerShops, ':new_gm_list': updatedNewUserGmShops, ':new_roles': updatedNewUserRoles, ':now': now } }
+                    Update: { TableName: TABLE_NAME, Key: { PK: `USER#${cleanNewUserId}`, SK: 'SHOP' }, UpdateExpression: 'SET owner_shop_ids = :new_owner_list, gm_shop_ids = :new_gm_list, #roles = :new_roles, email = :email, ts_updated_at = :now', ExpressionAttributeNames: { '#roles': 'roles' }, ExpressionAttributeValues: { ':new_owner_list': updatedNewUserOwnerShops, ':new_gm_list': updatedNewUserGmShops, ':new_roles': updatedNewUserRoles, ':email': newUserEmail, ':now': now } }
                 });
             } else {
                 // 初めてショップを持つユーザーの場合はレコードを新規作成

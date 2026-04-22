@@ -1,6 +1,6 @@
 # メール通知仕様マニュアル (Email Notification Guide)
 
-このドキュメントでは、「名刺がわりに」システムからユーザーに送信されるメールの種類、送信タイミング、および送信条件についてまとめています。
+このドキュメントでは、「名刺代わりに」システムからユーザーに送信されるメールの種類、送信タイミング、および送信条件についてまとめています。
 
 ## 概要
 本システムでは、以下の2つの経路でメールを送信しています。
@@ -95,6 +95,7 @@ AWS Cognitoから直接送信される、アカウントセキュリティに関
 | `SHIPPING_NOTIFICATION` | 発送完了 | `uuid`, `pin`, `baseUrl` |
 | `ADDRESS_REGISTRATION_CONFIRMATION` | 住所登録完了（注文者） | `uuid`, `pin`, `baseUrl` |
 | `ADDRESS_REGISTRATION_NOTIFICATION` | 住所登録発生（オーナー） | `shopName`, `productName`, `qr_id`, `shopId`, `baseUrl` |
+| `INQUIRY_NOTIFICATION` | 受取人からのお問い合わせ（オーナー向け） | `content`, `reply_email`, `phone`, `shopName`, `qr_id`, `shopId` |
 
 ---
 

@@ -36,7 +36,9 @@ import {
     Copy,
     Check,
     ExternalLink,
-    Truck
+    Truck,
+    Phone,
+    MapPin
 } from 'lucide-react';
 
 interface OrderDetailsDialogProps {
@@ -282,7 +284,18 @@ export default function OrderDetailsDialog({
 
                         {/* Right Column: Preview & Actions */}
                         <div className="p-6 flex flex-col gap-8 bg-white">
-
+                            <div>
+                                <h3 className="text-[11px] font-bold text-gray-400 uppercase tracking-[0.1em] mb-4 flex items-center gap-2">
+                                    <Truck className="w-3.5 h-3.5" />
+                                    {td('shippingInfo')}
+                                </h3>
+                                <div className="bg-white rounded-xl border border-gray-100 px-4 shadow-sm">
+                                    <InfoRow label={td('recipientName')} value={order.shop_recipient_name} icon={User} copyValue={order.shop_recipient_name} />
+                                    <InfoRow label={td('postalCode')} value={order.shop_postal_code} icon={Hash} copyValue={order.shop_postal_code} />
+                                    <InfoRow label={td('address')} value={order.shop_address} icon={MapPin} copyValue={order.shop_address} />
+                                    <InfoRow label={td('phone')} value={order.shop_phone} icon={Phone} copyValue={order.shop_phone} />
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>

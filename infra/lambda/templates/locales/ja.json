@@ -1,7 +1,8 @@
 {
-  "MESSAGE_NOTIFICATION": "【名刺がわりに】新着メッセージ",
-  "SYSTEM_NOTIFICATION": "【名刺がわりに】システム通知",
-  "SHIPPING_NOTIFICATION": "【名刺がわりに】発送完了のお知らせ",
-  "ADDRESS_REGISTRATION_CONFIRMATION": "【名刺がわりに】住所登録完了のお知らせ",
-  "ADDRESS_REGISTRATION_NOTIFICATION": "【名刺がわりに】お届け先住所が登録されました"
+  "MESSAGE_NOTIFICATION": "【名刺代わりに】新着メッセージ",
+  "SYSTEM_NOTIFICATION": "【名刺代わりに】システム通知",
+  "SHIPPING_NOTIFICATION": "【名刺代わりに】発送完了のお知らせ",
+  "ADDRESS_REGISTRATION_CONFIRMATION": "【名刺代わりに】住所登録完了のお知らせ",
+  "ADDRESS_REGISTRATION_NOTIFICATION": "【名刺代わりに】お届け先住所が登録されました",
+  "INQUIRY_NOTIFICATION": "【名刺代わりに】お問い合わせのお知らせ"
 }

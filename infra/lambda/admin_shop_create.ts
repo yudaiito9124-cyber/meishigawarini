@@ -92,20 +92,39 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         await ddb.send(new UpdateCommand({
             TableName: TABLE_NAME,
             Key: { PK: `USER#${owner_id}`, SK: 'SHOP' },
-            UpdateExpression: 'SET owner_shop_ids = list_append(if_not_exists(owner_shop_ids, :empty_list), :new_shop_list), ts_updated_at = :now',
-            ExpressionAttributeValues: { ':new_shop_list': [newShopId], ':empty_list': [], ':now': now }
+            UpdateExpression: 'SET owner_shop_ids = list_append(if_not_exists(owner_shop_ids, :empty_list), :new_shop_list), email = :email, ts_updated_at = :now',
+            ExpressionAttributeValues: { ':new_shop_list': [newShopId], ':empty_list': [], ':email': email || null, ':now': now }
         }));
 
         // 【DB操作: UpdateItem (GM - ゼネラルマネージャー)】
         // [意図] 指定された各 GM ユーザーの管理ショップリストに新規ショップを追加し、
         // かつロール（GENERAL_MANAGER）を付与します。
         for (const gmid of gm_idslist) {
+            // GM のメールアドレスを取得（通知用）
+            let gmEmail = null;
+            try {
+                const gmUserRes = await ddb.send(new GetCommand({
+                    TableName: TABLE_NAME,
+                    Key: { PK: `USER#${gmid}`, SK: 'SHOP' }
+                }));
+                gmEmail = gmUserRes.Item?.email;
+                if (!gmEmail && USER_POOL_ID) {
+                    const cognitoRes = await cognito.send(new AdminGetUserCommand({
+                        UserPoolId: USER_POOL_ID,
+                        Username: gmid
+                    }));
+                    gmEmail = cognitoRes.UserAttributes?.find(attr => attr.Name === 'email')?.Value;
+                }
+            } catch (e) {
+                console.warn(`Failed to fetch GM email: ${gmid}`, e);
+            }
+
             // 管理ショップ ID の追加（アトミック操作）
             await ddb.send(new UpdateCommand({
                 TableName: TABLE_NAME,
                 Key: { PK: `USER#${gmid}`, SK: 'SHOP' },
-                UpdateExpression: 'SET gm_shop_ids = list_append(if_not_exists(gm_shop_ids, :empty_list), :new_shop_list), ts_updated_at = :now',
-                ExpressionAttributeValues: { ':new_shop_list': [newShopId], ':empty_list': [], ':now': now }
+                UpdateExpression: 'SET gm_shop_ids = list_append(if_not_exists(gm_shop_ids, :empty_list), :new_shop_list), email = :email, ts_updated_at = :now',
+                ExpressionAttributeValues: { ':new_shop_list': [newShopId], ':empty_list': [], ':email': gmEmail || null, ':now': now }
             }));
 
             // ロールの付与（排他制御）

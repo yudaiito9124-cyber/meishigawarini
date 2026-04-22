@@ -130,6 +130,26 @@ export default function UserDashboardPage() {
      */
     const navItems = [
         {
+            title: t('receiveList'),
+            desc: t('receiveListDesc'),
+            icon: Inbox,
+            href: `/user/receivedmemory`,
+            color: "text-purple-600",
+            bg: "bg-purple-50",
+            border: "border-purple-100 hover:border-purple-300 hover:bg-purple-50/50"
+        },
+        {
+            title: t('deliverySettings'),
+            desc: t('deliverySettingsDesc'),
+            icon: Truck,
+            href: `/user/editdelivery`,
+            color: "text-rose-600",
+            bg: "bg-rose-50",
+            border: "border-rose-100 hover:border-rose-300 hover:bg-rose-50/50"
+        }
+    ];
+    const navItems_sub = [
+        {
             title: t('editProfile'),
             desc: t('editProfileDesc'),
             icon: UserPen,
@@ -155,24 +175,6 @@ export default function UserDashboardPage() {
             color: "text-green-600",
             bg: "bg-green-50",
             border: "border-green-100 hover:border-green-300 hover:bg-green-50/50"
-        },
-        {
-            title: t('receiveList'),
-            desc: t('receiveListDesc'),
-            icon: Inbox,
-            href: `/user/receivedmemory`,
-            color: "text-purple-600",
-            bg: "bg-purple-50",
-            border: "border-purple-100 hover:border-purple-300 hover:bg-purple-50/50"
-        },
-        {
-            title: t('deliverySettings'),
-            desc: t('deliverySettingsDesc'),
-            icon: Truck,
-            href: `/user/editdelivery`,
-            color: "text-rose-600",
-            bg: "bg-rose-50",
-            border: "border-rose-100 hover:border-rose-300 hover:bg-rose-50/50"
         }
     ];
 
@@ -268,6 +270,32 @@ export default function UserDashboardPage() {
                                 <div className="space-y-2 relative z-10">
                                     <h3 className="text-2xl font-black text-gray-900">{item.title}</h3>
                                     <p className="text-sm text-gray-500 font-medium leading-relaxed max-w-[200px] mx-auto">{item.desc}</p>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    ))}
+                </div>
+
+                {/* ナビゲーションカードグリッド */}
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-32">
+                    {navItems_sub.map((item, idx) => (
+                        <Card
+                            key={item.href}
+                            onClick={() => router.push(item.href)}
+                            className={`group cursor-pointer transition-all hover:-translate-y-2 active:scale-95 hover:shadow-2xl border-none bg-white/10 backdrop-blur-xl rounded-[2rem] overflow-hidden`}
+                        >
+                            <CardContent className="p-0 flex flex-col items-center justify-center text-center gap-2 h-full relative overflow-hidden mr-1 ml-1">
+                                {/* インタラクティブな背景装飾 */}
+                                <div className={`absolute -right-4 -bottom-4 w-24 h-24 rounded-full ${item.bg} opacity-20 blur-2xl group-hover:scale-150 transition-transform`} />
+
+                                <div className="flex flex-row items-center justify-center gap-2">
+                                    <div className={`p-2 rounded-xl ${item.bg} shadow-inner transition-transform group-hover:scale-110`}>
+                                        <item.icon className={`w-5 h-5 ${item.color}`} />
+                                    </div>
+                                    <h3 className="text-lg font-black text-gray-900">{item.title}</h3>
+                                </div>
+                                <div className="space-y-2 relative z-10">
+                                    <p className="text-[10px] text-gray-500 font-medium leading-relaxed max-w-[200px] mx-auto">{item.desc}</p>
                                 </div>
                             </CardContent>
                         </Card>

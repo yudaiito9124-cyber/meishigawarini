@@ -88,6 +88,16 @@ export default function ResponsiveSecureFrame({ html, darkMode = false }: { html
                 // 親サイトへの情報漏洩を防ぐ
                 node.setAttribute('referrerpolicy', 'no-referrer');
             }
+
+            // a タグにセキュリティ属性を自動付与し、サンドボックスの影響を最小化する
+            if (node.tagName === 'A') {
+                node.setAttribute('rel', 'noopener noreferrer');
+                // target="_blank" が明示されていない場合も、ベース設定により別タブで開くが、
+                // 这里で明示的に付与しておくと動作がより確実になる
+                if (!node.getAttribute('target')) {
+                    node.setAttribute('target', '_blank');
+                }
+            }
         });
 
         const parser = new DOMParser();
@@ -239,7 +249,8 @@ export default function ResponsiveSecureFrame({ html, darkMode = false }: { html
             <iframe
                 srcDoc={srcDoc}
                 // サンドボックス属性の権限設定
-                sandbox="allow-scripts allow-popups allow-forms allow-presentation allow-same-origin"
+                // allow-popups-to-escape-sandbox: リンクを別タブで開いた際にサンドボックス制限を引き継がないようにする (SNS連携等で必須)
+                sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox allow-forms allow-presentation allow-same-origin"
                 scrolling="no"
                 style={{
                     width: "100%",

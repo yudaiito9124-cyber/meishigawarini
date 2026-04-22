@@ -23,6 +23,7 @@ export function ShopSettingsSection({ shopId }: { shopId: string }) {
     const { translateError } = useBackendError();
     const [shopPostalCode, setShopPostalCode] = useState('');
     const [shopPhone, setShopPhone] = useState('');
+    const [shopRecipientName, setShopRecipientName] = useState('');
 
     const { shop, userId, refreshShopDetails } = useShop();
     const {
@@ -39,6 +40,7 @@ export function ShopSettingsSection({ shopId }: { shopId: string }) {
         if (shop && isSettingsOpen) {
             setShopPostalCode(shop.shop_postal_code || '');
             setShopPhone(shop.shop_phone || '');
+            setShopRecipientName(shop.shop_recipient_name || '');
             setSettings({
                 htmlImageUrls: shop.html_image_urls || [],
                 debouncedPreviewHtml: shop.detail_html || '',
@@ -133,6 +135,7 @@ export function ShopSettingsSection({ shopId }: { shopId: string }) {
                 shop_postal_code: shopPostalCode,
                 shop_address: (formData.get('shop_address') as string),
                 shop_phone: shopPhone,
+                shop_recipient_name: shopRecipientName,
                 detail_html: (formData.get('shop_detail_html') as string),
                 html_image_urls: htmlImageUrls,
                 deleted_html_image_urls: htmlImageUrlsToDelete
@@ -203,6 +206,17 @@ export function ShopSettingsSection({ shopId }: { shopId: string }) {
                                 placeholder={t('shopSettings.shopPhonePlaceholder')}
                             />
                         </div>
+                    </div>
+
+                    <div className="space-y-2">
+                        <Label htmlFor="shop_recipient_name">{t('shopSettings.shopRecipientName')}</Label>
+                        <Input
+                            id="shop_recipient_name"
+                            name="shop_recipient_name"
+                            value={shopRecipientName}
+                            onChange={(e) => setShopRecipientName(e.target.value)}
+                            placeholder={t('shopSettings.shopRecipientNamePlaceholder')}
+                        />
                     </div>
 
                     <div className="space-y-2">
