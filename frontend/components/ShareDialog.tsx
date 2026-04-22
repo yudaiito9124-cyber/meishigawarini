@@ -149,11 +149,12 @@ export function ShareDialog({ qr_id, product, card, shop }: ShareDialogProps) {
             </DialogTrigger>
 
             {/* ダイアログ本体: Glassmorphism / 高い角丸デザイン */}
-            <DialogContent className="sm:max-w-md bg-white/95 backdrop-blur-xl border-none shadow-2xl rounded-[2rem] overflow-y-auto">
+            <DialogContent className="sm:max-w-md bg-white/95 backdrop-blur-xl border-none shadow-2xl rounded-[2rem] flex flex-col max-h-[90svh] p-0 overflow-hidden">
                 {/* 頂上のアクセントバー */}
-                <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-emerald-400 via-teal-500 to-emerald-400" />
+                <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-emerald-400 via-teal-500 to-emerald-400 z-10" />
 
-                <DialogHeader className="pt-4">
+                <div className="overflow-y-auto flex-1 px-6">
+                <DialogHeader className="pt-6">
                     <DialogTitle className="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2 justify-center flex-col">
                         <div className="flex items-center gap-2">
                             <Sparkles className="w-6 h-6 text-amber-500 animate-pulse" />
@@ -295,8 +296,9 @@ export function ShareDialog({ qr_id, product, card, shop }: ShareDialogProps) {
                     </div>
                 </div>
 
-                <div className="pb-6 pt-2 text-center">
-                    <p className="text-[10px] font-bold text-slate-300 uppercase tracking-[0.2em]">{t('description')}</p>
+                    <div className="pb-6 pt-2 text-center">
+                        <p className="text-[10px] font-bold text-slate-300 uppercase tracking-[0.2em]">{t('description')}</p>
+                    </div>
                 </div>
             </DialogContent>
         </Dialog>
