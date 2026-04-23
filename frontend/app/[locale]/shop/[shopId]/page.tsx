@@ -31,7 +31,7 @@ export default function ShopPage() {
     /** 翻訳用フック */
     const t = useTranslations('ShopPage');
     const params = useParams();
-    
+
     /** 
      * URLパラメータから shopId を抽出 
      * 配列形式で返される可能性を考慮した正規化

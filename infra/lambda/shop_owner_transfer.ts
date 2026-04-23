@@ -93,7 +93,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             // 旧オーナーを管理者（GM）として残す設定
             const currentGmIds = shopMetadata.gm_ids || [];
             // 新オーナーがGMリストにいた場合は除外し、旧オーナーをGMリストに追加する
-            const updatedGmIds = Array.from(new Set([...currentGmIds.filter(id => id !== cleanNewUserId), userId]));
+            const updatedGmIds = Array.from(new Set([...currentGmIds.filter((id: string) => id !== cleanNewUserId), userId]));
 
             const transactItems: any[] = [
                 // 処理 A: ショップ情報の更新

@@ -21,13 +21,13 @@ export function ShopHeader({
 }: ShopHeaderProps) {
     const t = useTranslations('ShopPage');
     const router = useRouter();
-    const { 
-        shop, 
-        isAdmin, 
-        singleShopOwner, 
-        userId, 
-        shopLoading, 
-        refreshShopDetails 
+    const {
+        shop,
+        isAdmin,
+        singleShopOwner,
+        userId,
+        shopLoading,
+        refreshShopDetails
     } = useShop();
 
     const handleShops = () => {
@@ -123,7 +123,7 @@ export function ShopHeader({
                         apiFetchPost={shopApi.fetch_post.bind(shopApi)}
                         translationNamespace="ShopPage"
                         currentUserEmail={currentUserEmail}
-                        buttonClassName="text-mist-500 hover:text-mist-800 relative rounded-full"
+                        buttonClassName="text-mist-500 hover:text-mist-800 relative rounded-full gap-2"
                     />
 
                     <ShopSettingsSection
@@ -135,7 +135,7 @@ export function ShopHeader({
                             <ChevronDown className="h-4 w-4 mr-1 rotate-90" /> {t('movetoshops')}
                         </Button>
                     )}
-                    
+
                     {(singleShopOwner && !isAdmin) && (
                         <Button variant="outline" className="text-mist-500 hover:text-mist-800 rounded-full" onClick={handleLogin}>
                             <ChevronDown className="h-4 w-4 mr-1 rotate-90" /> {t('movetologin')}
@@ -143,7 +143,7 @@ export function ShopHeader({
                     )}
 
                     <Button
-                        variant="outline"
+                        variant="ghost"
                         className="text-mist-500 hover:text-mist-800"
                         onClick={handleSignOut}
                     >

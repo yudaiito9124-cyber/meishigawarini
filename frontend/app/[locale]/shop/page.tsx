@@ -107,7 +107,7 @@ export default function ShopListPage() {
             const roles = data.roles || [];
             const owner_shop_ids = data.owner_shop_ids || [];
             const gm_shop_ids = data.gm_shop_ids || [];
-            
+
             setShops(shopList);
             setRoles(roles);
             setOwnerShopIds(owner_shop_ids);
@@ -142,7 +142,7 @@ export default function ShopListPage() {
                 owner_id: createOwnerId.trim(),
                 gm_ids: createGmId ? createGmId.split(';').map(id => id.trim()).filter(Boolean) : undefined
             });
-            
+
             // 作成完了後は一覧を再取得し、対象ショップへ遷移
             await fetchShops();
             setCreateName('');
@@ -182,8 +182,8 @@ export default function ShopListPage() {
                         {userId && <p className="text-xs text-gray-400 mt-1">{t('userId', { id: userId })}</p>}
                     </div>
                     {/* 操作ボタン群 */}
-                    <div className="flex flex-row flex-wrap items-center justify-center mr-0">
-                        <Button variant="ghost" className="text-mist-500 hover:text-mist-800" onClick={() => router.push('/login')}>
+                    <div className="flex flex-row flex-wrap items-center justify-center mr-0 gap-2">
+                        <Button variant="outline" className="text-mist-500 hover:text-mist-800 rounded-full" onClick={() => router.push('/login')}>
                             <ChevronDown className="h-4 w-4 mr-1 rotate-90" /> {t('movetologin')}
                         </Button>
                         <Button variant="ghost" className="text-mist-500 hover:text-mist-800" onClick={handleLogout}>
@@ -205,9 +205,9 @@ export default function ShopListPage() {
                         </div>
                     ) : (
                         shops.map((shop) => (
-                            <Card 
-                                key={shop.id} 
-                                className={cn("hover:shadow-lg transition-shadow cursor-pointer border", gmShopIds.includes(shop.id) && "bg-orange-500/20")} 
+                            <Card
+                                key={shop.id}
+                                className={cn("hover:shadow-lg transition-shadow cursor-pointer border", gmShopIds.includes(shop.id) ? "bg-mist-300/20" : "bg-orange-300/20")}
                                 onClick={() => router.push(`/shop/${shop.id}`)}
                             >
                                 <CardHeader>
@@ -218,21 +218,21 @@ export default function ShopListPage() {
                                         {gmShopIds.includes(shop.id) ? t('gm') : t('owner')}
                                     </div>
                                 </CardHeader>
-                                <CardFooter>
+                                {/* <CardFooter>
                                     <Button className="w-full" variant="secondary" asChild>
                                         <div>{t('manageShop')}</div>
                                     </Button>
-                                </CardFooter>
+                                </CardFooter> */}
                             </Card>
                         ))
                     )}
 
                     {/* 新規ショップ作成ボタン (システム管理者のみ表示) */}
                     {isAdmin && (
-                        <div className="flex w-full h-full flex-col sm:flex-row sm:items-center sm:justify-between sm:space-y-0 min-h-40">
+                        <div className="flex w-full h-full flex-col sm:flex-row sm:items-center sm:justify-between sm:space-y-0 min-h-30">
                             <Dialog open={createOpen} onOpenChange={setCreateOpen}>
                                 <DialogTrigger asChild className="flex w-full h-full">
-                                    <Button size="lg" className="text-xs md:text-sm" >{t('createShop')}</Button>
+                                    <Button size="lg" className="text-xs md:text-sm rounded-xl" >{t('createShop')}</Button>
                                 </DialogTrigger>
                                 <DialogContent>
                                     <DialogHeader>
@@ -250,7 +250,7 @@ export default function ShopListPage() {
                                                 placeholder={t('createDialog.placeholder')}
                                                 required
                                             />
-                                            
+
                                             <Label htmlFor="ownerId">{t('createDialog.label-owner')}</Label>
                                             <div className="flex flex-wrap items-center space-x-2">
                                                 <Switch
@@ -267,7 +267,7 @@ export default function ShopListPage() {
                                                 placeholder={t('createDialog.placeholder-owner')}
                                                 required
                                             />
-                                            
+
                                             <Label htmlFor="gmId">{t('createDialog.label-gm')}</Label>
                                             <div className="flex flex-wrap items-center space-x-2">
                                                 <Switch

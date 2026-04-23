@@ -1142,6 +1142,7 @@
   "AdminPage": {
     "verifyingAdmin": "管理者権限をチェック中...",
     "title": "管理ダッシュボード",
+    "logout": "ログアウト",
     "qrAdminLoginPage": "ログイン画面",
     "helpButton": "ヘルプ",
     "cancel": "キャンセル",

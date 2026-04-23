@@ -209,19 +209,21 @@ export default function LoginPage() {
                 {isLoggedIn && (
                     <div className={cn("w-full pt-0 flex flex-wrap gap-4", (isAdmin ? "justify-between" : "justify-end"))}>
                         {isAdmin && (
-                            <div className="flex gap-2 flex-col items-start w-full sm:w-auto">
-                                <Link href="/help/admin" className="w-full sm:w-auto">
+                            <div className="flex gap-2 flex-col items-start w-auto">
+                                <Link href="/help/admin" className="w-full">
                                     <Button
                                         variant="ghost"
-                                        className="cursor-pointer text-white h-10 flex items-center gap-1.5 px-3 w-full sm:w-40 hover:text-white hover:bg-mist-700">
+                                        className="cursor-pointer text-white h-10 flex items-center gap-1.5 px-3 w-full hover:text-white hover:bg-mist-700">
                                         <HelpCircle className="size-5" />
                                         <span className="text-xs font-bold">{t('helpAdminPage')}</span>
                                     </Button>
                                 </Link>
-                                <Link href="/admin" className="w-full sm:w-auto">
-                                    <Button variant="destructive" className="shadow-md cursor-pointer border border-red-900 h-32 sm:h-40 w-full sm:w-40 flex flex-col items-center justify-center p-2 hover:bg-red-700 transition-colors">
-                                        <Crown className="size-12 sm:size-18 drop-shadow-md stroke-[2]" />
-                                        <div className='font-bold text-base sm:text-lg leading-tight text-center mt-1'>{t('qrAdminPage')}</div>
+                                <Link href="/admin" className="w-full h-full">
+                                    <Button variant="destructive" className="h-full p-7 pl-10 pr-10 shadow-md cursor-pointer border border-red-900 w-full flex flex-col items-center justify-center hover:bg-red-700 transition-colors rounded-[2rem]">
+                                        <div className="p-3 bg-white/20 rounded-2xl">
+                                            <Crown className="size-12 sm:size-18 drop-shadow-md stroke-[2]" />
+                                        </div>
+                                        <div className='font-bold text-base text-xl leading-tight text-center mt-3'>{t('qrAdminPage')}</div>
                                     </Button>
                                 </Link>
                             </div>

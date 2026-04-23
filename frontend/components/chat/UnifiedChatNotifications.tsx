@@ -492,7 +492,7 @@ export const UnifiedChatNotifications = React.forwardRef<
                 const email = res?.shop?.email || res?.shop?.contact_email || '';
                 if (email) setShopContactEmail(email);
             })
-            .catch(() => {});
+            .catch(() => { });
     }, [participantId]);
 
     // ─── チャット一覧の取得 ───────────────────────────────────────────────────
@@ -747,7 +747,7 @@ export const UnifiedChatNotifications = React.forwardRef<
                 participants: [participantId, 'ADMIN'],
                 initiator_id: participantId,
             };
-            
+
             // overridePayload がない場合は initial_message を追加
             if (!validOverride && createFormData.initial_message?.trim()) {
                 payload.initial_message = {
@@ -911,11 +911,11 @@ export const UnifiedChatNotifications = React.forwardRef<
     const sendFreeText = async () => {
         const text = inputMessage.trim();
         const hasFile = selectedFile !== null;
-        
+
         // テキストかファイルのいずれかは必須
         if (!text && !hasFile) return;
         if (!selectedChatId || sendingMessage || uploading) return;
-        
+
         setSendingMessage(true);
         try {
             let fileData: ChatFileData | null = null;
@@ -928,7 +928,7 @@ export const UnifiedChatNotifications = React.forwardRef<
                     setUploading(false);
                 }
             }
-            
+
             // メッセージを送信
             await apiFetchPost('/unified/chat/messages/send', {
                 chat_id: selectedChatId,
@@ -937,15 +937,15 @@ export const UnifiedChatNotifications = React.forwardRef<
                 message: text || '',
                 ...fileData,
             });
-            
+
             // フォームをリセット
             setInputMessage('');
             setSelectedFile(null);
-            
+
             // メッセージ一覧を再取得
             const allMessages = await fetchAllMessages(selectedChatId);
             setSelectedMessages(allMessages);
-            
+
             // チャット一覧側の最終更新日時も楽観的に更新
             setChats((prev) =>
                 prev.map((c) =>
@@ -1045,7 +1045,7 @@ export const UnifiedChatNotifications = React.forwardRef<
             ─────────────────────────────────────────────────────────────────────── */}
             <Dialog open={isOpen} onOpenChange={setIsOpen}>
                 <DialogContent
-                    className="w-[98vw] max-w-[98vw] sm:max-w-[96vw] lg:max-w-[92vw] xl:max-w-[1600px] max-h-[90vh] max-h-[90dvh] overflow-y-auto flex flex-col"
+                    className="w-[98vw] max-w-[98vw] sm:max-w-[96vw] lg:max-w-[92vw] xl:max-w-[1600px] max-h-[98vh] max-h-[98dvh] overflow-y-auto flex flex-col"
                     style={{
                         ...(dialogHeightPx ? { maxHeight: `${dialogHeightPx}px` } : {}),
                         WebkitOverflowScrolling: 'touch',
@@ -1105,7 +1105,7 @@ export const UnifiedChatNotifications = React.forwardRef<
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-0 min-h-0 items-start">
 
                         {/* ─── 左パネル: チャット一覧 ────────────────────────────── */}
-                        <Card className="overflow-hidden flex flex-col h-[67rem]">
+                        <Card className="overflow-hidden flex flex-col h-[30rem] sm:h-[40rem] lg:h-[calc(100vh-16rem)]">
                             <CardHeader className="flex flex-col gap-3 pb-3 border-b bg-gray-50/60">
                                 <div className="flex flex-row items-center justify-between">
                                     <CardTitle>{t('notifications.listTitle')}</CardTitle>
@@ -1189,7 +1189,7 @@ export const UnifiedChatNotifications = React.forwardRef<
                         </Card>
 
                         {/* ─── 右パネル: チャット詳細 ────────────────────────────── */}
-                        <Card className="overflow-hidden flex flex-col h-[67rem]">
+                        <Card className="overflow-hidden flex flex-col h-[30rem] sm:h-[40rem] lg:h-[calc(100vh-16rem)]">
                             <CardHeader>
                                 <CardTitle>{t('notifications.detailTitle')}</CardTitle>
                             </CardHeader>
@@ -1363,7 +1363,7 @@ export const UnifiedChatNotifications = React.forwardRef<
                                                     disabled={sendingMessage || uploading}
                                                     className="resize-none"
                                                 />
-                                                
+
                                                 {/* ファイル選択 */}
                                                 {selectedFile && (
                                                     <div className="flex items-center justify-between gap-2 p-2 bg-blue-50 rounded border border-blue-200">
@@ -1381,7 +1381,7 @@ export const UnifiedChatNotifications = React.forwardRef<
                                                         </Button>
                                                     </div>
                                                 )}
-                                                
+
                                                 <div className="flex gap-2">
                                                     <input
                                                         type="file"
@@ -1408,16 +1408,16 @@ export const UnifiedChatNotifications = React.forwardRef<
                                                     >
                                                         📎 {t('notifications.attachFile') || 'Attach'}
                                                     </Button>
-                                                    
+
                                                     <Button
                                                         className="self-end"
                                                         size="sm"
                                                         onClick={sendFreeText}
                                                         disabled={sendingMessage || uploading || (!inputMessage.trim() && !selectedFile)}
                                                     >
-                                                        {uploading ? (t('notifications.uploading') || 'Uploading...') 
-                                                         : sendingMessage ? (t('notifications.loading') || 'Sending...') 
-                                                         : (t('notifications.sendButton') || 'Send')}
+                                                        {uploading ? (t('notifications.uploading') || 'Uploading...')
+                                                            : sendingMessage ? (t('notifications.loading') || 'Sending...')
+                                                                : (t('notifications.sendButton') || 'Send')}
                                                     </Button>
                                                 </div>
                                             </div>

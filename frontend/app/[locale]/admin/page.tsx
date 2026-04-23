@@ -23,7 +23,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { notFound, useParams } from "next/navigation";
-import { getCurrentUser, fetchAuthSession } from 'aws-amplify/auth';
+import { getCurrentUser, fetchAuthSession, signOut } from 'aws-amplify/auth';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
@@ -36,7 +36,7 @@ import { useBackendError } from '@/hooks/useBackendError';
 import { generatePDF } from '@/lib/generatePDF';
 import { cardformats, paperformats } from '@/lib/constants/designs';
 import { generateCSVExport } from '@/lib/generateCSVExport';
-import { ExternalLink, Copy, Check, Eye, QrCode, Store, Wrench, Layers, HelpCircle, Home, Trash2, RotateCcw, Loader2, Plus, X, Search, Save, FileText, Download, CreditCard, Printer, Paintbrush, ChevronDown, Settings } from 'lucide-react';
+import { ExternalLink, Copy, Check, Eye, QrCode, Store, Wrench, Layers, HelpCircle, Home, Trash2, RotateCcw, Loader2, Plus, X, Search, Save, FileText, Download, CreditCard, Printer, Paintbrush, ChevronDown, Settings, LogOut } from 'lucide-react';
 import CardDesignEditor from "@/components/admin/CardDesignEditor";
 const NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 const NEXT_PUBLIC_APP_URL = process.env.NEXT_PUBLIC_APP_URL || "";
@@ -440,7 +440,7 @@ export default function AdminPage() {
                     <h1 className="text-2xl font-bold text-white w-full sm:w-auto text-center sm:text-left">{t('title')}</h1>
                     <div className="flex items-center gap-2 flex-wrap justify-center sm:justify-end w-full sm:w-auto">
                         <Link href="/admin/help" target="_blank" rel="noopener noreferrer">
-                            <Button variant="outline" className="bg-mist-800 border-mist-700 text-mist-300 hover:bg-mist-700 hover:text-white transition-all duration-300">
+                            <Button variant="outline" className="bg-mist-800 border-mist-700 text-mist-300 hover:bg-mist-700 hover:text-white transition-all duration-300 rounded-full">
                                 <HelpCircle className="w-4 h-4 mr-2" />
                                 {t('helpButton') || "Help"}
                             </Button>
@@ -451,8 +451,21 @@ export default function AdminPage() {
                             </Button>
                         </Link> */}
 
-                        <Button variant="ghost" className="text-mist-500 hover:text-mist-800" onClick={() => router.push('/login')}>
-                            <ChevronDown className="h-4 w-4 mr-1 rotate-90" /> {t('back')}
+                        <Button variant="outline" className="bg-mist-800 border-mist-700 text-mist-300 hover:bg-mist-700 hover:text-white transition-all duration-300 rounded-full" onClick={() => router.push('/login')}>
+                            {t('back')} <ChevronDown className="h-4 w-4 mr-1 rotate-270" />
+                        </Button>
+
+                        <Button
+                            variant="ghost"
+                            className={cn(
+                                "cursor-pointer w-full sm:w-40 justify-center h-10 text-white hover:bg-mist-700 hover:text-white")}
+                            onClick={async () => {
+                                await signOut();
+                                router.push(`/`);
+                            }}
+                        >
+                            <LogOut className="w-5 h-5 mr-2" />
+                            {t('logout')}
                         </Button>
                     </div>
                 </div>
@@ -1753,8 +1766,8 @@ function AdminInquiryChatSection({ dbCardDesigns }: { dbCardDesigns: any[] }) {
     }, [chatPageSize]);
 
     return (
-        <Card className="flex flex-col min-h-[70vh]">
-            <CardHeader className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
+        <Card className="flex flex-col min-h-[70vh] gap-1 pt-3">
+            <CardHeader className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between mb-0 pb-0">
                 <div>
                     <CardTitle>{t('inquiryChat.title')}</CardTitle>
                     <CardDescription>{t('inquiryChat.description')}</CardDescription>
@@ -1774,10 +1787,10 @@ function AdminInquiryChatSection({ dbCardDesigns }: { dbCardDesigns: any[] }) {
             </CardHeader>
 
             <CardContent
-                className="grid grid-cols-1 xl:grid-cols-2 gap-0 flex-1 min-h-0 p-6 overflow-y-auto xl:grid-rows-1"
+                className="grid grid-cols-1 xl:grid-cols-2 gap-0 flex-1 min-h-0 pt-0 mt-0 overflow-y-auto xl:grid-rows-1"
                 style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}
             >
-                <Card className="flex flex-col h-[67rem]">
+                <Card className="flex flex-col h-[35rem] xl:h-[calc(100vh-5rem)]">
                     <CardHeader className="pb-0 justify-end">
                         {/* <div className="flex items-center gap-2">
                             <CardTitle>{t('inquiryChat.listTitle')}</CardTitle>
@@ -1889,7 +1902,7 @@ function AdminInquiryChatSection({ dbCardDesigns }: { dbCardDesigns: any[] }) {
                     </CardContent>
                 </Card>
 
-                <Card className="overflow-hidden flex flex-col h-[67rem]">
+                <Card className="overflow-hidden flex flex-col h-[35rem] xl:h-[calc(100vh-5rem)]">
                     {/* <CardHeader>
                         <CardTitle>{t('inquiryChat.detailTitle')}</CardTitle>
                     </CardHeader> */}
