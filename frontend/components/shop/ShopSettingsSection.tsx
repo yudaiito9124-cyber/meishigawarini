@@ -75,7 +75,14 @@ export function ShopSettingsSection({ shopId }: { shopId: string }) {
             setSettings({ sessionUploadedUrls: [] });
         }
         if (open) fetchAdminEmails();
-        setSettings({ isSettingsOpen: open, isSettingShowHTML: false });
+        setSettings({
+            isSettingsOpen: open,
+            isAdminSectionOpen: false,
+            isBasicSettingsOpen: false,
+            isDeliverySettingsOpen: false,
+            isHtmlEditorOpen: false,
+            isNotificationSettingsOpen: false
+        });
     };
 
     const handleHtmlImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -792,7 +799,7 @@ function ImageUploadGrid({ htmlImageUrls, isOpen, setIsOpen, isUploading, onUplo
         <div className="space-y-2 pt-2">
             <Button type="button" variant="ghost" size="sm" onClick={() => setIsOpen(!isOpen)} className="w-full flex justify-between items-center text-gray-500 px-2">
                 <div className="flex items-center gap-2"><ImageIcon className="w-4 h-4" /><span className="font-semibold">{tr('senderInfo.labels.detail_html-images')}</span></div>
-                <ChevronDown className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-0' : '240'}`} />
+                <ChevronDown className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-180' : 'rotate-0'}`} />
             </Button>
             {isOpen && (
                 <div className="space-y-4 p-4 bg-gray-50/50 rounded-lg border border-dashed">
