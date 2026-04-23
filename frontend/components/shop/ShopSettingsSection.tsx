@@ -27,6 +27,9 @@ export function ShopSettingsSection({ shopId }: { shopId: string }) {
     const [shopRecipientName, setShopRecipientName] = useState('');
     const [shortestDeliveryDays, setShortestDeliveryDays] = useState('');
     const [deliveryTimeOptionsText, setDeliveryTimeOptionsText] = useState('');
+    const [shopName, setShopName] = useState('');
+    const [shopAddress, setShopAddress] = useState('');
+    const [shopDetailHtml, setShopDetailHtml] = useState('');
 
     const { shop, userId, refreshShopDetails } = useShop();
     const {
@@ -38,14 +41,15 @@ export function ShopSettingsSection({ shopId }: { shopId: string }) {
         set: setSettings
     } = useSettingsUI();
 
-    const shopDetailRef = useRef<HTMLTextAreaElement>(null);
-
     useEffect(() => {
         if (shop && isSettingsOpen) {
+            setShopName(shop.name || '');
+            setShopAddress(shop.shop_address || '');
+            setShopDetailHtml(shop.detail_html || '');
             setShopPostalCode(shop.shop_postal_code || '');
             setShopPhone(shop.shop_phone || '');
             setShopRecipientName(shop.shop_recipient_name || '');
-            setShortestDeliveryDays(shop.shortest_delivery_days !== undefined ? String(shop.shortest_delivery_days) : '');
+            setShortestDeliveryDays(shop.shortest_delivery_days != null ? String(shop.shortest_delivery_days) : '');
             setDeliveryTimeOptionsText(Array.isArray(shop.delivery_time_options) ? shop.delivery_time_options.join('\n') : '');
             setSettings({
                 htmlImageUrls: shop.html_image_urls || [],
@@ -128,8 +132,6 @@ export function ShopSettingsSection({ shopId }: { shopId: string }) {
 
     const handleUpdateShop = async (e: React.FormEvent) => {
         e.preventDefault();
-        const form = e.target as HTMLFormElement;
-        const formData = new FormData(form);
 
         if (shopPostalCode && !isValidZip(shopPostalCode)) {
             alert(tr('errors.invalidZip'));
@@ -146,16 +148,16 @@ export function ShopSettingsSection({ shopId }: { shopId: string }) {
         try {
             await shopApi.shop_details_update({
                 shop_id: shopId,
-                name: (formData.get('shop_name') as string),
+                name: shopName,
                 shop_postal_code: shopPostalCode,
-                shop_address: (formData.get('shop_address') as string),
+                shop_address: shopAddress,
                 shop_phone: shopPhone,
                 shop_recipient_name: shopRecipientName,
-                detail_html: (formData.get('shop_detail_html') as string),
+                detail_html: shopDetailHtml,
                 html_image_urls: htmlImageUrls,
                 deleted_html_image_urls: htmlImageUrlsToDelete,
-                shortest_delivery_days: shortestDeliveryDays !== '' ? parseInt(shortestDeliveryDays, 10) : undefined,
-                delivery_time_options: deliveryTimeOptionsText.trim() !== '' ? deliveryTimeOptionsText.split('\n').map(s => s.trim()).filter(s => s !== '') : undefined,
+                shortest_delivery_days: shortestDeliveryDays !== '' ? Math.max(0, parseInt(shortestDeliveryDays, 10)) : null,
+                delivery_time_options: deliveryTimeOptionsText.trim() !== '' ? deliveryTimeOptionsText.split('\n').map(s => s.trim()).filter(s => s !== '') : [],
                 order_notification_user_ids: orderNotificationUserIds,
                 inquiry_notification_user_ids: inquiryNotificationUserIds
             });
@@ -171,9 +173,7 @@ export function ShopSettingsSection({ shopId }: { shopId: string }) {
     };
 
     const handleUpdatePreview = () => {
-        if (shopDetailRef.current) {
-            setSettings({ debouncedPreviewHtml: shopDetailRef.current.value });
-        }
+        setSettings({ debouncedPreviewHtml: shopDetailHtml });
     };
 
     const handleCopy = (id: string | undefined) => {
@@ -344,7 +344,7 @@ export function ShopSettingsSection({ shopId }: { shopId: string }) {
                                 <div className="space-y-4 py-4 animate-in fade-in slide-in-from-top-2 duration-300 p-2">
                                     <div className="space-y-2">
                                         <Label htmlFor="shop_name">{t('shopSettings.name')}</Label>
-                                        <Input id="shop_name" name="shop_name" defaultValue={shop?.name} required className="rounded-xl h-11" />
+                                        <Input id="shop_name" name="shop_name" value={shopName} onChange={(e) => setShopName(e.target.value)} required className="rounded-xl h-11" />
                                     </div>
 
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -389,7 +389,8 @@ export function ShopSettingsSection({ shopId }: { shopId: string }) {
                                         <Input
                                             id="shop_address"
                                             name="shop_address"
-                                            defaultValue={shop?.shop_address || ''}
+                                            value={shopAddress}
+                                            onChange={(e) => setShopAddress(e.target.value)}
                                             placeholder={t('shopSettings.shopAddressPlaceholder')}
                                             className="rounded-xl h-11"
                                         />
@@ -473,8 +474,8 @@ export function ShopSettingsSection({ shopId }: { shopId: string }) {
                             {isHtmlEditorOpen && (
                                 <div className="space-y-4 py-4 animate-in fade-in slide-in-from-top-2 duration-300 p-2">
                                     <HtmlEditor
-                                        shopDetailRef={shopDetailRef}
-                                        defaultHtml={shop?.detail_html}
+                                        value={shopDetailHtml}
+                                        onChange={(val) => setShopDetailHtml(val)}
                                         debouncedPreviewHtml={debouncedPreviewHtml}
                                         onUpdatePreview={handleUpdatePreview}
                                         t={t} tr={tr}
@@ -726,15 +727,15 @@ function AdminInfo({ adminEmails, t, onUnlink, onLink, isAdding, isOwner, onTran
 }
 
 interface HtmlEditorProps {
-    shopDetailRef: React.RefObject<HTMLTextAreaElement | null>;
-    defaultHtml: string | undefined;
+    value: string;
+    onChange: (val: string) => void;
     debouncedPreviewHtml: string;
     onUpdatePreview: () => void;
     t: (key: string) => string;
     tr: (key: string) => string;
 }
 
-function HtmlEditor({ shopDetailRef, defaultHtml, debouncedPreviewHtml, onUpdatePreview, t, tr }: HtmlEditorProps) {
+function HtmlEditor({ value, onChange, debouncedPreviewHtml, onUpdatePreview, t, tr }: HtmlEditorProps) {
     const handleDownloadPrompt = () => {
         const link = document.createElement('a');
         link.href = '/prompts/landing-page-prompt.md';
@@ -758,7 +759,7 @@ function HtmlEditor({ shopDetailRef, defaultHtml, debouncedPreviewHtml, onUpdate
                             </Button>
                         </div>
                     </div>
-                    <textarea ref={shopDetailRef} id="shop_detail_html" name="shop_detail_html" defaultValue={defaultHtml} className="flex-1 w-full p-4 text-sm font-mono focus-visible:outline-none resize-none overflow-y-auto" placeholder={t('shopSettings.detailHtmlPlaceholder')} />
+                    <textarea id="shop_detail_html" name="shop_detail_html" value={value} onChange={(e) => onChange(e.target.value)} className="flex-1 w-full p-4 text-sm font-mono focus-visible:outline-none resize-none overflow-y-auto" placeholder={t('shopSettings.detailHtmlPlaceholder')} />
                 </div>
                 <div className="flex-1 flex flex-col min-h-0 bg-gray-50/50 max-w-2xl">
                     <div className="px-3 py-2 bg-gray-50 border-b flex justify-between items-center">
