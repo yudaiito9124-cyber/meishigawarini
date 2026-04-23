@@ -142,6 +142,8 @@
 | `GSI2_PK` | String | `USER#{owner_id}` （オーナーのショップ一覧取得用、[User](#21-user-ユーザー権限情報) への逆引き用） |
 | `GSI2_SK` | String | ソートキー。**オーナーID (`GSI2_PK`) が変更された際のみ**、現在時刻 (ISO 8601) に更新されます。 |
 | `html_image_urls` | Array<String> | ショップ詳細HTML内で使用される画像のURL配列 |
+| `shortest_delivery_days` | Number | 最短配送希望日（何日先から配送日を選択可能か） |
+| `delivery_time_options` | Array<String> | 配送希望時刻の選択肢リスト |
 
 ### 2.7 Product (商品情報)
 各ショップに紐づく商品カタログ情報です。

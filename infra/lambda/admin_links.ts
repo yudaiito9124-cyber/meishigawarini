@@ -18,6 +18,7 @@ import { successResponse, errorResponse } from './utils/response';
 import { ddb, TABLE_NAME, USER_POOL_ID } from './share/db';
 import { getUserId, getAction } from './utils/request';
 import { AdminApiSchema } from '@shared/api-types';
+import { refreshMailingLists } from './utils/mailing-list';
 
 const cognito = new CognitoIdentityProviderClient({});
 
@@ -167,6 +168,9 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                         ExpressionAttributeValues: { ':new_gm_list': finalUserIdsToLink, ':empty_list': [] }
                     }));
                 }
+                
+                // メーリングリストの同期（新規追加時には既存リストにはいないが、整合性のために実行）
+                await refreshMailingLists(ddb, TABLE_NAME, sid);
             }
 
             return successResponse({ message: 'Updates completed successfully' });
@@ -245,6 +249,9 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                         ExpressionAttributeValues: { ':new_list': newGmIds }
                     }));
                 }
+
+                // メーリングリストの同期（除名されたユーザーをリストから排除）
+                await refreshMailingLists(ddb, TABLE_NAME, sid);
             }
 
             return successResponse({ message: 'Unlinking completed successfully' });

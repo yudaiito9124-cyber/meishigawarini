@@ -70,6 +70,8 @@ classDiagram
         +String shop_address
         +String shop_phone
         +String shop_recipient_name
+        +Number shortest_delivery_days
+        +Array delivery_time_options
     }
 
     class Product_Catalog["商品カタログ (Product)"] {

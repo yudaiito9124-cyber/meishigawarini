@@ -16,22 +16,50 @@ import { successResponse, errorResponse } from './utils/response';
 import { ddb, TABLE_NAME } from './share/db';
 import { getShopId, getUserId } from './utils/request';
 import { ShopApiSchema } from '@shared/api-types';
+import { handler as adminLinksHandler } from './admin_links';
 
-export const handler: APIGatewayProxyHandler = async (event) => {
+export const handler: APIGatewayProxyHandler = async (event, context, callback) => {
     try {
         if (event.httpMethod === 'OPTIONS') return successResponse();
 
         const userId = getUserId(event);
-        const body = JSON.parse(event.body || '{}') as ShopApiSchema['shop_admins'];
+        const body = JSON.parse(event.body || '{}');
         const shopId = getShopId(event, body);
 
         if (!shopId) return errorResponse(400, 'Missing shopId');
         if (!userId) return errorResponse(401, 'Unauthorized');
 
-        // 権限検証: 同時にショップの管理者構成（owner_id, gm_ids）を取得
+        // 権限検証: 対象ショップのオーナーまたはGMであることを確認
         const shopMetadata = await checkShopOwnerOrGM(ddb, TABLE_NAME, shopId, userId, event);
         if (!shopMetadata) return errorResponse(403, 'Forbidden');
 
+        const path = event.resource || event.path || '';
+
+        // --------------------------------------------------------------------
+        // ACTION: link / unlink (管理者の追加・削除)
+        // --------------------------------------------------------------------
+        if (path.endsWith('/link') || path.endsWith('/unlink') || path.endsWith('/validate')) {
+            const action = path.endsWith('/link') ? 'execute' : (path.endsWith('/unlink') ? 'unlink' : 'validate');
+            const { user_id } = body as ShopApiSchema['shop_admins_link'];
+            if (!user_id) return errorResponse(400, 'Missing user_id');
+
+            // admin_links.ts のハンドラーを内部的に呼び出す
+            // admin_links は複数の shop_ids / user_ids を受け取るため、配列に包んで渡す
+            const adminEvent = {
+                ...event,
+                body: JSON.stringify({
+                    shop_ids: [shopId],
+                    user_ids: [user_id],
+                    action: action
+                })
+            };
+
+            return await (adminLinksHandler as any)(adminEvent, context, callback);
+        }
+
+        // --------------------------------------------------------------------
+        // ACTION: get (管理者一覧取得 - デフォルト)
+        // --------------------------------------------------------------------
         const ownerId = shopMetadata.owner_id;
         const gmIds = shopMetadata.gm_ids || [];
 
@@ -44,9 +72,12 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             return res.Item?.email || 'Unknown';
         };
 
-        const [ownerEmailResult, ...managerEmails] = await Promise.all([
+        const [ownerEmailResult, ...managerData] = await Promise.all([
             fetchUserEmail(ownerId),
-            ...gmIds.map((id: string) => fetchUserEmail(id))
+            ...gmIds.map(async (id: string) => {
+                const email = await fetchUserEmail(id);
+                return { user_id: id, email };
+            })
         ]);
 
         // オーナーのメールアドレスが取得できなかった場合のフォールバック
@@ -57,7 +88,8 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 
         return successResponse({ 
             owner_email: ownerEmail,
-            manager_emails: managerEmails.filter(email => email !== 'Unknown') // 実在するメールのみをフィルタ
+            owner_id: ownerId,
+            managers: managerData.filter(m => m.email !== 'Unknown') // 実在するメールのみをフィルタ
         });
 
     } catch (error: any) {

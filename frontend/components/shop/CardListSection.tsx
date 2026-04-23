@@ -122,6 +122,7 @@ export function CardListSection({ shopId }: { shopId: string }) {
     const t = useTranslations('ShopPage');
     const ts = useTranslations('Timestamp');
     const st = useTranslations('Status');
+    const tt = useTranslations('Time');
     const { translateError } = useBackendError();
 
     const { shop, products, orders, ordersLoading, refreshOrders, refreshProducts, refreshShopDetails } = useShop();
@@ -320,6 +321,9 @@ export function CardListSection({ shopId }: { shopId: string }) {
                 );
             case 'email': return <span className="text-xs truncate max-w-[120px] inline-block">{order.shipping_info?.email || "-"}</span>;
             case 'phone': return <span className="text-xs">{order.shipping_info?.phone || "-"}</span>;
+            case 'preferred_time': 
+                const timeKey = order[colKey];
+                return <span className="text-xs">{timeKey ? (tt.has(timeKey) ? tt(timeKey) : timeKey) : "-"}</span>;
             default: return <span className="truncate max-w-[150px] inline-block text-xs">{order[colKey] || "-"}</span>;
         }
     };
@@ -372,6 +376,10 @@ export function CardListSection({ shopId }: { shopId: string }) {
                         break;
                     case 'phone':
                         value = order.shipping_info?.phone || "-";
+                        break;
+                    case 'preferred_time':
+                        const tKey = order[col.key];
+                        value = tKey ? (tt.has(tKey) ? tt(tKey) : tKey) : "-";
                         break;
                     default:
                         value = order[col.key] || "-";

@@ -22,6 +22,7 @@ import { successResponse, errorResponse } from './utils/response';
 import { ddb, TABLE_NAME, BUCKET_NAME } from './share/db';
 import { getShopId, getAction, getUserId } from './utils/request';
 import { ShopApiSchema } from '@shared/api-types';
+import { refreshMailingLists } from './utils/mailing-list';
 
 export const handler: APIGatewayProxyHandler = async (event) => {
     try {
@@ -110,7 +111,11 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 shop_postal_code,
                 shop_address,
                 shop_phone,
-                shop_recipient_name
+                shop_recipient_name,
+                shortest_delivery_days,
+                delivery_time_options,
+                order_notification_user_ids,
+                inquiry_notification_user_ids
             } = body as ShopApiSchema['shop_details_update'];
             const updateExpr: string[] = ['ts_updated_at = :now'];
             const attrNames: any = {};
@@ -123,6 +128,10 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             if (shop_address !== undefined) { updateExpr.push('shop_address = :shop_address'); attrValues[':shop_address'] = shop_address; }
             if (shop_phone !== undefined) { updateExpr.push('shop_phone = :shop_phone'); attrValues[':shop_phone'] = shop_phone; }
             if (shop_recipient_name !== undefined) { updateExpr.push('shop_recipient_name = :shop_recipient_name'); attrValues[':shop_recipient_name'] = shop_recipient_name; }
+            if (shortest_delivery_days !== undefined) { updateExpr.push('shortest_delivery_days = :sdd'); attrValues[':sdd'] = shortest_delivery_days; }
+            if (delivery_time_options !== undefined) { updateExpr.push('delivery_time_options = :dto'); attrValues[':dto'] = delivery_time_options; }
+            if (order_notification_user_ids !== undefined) { updateExpr.push('order_notification_user_ids = :ouid'); attrValues[':ouid'] = order_notification_user_ids; }
+            if (inquiry_notification_user_ids !== undefined) { updateExpr.push('inquiry_notification_user_ids = :iuid'); attrValues[':iuid'] = inquiry_notification_user_ids; }
 
             // 画像 URL リストの同期と物理削除処理
             if (html_image_urls !== undefined) {
@@ -152,6 +161,9 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 ExpressionAttributeNames: Object.keys(attrNames).length > 0 ? attrNames : undefined,
                 ExpressionAttributeValues: attrValues
             }));
+
+            // メールアドレスリストの再解決と保存の実行
+            await refreshMailingLists(ddb, TABLE_NAME, shopId);
 
             return successResponse({ message: 'Shop updated' });
         }

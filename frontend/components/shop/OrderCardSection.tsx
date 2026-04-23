@@ -276,9 +276,9 @@ function ProductSelection({ products, selectedOrderProduct, setOrderCard, t }: P
 
     return (
         <div className="flex flex-wrap items-start gap-4">
-            {activeProducts.map((product: any) => (
+            {activeProducts.map((product: any, idx: number) => (
                 <div
-                    key={product.product_id}
+                    key={product.product_id || `active-product-${idx}`}
                     onClick={() => setOrderCard({ selectedOrderProduct: product })}
                     className={`group relative h-24 rounded-xl border-2 overflow-hidden cursor-pointer transition-all hover:shadow-lg ${selectedProductId === product.product_id
                         ? 'border-primary ring-4 ring-primary/10 shadow-xl scale-[1.02]'
@@ -329,9 +329,9 @@ function OrderHistoryTable({ cardOrders, cardOrdersLoading, products, onCancel, 
                         <TableRow><TableCell colSpan={5} className="h-32 text-center">Loading...</TableCell></TableRow>
                     ) : cardOrders.length === 0 ? (
                         <TableRow><TableCell colSpan={5} className="h-32 text-center text-gray-400 font-medium">{t('cardOrder.noOrders')}</TableCell></TableRow>
-                    ) : cardOrders.map((order: any) => (
+                    ) : cardOrders.map((order: any, idx: number) => (
                         <TableRow
-                            key={order.order_id}
+                            key={order.order_id || `card-order-${idx}`}
                             className="group hover:bg-gray-50/50 transition-colors cursor-pointer"
                             onClick={() => onDetails(order)}
                         >

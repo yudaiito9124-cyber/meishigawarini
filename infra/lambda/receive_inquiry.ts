@@ -52,19 +52,27 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         }));
         if (!shopRes.Item) return errorResponse(404, 'Shop not found');
 
-        let shopEmail = shopRes.Item.email;
-        if (!shopEmail && shopRes.Item.owner_id && USER_POOL_ID) {
+        let ownerEmail: string | undefined;
+        if (!shopRes.Item.email && shopRes.Item.owner_id && USER_POOL_ID) {
             try {
                 const userRes = await cognito.send(new AdminGetUserCommand({
                     UserPoolId: USER_POOL_ID, Username: shopRes.Item.owner_id
                 }));
-                shopEmail = userRes.UserAttributes?.find(attr => attr.Name === 'email')?.Value;
+                ownerEmail = userRes.UserAttributes?.find(attr => attr.Name === 'email')?.Value;
             } catch (e) {
                 console.warn('Failed to fetch shop owner email from Cognito:', e);
             }
         }
 
-        if (!shopEmail) {
+        // メーリングリスト（inquiry_mailing_list）が設定されている場合はそれを使用し、
+        // 空の場合は従来のフォールバック（shop.email またはオーナーの email）を使用します。
+        let shopRecipients = shopRes.Item.inquiry_mailing_list;
+        if (!shopRecipients || !Array.isArray(shopRecipients) || shopRecipients.length === 0) {
+            const fallback = shopRes.Item.email || ownerEmail;
+            shopRecipients = fallback ? [fallback] : [];
+        }
+
+        if (shopRecipients.length === 0) {
             console.error(`No email address found for shop ${shopId}`);
             // メールが送れなくても処理は続行させる（チャット通知は可能）
         }
@@ -74,10 +82,10 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         const now = new Date().toISOString();
 
         // 3.1. メール送信 (Resend)
-        if (shopEmail) {
+        if (shopRecipients.length > 0) {
             promises.push(sendLocalizedEmail({
                 type: 'INQUIRY_NOTIFICATION',
-                to: shopEmail,
+                to: shopRecipients,
                 reply_to: reply_email,
                 params: {
                     content,

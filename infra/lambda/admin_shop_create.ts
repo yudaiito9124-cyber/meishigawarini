@@ -80,6 +80,10 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             Item: {
                 PK: `SHOP#${newShopId}`, SK: 'METADATA',
                 name, email: email || null, owner_id, gm_ids: gm_idslist,
+                order_notification_user_ids: [owner_id],
+                inquiry_notification_user_ids: [owner_id],
+                order_mailing_list: email ? [email] : [],
+                inquiry_mailing_list: email ? [email] : [],
                 GSI2_PK: `USER#${owner_id}`, GSI2_SK: now,
                 ts_created_at: now, ts_updated_at: now
             }

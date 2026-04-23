@@ -192,10 +192,10 @@
  * 7. Shop Owners: ショップ開設のメリット。
  */
 
-import { signInWithRedirect } from 'aws-amplify/auth';
+import { signInWithRedirect, fetchAuthSession } from 'aws-amplify/auth';
 import { useParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import Link from 'next/link'
+import { Link, useRouter } from '@/i18n/routing';
 import {
   Store,
   HandshakeIcon,
@@ -417,6 +417,7 @@ export default function HomePage() {
   const ts = useTranslations('Site');
 
   const { locale } = useParams();
+  const router = useRouter();
 
   /**
    * Managed Login (Hosted UI) を呼び出す共通ハンドラー
@@ -424,6 +425,13 @@ export default function HomePage() {
    */
   const handleAuthRedirect = async () => {
     try {
+      // すでにログイン済みかチェック。セッションがある場合はショップページへ。
+      const session = await fetchAuthSession();
+      if (session.tokens) {
+        router.push('/login');
+        return;
+      }
+
       // aws-amplify の signInWithRedirect は options.lang を直接サポートしている。
       // queryParams は型定義に存在しないため使用不可。lang プロパティを直接渡す。
       await signInWithRedirect({
@@ -431,7 +439,12 @@ export default function HomePage() {
           lang: locale as string,
         }
       });
-    } catch (err) {
+    } catch (err: any) {
+      // すでにログイン済みの場合の例外をハンドリングしてショップページへ遷移。
+      if (err.name === 'UserAlreadyAuthenticatedException') {
+        router.push('/login');
+        return;
+      }
       console.error('Auth redirect error:', err);
     }
   };
@@ -447,7 +460,7 @@ export default function HomePage() {
           <a href="#howto" className="hidden lg:block text-sm text-gray-500 hover:text-black transition-colors">使い方</a>
           <a href="#shops" className="hidden lg:block text-sm text-gray-500 hover:text-black transition-colors">ショップ一覧</a>
           <a href="#for-shops" className="hidden lg:block text-sm text-gray-500 hover:text-black transition-colors">ショップ開設</a>
-          
+
           <button
             onClick={() => handleAuthRedirect()}
             className="ml-2 bg-black text-white px-5 py-2 rounded-full text-sm font-medium hover:bg-gray-800 transition-colors"

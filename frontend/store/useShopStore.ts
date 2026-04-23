@@ -73,7 +73,8 @@ const initialActivationState = {
 /** ショップ設定セクションの初期状態 */
 const initialSettingsState = {
     isSettingsOpen: false,        // 設定パネルの開閉
-    isSettingShowHTML: false,     // HTML プレビューの表示切替
+    isBasicSettingsOpen: false,   // 基本設定セクションの開閉
+    isHtmlEditorOpen: false,      // HTMLエディタセクションの開閉
     isSettingUploading: false,    // 全体的なアップロード中状態
     debouncedPreviewHtml: '',     // プレビュー用の HTML 文字列 (debounce済み)
     htmlImageUrls: [] as string[], // 現在の HTML 内画像 URL
@@ -81,7 +82,12 @@ const initialSettingsState = {
     isHtmlImageSectionOpen: false, // 画像管理セクションの開閉
     isUploadingHtmlImage: false,   // 画像アップロード中
     sessionUploadedUrls: [] as string[], // このセッションでアップロードされた URL
-    adminEmails: null as { owner_email: string, manager_emails: string[] } | null, // 通知先メールアドレス
+    adminEmails: null as { owner_email: string, owner_id: string, managers: { user_id: string, email: string }[] } | null, // 通知先メールアドレス
+    isAdminSectionOpen: false,    // 管理者設定セクションの開閉
+    isDeliverySettingsOpen: false, // 配送設定セクションの開閉
+    isNotificationSettingsOpen: false, // 通知設定セクションの開閉
+    orderNotificationUserIds: [] as string[],
+    inquiryNotificationUserIds: [] as string[],
     copiedId: null as string | null,
 };
 

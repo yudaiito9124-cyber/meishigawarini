@@ -169,28 +169,39 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                     productId ? ddb.send(new GetCommand({ TableName: TABLE_NAME, Key: { PK: `SHOP#${shopId}`, SK: `PRODUCT#${productId}` } })) : { Item: undefined }
                 ]);
 
+                const shop = shopRes.Item;
+                const product = productRes.Item;
+
                 // ショップ個別の Email がなければオーナー（Cognito）の Email を使用
-                let shopEmail = shopRes.Item?.email;
-                if (!shopEmail && shopRes.Item?.owner_id && USER_POOL_ID) {
+                let ownerEmail: string | undefined;
+                if (shop?.owner_id && USER_POOL_ID) {
                     const userRes = await cognito.send(new AdminGetUserCommand({
-                        UserPoolId: USER_POOL_ID, Username: shopRes.Item.owner_id
+                        UserPoolId: USER_POOL_ID, Username: shop.owner_id
                     }));
-                    shopEmail = userRes.UserAttributes?.find(attr => attr.Name === 'email')?.Value;
+                    ownerEmail = userRes.UserAttributes?.find(attr => attr.Name === 'email')?.Value;
                 }
 
-                if (shopEmail) {
-                    await sendLocalizedEmail({
-                        type: 'ADDRESS_REGISTRATION_NOTIFICATION',
-                        to: shopEmail,
-                        params: {
-                            shopName: shopRes.Item?.name || '不明なショップ',
-                            productName: productRes.Item?.name || '不明な商品',
-                            qr_id: qr_id,
-                            shopId: shopId,
-                            timestamp: client_timestamp || now.toLocaleString('ja-JP')
-                        },
-                        lang: 'ja'
-                    });
+                if (shop) {
+                    // ショップオーナー/管理者への通知 (ADDRESS_REGISTRATION_NOTIFICATION)
+                    // メーリングリスト（order_mailing_list）が設定されている場合はそれを使用し、
+                    // 空の場合は従来のフォールバック（shop.email またはオーナーの email）を使用します。
+                    let shopRecipients = Array.isArray(shop.order_mailing_list) ? shop.order_mailing_list : [];
+                    // Note: 配送先登録の通知については、明示的に登録されているユーザーのみに送ります（誰も登録されていない場合は誰にも送らない）。
+
+                    if (shopRecipients.length > 0) {
+                        await sendLocalizedEmail({
+                            type: 'ADDRESS_REGISTRATION_NOTIFICATION',
+                            to: shopRecipients,
+                            params: { 
+                                shopName: shop.name || 'Shop', 
+                                productName: product?.name || 'Gift',
+                                qr_id, 
+                                shopId: shop.SK, 
+                                timestamp: client_timestamp || now.toLocaleString('ja-JP')
+                            },
+                            lang: 'ja'
+                        });
+                    }
                 }
             } catch (e) { console.error('Shop notification failed', e); }
         }

@@ -266,7 +266,7 @@ export function OrderRow({
                                         {t('orders.preferredDateTime')}
                                     </h4>
                                     <p className="text-sm text-gray-900">
-                                        {order.preferred_date ? order.preferred_date : '-'} / {order.preferred_time ? tt(order.preferred_time) : '-'}
+                                        {order.preferred_date ? order.preferred_date : '-'} / {order.preferred_time ? (tt.has(order.preferred_time) ? tt(order.preferred_time) : order.preferred_time) : '-'}
                                     </p>
                                 </div>
                             </div>

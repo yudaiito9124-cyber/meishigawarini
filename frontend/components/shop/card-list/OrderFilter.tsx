@@ -90,15 +90,16 @@ export function OrderFilter() {
                             </div>
                             <div className="flex flex-wrap items-start gap-3 border-gray-200 p-2 bg-gray-300 rounded-xl max-h-100 overflow-y-auto w-full">
                                 <Card
+                                    key="filter-all-products"
                                     className={`overflow-hidden cursor-pointer transition-all relative flex items-center justify-center bg-gray-50 border-2 h-20 ${orderProductFilter.length === 0 ? 'ring-2 ring-primary border-primary' : 'border-dashed border-gray-200 hover:bg-gray-100'}`}
                                     style={{ aspectRatio: '84/52' }}
                                     onClick={() => setList({ orderProductFilter: [] })}
                                 >
                                     <span className={`font-bold text-sm ${orderProductFilter.length === 0 ? 'text-primary' : 'text-gray-500'}`}>{tc('all')}</span>
                                 </Card>
-                                {products.map((product) => (
+                                {products.map((product, idx) => (
                                     <Card
-                                        key={product.product_id}
+                                        key={product.product_id || `filter-product-${idx}`}
                                         className={`overflow-hidden cursor-pointer transition-all relative h-20 ${orderProductFilter.includes(product.product_id) ? 'ring-2 ring-offset-2 ring-primary' : 'hover:ring-2 hover:ring-primary/50'}`}
                                         style={{ aspectRatio: getDesignAspectRatio(product.design_id, allowedDesigns, product.design) }}
                                         onClick={() => {

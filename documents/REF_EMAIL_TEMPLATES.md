@@ -37,6 +37,11 @@
 *   **送信条件**: 後述の「メーリングリスト（通知先）」に含まれる全てのユーザー。
 *   **内容**: 投稿者名、メッセージ本文、画像・ファイルの有無、掲示板へのリンク。
 
+### 1-6. ショップへのお問い合わせ (ショップオーナー向け)
+*   **送信タイミング**: 受取人がショップ詳細画面の「お問い合わせ」フォームから内容を送信した瞬間。
+*   **送信条件**: ショップの設定にメールアドレスが登録されていること（またはオーナーのアカウントにメールアドレスがあること）。
+*   **内容**: お問い合わせ内容の本文、返信用メールアドレス、電話番号。
+
 ---
 
 ## 2. 認証・管理通知一覧
@@ -90,12 +95,12 @@ AWS Cognitoから直接送信される、アカウントセキュリティに関
 
 | テンプレートID | 用途 | 使用可能な変数 |
 | :--- | :--- | :--- |
-| `MESSAGE_NOTIFICATION` | 新着メッセージ | `username`, `message`, `uuid`, `pin`, `baseUrl` |
-| `SYSTEM_NOTIFICATION` | システム通知 | `message`, `uuid`, `pin`, `baseUrl` |
-| `SHIPPING_NOTIFICATION` | 発送完了 | `uuid`, `pin`, `baseUrl` |
-| `ADDRESS_REGISTRATION_CONFIRMATION` | 住所登録完了（注文者） | `uuid`, `pin`, `baseUrl` |
-| `ADDRESS_REGISTRATION_NOTIFICATION` | 住所登録発生（オーナー） | `shopName`, `productName`, `qr_id`, `shopId`, `baseUrl` |
-| `INQUIRY_NOTIFICATION` | 受取人からのお問い合わせ（オーナー向け） | `content`, `reply_email`, `phone`, `shopName`, `qr_id`, `shopId` |
+| `MESSAGE_NOTIFICATION` | 新着メッセージ | `username`, `message`, `qr_id`, `pin`, `baseUrl` |
+| `SYSTEM_NOTIFICATION` | システム通知 | `message`, `qr_id`, `pin`, `baseUrl` |
+| `SHIPPING_NOTIFICATION` | 発送完了 | `qr_id`, `pin`, `baseUrl` |
+| `ADDRESS_REGISTRATION_CONFIRMATION` | 住所登録完了（注文者） | `qr_id`, `pin`, `baseUrl` |
+| `ADDRESS_REGISTRATION_NOTIFICATION` | 住所登録発生（オーナー） | `shopName`, `productName`, `qr_id`, `shopId`, `timestamp`, `baseUrl` |
+| `INQUIRY_NOTIFICATION` | 受取人からのお問い合わせ（オーナー向け） | `content`, `reply_email`, `phone`, `shopName`, `qr_id`, `shopId`, `baseUrl` |
 
 ---
 

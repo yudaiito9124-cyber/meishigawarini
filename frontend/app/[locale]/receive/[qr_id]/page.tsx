@@ -1697,6 +1697,11 @@ export default function ReceivePage() {
                                                 type="date"
                                                 value={preferred_date}
                                                 onChange={(e) => setPreferredDate(e.target.value)}
+                                                min={(() => {
+                                                    const d = new Date();
+                                                    d.setDate(d.getDate() + (gift?.shortest_delivery_days ?? 3));
+                                                    return d.toISOString().split('T')[0];
+                                                })()}
                                                 className="w-full h-full"
                                             />
                                             {/* {preferred_date && (
@@ -1737,11 +1742,9 @@ export default function ReceivePage() {
                                         className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
                                     >
                                         <option value="">{t('formStep.noPreference')}</option>
-                                        <option value="timeMorning">{tt('timeMorning')}</option>
-                                        <option value="time1416">{tt('time1416')}</option>
-                                        <option value="time1618">{tt('time1618')}</option>
-                                        <option value="time1820">{tt('time1820')}</option>
-                                        <option value="time1921">{tt('time1921')}</option>
+                                        {(gift?.delivery_time_options || ["timeMorning", "time1416", "time1618", "time1820", "time1921"]).map((opt: string) => (
+                                            <option key={opt} value={opt}>{tt.has(opt) ? tt(opt) : opt}</option>
+                                        ))}
                                     </select>
                                 </div>
 

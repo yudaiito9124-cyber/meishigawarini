@@ -349,9 +349,9 @@ export function ProductsSection({
                             </div>
                         ) : (
                             <>
-                                {filteredProducts.map((product) => (
+                                {filteredProducts.map((product, index) => (
                                     <ProductCard
-                                        key={product.product_id}
+                                        key={product.product_id || `product-${index}`}
                                         product={product}
                                         allowedDesigns={allowedDesigns}
                                         t={t}
@@ -373,7 +373,7 @@ export function ProductsSection({
                                 ))}
 
                                 {/* 商品追加 */}
-                                <Dialog open={isAddProductDialogOpen} onOpenChange={(open) => {
+                                <Dialog key="add-product-dialog" open={isAddProductDialogOpen} onOpenChange={(open) => {
                                     setIsAddProductDialogOpen(open);
                                     if (!open) {
                                         setEditingProduct(null);
@@ -433,8 +433,8 @@ export function ProductsSection({
                                                                                         onChange={(e) => setSelectedImportShopId(e.target.value)}
                                                                                     >
                                                                                         <option value="">{t('importProduct.placeholder')}</option>
-                                                                                        {importShops.map(s => (
-                                                                                            <option key={s.id} value={s.id}>{s.name || s.id}</option>
+                                                                                        {importShops.map((s, idx) => (
+                                                                                            <option key={s.id || `import-shop-${idx}`} value={s.id}>{s.name || s.id}</option>
                                                                                         ))}
                                                                                     </select>
                                                                                 </div>
@@ -499,11 +499,11 @@ export function ProductsSection({
                                                             )}
                                                         </div>
                                                         <div className="flex flex-wrap items-start gap-3 max-h-[300px] overflow-y-auto p-1">
-                                                            {allowedDesigns?.map((design: any) => {
+                                                            {allowedDesigns?.map((design: any, idx: number) => {
                                                                 const designId = getDesignId(design);
                                                                 return (
                                                                 <div
-                                                                    key={designId || `${design.name || 'unknown-design'}`}
+                                                                    key={designId || `${design.name || 'design'}-${idx}`}
                                                                     onClick={() => designId && setSelectedDesignId(designId)}
                                                                     className={`group relative h-24 rounded-lg border-2 overflow-hidden cursor-pointer transition-all hover:shadow-md ${selectedDesignId === designId
                                                                         ? 'border-green-500 ring-2 ring-green-500/20 shadow-lg'

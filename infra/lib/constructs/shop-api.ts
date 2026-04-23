@@ -94,12 +94,13 @@ export class ShopApi extends cdk.NestedStack {
     const shop_delete_images = new nodejs.NodejsFunction(this, 'shop_delete_images', { entry: lampath('shop_delete_images'), ...fnProps });
     const shop_orders = new nodejs.NodejsFunction(this, 'shop_orders', { entry: lampath('shop_orders'), ...fnProps });
     const shop_card_orders = new nodejs.NodejsFunction(this, 'shop_card_orders', { entry: lampath('shop_card_orders'), ...fnProps });
+    const shop_owner_transfer = new nodejs.NodejsFunction(this, 'shop_owner_transfer', { entry: lampath('shop_owner_transfer'), ...fnProps });
 
     // --- Permissions ---
     const allShopLambdas = [
       shop_list, shop_details, shop_products, shop_products_import,
       shop_products_uploadurl, shop_qr, shop_admins, shop_delete_images, shop_orders,
-      shop_card_orders
+      shop_card_orders, shop_owner_transfer
     ];
     allShopLambdas.forEach(fn => {
       grantTablePermissions(fn, true);
@@ -142,7 +143,16 @@ export class ShopApi extends cdk.NestedStack {
     addResourceWithCors(detailsRes, 'get').addMethod('POST', new apigateway.LambdaIntegration(shop_details), routeOptions);
     addResourceWithCors(detailsRes, 'update').addMethod('POST', new apigateway.LambdaIntegration(shop_details), routeOptions);
 
-    addResourceWithCors(this.shopResource, 'admins').addMethod('POST', new apigateway.LambdaIntegration(shop_admins), routeOptions);
+    const adminsRes = addResourceWithCors(this.shopResource, 'admins');
+    adminsRes.addMethod('POST', new apigateway.LambdaIntegration(shop_admins), routeOptions);
+    addResourceWithCors(adminsRes, 'validate').addMethod('POST', new apigateway.LambdaIntegration(shop_admins), routeOptions);
+    addResourceWithCors(adminsRes, 'link').addMethod('POST', new apigateway.LambdaIntegration(shop_admins), routeOptions);
+    addResourceWithCors(adminsRes, 'unlink').addMethod('POST', new apigateway.LambdaIntegration(shop_admins), routeOptions);
+    
+    const ownerRes = addResourceWithCors(this.shopResource, 'owner');
+    const transferRes = addResourceWithCors(ownerRes, 'transfer');
+    addResourceWithCors(transferRes, 'validate').addMethod('POST', new apigateway.LambdaIntegration(shop_owner_transfer), routeOptions);
+    addResourceWithCors(transferRes, 'execute').addMethod('POST', new apigateway.LambdaIntegration(shop_owner_transfer), routeOptions);
     const deleteRes = addResourceWithCors(this.shopResource, 'delete');
     addResourceWithCors(deleteRes, 'images').addMethod('POST', new apigateway.LambdaIntegration(shop_delete_images), routeOptions);
 

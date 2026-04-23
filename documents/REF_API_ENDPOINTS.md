@@ -46,6 +46,8 @@
 | オーダー一覧 | 注文（配送先情報）一覧取得 | `/shop/orders/list` | `QueryCommand` (GSI2) + `BatchGetCommand` (Order/Design Enrichment) | [shop_orders.ts](../infra/lambda/shop_orders.ts) |
 | オーダーステータス更新 | 発送完了等の状態更新 | `/shop/orders/update` | `GetCommand` + `UpdateCommand` (QR Status & Order Tracking) | [shop_orders.ts](../infra/lambda/shop_orders.ts) |
 | 管理者一覧取得 | オーナー・GM一覧の取得 | `/shop/admins` | `GetCommand` (Shop Metadata + Each User) | [shop_admins.ts](../infra/lambda/shop_admins.ts) |
+| 管理者紐付け (Shop) | ショップのGMを追加 | `/shop/admins/link` | `GetCommand` + `UpdateCommand` | [shop_admins.ts](../infra/lambda/shop_admins.ts) |
+| 管理者解除 (Shop) | ショップのGMを削除 | `/shop/admins/unlink` | `GetCommand` + `UpdateCommand` | [shop_admins.ts](../infra/lambda/shop_admins.ts) |
 | カード発注作成 | 印刷用カードの新規発注 | `/shop/card/orders/create` | `PutCommand` (Card Order) | [shop_card_orders.ts](../infra/lambda/shop_card_orders.ts) |
 | カード発注一覧 | 自ショップの発注履歴取得 | `/shop/card/orders/list` | `QueryCommand` + `BatchGetCommand` (Design Enrichment) | [shop_card_orders.ts](../infra/lambda/shop_card_orders.ts) |
 | カード発注キャンセル | 受付中の発注の取り消し | `/shop/card/orders/cancel` | `GetCommand` + `UpdateCommand` (Card Order Status) | [shop_card_orders.ts](../infra/lambda/shop_card_orders.ts) |

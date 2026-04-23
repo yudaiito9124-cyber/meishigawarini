@@ -72,8 +72,17 @@ export type ShopApiSchema = {
         shop_address?: string;
         shop_phone?: string;
         shop_recipient_name?: string;
+        shortest_delivery_days?: number;
+        delivery_time_options?: string[];
+        order_notification_user_ids?: string[];
+        inquiry_notification_user_ids?: string[];
     };
     shop_admins: { shop_id: string };
+    shop_admins_validate: { shop_id: string; user_id: string };
+    shop_admins_link: { shop_id: string; user_id: string };
+    shop_admins_unlink: { shop_id: string; user_id: string };
+    shop_owner_transfer_validate: { shop_id: string; new_user_id: string };
+    shop_owner_transfer_execute: { shop_id: string; new_user_id: string };
     shop_delete_images: { shop_id: string; keys?: string[]; urls?: string[] };
     shop_orders_list: { shop_id: string; qr_id?: string };
     shop_orders_update: { shop_id: string; qr_id: string; status?: string; delivery_company?: string; tracking_number?: string; memo_for_users?: string; memo_for_shop?: string };
