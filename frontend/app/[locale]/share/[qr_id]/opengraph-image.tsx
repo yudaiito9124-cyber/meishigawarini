@@ -96,11 +96,11 @@ export default async function Image({ params }: { params: Promise<{ qr_id: strin
   const appBase = `${protocol}://${host}`;
 
   // 1. フォントの読み込み
-  const fontData = await getFont(`${appBase}/ArialUnicode.ttf`, appBase);
+  const fontData = await getFont(`${appBase}/NotoSansJP-Regular.ttf`, appBase);
   const fonts: any[] = [];
   if (fontData) {
     fonts.push({
-      name: 'ArialUnicode',
+      name: 'Noto Sans JP',
       data: fontData,
       style: 'normal',
       weight: 400,
@@ -177,7 +177,7 @@ export default async function Image({ params }: { params: Promise<{ qr_id: strin
           backgroundImage: backgroundImageDataUrl ? `url(${backgroundImageDataUrl})` : undefined,
           backgroundSize: 'cover',
           backgroundPosition: 'center',
-          fontFamily: 'ArialUnicode, sans-serif',
+          fontFamily: 'Noto Sans JP, sans-serif',
         }}
       >
         <div style={{ position: 'absolute', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', backdropFilter: 'blur(15px)' }}></div>
