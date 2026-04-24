@@ -296,7 +296,9 @@ export const generatePDF = async (batch: any, paperformat: string, cardformat: s
                 doc.setFontSize(cf.pinsize * pf.scale);
                 doc.setFont("helvetica", "bold");
                 const pinWidth = doc.getTextWidth(code.pin);
-                doc.text(code.pin, scaleofx + ax + (cardWidth * pf.scale - pinWidth) / 2 + cf.pinpos.x * pf.scale, scaleofy + ay + cf.pinpos.y * pf.scale);
+                doc.text(code.pin, scaleofx + ax + (cardWidth * pf.scale - pinWidth) / 2 + cf.pinpos.x * pf.scale, scaleofy + ay + cf.pinpos.y * pf.scale, {
+                    baseline: 'middle'
+                });
             }
 
             // 5. 管理用 UUID (下16桁) の印字
@@ -307,7 +309,9 @@ export const generatePDF = async (batch: any, paperformat: string, cardformat: s
                 const qr_id = code.qr_id || (code as any).uuid;
                 const uuidText = `${qr_id.substring(18, 34)}...`;
                 const uuidWidth = doc.getTextWidth(uuidText);
-                doc.text(uuidText, scaleofx + ax + (cardWidth * pf.scale - uuidWidth) / 2 + cf.codepos.x * pf.scale, scaleofy + ay + cf.codepos.y * pf.scale);
+                doc.text(uuidText, scaleofx + ax + (cardWidth * pf.scale - uuidWidth) / 2 + cf.codepos.x * pf.scale, scaleofy + ay + cf.codepos.y * pf.scale, {
+                    baseline: 'middle'
+                });
             }
             posInSheet++;
         }
@@ -360,7 +364,9 @@ export const generatePDF = async (batch: any, paperformat: string, cardformat: s
                 doc.setFontSize(cf.pinsize * pf.scale);
                 doc.setFont("helvetica", "bold");
                 const pinWidth = doc.getTextWidth(code.pin);
-                doc.text(code.pin, scaleofx + ax + (cardWidth * pf.scale - pinWidth) / 2 + (cf.pinpos.x) * pf.scale, scaleofy + ay + cf.pinpos.y * pf.scale);
+                doc.text(code.pin, scaleofx + ax + (cardWidth * pf.scale - pinWidth) / 2 + (cf.pinpos.x) * pf.scale, scaleofy + ay + cf.pinpos.y * pf.scale, {
+                    baseline: 'middle'
+                });
             }
 
             // 5. UUID印字 (裏面用)
@@ -371,7 +377,9 @@ export const generatePDF = async (batch: any, paperformat: string, cardformat: s
                 const qr_id = code.qr_id || (code as any).uuid;
                 const uuidText = `${qr_id.substring(18, 34)}...`;
                 const uuidWidth = doc.getTextWidth(uuidText);
-                doc.text(uuidText, scaleofx + ax + (cardWidth * pf.scale - uuidWidth) / 2 + (cf.codepos.x) * pf.scale, scaleofy + ay + cf.codepos.y * pf.scale);
+                doc.text(uuidText, scaleofx + ax + (cardWidth * pf.scale - uuidWidth) / 2 + (cf.codepos.x) * pf.scale, scaleofy + ay + cf.codepos.y * pf.scale, {
+                    baseline: 'middle'
+                });
             }
             posInSheet++;
         }

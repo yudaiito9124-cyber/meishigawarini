@@ -171,15 +171,16 @@
     @apply my-6 border-t border-gray-200;
   }
 }
+
 @layer utilities {
   .perspective-2000 {
     perspective: 2000px;
   }
-  
+
   .preserve-3d {
     transform-style: preserve-3d;
   }
-  
+
   .backface-hidden {
     backface-visibility: hidden;
     -webkit-backface-visibility: hidden;

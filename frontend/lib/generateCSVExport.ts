@@ -183,6 +183,7 @@ export const generateCSVExport = async (batch: any, cardformat: string | any) =>
                 // フォントサイズ計算: 1ポイント = 1/72 インチ = 0.3527 mm
                 ctxF.font = `bold ${cf.pinsize * 0.3527 * CANVAS_SCALE}px Helvetica`;
                 ctxF.textAlign = "center";
+                ctxF.textBaseline = "middle";
                 ctxF.fillText(pin, (cf.width / 2 + cf.pinpos.x) * CANVAS_SCALE, cf.pinpos.y * CANVAS_SCALE);
             }
 
@@ -191,6 +192,7 @@ export const generateCSVExport = async (batch: any, cardformat: string | any) =>
                 ctxF.fillStyle = "black";
                 ctxF.font = `${cf.codesize * 0.3527 * CANVAS_SCALE}px Helvetica`;
                 ctxF.textAlign = "center";
+                ctxF.textBaseline = "middle";
                 const uuidText = `${qr_id.substring(18, 34)}...`;
                 ctxF.fillText(uuidText, (cf.width / 2 + cf.codepos.x) * CANVAS_SCALE, cf.codepos.y * CANVAS_SCALE);
             }
@@ -220,6 +222,7 @@ export const generateCSVExport = async (batch: any, cardformat: string | any) =>
                 ctxB.fillStyle = "black";
                 ctxB.font = `bold ${cf.pinsize * 0.3527 * CANVAS_SCALE}px Helvetica`;
                 ctxB.textAlign = "center";
+                ctxB.textBaseline = "middle";
                 ctxB.fillText(pin, (cf.width / 2 + cf.pinpos.x) * CANVAS_SCALE, cf.pinpos.y * CANVAS_SCALE);
             }
 
@@ -228,6 +231,7 @@ export const generateCSVExport = async (batch: any, cardformat: string | any) =>
                 ctxB.fillStyle = "black";
                 ctxB.font = `${cf.codesize * 0.3527 * CANVAS_SCALE}px Helvetica`;
                 ctxB.textAlign = "center";
+                ctxB.textBaseline = "middle";
                 const uuidText = `${qr_id.substring(18, 34)}...`;
                 ctxB.fillText(uuidText, (cf.width / 2 + cf.codepos.x) * CANVAS_SCALE, cf.codepos.y * CANVAS_SCALE);
             }
