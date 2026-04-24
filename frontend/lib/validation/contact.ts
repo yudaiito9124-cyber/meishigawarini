@@ -24,9 +24,10 @@ export function sanitizePhoneForInput(rawValue: string, previousValue: string): 
 export function sanitizeZipForInput(rawValue: string, previousValue: string): string {
     let filtered = normalizeDigitsAndHyphen(rawValue);
 
+    // Remove excessive hyphens and keep only the first one
     const parts = filtered.split('-');
     if (parts.length > 2) {
-        filtered = parts.slice(0, 2).join('-') + parts.slice(3).join('');
+        filtered = parts[0] + '-' + parts.slice(1).join('');
     }
 
     const digitsOnly = filtered.replace(/-/g, '');
@@ -34,8 +35,14 @@ export function sanitizeZipForInput(rawValue: string, previousValue: string): st
         return previousValue;
     }
 
+    // Auto format if exactly 7 digits and no hyphen
+    if (digitsOnly.length === 7 && !filtered.includes('-')) {
+        return digitsOnly.slice(0, 3) + '-' + digitsOnly.slice(3);
+    }
+
     return filtered;
 }
+
 
 export function countDigits(value: string): number {
     return value.replace(/\D/g, '').length;

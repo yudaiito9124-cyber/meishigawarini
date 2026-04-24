@@ -86,6 +86,7 @@ const initialSettingsState = {
     isAdminSectionOpen: false,    // 管理者設定セクションの開閉
     isDeliverySettingsOpen: false, // 配送設定セクションの開閉
     isNotificationSettingsOpen: false, // 通知設定セクションの開閉
+    isShippingLabelSettingsOpen: false, // 送り状印刷設定セクションの開閉
     orderNotificationUserIds: [] as string[],
     inquiryNotificationUserIds: [] as string[],
     copiedId: null as string | null,

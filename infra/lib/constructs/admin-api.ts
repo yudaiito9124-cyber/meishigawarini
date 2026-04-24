@@ -174,6 +174,17 @@ export class AdminApi extends cdk.NestedStack {
     grantTablePermissions(admin_qr_batch);
     bucket.grantRead(admin_qr_batch);
 
+    const admin_qr_batch_list = new nodejs.NodejsFunction(this, 'admin_qr_batch_list', {
+      entry: lampath('admin_qr_batch_list'),
+      ...commonProps,
+      environment: {
+        ...commonProps.environment,
+        BUCKET_NAME: bucket.bucketName,
+      }
+    });
+    grantTablePermissions(admin_qr_batch_list);
+    bucket.grantRead(admin_qr_batch_list);
+
 
 
 
@@ -293,6 +304,7 @@ export class AdminApi extends cdk.NestedStack {
     // /admin/qr/batch/get
     const batchResource = addResourceWithCors(qrResource, 'batch');
     addResourceWithCors(batchResource, 'get').addMethod('POST', new apigateway.LambdaIntegration(admin_qr_batch), { authorizer: authorizerOfAdmin, });
+    addResourceWithCors(batchResource, 'list').addMethod('POST', new apigateway.LambdaIntegration(admin_qr_batch_list), { authorizer: authorizerOfAdmin, });
 
     // /admin/carddesigns
     const cardDesignsResource = addResourceWithCors(this.adminResource, 'carddesigns');

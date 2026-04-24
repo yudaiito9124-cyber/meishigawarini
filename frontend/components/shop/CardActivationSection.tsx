@@ -101,7 +101,7 @@ const ActivationScanner = ({
                         <div className="mt-2 border rounded-md bg-gray-50 flex-1 overflow-y-auto w-full overflow-x-hidden min-h-0">
                             <ul className="text-[10px] font-mono p-1 sm:p-2 space-y-1 min-h-[100px]">
                                 {scannedQrIds.map((item, i) => (
-                                    <li key={item.qr_id} className="border-b last:border-0 pb-1 last:pb-0 flex flex-col">
+                                    <li key={`${item.qr_id}-${i}`} className="border-b last:border-0 pb-1 last:pb-0 flex flex-col">
                                         <div className="flex flex-col gap-1 py-1 w-full overflow-hidden">
                                             <div className="flex items-center justify-between gap-1 w-full overflow-hidden">
                                                 <div className="flex items-center gap-1 min-w-0 flex-1 overflow-hidden">
@@ -188,8 +188,8 @@ const ScannedIdsList = ({ scannedQrIds, t, copiedId, handleCopy }: ScannedIdsLis
                         {t('linkQr.linkedTitle')}
                     </Label>
                     <div className="bg-amber-50/50 rounded-lg border border-amber-100 divide-y divide-amber-100 max-h-[150px] overflow-y-auto">
-                        {linkedIds.map((item) => (
-                            <div key={item.qr_id} className="p-3 flex justify-between items-center bg-white/40">
+                        {linkedIds.map((item, i) => (
+                            <div key={`${item.qr_id}-${i}`} className="p-3 flex justify-between items-center bg-white/40">
                                 <div className="flex flex-col">
                                     <span className="font-mono text-xs">{item.qr_id}</span>
                                     <span className="text-[10px] text-amber-600/70 font-medium">→ {t('linkQr.useExistingLink')}</span>
@@ -224,8 +224,8 @@ const ScannedIdsList = ({ scannedQrIds, t, copiedId, handleCopy }: ScannedIdsLis
                         {t('linkQr.availableTitle')}
                     </Label>
                     <div className="bg-blue-50/30 rounded-lg border border-blue-100 divide-y divide-blue-100 max-h-[150px] overflow-y-auto">
-                        {availableIds.map((item) => (
-                            <div key={item.qr_id} className="p-3 bg-white/40 flex justify-between items-center">
+                        {availableIds.map((item, i) => (
+                            <div key={`${item.qr_id}-${i}`} className="p-3 bg-white/40 flex justify-between items-center">
                                 <div className="flex flex-col">
                                     <span className="font-mono text-xs">{item.qr_id}</span>
                                     <span className="text-[10px] text-blue-600/70 font-medium">→ {t('linkQr.willBeLinked')}</span>
@@ -281,8 +281,8 @@ const ActivationForm = ({
                         defaultValue=""
                     >
                         <option value="" disabled>{t('linkQr.selectPlaceholder')}</option>
-                        {products.filter(p => p.status === 'ACTIVE').map(p => (
-                            <option key={p.product_id} value={p.product_id}>{p.name}</option>
+                        {products.filter(p => p.status === 'ACTIVE').map((p, i) => (
+                            <option key={`${p.product_id}-${i}`} value={p.product_id}>{p.name}</option>
                         ))}
                     </select>
                 )}

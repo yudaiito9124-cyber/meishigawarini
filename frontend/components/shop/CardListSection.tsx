@@ -9,7 +9,7 @@
  * - サブコンポーネント（OrderFilter / OrderRow）へ Context で操作関数を供給
  */
 
-import React, { createContext, useContext, useMemo } from 'react';
+import React, { createContext, useContext, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { RefreshCw, ArrowUp, ArrowDown, QrCode, Package, SlidersHorizontal, Plus as PlusIcon, User, Truck, Clock, Pencil, MessageCircleWarning, Mail, Phone, Hash, Calendar, CheckCircle2, XCircle, Link2, Zap, AlertCircle } from 'lucide-react';
@@ -29,6 +29,8 @@ import { OrderRow } from './card-list/OrderRow';
 import { ColumnSettingsDialog } from './card-list/ColumnSettingsDialog';
 import { StatusGuide } from './card-list/StatusGuide';
 import { Order, ColumnOption, ColumnGroup } from './card-list/types';
+import { generateAddressPDF } from '../../lib/generateAddressPDF';
+import { DEFAULT_POST_CONFIG, DEFAULT_EXPRESS_CONFIG } from './ShippingLabelSettings';
 
 // --- Context ---
 
@@ -42,7 +44,10 @@ interface CardListContextType {
     getDesignAspectRatio: typeof getDesignAspectRatio;
     getDesignImages: typeof getDesignImages;
     handleExportCSV: () => void;
+    handleExportShippinglabelPDF: (type: 'yubin' | 'takkyubin') => void;
+    isExporting: boolean;
     filteredOrdersCount: number;
+    usedOrdersCount: number;
 }
 
 const CardListContext = createContext<CardListContextType | null>(null);
@@ -161,6 +166,8 @@ export function CardListSection({ shopId }: { shopId: string }) {
     };
 
     const orderColGroups = useMemo(() => getOrderColGroups(t, ts), [t, ts]);
+    const [isExporting, setIsExporting] = useState(false);
+    const [fontCache, setFontCache] = useState<{ [key: string]: string }>({});
     const orderColOptions = useMemo(() => orderColGroups.flatMap(g => g.columns), [orderColGroups]);
 
     /**
@@ -321,7 +328,7 @@ export function CardListSection({ shopId }: { shopId: string }) {
                 );
             case 'email': return <span className="text-xs truncate max-w-[120px] inline-block">{order.shipping_info?.email || "-"}</span>;
             case 'phone': return <span className="text-xs">{order.shipping_info?.phone || "-"}</span>;
-            case 'preferred_time': 
+            case 'preferred_time':
                 const timeKey = order[colKey];
                 return <span className="text-xs">{timeKey ? (tt.has(timeKey) ? tt(timeKey) : timeKey) : "-"}</span>;
             default: return <span className="truncate max-w-[150px] inline-block text-xs">{order[colKey] || "-"}</span>;
@@ -348,7 +355,7 @@ export function CardListSection({ shopId }: { shopId: string }) {
             return visibleCols.map(col => {
                 let value = "";
                 const product = products.find(p => p.product_id === order.product_id);
-                
+
                 switch (col.key) {
                     case 'ts_updated_at':
                     case 'ts_created_at':
@@ -393,7 +400,7 @@ export function CardListSection({ shopId }: { shopId: string }) {
         // BOM を付与して日本語環境の表計算ソフトでの文字化けを防止します。
         const bom = '\uFEFF';
         const blob = new Blob([bom + csvContent], { type: 'text/csv;charset=utf-8;' });
-        
+
         // 3. Filename
         const now = new Date();
         const timestamp = now.getFullYear() +
@@ -402,7 +409,7 @@ export function CardListSection({ shopId }: { shopId: string }) {
             String(now.getHours()).padStart(2, '0') +
             String(now.getMinutes()).padStart(2, '0') +
             String(now.getSeconds()).padStart(2, '0');
-        
+
         const filename = `cards_${shop.name}_${timestamp}.csv`;
 
         // 4. Trigger Download
@@ -416,6 +423,87 @@ export function CardListSection({ shopId }: { shopId: string }) {
         document.body.removeChild(link);
     };
 
+    /**
+     * 送り状 PDF を生成してダウンロードします。
+     */
+    const handleExportShippinglabelPDF = async (type: 'yubin' | 'takkyubin') => {
+        const ordersToExport = filteredOrders.filter(o => o.status === 'USED');
+        if (!shop || ordersToExport.length === 0 || isExporting) return;
+
+        setIsExporting(true);
+        try {
+            // 設定が保存されていない場合はデフォルト値を使用する
+            const defaultConfig = type === 'yubin' ? DEFAULT_POST_CONFIG : DEFAULT_EXPRESS_CONFIG;
+            const savedConfig = shop.shipping_label_settings?.[type];
+
+            // 既存設定がある場合も、デフォルト設定とマージして新しいプロパティ（maxWidth等）が欠落しないようにする
+            const config = savedConfig ? {
+                ...defaultConfig,
+                ...savedConfig,
+                paper: {
+                    ...defaultConfig.paper,
+                    ...(savedConfig.paper || {})
+                },
+                layout: Object.keys(defaultConfig.layout).reduce((acc, key) => {
+                    const k = key as keyof typeof defaultConfig.layout;
+                    acc[k] = {
+                        ...defaultConfig.layout[k],
+                        ...(savedConfig.layout?.[k] || {})
+                    };
+                    return acc;
+                }, {} as any)
+            } : defaultConfig;
+
+            const now = new Date();
+            const timestamp = now.getFullYear() +
+                String(now.getMonth() + 1).padStart(2, '0') +
+                String(now.getDate()).padStart(2, '0') + '_' +
+                String(now.getHours()).padStart(2, '0') +
+                String(now.getMinutes()).padStart(2, '0');
+
+            const filename = `shippinglabel_${type}_${shop.name}_${timestamp}.pdf`;
+
+            // フォントの取得 (Blob -> Base64)
+            const fetchFontAsBase64 = async (url: string): Promise<string | undefined> => {
+                if (fontCache[url]) return fontCache[url];
+                try {
+                    const resp = await fetch(url);
+                    if (!resp.ok) return undefined;
+                    const blob = await resp.blob();
+                    const base64 = await new Promise<string>((resolve, reject) => {
+                        const reader = new FileReader();
+                        reader.onloadend = () => resolve((reader.result as string).split(',')[1]);
+                        reader.onerror = reject;
+                        reader.readAsDataURL(blob);
+                    });
+                    if (base64) setFontCache(prev => ({ ...prev, [url]: base64 }));
+                    return base64;
+                } catch (e) {
+                    console.error(`Font fetch failed: ${url}`, e);
+                    return undefined;
+                }
+            };
+
+            const fontUrl = '/NotoSansJP-Regular.ttf';
+            const [normalFont, boldFont] = await Promise.all([
+                fetchFontAsBase64(fontUrl),
+                fetchFontAsBase64('/NotoSansJP-Bold.ttf')
+            ]);
+
+            const enrichedOrders = ordersToExport.map(order => ({
+                ...order,
+                product_name: products.find(p => p.product_id === order.product_id)?.name
+            }));
+
+            await generateAddressPDF(enrichedOrders, shop, config, filename, {
+                normal: normalFont || '',
+                bold: boldFont || ''
+            });
+        } finally {
+            setIsExporting(false);
+        }
+    };
+
     const value = {
         fetchSectionData,
         orderColGroups,
@@ -426,12 +514,15 @@ export function CardListSection({ shopId }: { shopId: string }) {
         getDesignAspectRatio,
         getDesignImages,
         handleExportCSV,
-        filteredOrdersCount: filteredOrders.length
+        handleExportShippinglabelPDF,
+        isExporting,
+        filteredOrdersCount: filteredOrders.length,
+        usedOrdersCount: filteredOrders.filter(o => o.status === 'USED').length
     };
 
     return (
         <CardListContext.Provider value={value}>
-            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
+            <div className="space-y-6">
                 <Card>
                     <CardHeader>
                         <CardTitle>{t('incomingOrders')}</CardTitle>
@@ -448,7 +539,7 @@ export function CardListSection({ shopId }: { shopId: string }) {
                                     : "全件"
                                 }:
                             </span>
-                            <span className="text-2xl font-black text-primary animate-in fade-in zoom-in duration-300 items-len">
+                            <span className="text-2xl font-black text-primary">
                                 {filteredOrders.length}
                             </span>
                             <span className="text-sm font-medium text-gray-500">件</span>

@@ -36,7 +36,8 @@ import { useBackendError } from '@/hooks/useBackendError';
 import { generatePDF } from '@/lib/generatePDF';
 import { cardformats, paperformats } from '@/lib/constants/designs';
 import { generateCSVExport } from '@/lib/generateCSVExport';
-import { ExternalLink, Copy, Check, Eye, QrCode, Store, Wrench, Layers, HelpCircle, Home, Trash2, RotateCcw, Loader2, Plus, X, Search, Save, FileText, Download, CreditCard, Printer, Paintbrush, ChevronDown, Settings, LogOut } from 'lucide-react';
+import { ExternalLink, Copy, Check, Eye, QrCode, Store, Wrench, Layers, HelpCircle, Home, Trash2, RotateCcw, Loader2, Plus, X, Search, Save, FileText, Download, CreditCard, Printer, Paintbrush, ChevronDown, Settings, LogOut, Calendar } from 'lucide-react';
+import { Badge } from "@/components/ui/badge";
 import CardDesignEditor from "@/components/admin/CardDesignEditor";
 const NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 const NEXT_PUBLIC_APP_URL = process.env.NEXT_PUBLIC_APP_URL || "";
@@ -125,8 +126,16 @@ export default function AdminPage() {
     const [activateNow, setActivateNow] = useState(false);
     /** メタデータ（ShopID等）を使用した詳細設定を使用するか */
     const [useMetadataOptions, setUseMetadataOptions] = useState(false);
-    /** このセッション中に生成されたバッチの履歴 */
-    const [generatedBatches, setGeneratedBatches] = useState<any[]>([]);
+    /** このセッション中に生成したバッチ */
+    const [sessionBatches, setSessionBatches] = useState<any[]>([]);
+    /** DBから取得したバッチ履歴（全件・検索用） */
+    const [batchHistory, setBatchHistory] = useState<any[]>([]);
+    /** バッチ履歴のページングカーソル */
+    const [batchCursor, setBatchCursor] = useState<any>(null);
+    /** バッチ履歴読み込み中フラグ */
+    const [isBatchesLoading, setIsBatchesLoading] = useState(false);
+    /** バッチ検索キーワード */
+    const [batchSearchKeyword, setBatchSearchKeyword] = useState("");
     /** PDF生成時の用紙フォーマット（A4等） */
     const [paperFormat, setPaperFormat] = useState("10S31251");
     /** カードのデザイン（システムのプリセットまたはDBカスタムデザイン） */
@@ -153,11 +162,16 @@ export default function AdminPage() {
     const router = useRouter();
     /** 直近でコピーしたID (UI通知用) */
     const [copiedId, setCopiedId] = useState<string | null>(null);
+    /** 日本語フォントのキャッシュ */
+    const [fontCache, setFontCache] = useState<{ [key: string]: string }>({});
 
     // ID Search states
     const [searchId, setSearchId] = useState("");
     const [isSearching, setIsSearching] = useState(false);
     const [searchedOrder, setSearchedOrder] = useState<any>(null);
+
+    /** 手動生成セクションの表示・非表示 */
+    const [isManualGenerateOpen, setIsManualGenerateOpen] = useState(false);
 
 
     /**
@@ -168,6 +182,29 @@ export default function AdminPage() {
             setCopiedId(id);
             setTimeout(() => setCopiedId(null), 2000);
         });
+    };
+
+    /**
+     * フォントを Base64 形式で取得し、キャッシュします。
+     */
+    const fetchFontAsBase64 = async (url: string): Promise<string | undefined> => {
+        if (fontCache[url]) return fontCache[url];
+        try {
+            const resp = await fetch(url);
+            if (!resp.ok) return undefined;
+            const blob = await resp.blob();
+            const base64 = await new Promise<string>((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onloadend = () => resolve((reader.result as string).split(',')[1]);
+                reader.onerror = reject;
+                reader.readAsDataURL(blob);
+            });
+            if (base64) setFontCache(prev => ({ ...prev, [url]: base64 }));
+            return base64;
+        } catch (e) {
+            console.error(`Font fetch failed: ${url}`, e);
+            return undefined;
+        }
     };
 
     /**
@@ -195,6 +232,7 @@ export default function AdminPage() {
         }
         if (activeTab === "cardorders") {
             fetchCardOrders();
+            fetchBatchHistory();
         }
     }, [activeTab, reloadDbCardDesigns, cardOrderFilterStatus]);
 
@@ -213,6 +251,53 @@ export default function AdminPage() {
             console.error("Failed to fetch card orders", e);
         } finally {
             setCardOrdersLoading(false);
+        }
+    };
+
+    /**
+     * 直近の QR バッチ履歴をデータベースから取得します。
+     */
+    const fetchBatchHistory = async (cursor?: any) => {
+        setIsBatchesLoading(true);
+        try {
+            const data = await adminApi.admin_qr_batch_list({
+                limit: 10,
+                cursor: cursor,
+                keyword: batchSearchKeyword.trim() || undefined
+            });
+            if (cursor) {
+                setBatchHistory(prev => [...prev, ...(data.items || [])]);
+            } else {
+                setBatchHistory(data.items || []);
+            }
+            setBatchCursor(data.cursor);
+        } catch (e) {
+            console.error("Failed to fetch batches", e);
+        } finally {
+            setIsBatchesLoading(false);
+        }
+    };
+
+    /**
+     * バッチIDでバッチ履歴を検索します。
+     */
+    const handleSearchBatches = async () => {
+        if (!batchSearchKeyword.trim()) {
+            fetchBatchHistory();
+            return;
+        }
+        setIsBatchesLoading(true);
+        try {
+            const data = await adminApi.admin_qr_batch_list({
+                keyword: batchSearchKeyword.trim(),
+                limit: 10
+            });
+            setBatchHistory(data.items || []);
+            setBatchCursor(data.cursor); // 検索結果もページング可能にする
+        } catch (e) {
+            console.error("Failed to search batches", e);
+        } finally {
+            setIsBatchesLoading(false);
         }
     };
 
@@ -310,7 +395,7 @@ export default function AdminPage() {
             };
 
             // ローカルの生成履歴に追加（セッション中のみ保持）
-            setGeneratedBatches(prev => {
+            setSessionBatches(prev => {
                 const exists = prev.find(b => b.id === batchId);
                 if (exists) return prev;
                 return [batch, ...prev];
@@ -329,7 +414,7 @@ export default function AdminPage() {
 
             // PDF/CSVのダウンロード実行
             if (type === 'pdf') {
-                await generatePDF(batch, paperFormat, design);
+                await generatePDF(batch, paperFormat, design, false);
             } else {
                 await generateCSVExport(batch, design);
             }
@@ -339,6 +424,10 @@ export default function AdminPage() {
         } finally {
             setIsExportingCsv(null);
         }
+    };
+
+    const handleGeneratePDF = async (batch: any, paperformat: string, cardformat: string | any, fillall: boolean = false) => {
+        return generatePDF(batch, paperformat, cardformat, fillall);
     };
 
     /**
@@ -562,7 +651,7 @@ export default function AdminPage() {
                         {/* すべてのQRコード一覧 */}
                         <QRCodeListSection
                             apiUrl={NEXT_PUBLIC_API_URL}
-                            onGeneratePDF={generatePDF}
+                            onGeneratePDF={handleGeneratePDF}
                             paperFormat={paperFormat}
                             cardFormat={cardFormat}
                             dbCardDesigns={dbCardDesigns}
@@ -661,343 +750,329 @@ export default function AdminPage() {
                             </CardContent>
                         </Card> */}
 
-                        {/* QRコード生成 */}
-                        <Card>
 
-                            <CardHeader>
-                                <CardTitle>{t('generate.title')}</CardTitle>
-                            </CardHeader>
-                            <CardContent className="space-y-4">
-                                <div className="flex flex-col w-full gap-1.5">
-                                    <div className="grid w-full items-center gap-1.5">
-                                        <label htmlFor="count" className="text-lg font-bold mt-4">1. {t('generate.quantity')}</label>
-                                        <Input
-                                            id="count"
-                                            type="number"
-                                            value={count}
-                                            onChange={(e) => setCount(Number(e.target.value))}
-                                        />
+
+                        {/* 印刷履歴セクション（データベースから直近10件を取得） */}
+                        <Card className="border-mist-200 overflow-hidden shadow-sm">
+                            <CardHeader className="bg-mist-50/50 border-b">
+                                <div className="flex justify-between items-center flex-wrap gap-4">
+                                    <div>
+                                        <CardTitle className="text-mist-900 flex items-center gap-2">
+                                            <Printer className="w-5 h-5" />
+                                            {t('batches.recentTitle') || "直近の印刷履歴"}
+                                        </CardTitle>
+                                        <CardDescription>
+                                            データベースから取得した最近の印刷バッチ（最新10件）
+                                        </CardDescription>
                                     </div>
-
-                                    <h3 className="text-lg font-bold mt-4">2. {t('generate.pdfOptions')}</h3>
-                                    <div className="space-y-4 rounded-xl bg-gray-100 border border-gray-200 border-dashed border-5 p-3 sm:p-4">
-                                        <div className="flex flex-col gap-3">
-
-                                            <div className="flex flex-col sm:flex-row w-full gap-1">
-                                                <label className="flex w-full sm:w-24 items-center text-[11px] sm:text-xs text-gray-700 font-medium">{t('generate.cardFormat')}</label>
-                                                <select
-                                                    className="flex-1 min-w-0 w-full rounded-md p-2 text-sm border border-gray-200 shadow-sm text-black bg-white"
-                                                    value={cardFormat}
-                                                    onChange={(e) => setCardFormat(e.target.value)}
-                                                >
-                                                    {Object.entries(cardformats).map(([key, value]: [string, any]) => (
-                                                        <option key={key} value={key}>{value.name || key} [System]</option>
-                                                    ))}
-                                                    {dbCardDesigns.map((d: any) => (
-                                                        <option key={d.design_id} value={d.design_id}>{d.name || d.design_id} [DB]</option>
-                                                    ))}
-                                                </select>
-                                            </div>
-                                        </div>
-
-                                        {/* Card Preview */}
-                                        <div className="w-full overflow-hidden">
-                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                                <div className="space-y-1 w-full">
-                                                    <div
-                                                        className="w-full relative rounded shadow-lg overflow-hidden border border-gray-700 bg-white"
-                                                        style={{ aspectRatio: previewAspectRatio }}
-                                                    >
-                                                        <img
-                                                            src={(dbCardDesigns.find(d => d.design_id === cardFormat)?.thumbf || dbCardDesigns.find(d => d.design_id === cardFormat)?.bgimgf) || cardformats[cardFormat]?.bgimgf}
-                                                            alt={t('generate.frontPreview')}
-                                                            className="absolute inset-0 w-full h-full object-fill"
-                                                            crossOrigin="anonymous"
-                                                        />
-                                                    </div>
-                                                    <p className="text-[10px] text-gray-500 text-center uppercase tracking-wider">{t('generate.front')}</p>
-                                                </div>
-                                                <div className="space-y-1 w-full">
-                                                    <div
-                                                        className="w-full relative rounded shadow-lg overflow-hidden border border-gray-700 bg-white"
-                                                        style={{ aspectRatio: previewAspectRatio }}
-                                                    >
-                                                        <img
-                                                            src={(dbCardDesigns.find(d => d.design_id === cardFormat)?.thumbb || dbCardDesigns.find(d => d.design_id === cardFormat)?.bgimgb) || cardformats[cardFormat]?.bgimgb}
-                                                            alt={t('generate.backPreview')}
-                                                            className="absolute inset-0 w-full h-full object-fill"
-                                                            crossOrigin="anonymous"
-                                                        />
-                                                    </div>
-                                                    <p className="text-[10px] text-gray-500 text-center uppercase tracking-wider">{t('generate.back')}</p>
-                                                </div>
-                                            </div>
-                                        </div>
-
-
-                                    </div>
-
-
-                                    <label htmlFor="shopId" className="text-lg font-bold mt-4">3. {t('generate.option')}</label>
-                                    <div className="flex items-center gap-2">
-                                        <Switch
-                                            id="useMetadataOptions"
-                                            checked={useMetadataOptions}
-                                            onCheckedChange={(checked: boolean) => setUseMetadataOptions(checked)}
-                                        />
-                                        <Label htmlFor="useMetadataOptions" className="text-sm font-medium cursor-pointer">
-                                            {t('generate.useMetadata')}
-                                        </Label>
-                                    </div>
-
-                                    <div className={cn(
-                                        "grid w-full items-center gap-2 p-4 rounded-xl bg-gray-100 border border-gray-200 border-dashed border-5 transition-all duration-200",
-                                        !useMetadataOptions && "opacity-50 grayscale pointer-events-none"
-                                    )}>
-                                        <div className="grid w-full items-center gap-1.5">
-                                            <div className="flex items-center gap-2">
-                                                <div className={cn("w-3 h-3 rounded-full items-center justify-center", shopId ? "bg-red-500" : "bg-gray-500")}></div>
-                                                <label htmlFor="shopId" className="text-sm font-medium">{t('generate.shopId')}</label>
-                                            </div>
+                                    <div className="flex items-center gap-2 w-full sm:w-auto">
+                                        <div className="relative flex-1 sm:w-64">
+                                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                                             <Input
-                                                id="shopId"
-                                                type="text"
-                                                value={shopId}
-                                                placeholder=""
-                                                onChange={(e) => setShopId(e.target.value)}
+                                                placeholder={t('batches.searchPlaceholder') || "バッチID / 注文ID / キーワード"}
+                                                value={batchSearchKeyword}
+                                                onChange={(e) => setBatchSearchKeyword(e.target.value)}
+                                                onKeyDown={(e) => e.key === 'Enter' && handleSearchBatches()}
+                                                className="pl-10 h-10 text-black bg-white border-gray-200 focus:ring-mist-500"
                                             />
                                         </div>
-                                        <div className="grid w-full items-center gap-1.5">
-                                            <div className="flex items-center gap-2">
-                                                <div className={cn("w-3 h-3 rounded-full items-center justify-center", productId ? "bg-red-500" : "bg-gray-500")}></div>
-                                                <label htmlFor="productId" className="text-sm font-medium">{t('generate.productId')}</label>
-                                            </div>
-                                            <Input
-                                                id="productId"
-                                                type="text"
-                                                value={productId}
-                                                placeholder=""
-                                                onChange={(e) => setProductId(e.target.value)}
-                                            />
-                                        </div>
-                                        <div className="grid w-full items-center gap-1.5">
-                                            <div className="flex items-center gap-2">
-                                                <div className={cn("w-3 h-3 rounded-full items-center justify-center", ownerUuid ? "bg-red-500" : "bg-gray-500")}></div>
-                                                <label htmlFor="ownerUuid" className="text-sm font-medium">{t('generate.ownerUserId')}</label>
-                                            </div>
-                                            <Input
-                                                id="ownerUuid"
-                                                type="text"
-                                                value={ownerUuid}
-                                                placeholder=""
-                                                onChange={(e) => setOwnerUuid(e.target.value)}
-                                            />
-                                        </div>
-                                        <div className="grid w-full items-center gap-1.5">
-                                            <div className="flex items-center gap-2">
-                                                <div className={cn("w-3 h-3 rounded-full items-center justify-center", senderId ? "bg-red-500" : "bg-gray-500")}></div>
-                                                <label htmlFor="senderId" className="text-sm font-medium">{t('generate.senderId')}</label>
-                                            </div>
-                                            <Input
-                                                id="senderId"
-                                                type="text"
-                                                value={senderId}
-                                                placeholder=""
-                                                onChange={(e) => setSenderId(e.target.value)}
-                                            />
-                                        </div>
-                                        <div className="grid w-full items-center gap-1.5">
-                                            <div className="flex items-center gap-2">
-                                                <div className={cn("w-3 h-3 rounded-full items-center justify-center", expiryDate ? "bg-red-500" : "bg-gray-500")}></div>
-                                                <label htmlFor="expiryDate" className="text-sm font-medium">{t('generate.expiryDate')}</label>
-                                            </div>
-                                            <Input
-                                                id="expiryDate"
-                                                type="datetime-local"
-                                                value={expiryDate}
-                                                onChange={(e) => setExpiryDate(e.target.value)}
-                                            />
-                                        </div>
-                                        <div className="grid w-full items-center gap-1.5">
-                                            <div className="flex items-center gap-2">
-                                                <div className={cn("w-3 h-3 rounded-full items-center justify-center", activateNow && shopId && productId ? "bg-red-500" : shopId && productId ? "bg-green-500" : "bg-gray-500")}></div>
-                                                <label htmlFor="activateNow" className="text-sm font-medium">{t('generate.activateNow')}</label>
-                                            </div>
-                                            <Switch
-                                                id="activateNow"
-                                                checked={(activateNow && shopId && productId) ? true : false}
-                                                disabled={!shopId || !productId}
-                                                onCheckedChange={(checkedstate: boolean) => setActivateNow(checkedstate)}
-                                            />
-                                        </div>
-                                    </div>
-
-                                    <div className="grid w-full items-center gap-1.5 mt-4">
                                         <Button
-                                            onClick={handleGenerate}
-                                            className="w-full items-center gap-1.5 h-24"
-                                            disabled={isGenerating}
+                                            onClick={handleSearchBatches}
+                                            disabled={isBatchesLoading}
+                                            className="bg-mist-800 hover:bg-mist-700 text-white"
                                         >
-                                            {isGenerating ? (
-                                                <>
-                                                    <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                                                    {t('generate.button')}...
-                                                </>
-                                            ) : (
-                                                t('generate.button')
-                                            )}
+                                            {isBatchesLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
                                         </Button>
                                     </div>
-
                                 </div>
-                            </CardContent>
-                            {/* このページを開いてから生成したQRコードのバッチ一覧 */}
-                            <CardFooter className="border-t">
+                            </CardHeader>
+                            <CardContent className="p-0">
+                                <div className="divide-y divide-gray-100">
+                                    {isBatchesLoading && batchHistory.length === 0 ? (
+                                        <div className="flex flex-col items-center justify-center p-12 text-mist-500">
+                                            <Loader2 className="w-8 h-8 animate-spin mb-4" />
+                                            <p>{t('batches.loading')}</p>
+                                        </div>
+                                    ) : batchHistory.length === 0 ? (
+                                        <div className="p-12 text-center text-gray-500">
+                                            <p>{t('batches.noBatches')}</p>
+                                        </div>
+                                    ) : (
+                                        <div className="p-4 space-y-4">
+                                            {batchHistory.map(batch => (
+                                                <BatchItem
+                                                    key={batch.id}
+                                                    batch={batch}
+                                                    t={t}
+                                                    handleCopy={handleCopy}
+                                                    copiedId={copiedId}
+                                                    setIsExportingCsv={setIsExportingCsv}
+                                                    isExportingCsv={isExportingCsv}
+                                                    cardFormat={cardFormat}
+                                                    dbCardDesigns={dbCardDesigns}
+                                                    handleGeneratePDF={handleGeneratePDF}
+                                                    paperFormat={paperFormat}
+                                                />
+                                            ))}
 
-
-                                <div className="space-y-4 w-full">
-                                    <CardTitle>{t('batches.title')}</CardTitle>
-                                    {generatedBatches.length === 0 ? <p className="text-gray-500">{t('batches.noBatches')}</p> : (
-                                        generatedBatches.map(batch => (
-                                            <div key={batch.id} className="bg-white border p-4 rounded-md">
-                                                <div className="flex items-center mb-2">
-                                                    <div className="flex gap-2 flex-wrap flex-rows items-center">
-                                                        <div>
-                                                            <div className="flex items-center gap-1">
-                                                                <p className="font-medium">{t('batches.batchId', { id: batch.id })}</p>
-                                                                <Button
-                                                                    variant="ghost"
-                                                                    size="icon"
-                                                                    className="h-4 w-4"
-                                                                    onClick={() => handleCopy(batch.id)}
-                                                                >
-                                                                    {copiedId === batch.id ? (
-                                                                        <Check className="h-3 w-3 text-green-500" />
-                                                                    ) : (
-                                                                        <Copy className="h-3 w-3" />
-                                                                    )}
-                                                                </Button>
-                                                            </div>
-                                                            <p className="text-sm text-gray-500">{t('batches.info', { count: batch.count, date: batch.date })}</p>
-                                                        </div>
-                                                        <p className="flex justify-center items-center text-sm bg-green-100 text-green-800 px-3 py-1 rounded-xl">{t(`batches.status.${batch.status}`)}</p>
-                                                    </div>
-                                                    <Button className="ml-auto" variant="outline" size="sm" onClick={() => {
-                                                        setIsExportingCsv(batch.id);
-                                                        try {
-                                                            const resolveDesign = (designId?: string) => {
-                                                                const targetId = designId || cardFormat;
-                                                                const dbDesign = dbCardDesigns.find(d => d.design_id === targetId);
-                                                                if (dbDesign) return dbDesign;
-                                                                if (cardformats[targetId]) return targetId;
-                                                                const globalDesign = dbCardDesigns.find(d => d.design_id === cardFormat);
-                                                                return globalDesign || cardFormat;
-                                                            };
-                                                            const design = resolveDesign(batch.design_id);
-                                                            generatePDF(batch, paperFormat, design);
-                                                        } finally {
-                                                            setIsExportingCsv(null);
-                                                        }
-                                                    }}>
-                                                        {isExportingCsv === batch.id ? (
+                                            {batchCursor && (
+                                                <div className="flex justify-center pt-4">
+                                                    <Button
+                                                        variant="outline"
+                                                        onClick={() => fetchBatchHistory(batchCursor)}
+                                                        disabled={isBatchesLoading}
+                                                        className="w-full sm:w-auto text-mist-900 border-mist-200 hover:bg-mist-50"
+                                                    >
+                                                        {isBatchesLoading ? (
                                                             <>
-                                                                <Loader2 className="w-3 h-3 animate-spin mr-1" />
-                                                                {t('batches.downloading')}
+                                                                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                                                                {t('batches.loading')}
                                                             </>
                                                         ) : (
-                                                            <>
-                                                                <FileText className="w-4 h-4 mr-2" />
-                                                                {t('batches.downloadPdf')}
-                                                            </>
-                                                        )}
-                                                    </Button>
-                                                    <Button className="ml-2" variant="outline" size="sm" disabled={isExportingCsv === batch.id} onClick={async () => {
-                                                        setIsExportingCsv(batch.id);
-                                                        try {
-                                                            const resolveDesign = (designId?: string) => {
-                                                                const targetId = designId || cardFormat;
-                                                                const dbDesign = dbCardDesigns.find(d => d.design_id === targetId);
-                                                                if (dbDesign) return dbDesign;
-                                                                if (cardformats[targetId]) return targetId;
-                                                                const globalDesign = dbCardDesigns.find(d => d.design_id === cardFormat);
-                                                                return globalDesign || cardFormat;
-                                                            };
-                                                            const design = resolveDesign(batch.design_id);
-                                                            await generateCSVExport(batch, design);
-                                                        } finally {
-                                                            setIsExportingCsv(null);
-                                                        }
-                                                    }}>
-                                                        {isExportingCsv === batch.id ? (
-                                                            <>
-                                                                <Loader2 className="w-3 h-3 animate-spin mr-1" />
-                                                                {t('batches.downloading')}
-                                                            </>
-                                                        ) : (
-                                                            <>
-                                                                <Download className="w-4 h-4 mr-2" />
-                                                                {t('batches.downloadCsv')}
-                                                            </>
+                                                            t('batches.loadMore') || "さらに読み込む"
                                                         )}
                                                     </Button>
                                                 </div>
-                                                {/* Display Codes */}
-                                                <div className="mt-2 bg-gray-100 p-2 rounded text-xs font-mono overflow-auto max-h-40">
-                                                    <table className="w-full text-left">
-                                                        <thead>
-                                                            <tr>
-                                                                <th>{t('batches.table.qrId')}</th>
-                                                                <th>{t('batches.table.pin')}</th>
-                                                            </tr>
-                                                        </thead>
-                                                        <tbody>
-                                                            {batch.codes?.map((code: any) => (
-                                                                <tr key={code.qr_id} className="border-b border-gray-200 last:border-0 group">
-                                                                    <td className="pr-4 py-0.5 select-all text-[10px] break-all">
-                                                                        <div className="flex items-center gap-1">
-                                                                            {code.qr_id}
-                                                                            <Button
-                                                                                variant="ghost"
-                                                                                size="icon"
-                                                                                className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity"
-                                                                                onClick={() => handleCopy(code.qr_id)}
-                                                                            >
-                                                                                {copiedId === code.qr_id ? (
-                                                                                    <Check className="h-2 w-2 text-green-500" />
-                                                                                ) : (
-                                                                                    <Copy className="h-2 w-2" />
-                                                                                )}
-                                                                            </Button>
-                                                                        </div>
-                                                                    </td>
-                                                                    <td className="py-0.5 select-all text-[10px] break-all">
-                                                                        <div className="flex items-center gap-1">
-                                                                            {code.pin}
-                                                                            <Button
-                                                                                variant="ghost"
-                                                                                size="icon"
-                                                                                className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity"
-                                                                                onClick={() => handleCopy(code.pin)}
-                                                                            >
-                                                                                {copiedId === code.pin ? (
-                                                                                    <Check className="h-2 w-2 text-green-500" />
-                                                                                ) : (
-                                                                                    <Copy className="h-2 w-2" />
-                                                                                )}
-                                                                            </Button>
-                                                                        </div>
-                                                                    </td>
-                                                                </tr>
-                                                            ))}
-                                                        </tbody>
-                                                    </table>
-                                                </div>
-                                            </div>
-                                        ))
+                                            )}
+                                        </div>
                                     )}
                                 </div>
-                            </CardFooter>
+                            </CardContent>
                         </Card>
+
+
+                        {/* QRコード手動生成 (Toggle Button) */}
+                        <div className="flex justify-end mb-2">
+                            <Button
+                                variant="outline"
+                                className="bg-mist-800 border-mist-700 text-mist-300 hover:bg-mist-700 hover:text-white transition-all duration-300 rounded-full"
+                                onClick={() => setIsManualGenerateOpen(!isManualGenerateOpen)}
+                            >
+                                <Plus className={cn("w-4 h-4 mr-2 transition-transform duration-300", isManualGenerateOpen && "rotate-45")} />
+                                {isManualGenerateOpen ? t('generate.hideManualGenerate') : t('generate.showManualGenerate')}
+                            </Button>
+                        </div>
+
+                        {/* QRコード生成 */}
+                        {isManualGenerateOpen && (
+                            <Card className="animate-in fade-in slide-in-from-top-2 duration-300">
+
+                                <CardHeader>
+                                    <CardTitle>{t('generate.title')}</CardTitle>
+                                </CardHeader>
+                                <CardContent className="space-y-4">
+                                    <div className="flex flex-col w-full gap-1.5">
+                                        <div className="grid w-full items-center gap-1.5">
+                                            <label htmlFor="count" className="text-lg font-bold mt-4">1. {t('generate.quantity')}</label>
+                                            <Input
+                                                id="count"
+                                                type="number"
+                                                value={count}
+                                                onChange={(e) => setCount(Number(e.target.value))}
+                                            />
+                                        </div>
+
+                                        <h3 className="text-lg font-bold mt-4">2. {t('generate.pdfOptions')}</h3>
+                                        <div className="space-y-4 rounded-xl bg-gray-100 border border-gray-200 border-dashed border-5 p-3 sm:p-4">
+                                            <div className="flex flex-col gap-3">
+
+                                                <div className="flex flex-col sm:flex-row w-full gap-1">
+                                                    <label className="flex w-full sm:w-24 items-center text-[11px] sm:text-xs text-gray-700 font-medium">{t('generate.cardFormat')}</label>
+                                                    <select
+                                                        className="flex-1 min-w-0 w-full rounded-md p-2 text-sm border border-gray-200 shadow-sm text-black bg-white"
+                                                        value={cardFormat}
+                                                        onChange={(e) => setCardFormat(e.target.value)}
+                                                    >
+                                                        {Object.entries(cardformats).map(([key, value]: [string, any]) => (
+                                                            <option key={key} value={key}>{value.name || key} [System]</option>
+                                                        ))}
+                                                        {dbCardDesigns.map((d: any) => (
+                                                            <option key={d.design_id} value={d.design_id}>{d.name || d.design_id} [DB]</option>
+                                                        ))}
+                                                    </select>
+                                                </div>
+                                            </div>
+
+                                            {/* Card Preview */}
+                                            <div className="w-full overflow-hidden">
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                                    <div className="space-y-1 w-full">
+                                                        <div
+                                                            className="w-full relative rounded shadow-lg overflow-hidden border border-gray-700 bg-white"
+                                                            style={{ aspectRatio: previewAspectRatio }}
+                                                        >
+                                                            <img
+                                                                src={(dbCardDesigns.find(d => d.design_id === cardFormat)?.thumbf || dbCardDesigns.find(d => d.design_id === cardFormat)?.bgimgf) || cardformats[cardFormat]?.bgimgf}
+                                                                alt={t('generate.frontPreview')}
+                                                                className="absolute inset-0 w-full h-full object-fill"
+                                                                crossOrigin="anonymous"
+                                                            />
+                                                        </div>
+                                                        <p className="text-[10px] text-gray-500 text-center uppercase tracking-wider">{t('generate.front')}</p>
+                                                    </div>
+                                                    <div className="space-y-1 w-full">
+                                                        <div
+                                                            className="w-full relative rounded shadow-lg overflow-hidden border border-gray-700 bg-white"
+                                                            style={{ aspectRatio: previewAspectRatio }}
+                                                        >
+                                                            <img
+                                                                src={(dbCardDesigns.find(d => d.design_id === cardFormat)?.thumbb || dbCardDesigns.find(d => d.design_id === cardFormat)?.bgimgb) || cardformats[cardFormat]?.bgimgb}
+                                                                alt={t('generate.backPreview')}
+                                                                className="absolute inset-0 w-full h-full object-fill"
+                                                                crossOrigin="anonymous"
+                                                            />
+                                                        </div>
+                                                        <p className="text-[10px] text-gray-500 text-center uppercase tracking-wider">{t('generate.back')}</p>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+
+                                        </div>
+
+
+                                        <label htmlFor="shopId" className="text-lg font-bold mt-4">3. {t('generate.option')}</label>
+                                        <div className="flex items-center gap-2">
+                                            <Switch
+                                                id="useMetadataOptions"
+                                                checked={useMetadataOptions}
+                                                onCheckedChange={(checked: boolean) => setUseMetadataOptions(checked)}
+                                            />
+                                            <Label htmlFor="useMetadataOptions" className="text-sm font-medium cursor-pointer">
+                                                {t('generate.useMetadata')}
+                                            </Label>
+                                        </div>
+
+                                        <div className={cn(
+                                            "grid w-full items-center gap-2 p-4 rounded-xl bg-gray-100 border border-gray-200 border-dashed border-5 transition-all duration-200",
+                                            !useMetadataOptions && "opacity-50 grayscale pointer-events-none"
+                                        )}>
+                                            <div className="grid w-full items-center gap-1.5">
+                                                <div className="flex items-center gap-2">
+                                                    <div className={cn("w-3 h-3 rounded-full items-center justify-center", shopId ? "bg-red-500" : "bg-gray-500")}></div>
+                                                    <label htmlFor="shopId" className="text-sm font-medium">{t('generate.shopId')}</label>
+                                                </div>
+                                                <Input
+                                                    id="shopId"
+                                                    type="text"
+                                                    value={shopId}
+                                                    placeholder=""
+                                                    onChange={(e) => setShopId(e.target.value)}
+                                                />
+                                            </div>
+                                            <div className="grid w-full items-center gap-1.5">
+                                                <div className="flex items-center gap-2">
+                                                    <div className={cn("w-3 h-3 rounded-full items-center justify-center", productId ? "bg-red-500" : "bg-gray-500")}></div>
+                                                    <label htmlFor="productId" className="text-sm font-medium">{t('generate.productId')}</label>
+                                                </div>
+                                                <Input
+                                                    id="productId"
+                                                    type="text"
+                                                    value={productId}
+                                                    placeholder=""
+                                                    onChange={(e) => setProductId(e.target.value)}
+                                                />
+                                            </div>
+                                            <div className="grid w-full items-center gap-1.5">
+                                                <div className="flex items-center gap-2">
+                                                    <div className={cn("w-3 h-3 rounded-full items-center justify-center", ownerUuid ? "bg-red-500" : "bg-gray-500")}></div>
+                                                    <label htmlFor="ownerUuid" className="text-sm font-medium">{t('generate.ownerUserId')}</label>
+                                                </div>
+                                                <Input
+                                                    id="ownerUuid"
+                                                    type="text"
+                                                    value={ownerUuid}
+                                                    placeholder=""
+                                                    onChange={(e) => setOwnerUuid(e.target.value)}
+                                                />
+                                            </div>
+                                            <div className="grid w-full items-center gap-1.5">
+                                                <div className="flex items-center gap-2">
+                                                    <div className={cn("w-3 h-3 rounded-full items-center justify-center", senderId ? "bg-red-500" : "bg-gray-500")}></div>
+                                                    <label htmlFor="senderId" className="text-sm font-medium">{t('generate.senderId')}</label>
+                                                </div>
+                                                <Input
+                                                    id="senderId"
+                                                    type="text"
+                                                    value={senderId}
+                                                    placeholder=""
+                                                    onChange={(e) => setSenderId(e.target.value)}
+                                                />
+                                            </div>
+                                            <div className="grid w-full items-center gap-1.5">
+                                                <div className="flex items-center gap-2">
+                                                    <div className={cn("w-3 h-3 rounded-full items-center justify-center", expiryDate ? "bg-red-500" : "bg-gray-500")}></div>
+                                                    <label htmlFor="expiryDate" className="text-sm font-medium">{t('generate.expiryDate')}</label>
+                                                </div>
+                                                <Input
+                                                    id="expiryDate"
+                                                    type="datetime-local"
+                                                    value={expiryDate}
+                                                    onChange={(e) => setExpiryDate(e.target.value)}
+                                                />
+                                            </div>
+                                            <div className="grid w-full items-center gap-1.5">
+                                                <div className="flex items-center gap-2">
+                                                    <div className={cn("w-3 h-3 rounded-full items-center justify-center", activateNow && shopId && productId ? "bg-red-500" : shopId && productId ? "bg-green-500" : "bg-gray-500")}></div>
+                                                    <label htmlFor="activateNow" className="text-sm font-medium">{t('generate.activateNow')}</label>
+                                                </div>
+                                                <Switch
+                                                    id="activateNow"
+                                                    checked={(activateNow && shopId && productId) ? true : false}
+                                                    disabled={!shopId || !productId}
+                                                    onCheckedChange={(checkedstate: boolean) => setActivateNow(checkedstate)}
+                                                />
+                                            </div>
+                                        </div>
+
+                                        <div className="grid w-full items-center gap-1.5 mt-4">
+                                            <Button
+                                                onClick={handleGenerate}
+                                                className="w-full items-center gap-1.5 h-24"
+                                                disabled={isGenerating}
+                                            >
+                                                {isGenerating ? (
+                                                    <>
+                                                        <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                                                        {t('generate.button')}...
+                                                    </>
+                                                ) : (
+                                                    t('generate.button')
+                                                )}
+                                            </Button>
+                                        </div>
+
+                                    </div>
+                                </CardContent>
+                                {/* このページを開いてから生成したQRコードのバッチ一覧
+                                {sessionBatches.length > 0 && (
+                                    <CardFooter className="border-t">
+                                        <div className="space-y-4 w-full">
+                                            <CardTitle className="text-sm font-semibold">{t('batches.title')}</CardTitle>
+                                            <div className="grid grid-cols-1 gap-4">
+                                                {sessionBatches.map(batch => (
+                                                    <BatchItem
+                                                        key={batch.id}
+                                                        batch={batch}
+                                                        t={t}
+                                                        handleCopy={handleCopy}
+                                                        copiedId={copiedId}
+                                                        setIsExportingCsv={setIsExportingCsv}
+                                                        isExportingCsv={isExportingCsv}
+                                                        cardFormat={cardFormat}
+                                                        dbCardDesigns={dbCardDesigns}
+                                                        handleGeneratePDF={handleGeneratePDF}
+                                                        paperFormat={paperFormat}
+                                                    />
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </CardFooter>
+                                )} */}
+                            </Card>
+                        )}
+
+
 
                         {searchedOrder && (
                             <OrderDetailsDialog
@@ -4555,5 +4630,165 @@ function CardOrderListSection({
                 )}
             </CardContent>
         </Card>
+    );
+}
+
+/**
+ * 個別のバッチ（印刷セット）を表示するコンポーネント。
+ * セッション履歴とデータベース履歴の両方で使用されます。
+ */
+function BatchItem({
+    batch,
+    t,
+    handleCopy,
+    copiedId,
+    setIsExportingCsv,
+    isExportingCsv,
+    cardFormat,
+    dbCardDesigns,
+    handleGeneratePDF,
+    paperFormat
+}: any) {
+    const resolveDesign = (designId?: string) => {
+        const targetId = designId || cardFormat;
+        const dbDesign = dbCardDesigns.find((d: any) => d.design_id === targetId);
+        if (dbDesign) return dbDesign;
+        if (cardformats[targetId]) return targetId;
+        return targetId;
+    };
+
+    return (
+        <div key={batch.id} className="bg-white border border-gray-200 p-4 rounded-lg text-black shadow-sm hover:shadow-md transition-shadow">
+            <div className="flex items-center mb-3 flex-wrap gap-4">
+                <div className="flex gap-2 flex-wrap items-center">
+                    <div>
+                        <div className="flex items-center gap-1">
+                            <p className="font-bold text-mist-900">{t('batches.batchId', { id: batch.id })}</p>
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-5 w-5 text-mist-400 hover:text-mist-600"
+                                onClick={() => handleCopy(batch.id)}
+                            >
+                                {copiedId === batch.id ? (
+                                    <Check className="h-3 w-3 text-green-500" />
+                                ) : (
+                                    <Copy className="h-3 w-3" />
+                                )}
+                            </Button>
+                        </div>
+                        <p className="text-xs text-gray-500 flex items-center gap-2 mt-1">
+                            <Calendar className="w-3 h-3" />
+                            {t('batches.info', { count: batch.count, date: new Date(batch.date).toLocaleString() })}
+                        </p>
+                        {batch.order_id && (
+                            <p className="text-[10px] text-mist-500 mt-1 font-medium bg-mist-50 px-1.5 py-0.5 rounded border border-mist-100 inline-block">
+                                Order: {batch.order_id}
+                            </p>
+                        )}
+                    </div>
+                    <Badge variant="secondary" className="bg-green-50 text-green-700 border-green-200">
+                        {t(`batches.status.${batch.status}`)}
+                    </Badge>
+                </div>
+                <div className="ml-auto flex gap-2">
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-8 text-xs border-mist-200 hover:bg-mist-50"
+                        onClick={async () => {
+                            setIsExportingCsv(batch.id);
+                            try {
+                                const design = resolveDesign(batch.design_id);
+                                await handleGeneratePDF(batch, paperFormat, design);
+                            } finally {
+                                setIsExportingCsv(null);
+                            }
+                        }}
+                    >
+                        {isExportingCsv === batch.id ? (
+                            <Loader2 className="w-3 h-3 animate-spin mr-1" />
+                        ) : (
+                            <FileText className="w-3.5 h-3.5 mr-1.5 text-mist-600" />
+                        )}
+                        {t('batches.downloadPdf')}
+                    </Button>
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={isExportingCsv === batch.id}
+                        className="h-8 text-xs border-mist-200 hover:bg-mist-50"
+                        onClick={async () => {
+                            setIsExportingCsv(batch.id);
+                            try {
+                                const design = resolveDesign(batch.design_id);
+                                await generateCSVExport(batch, design);
+                            } finally {
+                                setIsExportingCsv(null);
+                            }
+                        }}
+                    >
+                        {isExportingCsv === batch.id ? (
+                            <Loader2 className="w-3 h-3 animate-spin mr-1" />
+                        ) : (
+                            <Download className="w-3.5 h-3.5 mr-1.5 text-mist-600" />
+                        )}
+                        {t('batches.downloadCsv')}
+                    </Button>
+                </div>
+            </div>
+
+            {/* Display Codes (Collapsible or Scrollable) */}
+            <div className="mt-2 bg-gray-50 border border-gray-100 p-2 rounded-md text-[10px] font-mono overflow-auto max-h-32">
+                <table className="w-full text-left">
+                    <thead className="text-gray-400 border-b border-gray-100">
+                        <tr>
+                            <th className="pb-1 font-normal">{t('batches.table.qrId')}</th>
+                            <th className="pb-1 font-normal">{t('batches.table.pin')}</th>
+                        </tr>
+                    </thead>
+                    <tbody className="text-mist-800">
+                        {batch.codes?.map((code: any) => (
+                            <tr key={code.qr_id} className="border-b border-gray-50 last:border-0 group hover:bg-white transition-colors">
+                                <td className="pr-4 py-1 select-all break-all">
+                                    <div className="flex items-center gap-1">
+                                        {code.qr_id}
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity"
+                                            onClick={() => handleCopy(code.qr_id)}
+                                        >
+                                            {copiedId === code.qr_id ? (
+                                                <Check className="h-2 w-2 text-green-500" />
+                                            ) : (
+                                                <Copy className="h-2 w-2" />
+                                            )}
+                                        </Button>
+                                    </div>
+                                </td>
+                                <td className="py-1 select-all break-all">
+                                    <div className="flex items-center gap-1">
+                                        {code.pin}
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity"
+                                            onClick={() => handleCopy(code.pin)}
+                                        >
+                                            {copiedId === code.pin ? (
+                                                <Check className="h-2 w-2 text-green-500" />
+                                            ) : (
+                                                <Copy className="h-2 w-2" />
+                                            )}
+                                        </Button>
+                                    </div>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+        </div>
     );
 }

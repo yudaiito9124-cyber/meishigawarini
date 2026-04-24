@@ -78,7 +78,10 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         const designId = item.design_id || (item as any).card_design;
 
         const keys = [];
-        if (shopId) keys.push({ PK: `SHOP#${shopId}`, SK: 'METADATA' });
+        if (shopId) {
+            keys.push({ PK: `SHOP#${shopId}`, SK: 'METADATA' });
+            keys.push({ PK: `SHOP#${shopId}`, SK: 'DETAIL_HTML' });
+        }
         if (shopId && productId) keys.push({ PK: `SHOP#${shopId}`, SK: `PRODUCT#${productId}` });
         if (designId) keys.push({ PK: 'CARD_DESIGN#METADATA', SK: designId });
         // パスワード認証成功時かつ発送済みの時のみ、オーダー（発送追跡）情報を取得
@@ -90,10 +93,13 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         const responses = batchRes.Responses?.[TABLE_NAME] || [];
 
         const shop = responses.find(r => r.PK === `SHOP#${shopId}` && r.SK === 'METADATA');
+        const shopDetail = responses.find(r => r.PK === `SHOP#${shopId}` && r.SK === 'DETAIL_HTML');
         const product = responses.find(r => r.PK === `SHOP#${shopId}` && r.SK === `PRODUCT#${productId}`);
         const designMeta = responses.find(r => r.PK === 'CARD_DESIGN#METADATA' && r.SK === designId);
         const design = designMeta || (designId ? getSystemDesign(designId) : null);
         const order = responses.find(r => r.PK === `QR#${qr_id}` && r.SK === 'ORDER');
+
+        const detail_html = shopDetail?.detail_html;
 
         // ショップオーナーの Email フォールバック（Cognito から取得）
         let shopEmail = shop?.email;
@@ -108,7 +114,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         const result: any = {
             qr_id, status, shop_id: shopId, product_id: productId,
             shop_name: shop?.name,
-            shop_detail_html: shop?.detail_html ? await signUrlsInHtml(shop.detail_html, BUCKET_NAME) : undefined,
+            shop_detail_html: detail_html ? await signUrlsInHtml(detail_html, BUCKET_NAME) : undefined,
             shop_email: shopEmail,
             shortest_delivery_days: shop?.shortest_delivery_days ?? 3,
             delivery_time_options: shop?.delivery_time_options ?? ["timeMorning", "time1416", "time1618", "time1820", "time1921"],

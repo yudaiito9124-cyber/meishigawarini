@@ -71,10 +71,8 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         const gm_idslist = Array.isArray(gm_ids) ? gm_ids : [];
 
         // 【DB操作: PutItem (SHOP METADATA)】
-        // [意図] ショップの基本属性（名前、メアド、オーナーID）を新規保存。
-        // [インデックス設計]
-        // - GSI2_PK: `USER#${owner_id}` / GSI2_SK: now
-        //   これにより「あるユーザーがオーナーを務めるショップ一覧」を高速に逆引き検索可能にしています（規格化されたクエリパターン）。
+        // [意図] ショップの基本属性を定義する正本レコードを作成します。
+        // 通知先ユーザーID（Owner）や、初期のメーリングリスト情報を保持します。
         await ddb.send(new PutCommand({
             TableName: TABLE_NAME,
             Item: {
@@ -85,6 +83,74 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 order_mailing_list: email ? [email] : [],
                 inquiry_mailing_list: email ? [email] : [],
                 GSI2_PK: `USER#${owner_id}`, GSI2_SK: now,
+                ts_created_at: now, ts_updated_at: now
+            }
+        }));
+
+        // 【DB操作: PutItem (DETAIL_HTML)】初期化
+        // [意図] 肥大化が予想される HTML 系コンテンツを別レコードとして初期化します。
+        // これにより、将来的に店舗説明が巨大になっても METADATA の読み取り速度を落としません。
+        await ddb.send(new PutCommand({
+            TableName: TABLE_NAME,
+            Item: {
+                PK: `SHOP#${newShopId}`, SK: 'DETAIL_HTML',
+                detail_html: "", html_image_urls: [],
+                ts_created_at: now, ts_updated_at: now
+            }
+        }));
+
+        // 【DB操作: PutItem (SETTINGS#SHIPPING_LABEL)】初期化（デフォルト設定）
+        // [意図] 郵便および宅急便の配送ラベル印刷設定のデフォルト値をセットします。
+        // フロントエンドの ShippingLabelSettings.tsx で定義されている
+        // DEFAULT_POST_CONFIG / DEFAULT_EXPRESS_CONFIG と整合性を取っています。
+        await ddb.send(new PutCommand({
+            TableName: TABLE_NAME,
+            Item: {
+                PK: `SHOP#${newShopId}`, SK: 'SETTINGS#SHIPPING_LABEL',
+                shipping_label_settings: {
+                    takkyubin: {
+                        labelHeight: 50,
+                        labelWidth: 86.4,
+                        layout: {
+                            orderIdPos: { enabled: false, fontSize: 6, x: 5, y: 85 },
+                            productNamePos: { enabled: true, fontSize: 8, x: 2, y: 44.5 },
+                            recipientAddressPos: { enabled: true, fontSize: 9, maxWidth: 80, x: 2, y: 7 },
+                            recipientNamePos: { enabled: true, fontSize: 12, fontWeight: 'bold', maxWidth: 80, x: 1.5, y: 20 },
+                            recipientPhonePos: { enabled: true, fontSize: 10, maxWidth: 80, x: 50, y: 2 },
+                            recipientZipPos: { enabled: true, fontSize: 10, x: 2, y: 2 },
+                            senderAddressPos: { enabled: true, fontSize: 7, maxWidth: 80, x: 2, y: 37 },
+                            senderNamePos: { enabled: true, fontSize: 9, x: 5, y: 40.5 },
+                            senderPhonePos: { enabled: true, fontSize: 8, x: 58, y: 33.5 },
+                            senderZipPos: { enabled: true, fontSize: 8, x: 2, y: 33.5 }
+                        },
+                        paper: {
+                            cols: 2, cols_gap: 0, offset_x: 0, offset_y: 0,
+                            pageHeight: 297, pageWidth: 210, rows: 4, rows_gap: 0
+                        }
+                    },
+                    yubin: {
+                        labelHeight: 50.8,
+                        labelWidth: 86.4,
+                        layout: {
+                            orderIdPos: { enabled: false, fontSize: 7, x: 15, y: 130 },
+                            preferredDatePos: { enabled: false, fontSize: 9, maxWidth: 85, x: 15, y: 124 },
+                            preferredTimePos: { enabled: false, fontSize: 9, maxWidth: 85, x: 15, y: 131 },
+                            productNamePos: { enabled: true, fontSize: 9, maxWidth: 80, x: 2, y: 44 },
+                            recipientAddressPos: { enabled: true, fontSize: 10, maxWidth: 80, x: 2, y: 7.5 },
+                            recipientNamePos: { enabled: true, fontSize: 16, fontWeight: 'bold', maxWidth: 80, x: 2, y: 22 },
+                            recipientPhonePos: { enabled: false, fontSize: 10, maxWidth: 85, x: 15, y: 65 },
+                            recipientZipPos: { enabled: true, fontSize: 12, x: 2, y: 2.5 },
+                            senderAddressPos: { enabled: true, fontSize: 8, maxWidth: 80, x: 2, y: 36 },
+                            senderNamePos: { enabled: true, fontSize: 10, maxWidth: 80, x: 5, y: 39.5 },
+                            senderPhonePos: { enabled: true, fontSize: 8, maxWidth: 80, x: 60, y: 33 },
+                            senderZipPos: { enabled: true, fontSize: 9, x: 2, y: 32.5 }
+                        },
+                        paper: {
+                            cols: 2, cols_gap: 0, offset_x: 18.6, offset_y: 21.2,
+                            pageHeight: 297, pageWidth: 210, rows: 5, rows_gap: 0
+                        }
+                    }
+                },
                 ts_created_at: now, ts_updated_at: now
             }
         }));

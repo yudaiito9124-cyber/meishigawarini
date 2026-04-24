@@ -34,7 +34,7 @@
 ### 「どのブランチのコード」を「どこの環境に」「どのようにデプロイ」するか
 | 環境 | 対象ブランチ |  フロントエンドデプロイ方法(AWS Amplify) | フロントエンドのみローカルで実行する方法  | バックエンドデプロイ方法(AWS CDK) |
 | :--- | :--- | :--- | :--- | :--- |
-| **本番 (Prod)** | `master` | masterブランチの更新(push)で自動デプロイ | `npm run dev:prod` (本番用バックエンド) | `npx cdk deploy -c stage=prod` (手動デプロイ) |
+| **本番 (Prod)** | `master` | masterブランチの更新(push)で自動デプロイ | `npm run dev:prod` (本番用バックエンド) | `npx cdk deploy -c stage=prod` <br> (または `stage=任意の名前`) |
 | **検証 (Stg)** | `stg` | stgブランチの更新(push)で自動デプロイ | `npm run dev:stg` (検証用バックエンド) | `npx cdk deploy -c stage=stg` (手動デプロイ) |
 
 > [!IMPORTANT]
@@ -98,9 +98,10 @@
     - `npx tsc --noEmit` （静的型チェック：エラーがないか確認）
     - `npx cdk diff -c stage=prod` （本番環境との差分を最終確認）
     - `npx cdk deploy -c stage=prod`
-    > [!WARNING]
-    > APIのURLやCognitoのIDが新しくなった場合は、`frontend/.env.production` を更新してください。
-2.  **フロントエンドの反映**
+      - *※ `prod-v2` のように任意のステージ名でデプロイすることも可能です。その場合、新しいスタックが作成されます。*新しいスタックを用意することで、以前の環境戻すことが容易です。(AmplifyでAPIURLの環境変数を変更するだけで戻せます)
+2.  **フロントエンドの環境変数の更新（重要）**
+    - バックエンドを新規ステージ名でデプロイした場合や、API URL が変更された場合は、Amplifyの環境変数を新しいAPIURLで更新します。また，ローカルでその本番環境を使用する際には`frontend/.env.production` の値を新しい API URL 等に更新する必要があります。
+3.  **フロントエンドの反映**
     - `git checkout master` -> `git merge stg` -> `git push origin master`
 3.  **ビルド状況の確認**
     - **AWS Amplify の管理画面**を開き、ビルド状況を確認します。

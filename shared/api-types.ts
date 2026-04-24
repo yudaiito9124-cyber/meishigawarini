@@ -53,6 +53,7 @@ export type AdminApiSchema = {
     }; //カード発注のステータス更新
     admin_card_orders_get: { order_id: string }; //特定のカード発注を取得
     admin_qr_batch_get: { batch_id: string }; //バッチIDからQRコードリストを取得
+    admin_qr_batch_list: { keyword?: string, limit?: number, cursor?: any }; //バッチIDまたは注文IDで検索、または最新順に取得
 };
 
 // ==========================================
@@ -76,6 +77,10 @@ export type ShopApiSchema = {
         delivery_time_options?: string[];
         order_notification_user_ids?: string[];
         inquiry_notification_user_ids?: string[];
+        shipping_label_settings?: {
+            yubin?: ShippingLabelConfig;
+            takkyubin?: ShippingLabelConfig;
+        };
     };
     shop_admins: { shop_id: string };
     shop_admins_validate: { shop_id: string; user_id: string };
@@ -223,3 +228,48 @@ export type UnifiedChatApiSchema = {
         file_size: number;
     };
 };
+
+// ==========================================
+// Shipping Label Configuration Types
+// ==========================================
+
+export interface TextPos {
+    x: number;
+    y: number;
+    fontSize: number;
+    fontWeight?: 'normal' | 'bold';
+    align?: 'left' | 'center' | 'right';
+    enabled?: boolean;
+    maxWidth?: number;
+}
+
+export interface PaperFormat {
+    pageWidth: number;
+    pageHeight: number;
+    cols: number;
+    rows: number;
+    cols_gap: number;
+    rows_gap: number;
+    offset_x: number;
+    offset_y: number;
+}
+
+export interface ShippingLabelConfig {
+    labelWidth: number;
+    labelHeight: number;
+    paper: PaperFormat;
+    layout: {
+        recipientNamePos: TextPos;
+        recipientAddressPos: TextPos;
+        recipientZipPos: TextPos;
+        recipientPhonePos: TextPos;
+        senderNamePos: TextPos;
+        senderAddressPos: TextPos;
+        senderZipPos: TextPos;
+        senderPhonePos: TextPos;
+        orderIdPos: TextPos;
+        productNamePos: TextPos;
+        preferredDatePos?: TextPos;
+        preferredTimePos?: TextPos;
+    };
+}

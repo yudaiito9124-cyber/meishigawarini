@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import { Settings, ShoppingBasket, Eye, Plus, Trash2, Copy, Check, ImageIcon, Save, Loader2, ChevronDown, Download, MoreVertical, UserMinus, Store, Code, User, Truck, Bell } from 'lucide-react';
+import { Settings, ShoppingBasket, Eye, Plus, Trash2, Copy, Check, ImageIcon, Save, Loader2, ChevronDown, Download, MoreVertical, UserMinus, Store, Code, User, Truck, Bell, Printer } from 'lucide-react';
+import { ShippingLabelSettings } from './ShippingLabelSettings';
 import { useTranslations } from 'next-intl';
 import { shopApi } from '@/lib/api/shop';
 import { Button } from '@/components/ui/button';
@@ -33,13 +34,16 @@ export function ShopSettingsSection({ shopId }: { shopId: string }) {
 
     const { shop, userId, refreshShopDetails } = useShop();
     const {
-        isSettingsOpen, isBasicSettingsOpen, isHtmlEditorOpen, isSettingUploading,
-        debouncedPreviewHtml, htmlImageUrls, htmlImageUrlsToDelete,
-        isHtmlImageSectionOpen, isUploadingHtmlImage,
-        sessionUploadedUrls, adminEmails, copiedId, isAdminSectionOpen, isDeliverySettingsOpen,
-        isNotificationSettingsOpen, orderNotificationUserIds, inquiryNotificationUserIds,
+        isSettingsOpen, isBasicSettingsOpen, isHtmlEditorOpen, isDeliverySettingsOpen,
+        isNotificationSettingsOpen, isShippingLabelSettingsOpen, isAdminSectionOpen,
+        orderNotificationUserIds, inquiryNotificationUserIds,
+        htmlImageUrls, htmlImageUrlsToDelete, isHtmlImageSectionOpen,
+        isUploadingHtmlImage, isSettingUploading, debouncedPreviewHtml, adminEmails, copiedId,
+        sessionUploadedUrls,
         set: setSettings
     } = useSettingsUI();
+
+    const [shippingLabelSettings, setShippingLabelSettings] = useState<any>(shop?.shipping_label_settings || {});
 
     useEffect(() => {
         if (shop && isSettingsOpen) {
@@ -61,6 +65,7 @@ export function ShopSettingsSection({ shopId }: { shopId: string }) {
                 orderNotificationUserIds: shop.order_notification_user_ids || [],
                 inquiryNotificationUserIds: shop.inquiry_notification_user_ids || []
             });
+            setShippingLabelSettings(shop.shipping_label_settings || {});
         }
     }, [isSettingsOpen, shop]);
 
@@ -159,7 +164,8 @@ export function ShopSettingsSection({ shopId }: { shopId: string }) {
                 shortest_delivery_days: shortestDeliveryDays !== '' ? Math.max(0, parseInt(shortestDeliveryDays, 10)) : null,
                 delivery_time_options: deliveryTimeOptionsText.trim() !== '' ? deliveryTimeOptionsText.split('\n').map(s => s.trim()).filter(s => s !== '') : [],
                 order_notification_user_ids: orderNotificationUserIds,
-                inquiry_notification_user_ids: inquiryNotificationUserIds
+                inquiry_notification_user_ids: inquiryNotificationUserIds,
+                shipping_label_settings: shippingLabelSettings
             });
 
             alert(t('shopSettings.success'));
@@ -534,6 +540,37 @@ export function ShopSettingsSection({ shopId }: { shopId: string }) {
 
                         </div>
                         {isNotificationSettingsOpen && (<div className="mb-10" />)}
+                        
+                        <div className="border border-gray-100 rounded-2xl mt-4 shadow-sm">
+                            <Button
+                                type="button"
+                                variant="outline"
+                                className="w-full flex justify-between items-center text-gray-600 px-4 py-7 rounded-2xl hover:bg-gray-50 border-gray-100 shadow-sm group transition-all"
+                                onClick={() => setSettings({ isShippingLabelSettingsOpen: !isShippingLabelSettingsOpen })}
+                            >
+                                <div className="flex items-center gap-3">
+                                    <div className={`p-2 rounded-lg transition-colors ${isShippingLabelSettingsOpen ? 'bg-amber-100 text-amber-600' : 'bg-gray-100 text-gray-400 group-hover:bg-gray-200'}`}>
+                                        <Printer className="w-5 h-5" />
+                                    </div>
+                                    <div className="flex flex-col items-start">
+                                        <span className="font-bold text-gray-900">{t('shopSettings.shippingLabelSettings')}</span>
+                                        <span className="text-[10px] text-gray-400 font-medium">{t('shopSettings.shippingLabelSettingsDesc')}</span>
+                                    </div>
+                                </div>
+                                <ChevronDown className={`w-5 h-5 text-gray-300 transition-transform duration-300 ${isShippingLabelSettingsOpen ? 'rotate-180' : 'rotate-0'}`} />
+                            </Button>
+
+                            {isShippingLabelSettingsOpen && (
+                                <div className="p-4 animate-in fade-in slide-in-from-top-2 duration-300">
+                                    <ShippingLabelSettings
+                                        settings={shippingLabelSettings}
+                                        onUpdate={setShippingLabelSettings}
+                                        t={t}
+                                    />
+                                </div>
+                            )}
+                        </div>
+                        {isShippingLabelSettingsOpen && (<div className="mb-10" />)}
 
                         <DialogFooter className="mt-10">
                             <Button type="submit" className="w-full h-20 rounded-xl text-base font-bold shadow-lg shadow-primary/20" disabled={isSettingUploading}>

@@ -197,7 +197,13 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                     SK: `METADATA#${batchTimestamp}`,
                     data: ids,
                     order_id: order_id,
-                    ts_created_at: batchTimestamp
+                    ts_created_at: batchTimestamp,
+                    // GSI1: 最新順取得用 (QR_BATCH#METADATA -> ts_created_at)
+                    GSI1_PK: 'QR_BATCH#METADATA',
+                    GSI1_SK: batchTimestamp,
+                    // GSI2: order_id からの逆引き用 (CARD_ORDER#order_id -> ts_created_at)
+                    GSI2_PK: `CARD_ORDER#${order_id}`,
+                    GSI2_SK: batchTimestamp
                 }
             }
         });

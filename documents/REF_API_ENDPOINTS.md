@@ -14,7 +14,7 @@
 | BAN済みQRコード削除 | 停止状態のQRコードを物理削除します。 | `/admin/qr/deleteban` | `BatchWriteCommand` (Delete) + `QueryCommand` | [admin_qr_deleteban.ts](../infra/lambda/admin_qr_deleteban.ts) |
 | カードデザイン管理 | カードデザイン（背景、サムネイル）のCRUD操作とURL発行を行います。 | `/admin/carddesigns/*` | `PutCommand` / `QueryCommand` / `GetCommand` / `UpdateCommand` / `DeleteCommand` | [admin_carddesigns.ts](../infra/lambda/admin_carddesigns.ts) |
 | カード発注管理 | 各ショップからのカード印刷依頼の管理・ステータス更新を行います。 | `/admin/card/orders/*` | `QueryCommand` (GSI1/GSI2) / `BatchGetCommand` / `PutCommand` / `UpdateCommand` | [admin_card_orders.ts](../infra/lambda/admin_card_orders.ts) |
-| ショップ作成(Admin) | 管理者によるショップ新規発行とオーナー紐付けを行います。 | `/admin/shop/create` | `PutCommand` (Shop Metadata) + `GetCommand` (User) | [admin_shop_create.ts](../infra/lambda/admin_shop_create.ts) |
+| ショップ作成(Admin) | 管理者によるショップ新規発行とオーナー紐付けを行います。 | `/admin/shop/create` | `PutCommand` (Metadata, Detail, Settings) + `UpdateCommand` (Owner, GMs) | [admin_shop_create.ts](../infra/lambda/admin_shop_create.ts) |
 | カードデザイン紐付け | ショップが利用可能な限定デザインを管理します。 | `/admin/shop/carddesign/link` | `GetCommand` + `UpdateCommand` | [admin_shop_carddesign_link.ts](../infra/lambda/admin_shop_carddesign_link.ts) |
 
 ---
@@ -29,8 +29,8 @@
 | 名前 | 概要 | エンドポイント (`POST`) | DB操作 (Commands) | ソースコード |
 | :--- | :--- | :--- | :--- | :--- |
 | ショップ一覧取得 | ログインユーザーの管理ショップ一覧 | `/shop/list` | `GetCommand` (User Shop) + `BatchGetCommand` (Shop) / `QueryCommand` / `PutCommand` | [shop_list.ts](../infra/lambda/shop_list.ts) |
-| ショップ詳細取得 | ショップのメタデータ取得 | `/shop/details/get` | `GetCommand` (Shop Metadata) + `BatchGetCommand` (Design Enrichment) | [shop_details.ts](../infra/lambda/shop_details.ts) |
-| ショップ詳細更新 | ショップ情報（名称・画像等）の更新 | `/shop/details/update` | `UpdateCommand` (Shop Metadata) | [shop_details.ts](../infra/lambda/shop_details.ts) |
+| ショップ詳細取得 | ショップのメタデータ取得（基本・HTML・印刷設定を統合） | `/shop/details/get` | `BatchGetCommand` (Metadata, Detail, Settings) + `BatchGetCommand` (Design Enrichment) | [shop_details.ts](../infra/lambda/shop_details.ts) |
+| ショップ詳細更新 | ショップ情報の更新（基本・HTML・印刷設定をアトミックに更新） | `/shop/details/update` | `TransactWriteCommand` (Metadata, Detail, Settings) + `UpdateCommand` (Mailing Lists) | [shop_details.ts](../infra/lambda/shop_details.ts) |
 | プロダクト一覧 | ショップ内の商品一覧取得 | `/shop/products/list` | `QueryCommand` (Product) + `BatchGetCommand` (Design Enrichment) | [shop_products.ts](../infra/lambda/shop_products.ts) |
 | プロダクト作成 | 新規商品の作成 | `/shop/products/create` | `PutCommand` (Product) | [shop_products.ts](../infra/lambda/shop_products.ts) |
 | プロダクト更新 | 商品情報の更新 | `/shop/products/update` | `GetCommand` + `UpdateCommand` (Product) | [shop_products.ts](../infra/lambda/shop_products.ts) |

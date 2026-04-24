@@ -18,7 +18,9 @@ import { GetCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
 import { successResponse, errorResponse } from './utils/response';
 import { ddb, TABLE_NAME } from './share/db';
 import { getUserId, getAction } from './utils/request';
+import { normalizeZipCode } from './utils/normalization';
 import { UserApiSchema } from '@shared/api-types';
+
 
 export const handler: APIGatewayProxyHandler = async (event) => {
     try {
@@ -85,10 +87,15 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             };
 
             keys.forEach((k, i) => {
+                let val = dbFields[k];
+                if (k === 'zip_code' || k === 'zipCode') {
+                    val = normalizeZipCode(val);
+                }
                 updateExpressions.push(`#f${i} = :v${i}`);
                 expressionAttributeNames[`#f${i}`] = k;
-                expressionAttributeValues[`:v${i}`] = dbFields[k];
+                expressionAttributeValues[`:v${i}`] = val;
             });
+
 
             await ddb.send(new UpdateCommand({
                 TableName: TABLE_NAME,

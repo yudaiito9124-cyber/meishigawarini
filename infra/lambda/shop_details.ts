@@ -3,18 +3,20 @@
  * @role ショップ用：店舗プロフィール・設定管理ハンドラー
  * @responsibility
  *  - 店舗名、説明文（HTML）、および店舗紹介用の画像アセットを管理します。
+ *  - 【マルチレコード・アーキテクチャ】
+ *    - METADATA: 基本情報（名前、連絡先、通知設定）
+ *    - DETAIL_HTML: 肥大化しやすい HTML コンテンツと画像リスト
+ *    - SETTINGS#SHIPPING_LABEL: 配送ラベルの印字設定
+ *    - これらを分離することで、基本情報の読み取りパフォーマンスを維持し、DynamoDB の 400KB 制限を回避します。
  *  - 【アセット・ライフサイクル管理】
- *    - 更新時（`update`）: 新旧の画像 URL リストを比較し、不要になった画像を S3 から物理削除（`deleteFileByUrl`）します。これによりストレージの肥大化を防ぎます。
- *    - 保存時: `stripSignature` により、署名情報（QueryString）を除去した純粋なパスのみを DynamoDB に永続化します。
- *    - 取得時（`get`）: 保存されたパスに対し、動的に署名を付与し、ブラウザで閲覧可能な URL へ変換します。
- *  - 【デザイン認可の集約】
- *    - 店舗に許可されているカードデザイン一覧（`card_designs`）を、リッチなデザインメタデータへ変換（Enrichment）して返却します。
+ *    - 更新時（`update`）: 新旧の画像 URL リストを比較し、不要になった画像を S3 から物理削除。
+ *    - 取得時（`get`）: 保存された S3 パスに対し動的に署名を付与。
  * @context
- *  - 被贈答者が商品選択画面などで目にする「店舗情報」を司る、ブランディングの根幹となるハンドラーです。
+ *  - ショップ管理画面の「設定」タブにおける全ての操作を司るバックエンドの正本です。
  */
 
 import { APIGatewayProxyHandler } from 'aws-lambda';
-import { UpdateCommand, BatchGetCommand } from '@aws-sdk/lib-dynamodb';
+import { GetCommand, UpdateCommand, BatchGetCommand, TransactWriteCommand } from '@aws-sdk/lib-dynamodb';
 import { checkShopOwnerOrGM } from './share/shop-auth';
 import { signUrlsInHtml, signUrlIfS3, stripSignaturesInHtml, stripSignature, deleteFileByUrl } from './utils/s3';
 import { getSystemDesign } from './utils/designs';
@@ -23,6 +25,8 @@ import { ddb, TABLE_NAME, BUCKET_NAME } from './share/db';
 import { getShopId, getAction, getUserId } from './utils/request';
 import { ShopApiSchema } from '@shared/api-types';
 import { refreshMailingLists } from './utils/mailing-list';
+import { normalizeZipCode } from './utils/normalization';
+
 
 export const handler: APIGatewayProxyHandler = async (event) => {
     try {
@@ -50,7 +54,30 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         // 目的: 管理画面表示用に、署名付き URL の生成とデザイン情報の結合を行います。
         // --------------------------------------------------------------------
         if (action === 'get') {
-            const result = { ...shopMetadata };
+            // 【多レコード取得】DETAIL_HTML と SHIPPING_LABEL_SETTINGS を追加取得
+            const extraKeys = [
+                { PK: `SHOP#${shopId}`, SK: 'DETAIL_HTML' },
+                { PK: `SHOP#${shopId}`, SK: 'SETTINGS#SHIPPING_LABEL' }
+            ];
+            // 【DB操作: BatchGetCommand】
+            // [意図] ショップの基本メタデータに加え、別レコードとして分離されている
+            // HTML コンテンツと配送ラベル設定を一度のラウンドトリップで取得します。
+            // [Keys]
+            // - DETAIL_HTML: 肥大化対策のため分離された HTML
+            // - SETTINGS#SHIPPING_LABEL: 配送ラベルのカスタマイズ設定
+            const extraRes = await ddb.send(new BatchGetCommand({
+                RequestItems: { [TABLE_NAME]: { Keys: extraKeys } }
+            }));
+            const extras = extraRes.Responses?.[TABLE_NAME] || [];
+            const detailRecord = extras.find(r => r.SK === 'DETAIL_HTML');
+            const shippingRecord = extras.find(r => r.SK === 'SETTINGS#SHIPPING_LABEL');
+
+            const result = { 
+                ...shopMetadata,
+                detail_html: detailRecord?.detail_html,
+                html_image_urls: detailRecord?.html_image_urls,
+                shipping_label_settings: shippingRecord?.shipping_label_settings
+            };
             
             // RichText (HTML) 内の S3 パスを署名付き URL へ置換
             if (result.detail_html) {
@@ -64,7 +91,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             }
 
             // 【Enrichment】許可されているカードデザイン情報を BatchGet で一括取得
-            const allowedDesignIds = result.card_designs;
+            const allowedDesignIds = (result as any).card_designs;
             if (allowedDesignIds && Array.isArray(allowedDesignIds) && allowedDesignIds.length > 0) {
                 const keys = allowedDesignIds.map((id: string) => ({ PK: 'CARD_DESIGN#METADATA', SK: id }));
                 const batchRes = await ddb.send(new BatchGetCommand({
@@ -73,8 +100,8 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 
                 const rawDesigns = batchRes.Responses?.[TABLE_NAME] || [];
                 const designList = await Promise.all(rawDesigns.map(async (d) => ({
-                    design_id: d.SK, name: d.name, description: d.description,
-                    width: d.width, height: d.height,
+                    design_id: d.SK as string, name: d.name as string, description: d.description as string,
+                    width: d.width as number, height: d.height as number,
                     thumbf: d.thumbf ? await signUrlIfS3(d.thumbf, BUCKET_NAME) : undefined,
                     thumbb: d.thumbb ? await signUrlIfS3(d.thumbb, BUCKET_NAME) : undefined,
                     bgimgf: d.bgimgf ? await signUrlIfS3(d.bgimgf, BUCKET_NAME) : undefined
@@ -87,13 +114,13 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                         designList.push({ design_id: id, name: id, description: "System Design", ...sys } as any);
                     }
                 }
-                result.allowed_designs = designList;
+                (result as any).allowed_designs = designList;
             } else {
-                result.allowed_designs = [];
+                (result as any).allowed_designs = [];
             }
             
             // レスポンスのクリーンアップ: 内部管理用の ID 配列は削除
-            delete result.card_designs;
+            if ('card_designs' in result) delete (result as any).card_designs;
             
             return successResponse(result);
         }
@@ -115,31 +142,71 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 shortest_delivery_days,
                 delivery_time_options,
                 order_notification_user_ids,
-                inquiry_notification_user_ids
+                inquiry_notification_user_ids,
+                shipping_label_settings
             } = body as ShopApiSchema['shop_details_update'];
-            const updateExpr: string[] = ['ts_updated_at = :now'];
-            const attrNames: any = {};
-            const attrValues: any = { ':now': new Date().toISOString() };
 
-            if (name !== undefined) { updateExpr.push('#name = :name'); attrNames['#name'] = 'name'; attrValues[':name'] = name; }
-            // 保存前に署名を除去（DB には純粋な S3 Key のみを格納する方針）
-            if (detail_html !== undefined) { updateExpr.push('detail_html = :html'); attrValues[':html'] = stripSignaturesInHtml(detail_html, BUCKET_NAME); }
-            if (shop_postal_code !== undefined) { updateExpr.push('shop_postal_code = :shop_postal_code'); attrValues[':shop_postal_code'] = shop_postal_code; }
-            if (shop_address !== undefined) { updateExpr.push('shop_address = :shop_address'); attrValues[':shop_address'] = shop_address; }
-            if (shop_phone !== undefined) { updateExpr.push('shop_phone = :shop_phone'); attrValues[':shop_phone'] = shop_phone; }
-            if (shop_recipient_name !== undefined) { updateExpr.push('shop_recipient_name = :shop_recipient_name'); attrValues[':shop_recipient_name'] = shop_recipient_name; }
-            if (shortest_delivery_days !== undefined) { updateExpr.push('shortest_delivery_days = :sdd'); attrValues[':sdd'] = shortest_delivery_days; }
-            if (delivery_time_options !== undefined) { updateExpr.push('delivery_time_options = :dto'); attrValues[':dto'] = delivery_time_options; }
-            if (order_notification_user_ids !== undefined) { updateExpr.push('order_notification_user_ids = :ouid'); attrValues[':ouid'] = order_notification_user_ids; }
-            if (inquiry_notification_user_ids !== undefined) { updateExpr.push('inquiry_notification_user_ids = :iuid'); attrValues[':iuid'] = inquiry_notification_user_ids; }
+            // 【物理削除の整合性】現在の画像リストを正確に把握するため、DETAIL_HTML レコードを先行取得
+            const currentDetailRes = await ddb.send(new GetCommand({
+                TableName: TABLE_NAME,
+                Key: { PK: `SHOP#${shopId}`, SK: 'DETAIL_HTML' }
+            }));
+            const currentDetail = currentDetailRes.Item;
+
+            const now = new Date().toISOString();
+            const attrValues: any = { ':now': now };
+            const attrNames: any = {};
+            
+            // 1. METADATA レコード用の基本フィールド更新式
+            const metadataUpdateExprParts: string[] = ['ts_updated_at = :now'];
+            
+            if (name !== undefined) { 
+                metadataUpdateExprParts.push('#name = :name'); 
+                attrNames['#name'] = 'name'; 
+                attrValues[':name'] = name; 
+            }
+            if (shop_postal_code !== undefined) { 
+                metadataUpdateExprParts.push('shop_postal_code = :shop_postal_code'); 
+                attrValues[':shop_postal_code'] = normalizeZipCode(shop_postal_code); 
+            }
+            if (shop_address !== undefined) { 
+                metadataUpdateExprParts.push('shop_address = :shop_address'); 
+                attrValues[':shop_address'] = shop_address; 
+            }
+            if (shop_phone !== undefined) { 
+                metadataUpdateExprParts.push('shop_phone = :shop_phone'); 
+                attrValues[':shop_phone'] = shop_phone; 
+            }
+            if (shop_recipient_name !== undefined) { 
+                metadataUpdateExprParts.push('shop_recipient_name = :shop_recipient_name'); 
+                attrValues[':shop_recipient_name'] = shop_recipient_name; 
+            }
+            if (shortest_delivery_days !== undefined) { 
+                metadataUpdateExprParts.push('shortest_delivery_days = :sdd'); 
+                attrValues[':sdd'] = shortest_delivery_days; 
+            }
+            if (delivery_time_options !== undefined) { 
+                metadataUpdateExprParts.push('delivery_time_options = :dto'); 
+                attrValues[':dto'] = delivery_time_options; 
+            }
+            if (order_notification_user_ids !== undefined) { 
+                metadataUpdateExprParts.push('order_notification_user_ids = :ouid'); 
+                attrValues[':ouid'] = order_notification_user_ids; 
+            }
+            if (inquiry_notification_user_ids !== undefined) { 
+                metadataUpdateExprParts.push('inquiry_notification_user_ids = :iuid'); 
+                attrValues[':iuid'] = inquiry_notification_user_ids; 
+            }
 
             // 画像 URL リストの同期と物理削除処理
+            let newUrls: string[] | undefined = undefined;
             if (html_image_urls !== undefined) {
-                const newUrls = Array.isArray(html_image_urls) ? html_image_urls.map((url: string) => stripSignature(url)) : [];
-                const oldUrls = shopMetadata.html_image_urls || [];
+                newUrls = Array.isArray(html_image_urls) ? html_image_urls.map((url: string) => stripSignature(url)).filter((u): u is string => !!u) : [];
+                // 専用レコードから古いURLを特定
+                const oldUrls = (currentDetail?.html_image_urls as string[]) || [];
 
                 // 【物理削除】以前のリストにはあったが、新しいリストからは消えた画像を S3 から抹消
-                const toDelete = oldUrls.filter((url: string) => !newUrls.includes(url));
+                const toDelete = oldUrls.filter((url: string) => !newUrls!.includes(url));
                 for (const url of toDelete) await deleteFileByUrl(url, BUCKET_NAME);
 
                 // 歴史的互換性: クライアントが明示的に削除を要求した場合も対応
@@ -149,18 +216,69 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                         if (cleanUrl && !toDelete.includes(cleanUrl)) await deleteFileByUrl(cleanUrl, BUCKET_NAME);
                     }
                 }
-                updateExpr.push('html_image_urls = :hiu');
-                attrValues[':hiu'] = newUrls;
             }
 
-            // 【DB操作: UpdateItem】
-            await ddb.send(new UpdateCommand({
-                TableName: TABLE_NAME,
-                Key: { PK: `SHOP#${shopId}`, SK: 'METADATA' },
-                UpdateExpression: `SET ${updateExpr.join(', ')}`,
-                ExpressionAttributeNames: Object.keys(attrNames).length > 0 ? attrNames : undefined,
-                ExpressionAttributeValues: attrValues
-            }));
+            // 【DB操作: TransactWriteItems】
+            const transactItems: any[] = [];
+
+            // (A) METADATA レコードの更新とクリーンアップ
+            // 常に legacy フィールドの削除を試みる
+            const metadataRemoves = ['detail_html', 'html_image_urls', 'shipping_label_settings'];
+            const metadataFinalExpr = `SET ${metadataUpdateExprParts.join(', ')} REMOVE ${metadataRemoves.join(', ')}`;
+
+            transactItems.push({
+                Update: {
+                    TableName: TABLE_NAME,
+                    Key: { PK: `SHOP#${shopId}`, SK: 'METADATA' },
+                    UpdateExpression: metadataFinalExpr,
+                    ExpressionAttributeNames: Object.keys(attrNames).length > 0 ? attrNames : undefined,
+                    ExpressionAttributeValues: attrValues
+                }
+            });
+
+            // (B) DETAIL_HTML レコードの更新
+            if (detail_html !== undefined || newUrls !== undefined) {
+                const detailExpr: string[] = ['ts_updated_at = :now'];
+                const detailValues: any = { ':now': now };
+                if (detail_html !== undefined) {
+                    detailExpr.push('detail_html = :html');
+                    detailValues[':html'] = stripSignaturesInHtml(detail_html, BUCKET_NAME);
+                }
+                if (newUrls !== undefined) {
+                    detailExpr.push('html_image_urls = :hiu');
+                    detailValues[':hiu'] = newUrls;
+                }
+                transactItems.push({
+                    Update: {
+                        TableName: TABLE_NAME,
+                        Key: { PK: `SHOP#${shopId}`, SK: 'DETAIL_HTML' },
+                        UpdateExpression: `SET ${detailExpr.join(', ')}`,
+                        ExpressionAttributeValues: detailValues
+                    }
+                });
+            }
+
+            // (C) SETTINGS#SHIPPING_LABEL レコードの更新
+            if (shipping_label_settings !== undefined) {
+                transactItems.push({
+                    Update: {
+                        TableName: TABLE_NAME,
+                        Key: { PK: `SHOP#${shopId}`, SK: 'SETTINGS#SHIPPING_LABEL' },
+                        UpdateExpression: 'SET shipping_label_settings = :sls, ts_updated_at = :now',
+                        ExpressionAttributeValues: {
+                            ':sls': shipping_label_settings,
+                            ':now': now
+                        }
+                    }
+                });
+            }
+
+            // 【DB操作: TransactWriteCommand】
+            // [意図] 複数のレコード（METADATA, DETAIL_HTML, SETTINGS#SHIPPING_LABEL）を
+            // アトミックに更新します。これにより、一部のデータだけが更新される不整合を防ぎます。
+            // また、METADATA レコードから旧来の legacy フィールド（detail_html 等）を
+            // REMOVE することで、データのクリーンアップと容量削減を同時に行います。
+            await ddb.send(new TransactWriteCommand({ TransactItems: transactItems }));
 
             // メールアドレスリストの再解決と保存の実行
             await refreshMailingLists(ddb, TABLE_NAME, shopId);

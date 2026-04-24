@@ -777,7 +777,43 @@
       "inquiryNotifications": "Customer Inquiry Notifications",
       "user": "User",
       "actions": "Actions",
-      "danger": "DANGER"
+      "danger": "DANGER",
+      "noAdminsFound": "No administrators found.",
+      "shippingLabelSettings": "Shipping Label Settings",
+      "shippingLabelSettingsDesc": "Customize the printing format for postal and courier labels",
+      "shippingLabel": {
+        "preview": "Preview (per label)",
+        "width": "Label Width (mm)",
+        "height": "Label Height (mm)",
+        "post": "Postage (Post)",
+        "express": "Express (Courier)",
+        "pageFormat": "Page Format",
+        "pageWidth": "Page Width (mm)",
+        "pageHeight": "Page Height (mm)",
+        "cols": "Cols",
+        "rows": "Rows",
+        "colGap": "Col Gap (mm)",
+        "rowGap": "Row Gap (mm)",
+        "offsetX": "Offset X (Left)",
+        "offsetY": "Offset Y (Top)",
+        "font": "Font Used",
+        "fontDesc": "Note: Using Noto Sans JP for stable Japanese character rendering.",
+        "layout": "Item Layout & Visibility",
+        "recipientZip": "Recipient Postal Code",
+        "recipientAddress": "Recipient Address",
+        "recipientName": "Recipient Name",
+        "recipientPhone": "Recipient Phone",
+        "senderZip": "Sender Postal Code",
+        "senderAddress": "Sender Address",
+        "senderName": "Sender Name",
+        "senderPhone": "Sender Phone",
+        "orderId": "Order ID (Internal)",
+        "productName": "Product Name",
+        "preferredDate": "Preferred Delivery Date",
+        "preferredTime": "Preferred Time Slot",
+        "unitNotice": "* All values are in millimeters (mm).",
+        "originNotice": "* X and Y are distances from the top-left corner of each label."
+      }
     },
     "productDetails": {
       "title": "Product Details",
@@ -1195,7 +1231,9 @@
       "back": "Back",
       "frontPreview": "Front Preview",
       "backPreview": "Back Preview",
-      "button": "Generate"
+      "button": "Generate",
+      "showManualGenerate": "Show Manual Generation",
+      "hideManualGenerate": "Hide Manual Generation"
     },
     "batches": {
       "title": "Currently Generated QR Codes",
@@ -1217,7 +1255,11 @@
         "success": "Successfully generated codes",
         "failed": "Failed to generate codes",
         "error": "Error generating codes"
-      }
+      },
+      "searchPlaceholder": "Search by Batch ID...",
+      "recentTitle": "Recent Print History",
+      "loading": "Loading...",
+      "loadMore": "Fetch More"
     },
     "list": {
       "title": "All QR Codes",

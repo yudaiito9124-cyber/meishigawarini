@@ -60,7 +60,7 @@ classDiagram
 
 ```mermaid
 classDiagram
-    class Shop_Metadata["ショップ情報 (Shop Metadata)"] {
+    class Shop_Metadata["ショップ基本情報 (Shop Metadata)"] {
         <<PK: SHOP#shop_id, SK: METADATA>>
         +String shop_id (ショップID)
         +String name (ショップ名)
@@ -72,6 +72,22 @@ classDiagram
         +String shop_recipient_name
         +Number shortest_delivery_days
         +Array delivery_time_options
+        +Array order_notification_user_ids (受注通知対象)
+        +Array inquiry_notification_user_ids (問合せ通知対象)
+        +Array order_mailing_list (受注通知メール)
+        +Array inquiry_mailing_list (問合せ通知メール)
+    }
+
+    class Shop_Detail["ショップ詳細 (Shop Detail)"] {
+        <<PK: SHOP#shop_id, SK: DETAIL_HTML>>
+        +String detail_html (紹介HTML)
+        +Array html_image_urls (画像URL群)
+    }
+
+    class Shipping_Label["宛名ラベル設定 (Shipping Label)"] {
+        <<PK: SHOP#shop_id, SK: SETTINGS#SHIPPING_LABEL>>
+        +ShippingLabelConfig yubin (郵便用レイアウト)
+        +ShippingLabelConfig takkyubin (宅急便用レイアウト)
     }
 
     class Product_Catalog["商品カタログ (Product)"] {
@@ -91,6 +107,8 @@ classDiagram
         +String ts_activated_at (有効化日時)
     }
 
+    Shop_Metadata "1" -- "1" Shop_Detail : 詳細情報を分離保持
+    Shop_Metadata "1" -- "1" Shipping_Label : 印刷設定を保持
     Shop_Metadata "1" -- "*" Product_Catalog : 商品を保持
     Shop_Metadata "1" -- "*" Managed_QR : GSI2で逆引き管理
     Product_Catalog "1" -- "*" Managed_QR : QRに割り当て
@@ -239,6 +257,8 @@ erDiagram
     USER ||--o{ RECEIVER : "配送先既定値保持"
     USER ||--o{ ACTIVITY_LOG : "行動履歴を記録"
     
+    SHOP ||--|| SHOP_DETAIL : "詳細情報を分離保持 (PK共通)"
+    SHOP ||--|| SHIPPING_LABEL : "印刷設定を保持 (PK共通)"
     SHOP ||--o{ PRODUCT : "商品をカタログ保持"
     SHOP ||--o{ MANAGED_QR : "発行済みギフトを管理 (GSI2)"
     SHOP ||--o{ CARD_ORDER : "物理カードを発注"

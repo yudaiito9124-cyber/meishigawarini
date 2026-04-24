@@ -29,7 +29,9 @@ import { successResponse, errorResponse } from './utils/response';
 import { ddb, TABLE_NAME } from './share/db';
 import { getQrId, getPIN, getUserId } from './utils/request';
 import { appendToHistory } from './utils/history';
+import { normalizeZipCode } from './utils/normalization';
 import { ReceiveApiSchema } from '@shared/api-types';
+
 
 const cognito = new CognitoIdentityProviderClient({});
 const USER_POOL_ID = process.env.USER_POOL_ID || '';
@@ -112,7 +114,8 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                         TableName: TABLE_NAME,
                         Item: {
                             PK: `QR#${qr_id}`, SK: 'ORDER',
-                            name, address, zip_code, phone, preferred_date, preferred_time, email,
+                            name, address, zip_code: normalizeZipCode(zip_code), phone, preferred_date, preferred_time, email,
+
                             ts_submitted_at: nowIso, ts_updated_at: nowIso,
                             ...(userId ? { receiver_user_id: userId } : {})
                         }

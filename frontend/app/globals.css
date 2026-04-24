@@ -190,3 +190,17 @@
     transform: rotateY(180deg);
   }
 }
+
+@font-face {
+  font-family: 'Noto Sans JP';
+  src: url('/NotoSansJP-Regular.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'Noto Sans JP';
+  src: url('/NotoSansJP-Bold.ttf') format('truetype');
+  font-weight: bold;
+  font-style: normal;
+}

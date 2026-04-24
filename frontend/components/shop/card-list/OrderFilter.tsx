@@ -10,7 +10,7 @@
  */
 
 import React from 'react';
-import { Filter, Plus, Check, Search, Loader2, Table2, RefreshCw, Download } from 'lucide-react';
+import { Filter, Plus, Check, Search, Loader2, Table2, RefreshCw, Download, Printer } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
@@ -33,7 +33,10 @@ export function OrderFilter() {
         getDesignAspectRatio,
         getDesignImages,
         handleExportCSV,
+        handleExportShippinglabelPDF,
+        isExporting,
         filteredOrdersCount,
+        usedOrdersCount,
     } = useCardListContext();
 
     const {
@@ -311,12 +314,34 @@ export function OrderFilter() {
                             variant="ghost"
                             size="sm"
                             onClick={handleExportCSV}
-                            disabled={subRefreshing || ordersLoading || filteredOrdersCount === 0}
+                            disabled={subRefreshing || ordersLoading || filteredOrdersCount === 0 || isExporting}
                             className="text-primary hover:text-primary/80 hover:bg-primary/5"
                         >
                             {/* 0件時は無効化して空CSVダウンロードを防止 */}
                             <Download className="mr-2 h-4 w-4" />
                             CSV出力
+                        </Button>
+
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleExportShippinglabelPDF('yubin')}
+                            disabled={subRefreshing || ordersLoading || usedOrdersCount === 0 || isExporting}
+                            className="text-amber-600 hover:text-amber-700 hover:bg-amber-50 gap-2"
+                        >
+                            {isExporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Printer className="h-4 w-4" />}
+                            郵便 ({usedOrdersCount})
+                        </Button>
+
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleExportShippinglabelPDF('takkyubin')}
+                            disabled={subRefreshing || ordersLoading || usedOrdersCount === 0 || isExporting}
+                            className="text-amber-600 hover:text-amber-700 hover:bg-amber-50 gap-2"
+                        >
+                            {isExporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Printer className="h-4 w-4" />}
+                            宅急便 ({usedOrdersCount})
                         </Button>
 
                         {/* 更新ボタン */}

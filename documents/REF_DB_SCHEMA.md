@@ -20,6 +20,8 @@
 | **[User (ユーザー履歴ログ)](#24-user-送信受信履歴ログ)** | `USER#{user_id}` | `SENDLOG#{index}` / `RECEIVEDLOG#{index}` |
 | **[User (ユーザー履歴メタデータ)](#25-user-履歴管理用メタデータ)** | `USER#{user_id}` | `SENDLOG_META` / `RECEIVEDLOG_META` |
 | **[Shop Metadata (ショップ情報)](#26-shop-ショップ情報)** | `SHOP#{shop_id}` | `METADATA` |
+| **[Shop Detail HTML (ショップ詳細HTML)](#26a-shop-detail-html-ショップ詳細html)** | `SHOP#{shop_id}` | `DETAIL_HTML` |
+| **[Shop Shipping Label Settings (宛名ラベル設定)](#26b-shop-shipping-label-settings-宛名ラベル設定)** | `SHOP#{shop_id}` | `SETTINGS#SHIPPING_LABEL` |
 | **[Shop Product (商品情報)](#27-product-商品情報)** | `SHOP#{shop_id}` | `PRODUCT#{product_id}` |
 | **[QR Metadata (QRコード及び注文ステータス)](#28-qr-metadata-qrコード及び注文ステータス)** | `QR#{uuid}` | `METADATA` |
 | **[QR Order (受取人入力の配送先注文詳細)](#29-order-受取人による配送先注文詳細)** | `QR#{uuid}` | `ORDER` |
@@ -129,7 +131,6 @@
 | `PK` | String | `SHOP#{shop_id}` （`shop_id` はUUID形式、例: `SHOP#123e4567-...`） |
 | `SK` | String | 常に固定値 `METADATA` |
 | `name` | String | ショップ名 （任意の文字列、例: `山田青果店`） |
-| `detail_html` | String | ショップ説明 （任意のHTML文字列） |
 | `email` | String | ショップの連絡先メールアドレス （例: `info@example.com`） |
 | `owner_id` | String | オーナーのCognitoユーザーID （[User](#21-user-ユーザー権限情報) の `sub` 属性） |
 | `gm_ids` | Array<String> | マネージャーのCognitoユーザーIDのリスト （[User](#21-user-ユーザー権限情報) の `sub` 属性） |
@@ -139,11 +140,41 @@
 | `shop_phone` | String | ショップ・カード配送先の電話番号 |
 | `shop_recipient_name` | String | ショップ・カード配送先の宛名 |
 | `ts_created_at` | String | 作成日時 （ISO 8601形式のUTC日時文字列、例: `2024-03-01T12:00:00.000Z`） |
+| `ts_updated_at` | String | 更新日時 |
 | `GSI2_PK` | String | `USER#{owner_id}` （オーナーのショップ一覧取得用、[User](#21-user-ユーザー権限情報) への逆引き用） |
 | `GSI2_SK` | String | ソートキー。**オーナーID (`GSI2_PK`) が変更された際のみ**、現在時刻 (ISO 8601) に更新されます。 |
-| `html_image_urls` | Array<String> | ショップ詳細HTML内で使用される画像のURL配列 |
 | `shortest_delivery_days` | Number | 最短配送希望日（何日先から配送日を選択可能か） |
 | `delivery_time_options` | Array<String> | 配送希望時刻の選択肢リスト |
+| `order_notification_user_ids` | Array<String> | 受注通知を受け取るユーザーIDのリスト |
+| `inquiry_notification_user_ids` | Array<String> | お問い合わせ通知を受け取るユーザーIDのリスト |
+| `order_mailing_list` | Array<String> | 受注通知メールの送信先リスト（自動同期） |
+| `inquiry_mailing_list` | Array<String> | お問い合わせ通知メールの送信先リスト（自動同期） |
+
+> [!NOTE]
+> `detail_html`, `html_image_urls`, `shipping_label_settings` は、肥大化対策のため専用レコード（`DETAIL_HTML`, `SETTINGS#SHIPPING_LABEL`）へ分離されました。
+
+### 2.6a Shop (ショップ詳細HTML)
+ショップの紹介文（HTML）およびその中で使用される画像URLのリストを保持します。
+
+| 属性名 | 型 | 説明 |
+| --- | --- | --- |
+| `PK` | String | `SHOP#{shop_id}` |
+| `SK` | String | 常に固定値 `DETAIL_HTML` |
+| `detail_html` | String | ショップ説明 （任意のHTML文字列） |
+| `html_image_urls` | Array<String> | ショップ詳細HTML内で使用される画像のURL配列 |
+| `ts_created_at` | String | 作成日時 |
+| `ts_updated_at` | String | 更新日時 |
+
+### 2.6b Shop (宛名ラベル設定)
+ショップが伝票印刷を行う際の、レイアウト調整用オフセット設定を保持します。
+
+| 属性名 | 型 | 説明 |
+| --- | --- | --- |
+| `PK` | String | `SHOP#{shop_id}` |
+| `SK` | String | 常に固定値 `SETTINGS#SHIPPING_LABEL` |
+| `shipping_label_settings` | Map | ラベルレイアウト設定。`yubin` および `takkyubin` キーの下に `ShippingLabelConfig` 構造を保持します。詳細は `shared/api-types.ts` を参照。 |
+| `ts_created_at` | String | 作成日時 |
+| `ts_updated_at` | String | 更新日時 |
 
 ### 2.7 Product (商品情報)
 各ショップに紐づく商品カタログ情報です。
@@ -462,6 +493,10 @@ QRコードを一括生成した際のメタデータと、生成された全QR�
 | `data` | Array | 生成されたQRコードのリスト。形式: `[{ qr_id: "...", pin: "..." }]` |
 | `order_id` | String | このバッチ生成の契機となった [カード発注ID](#212-card-order-カード発注情報) |
 | `ts_created_at` | String | 作成日時 |
+| `GSI1_PK` | String | `QR_BATCH#METADATA` （全バッチの最新順一覧取得用） |
+| `GSI1_SK` | String | 作成日時 （ソート用） |
+| `GSI2_PK` | String | `CARD_ORDER#{order_id}` （発注IDからの逆引き用） |
+| `GSI2_SK` | String | 作成日時 （ソート用） |
 
 ### 2.15 各エンティティのステータス定義
 QRコードや商品のライフサイクルにおけるステータスの詳細定義については、以下のドキュメントを参照してください。

@@ -51,13 +51,17 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         const designId = item.design_id || (item as any).card_design;
 
         const keys = [];
-        if (shopId) keys.push({ PK: `SHOP#${shopId}`, SK: 'METADATA' });
+        if (shopId) {
+            keys.push({ PK: `SHOP#${shopId}`, SK: 'METADATA' });
+            keys.push({ PK: `SHOP#${shopId}`, SK: 'DETAIL_HTML' });
+        }
         if (shopId && productId) keys.push({ PK: `SHOP#${shopId}`, SK: `PRODUCT#${productId}` });
         if (designId) keys.push({ PK: 'CARD_DESIGN#METADATA', SK: designId });
 
         let shop: any = null;
         let product: any = null;
         let design: any = null;
+        let detail_html: string | undefined = undefined;
 
         if (keys.length > 0) {
             const batchRes = await ddb.send(new BatchGetCommand({
@@ -66,9 +70,13 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             const responses = batchRes.Responses?.[TABLE_NAME] || [];
 
             shop = responses.find(r => r.PK === `SHOP#${shopId}` && r.SK === 'METADATA');
+            const shopDetail = responses.find(r => r.PK === `SHOP#${shopId}` && r.SK === 'DETAIL_HTML');
             product = responses.find(r => r.PK === `SHOP#${shopId}` && r.SK === `PRODUCT#${productId}`);
             const designMeta = responses.find(r => r.PK === 'CARD_DESIGN#METADATA' && r.SK === designId);
             design = designMeta || (designId ? getSystemDesign(designId) : null);
+
+            // 公開用項目（detail_html）の抽出
+            detail_html = shopDetail?.detail_html;
         }
 
         // 3. レスポンスの構築（厳選された公開項目のみ）
@@ -77,11 +85,11 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             status: currentStatus,
             shop: shop ? {
                 name: shop.name || 'Unknown Shop',
-                detail_html: shop.detail_html ? await signUrlsInHtml(shop.detail_html, BUCKET_NAME) : undefined
+                detail_html: detail_html ? await signUrlsInHtml(detail_html, BUCKET_NAME) : undefined
             } : null,
             // 被贈答者用 verify ページ等との互換性フィールド。
             shop_name: shop?.name,
-            shop_detail_html: shop?.detail_html ? await signUrlsInHtml(shop.detail_html, BUCKET_NAME) : undefined,
+            shop_detail_html: detail_html ? await signUrlsInHtml(detail_html, BUCKET_NAME) : undefined,
             product: product ? {
                 name: product.name,
                 image_url: product.image_url ? await signUrlIfS3(product.image_url, BUCKET_NAME) : undefined,
