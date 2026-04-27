@@ -50,7 +50,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         const password = body.password;
 
         if (!qr_id || !pin || !name || !address) {
-            return errorResponse(400, 'Missing required fields (qr_id, pin, name, or address)');
+            return errorResponse(400, 'MISSING_REQUIRED_FIELDS');
         }
 
         // 【確認フェーズ 1: QRコードの状態確認】
@@ -58,14 +58,14 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         const qrRes = await ddb.send(new GetCommand({
             TableName: TABLE_NAME, Key: { PK: `QR#${qr_id}`, SK: 'METADATA' }
         }));
-        if (!qrRes.Item) return errorResponse(404, 'QR Code not found');
+        if (!qrRes.Item) return errorResponse(404, 'QR_NOT_FOUND');
 
         const item = qrRes.Item;
 
 
         // 状態チェック
         if (item.status !== 'ACTIVE') {
-            const msg = item.status === 'EXPIRED' ? 'QR Code has expired' : 'QR Code is not active or already used';
+            const msg = item.status === 'EXPIRED' ? 'QR_EXPIRED' : 'QR_NOT_ACTIVE';
             return errorResponse(400, msg);
         }
 
@@ -75,13 +75,42 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         // 期限切れチェック (遅延評価)
         const currentStatus = await checkAndExpire(ddb, TABLE_NAME, qr_id, item as any);
         if (currentStatus === 'EXPIRED') {
-            return errorResponse(400, 'QR Code has expired');
+            return errorResponse(400, 'QR_EXPIRED');
         }
 
         // 【確認フェーズ 3: パスワードハッシュ化 (設定されている場合)】
         let password_hash: string | undefined;
         if (password) {
             password_hash = await bcrypt.hash(password, await bcrypt.genSalt(10));
+        }
+
+        // 【確認フェーズ 4: 配送希望日のバリデーション】
+        // 目的: 指定された配送希望日がショップの最短配送日設定（shortest_delivery_days）を満たしているか検証します。
+        // 背景: iOS/Androidの一部ブラウザで HTML5 input[type=date] の min 属性が効かない場合があるための最終防衛ラインです。
+        if (preferred_date) {
+            const shopId = item.shop_id;
+            if (shopId) {
+                // 【DB操作: GetItem】
+                // PK: SHOP#{shopId}
+                // SK: METADATA
+                // 目的: ショップの最短配送日設定を取得するためにメタデータを参照します。
+                const shopRes = await ddb.send(new GetCommand({
+                    TableName: TABLE_NAME, Key: { PK: `SHOP#${shopId}`, SK: 'METADATA' }
+                }));
+                const shop = shopRes.Item;
+                // ショップ設定がない場合のデフォルト値は3日
+                const shortestDays = shop?.shortest_delivery_days ?? 3;
+
+                // サーバー時刻（UTC）を基準に最短配送可能日を算出
+                const minDate = new Date();
+                minDate.setDate(minDate.getDate() + shortestDays);
+                const minDateStr = minDate.toISOString().split('T')[0];
+
+                // 選択された日付が最短日よりも前であれば 400 エラーを返却
+                if (preferred_date < minDateStr) {
+                    return errorResponse(400, 'INVALID_PREFERRED_DATE', minDateStr);
+                }
+            }
         }
 
         // 【受取体験の継続】ログイン中のユーザーであれば ID を記録し RECEIVEDLOG に自動追加
@@ -186,8 +215,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 
                 if (shop) {
                     // ショップオーナー/管理者への通知 (ADDRESS_REGISTRATION_NOTIFICATION)
-                    // メーリングリスト（order_mailing_list）が設定されている場合はそれを使用し、
-                    // 空の場合は従来のフォールバック（shop.email またはオーナーの email）を使用します。
+                    // メーリングリスト（order_mailing_list）が設定されている場合はそれを使用します。
                     let shopRecipients = Array.isArray(shop.order_mailing_list) ? shop.order_mailing_list : [];
                     // Note: 配送先登録の通知については、明示的に登録されているユーザーのみに送ります（誰も登録されていない場合は誰にも送らない）。
 
@@ -199,7 +227,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                                 shopName: shop.name || 'Shop', 
                                 productName: product?.name || 'Gift',
                                 qr_id, 
-                                shopId: shop.SK, 
+                                shopId: shopId, 
                                 timestamp: client_timestamp || now.toLocaleString('ja-JP')
                             },
                             lang: 'ja'
@@ -214,8 +242,10 @@ export const handler: APIGatewayProxyHandler = async (event) => {
     } catch (error: any) {
         console.error('Receive submit error:', error);
         if (error.name === 'TransactionCanceledException') {
-            return errorResponse(409, 'Conflict detected. Order might be already submitted or QR state changed.');
+            // トランザクション失敗時（既に登録済み、または状態変更時）のコンフリクトエラー
+            return errorResponse(409, 'CONFLICT_DETECTED_ORDER_MIGHT_BE_ALREADY_SUBMITTED_OR_QR_STATE_CHANGED');
         }
-        return errorResponse(500, 'Internal Server Error', error.message);
+        // 予期せぬシステムエラー
+        return errorResponse(500, 'INTERNAL_SERVER_ERROR', error.message);
     }
 };

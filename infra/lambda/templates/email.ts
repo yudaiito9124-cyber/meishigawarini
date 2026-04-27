@@ -107,7 +107,7 @@ export async function sendLocalizedEmail(options: SendLocalizedEmailParams) {
     }
 
     // デフォルトの baseUrl を含めて全パラメータをマージ
-    const allParams = { ...params, baseUrl };
+    const allParams = { ...params, baseUrl: baseUrl.replace(/\/$/, '') };
     const subject = replacePlaceholders(subjectTemplate, allParams);
     const bodyText = replacePlaceholders(bodyTemplate, allParams);
 

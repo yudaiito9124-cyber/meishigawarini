@@ -17,7 +17,7 @@
 - [ ] `aws login` (SSO ログイン) が正常に成功し、AWS リソースへアクセスできるか？
 - [ ] `frontend/.env.local` を設定し、`npm run dev:stg` でローカルサーバーを起動できたか？
 - [ ] **[AI 開発エチケット (ATFIRST_AI_ETIQUETTE.md)](./ATFIRST_AI_ETIQUETTE.md)** を読み、AI への指示作法を理解したか？
-- [ ] `.agent/skills/development/SKILL.md` を AI アシスタントに読み込ませたか？
+- [ ] `.agent/rules/SKILL.md` を AI アシスタントに読み込ませたか？
 
 ---
 

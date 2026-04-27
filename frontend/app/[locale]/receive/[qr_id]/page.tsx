@@ -548,6 +548,19 @@ export default function ReceivePage() {
             return;
         }
 
+        // 最短配送日の計算ロジック（UI表示と共通）
+        const minDate = (() => {
+            const d = new Date();
+            d.setDate(d.getDate() + (gift?.shortest_delivery_days ?? 3));
+            return d.toISOString().split('T')[0];
+        })();
+
+        // 送信直前の最終バリデーション。iOS Chrome等で min 属性がバイパスされるケースをカバー
+        if (preferred_date && preferred_date < minDate) {
+            alert(t('errors.invalidDate'));
+            return;
+        }
+
         setLoading(true);
         try {
             await receiveApi.receive_submit(qr_id, pin, {
@@ -1690,35 +1703,45 @@ export default function ReceivePage() {
                                 </div>
                                 <div className="space-y-2">
                                     <Label htmlFor="preferred_date">{t('formStep.preferred_date')}</Label>
+                                    {/* 最短配送可能日をユーザーに通知するためのヒント表示 */}
+                                    <p className="text-[10px] text-muted-foreground mt-1">
+                                        {t('formStep.minDateHint', {
+                                            date: (() => {
+                                                const d = new Date();
+                                                d.setDate(d.getDate() + (gift?.shortest_delivery_days ?? 3));
+                                                return d.toISOString().split('T')[0];
+                                            })()
+                                        })}
+                                    </p>
                                     <div className="flex gap-2 items-start h-9">
-                                        <div className="flex-1 flex h-full items-center justify-center">
-                                            <Input
-                                                id="preferred_date"
-                                                type="date"
-                                                value={preferred_date}
-                                                onChange={(e) => setPreferredDate(e.target.value)}
-                                                min={(() => {
-                                                    const d = new Date();
-                                                    d.setDate(d.getDate() + (gift?.shortest_delivery_days ?? 3));
-                                                    return d.toISOString().split('T')[0];
-                                                })()}
-                                                className="w-full h-full"
-                                            />
-                                            {/* {preferred_date && (
-                                                    <p className="text-[10px] text-blue-600 font-bold ml-1 animate-in fade-in slide-in-from-top-1">
-                                                        {(() => {
-                                                            try {
-                                                                const [y, m, d] = preferred_date.split('-').map(Number);
-                                                                const date = new Date(y, m - 1, d);
-                                                                if (isNaN(date.getTime())) return "";
-                                                                    const weekday = date.toLocaleDateString(params?.locale as string || 'ja-JP', { weekday: 'short' });
-                                                                    return `(${weekday})`;
-                                                                } catch (e) {
-                                                                    return "";
-                                                                }
-                                                            })()}
-                                                        </p>
-                                                    )} */}
+                                        <div className="flex-1">
+                                            <div className="flex h-9 items-center justify-center">
+                                                <Input
+                                                    id="preferred_date"
+                                                    type="date"
+                                                    value={preferred_date}
+                                                    onChange={(e) => setPreferredDate(e.target.value)}
+                                                    min={(() => {
+                                                        const d = new Date();
+                                                        d.setDate(d.getDate() + (gift?.shortest_delivery_days ?? 3));
+                                                        return d.toISOString().split('T')[0];
+                                                    })()}
+                                                    onBlur={(e) => {
+                                                        const val = e.target.value;
+                                                        const d = new Date();
+                                                        // 最短配送日を加算してバリデーション用の基準日を作成
+                                                        d.setDate(d.getDate() + (gift?.shortest_delivery_days ?? 3));
+                                                        const min = d.toISOString().split('T')[0];
+                                                        // 指定された日付が最短配送日より前の場合、ユーザーに通知してリセット
+                                                        if (val && val < min) {
+                                                            alert(t('errors.invalidDate'));
+                                                            setPreferredDate("");
+                                                        }
+                                                    }}
+                                                    className="w-full h-full"
+                                                />
+                                            </div>
+
                                         </div>
                                         <div className="flex h-full items-center justify-center">
 

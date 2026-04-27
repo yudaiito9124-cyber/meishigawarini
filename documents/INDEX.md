@@ -79,7 +79,7 @@
 ---
 
 ## 🤖 AI共同開発用スキル
-- 🤖 **[SKILL.md](../.agent/skills/development/SKILL.md)**  
+- 🤖 **[SKILL.md](../.agent/rules/SKILL.md)**  
   AI エージェントに対する技術的な「命令（しつけ）」の定義。
 - 🤖 **[REF_SCREENSHOT_PLAN.md](./REF_SCREENSHOT_PLAN.md)**  
   AI エージェントがスクリーンショットを撮影する際の指示書。

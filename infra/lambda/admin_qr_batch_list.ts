@@ -30,26 +30,51 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 
         if (keyword) {
             // --------------------------------------------------------------------
-            // 検索モード (Scan を使用して PK プレフィックス一致 = ワイルドカード検索をサポート)
+            // 検索モード (完全一致検索)
             // --------------------------------------------------------------------
+            // 入力からプレフィックスを除去して正規化された ID を取得します。
+            // ユーザーが ID 全体を入力することを想定し、完全一致での検索を行います。
             const cleanId = keyword.replace(/^(QR_BATCH#|CARD_ORDER#)/, '');
             
-            const result = await ddb.send(new ScanCommand({
+            // 1. バッチ ID (PK) による検索
+            // 操作: Query
+            // 理由: PK (QR_BATCH#ID) と SK (METADATA#timestamp) の組み合わせで一意に特定可能なため。
+            // インデックス: 基本テーブル (Primary Key)
+            const batchResult = await ddb.send(new QueryCommand({
                 TableName: TABLE_NAME,
-                FilterExpression: "(begins_with(PK, :pk_prefix) OR begins_with(GSI2_PK, :order_prefix)) AND begins_with(SK, :sk_prefix)",
+                KeyConditionExpression: "PK = :pk AND begins_with(SK, :sk_prefix)",
                 ExpressionAttributeValues: {
-                    ':pk_prefix': `QR_BATCH#${cleanId}`,
-                    ':order_prefix': `CARD_ORDER#${cleanId}`,
+                    ':pk': `QR_BATCH#${cleanId}`,
                     ':sk_prefix': 'METADATA'
                 },
-                Limit: limit,
-                ExclusiveStartKey: cursor
+                Limit: limit
             }));
 
-            items = result.Items || [];
-            // 検索結果も日付順（最新順）に並べる
+            // 2. カード注文 ID (GSI2_PK) による検索
+            // 操作: Query
+            // 理由: 特定の注文に関連付けられたバッチを効率的に抽出するため。
+            // インデックス: GSI2 (GSI2_PK = CARD_ORDER#order_id)
+            const orderResult = await ddb.send(new QueryCommand({
+                TableName: TABLE_NAME,
+                IndexName: 'GSI2',
+                KeyConditionExpression: "GSI2_PK = :order_prefix",
+                ExpressionAttributeValues: {
+                    ':order_prefix': `CARD_ORDER#${cleanId}`
+                },
+                Limit: limit
+            }));
+
+            // 両方の検索結果を統合し、重複を排除（通常は発生しないが安全のため）
+            const combinedItems = [...(batchResult.Items || []), ...(orderResult.Items || [])];
+            const uniqueItems = Array.from(new Map(combinedItems.map(item => [item.PK + item.SK, item])).values());
+            
+            items = uniqueItems;
+            
+            // 検索結果も日付順（最新順）にソート
             items.sort((a, b) => (b.ts_created_at || "").localeCompare(a.ts_created_at || ""));
-            nextCursor = result.LastEvaluatedKey;
+            
+            // ID 指定による検索では通常結果が少数のため、検索結果のページングはサポートせず null を返却します。
+            nextCursor = null;
         } else {
             // --------------------------------------------------------------------
             // 一覧モード (GSI1 を使用して最新順に取得)

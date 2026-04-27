@@ -21,14 +21,15 @@ This skill provides the AI assistant with the necessary instructions to maintain
 3.  **Fool-proof Design through Types**:
     *   **Exhaustive Type Safety**: Mandatory type definitions for all data structures, API interfaces, and function parameters. Avoid `any` at all costs.
     *   **Early Error Detection**: Design types and logic such that incorrect usage results in immediate, descriptive compile-time errors.
-4.  **Behavior & State Preservation**:
+4.  **Minimal Scope & Behavior Preservation**:
+    *   **No Unnecessary Refactoring**: NEVER refactor code, simplify logic, or change variable names in sections unrelated to the current task. Changes must be strictly limited to what is necessary to fulfill the user's specific request.
     *   **No Stealth UI Changes**: Never make large-scale visual or layout changes unless explicitly instructed.
     *   **Internal Consistency**: Ensure that any modification preserves the existing behavior and communication protocols between the Frontend and Backend.
-5.  **Lossless Editing & Anti-Deletion**:
-    *   **Prohibition of Deletion**: NEVER delete or overwrite existing documentation, comments, or examples without explicit user permission.
+5.  **Lossless Editing & Anti-Deletion (Mandatory)**:
+    *   **Prohibition of Deletion**: NEVER delete or overwrite existing documentation, comments, or examples without explicit user permission. Existing comments are considered as critical as the logic itself.
     *   **Preservation**: Even when reorganizing information, ensure no data density is lost.
     *   **The Triple Principles of Editing**:
-        1. **No Deletion**: Unauthorized removal of text is strictly prohibited.
+        1. **No Deletion**: Unauthorized removal of text/comments is strictly prohibited. If a comment becomes technically inaccurate, update it while preserving its original presence and intent.
         2. **Information Increment**: Edits MUST result in an overall increase in information density (explanations, details, examples).
         3. **Complete Transcription**: All previous content, including detailed wording and underlying "intent," must be fully transcribed and inherited into the new structure.
 6.  **Writing Constraints**:
@@ -37,8 +38,9 @@ This skill provides the AI assistant with the necessary instructions to maintain
 ## Reference Materials
 
 *   **AI Etiquette**: [ATFIRST_AI_ETIQUETTE.md](file:///Users/yudai/git/meishigawarini/documents/ATFIRST_AI_ETIQUETTE.md) (Read this first for philosophical and procedural alignment)
-*   **Development Guide**: [SPEC_DEV_STANDARDS.md](file:///Users/yudai/git/meishigawarini/documents/SPEC_DEV_STANDARDS.md)
-*   **Frontend Data Management**: [SPEC_FE_DATA_STATE.md](file:///Users/yudai/git/meishigawarini/documents/SPEC_FE_DATA_STATE.md)
+*   **Developer Guide**: [ATFIRST_DEVELOPER_GUIDE.md](file:///Users/yudai/git/meishigawarini/documents/ATFIRST_DEVELOPER_GUIDE.md)
+*   **Backend Guide**: [SPEC_HOW_TO_DEVELOP_BACKEND.md](file:///Users/yudai/git/meishigawarini/documents/SPEC_HOW_TO_DEVELOP_BACKEND.md)
+*   **Frontend Guide**: [SPEC_HOW_TO_DEVELOP_FRONTEND.md](file:///Users/yudai/git/meishigawarini/documents/SPEC_HOW_TO_DEVELOP_FRONTEND.md)
 
 ## Verification Protocol
 

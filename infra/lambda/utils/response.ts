@@ -65,4 +65,11 @@ export const successResponse = (body: any = null, methods: string = 'GET,POST,OP
  * @param methods - 許可メソッド。
  */
 export const errorResponse = (statusCode: number, message: string, error?: any, methods: string = 'GET,POST,OPTIONS') =>
-    apiResponse(statusCode, { message, ...(error ? { error: String(error) } : {}) }, methods);
+    apiResponse(statusCode, { 
+        message, 
+        ...(error ? { 
+            error: String(error), 
+            // フロントエンド (useBackendError 等) との互換性のため detail 属性も含めます。
+            detail: String(error) 
+        } : {}) 
+    }, methods);

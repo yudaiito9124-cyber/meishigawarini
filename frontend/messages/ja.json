@@ -983,6 +983,7 @@
       "preferred_date": "配送希望日 (任意)",
       "preferred_time": "配送希望時間 (任意)",
       "noPreference": "指定なし",
+      "minDateHint": "{date} 以降が選択可能です",
       "submit": "この住所に配送する",
       "submitting": "住所を送信中...",
       "passwordTitle": "パスワード設定 (任意)",
@@ -1025,7 +1026,8 @@
       "invalidZip": "郵便番号の形式が正しくありません",
       "invalidPhone": "電話番号の形式が正しくありません",
       "requiredField": "必須項目を入力してください",
-      "emailMismatch": "メールアドレスが一致しません"
+      "emailMismatch": "メールアドレスが一致しません",
+      "invalidDate": "指定された配送希望日は選択できません（最短配送日以降を選択してください）"
     },
     "chat": {
       "title": "メッセージチャット",
@@ -1780,7 +1782,10 @@
     "cannot_mark_as_completed_from_current_state_linked": "連携直後の状態からは完了にできません。まず配送先を入力する必要があります。",
     "cannot_mark_as_completed_from_current_state_unassigned": "未連携の状態からは完了にできません。",
     "cannot_cancel_order_in_current_status_shipped": "発送済みの注文はキャンセルできません。",
-    "cannot_cancel_order_in_current_status_completed": "完了した注文はキャンセルできません。"
+    "cannot_cancel_order_in_current_status_completed": "完了した注文はキャンセルできません。",
+    "invalid_preferred_date": "最短配送日よりも前の日付が指定されています。",
+    "qr_expired": "このQRコードは有効期限が切れています。",
+    "qr_not_active": "このQRコードは有効ではないか、既に使用されています。"
   },
   "MFASetupPage": {
     "title": "2段階認証(MFA)の設定",

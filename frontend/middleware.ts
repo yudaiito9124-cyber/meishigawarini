@@ -18,10 +18,17 @@ export function middleware(request: NextRequest) {
     // 旧ドメイン（amplifyapp.com）からのアクセスの場合は、新ドメインへ301転送
     if (host && host.includes(NEXT_PUBLIC_APP_URL_ORIGIN) && !host.includes('localhost')) {
         const url = request.nextUrl.clone();
-        url.host = NEXT_PUBLIC_APP_URL;
-        url.protocol = 'https';
-        url.port = ""
-        return NextResponse.redirect(url, 301);
+        try {
+            // フル URL からホスト名を抽出
+            const targetHost = new URL(NEXT_PUBLIC_APP_URL).host;
+            url.host = targetHost;
+            url.protocol = 'https';
+            url.port = "";
+            return NextResponse.redirect(url, 301);
+        } catch (e) {
+            console.error("Invalid NEXT_PUBLIC_APP_URL for redirect:", NEXT_PUBLIC_APP_URL);
+            // エラー時はフォールバックして通常の処理へ
+        }
     }
 
     // 2. i18n ルーティング処理

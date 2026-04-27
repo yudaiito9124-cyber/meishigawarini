@@ -867,6 +867,7 @@
       "preferredDate": "Preferred Delivery Date",
       "preferredTime": "Preferred Delivery Time",
       "noPreference": "No preference",
+      "minDateHint": "Available from {date}",
       "submit": "Receive Gift",
       "submitting": "Submitting...",
       "passwordTitle": "Password Setup (Optional)",
@@ -906,7 +907,8 @@
       "uploadFailed": "Failed to upload",
       "receiveFailed": "Failed to receive the gift.",
       "requiredField": "Please fill in the required fields.",
-      "emailMismatch": "Email addresses do not match."
+      "emailMismatch": "Email addresses do not match.",
+      "invalidDate": "The selected delivery date is not available (Please select a date after the shortest delivery date)."
     },
     "chat": {
       "title": "Chat",
@@ -1577,7 +1579,10 @@
     "cannot_mark_as_completed_from_current_state_linked": "Cannot mark as completed from linked state. Delivery address must be entered first.",
     "cannot_mark_as_completed_from_current_state_unassigned": "Cannot mark as completed from unassigned state.",
     "cannot_cancel_order_in_current_status_shipped": "Cannot cancel order that has already been shipped.",
-    "cannot_cancel_order_in_current_status_completed": "Cannot cancel order that has already been completed."
+    "cannot_cancel_order_in_current_status_completed": "Cannot cancel order that has already been completed.",
+    "invalid_preferred_date": "The selected delivery date is too early.",
+    "qr_expired": "This QR code has expired.",
+    "qr_not_active": "This QR code is not active or already used."
   },
   "MFASetupPage": {
     "title": "Set up Two-Factor Authentication (MFA)",

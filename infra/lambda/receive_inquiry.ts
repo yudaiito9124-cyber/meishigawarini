@@ -100,7 +100,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         }
 
         // 3.2. ショップオーナー向け Unified Chat 通知 (即クローズ)
-        const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://meishigawarini.com';
+        const baseUrl = (process.env.NEXT_PUBLIC_APP_URL || 'https://meishigawarini.com').replace(/\/$/, '');
         const shopName = shopRes.Item.name || 'Shop';
         const shopAdminUrl = `${baseUrl}/shop/${shopId}`;
         const notificationMessage = `【お問い合わせ】ショップ: ${shopName}\n\n受取人様よりお問い合わせがありました。このチャット機能ではなく、直接ユーザーのメールアドレスまたは電話番号に対して返信し、対応を行なってください。\n\n[注文ID(カードのID)]\n${qr_id}\n[ショップ管理画面]\n${shopAdminUrl}\n[返信先]\n${reply_email}\n[電話番号]\n${phone}\n\n[お問い合わせ内容]\n${content}`;
