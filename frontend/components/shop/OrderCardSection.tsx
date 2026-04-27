@@ -1,13 +1,29 @@
 'use client';
 
+/**
+ * OrderCardSection コンポーネント
+ * 
+ * このコンポーネントは、ショップ管理画面における物理カードの発注プロセスを管理します。
+ * 商品の選択、カードデザインのプレビュー、発注詳細（数量、有効期限）の設定、
+ * および発注履歴の追跡のための包括的なUIを提供します。
+ * 
+ * 主な責務:
+ * - 商品選択: アクティブな商品とそれに関連付けられたカードデザインを表示します。
+ * - デザインプレビュー: 選択されたカードデザインの表面と裏面のプレビューを表示します。
+ * - 発注設定: 数量の選択とカスタム有効期限の設定を処理します。
+ * - 発注管理: ショップAPIと連携して、発注の作成、キャンセル、完了を行います。
+ * - 履歴追跡: 過去のカード発注をステータスに応じたアクションとともにテーブルに表示します。
+ */
+
 import React, { createContext, useContext, useState } from 'react';
-import { ShoppingBasket, RefreshCw, Check } from 'lucide-react';
+import { ShoppingBasket, RefreshCw, Check, Calendar, AlertCircle, Info, Clock } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Dialog, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { shopApi } from '@/lib/api/shop';
 import { getDesignAspectRatio, getDesignImages } from '@/lib/utils/design';
@@ -52,6 +68,7 @@ export function OrderCardSection({ shopId }: { shopId: string }) {
 
     const {
         selectedOrderProduct, orderQuantity, isCreatingCardOrder, isConfirmOrderDialogOpen,
+        useCustomExpiration, expirationDate,
         set: setOrderCard
     } = useOrderCardUI();
 
@@ -83,6 +100,7 @@ export function OrderCardSection({ shopId }: { shopId: string }) {
                 quantity: orderQuantity,
                 design_id: selectedOrderProduct.design_id || selectedOrderProduct.design?.design_id,
                 product_id: selectedOrderProduct.product_id,
+                expiration_date: useCustomExpiration && expirationDate ? new Date(`${expirationDate}T23:59:59`).toISOString() : undefined,
                 activate_now: false
             });
             setOrderCard({ isConfirmOrderDialogOpen: false, selectedOrderProduct: null });
@@ -171,7 +189,8 @@ export function OrderCardSection({ shopId }: { shopId: string }) {
                                                 <div className="space-y-2">
                                                     <div className="relative rounded-2xl border-4 border-white shadow-2xl overflow-hidden group ring-1 ring-gray-200/50"
                                                         style={{ aspectRatio: getDesignAspectRatio(selectedOrderProduct.design_id, [], selectedOrderProduct.design) }}>
-                                                        <img src={getDesignImages(selectedOrderProduct.design_id, [], selectedOrderProduct.design).front}
+                                                        {/* Fix: Use null for src if image is missing to prevent browser warning */}
+                                                        <img src={getDesignImages(selectedOrderProduct.design_id, [], selectedOrderProduct.design).front || undefined}
                                                             className="w-full h-full object-fill select-none" draggable={false} crossOrigin="anonymous" />
                                                         <div className="absolute top-3 left-3 px-3 py-1 bg-black/60 backdrop-blur-md text-[10px] font-black text-white rounded-full uppercase tracking-widest shadow-lg">{t('frontView')}</div>
                                                     </div>
@@ -179,7 +198,8 @@ export function OrderCardSection({ shopId }: { shopId: string }) {
                                                 <div className="space-y-2">
                                                     <div className="relative rounded-2xl border-4 border-white shadow-2xl overflow-hidden group ring-1 ring-gray-200/50"
                                                         style={{ aspectRatio: getDesignAspectRatio(selectedOrderProduct.design_id, [], selectedOrderProduct.design) }}>
-                                                        <img src={getDesignImages(selectedOrderProduct.design_id, [], selectedOrderProduct.design).back}
+                                                        {/* Fix: Use null for src if image is missing to prevent browser warning */}
+                                                        <img src={getDesignImages(selectedOrderProduct.design_id, [], selectedOrderProduct.design).back || undefined}
                                                             className="w-full h-full object-fill select-none" draggable={false} crossOrigin="anonymous" />
                                                         <div className="absolute top-3 left-3 px-3 py-1 bg-black/60 backdrop-blur-md text-[10px] font-black text-white rounded-full uppercase tracking-widest shadow-lg">{t('backView')}</div>
                                                     </div>
@@ -190,6 +210,84 @@ export function OrderCardSection({ shopId }: { shopId: string }) {
                                 </div>
 
                                 <div className="grid grid-cols-1 gap-8 items-end">
+                                    <div className="space-y-4">
+
+                                        <div className="space-y-4">
+                                            <Label className="text-sm font-bold flex items-center gap-2">
+                                                <div className="w-1 h-4 bg-primary rounded-full" />
+                                                {t('cardOrder.expirationDate')}
+                                            </Label>
+                                            <div className="flex items-center justify-start border-gray-50 gap-4">
+                                                <Switch
+                                                    checked={useCustomExpiration}
+                                                    onCheckedChange={(checked) => {
+                                                        const patch: any = { useCustomExpiration: checked };
+                                                        if (checked && !expirationDate) {
+                                                            const d = new Date();
+                                                            d.setFullYear(d.getFullYear() + 1);
+                                                            patch.expirationDate = d.toISOString().split('T')[0];
+                                                        }
+                                                        setOrderCard(patch);
+                                                    }}
+                                                />
+                                                <span className="text-sm font-bold text-gray-700">{t('cardOrder.manualSelection')}</span>
+                                            </div>
+                                            <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm space-y-6">
+
+                                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                                                    <div className="space-y-1">
+                                                        <div className="flex items-center gap-2">
+                                                            <Clock className="w-4 h-4 text-gray-400" />
+                                                            <span className="font-bold text-gray-900">
+                                                                {useCustomExpiration ? t('cardOrder.customExpiration') : t('cardOrder.defaultExpiration')}
+                                                            </span>
+                                                        </div>
+                                                        <p className="text-xs text-gray-500">
+                                                            {useCustomExpiration
+                                                                ? t('cardOrder.customExpirationDesc')
+                                                                : t('cardOrder.defaultExpirationDesc', { days: selectedOrderProduct.valid_days || '?' })}
+                                                        </p>
+                                                    </div>
+                                                </div>
+
+                                                {useCustomExpiration && (
+                                                    <div className="animate-in fade-in slide-in-from-top-2 duration-300">
+                                                        <div className="flex items-center gap-4">
+                                                            <div className="relative flex-1 max-w-[300px]">
+                                                                <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                                                                <Input
+                                                                    type="date"
+                                                                    value={expirationDate}
+                                                                    onChange={(e) => setOrderCard({ expirationDate: e.target.value })}
+                                                                    min={new Date().toISOString().split('T')[0]}
+                                                                    max={(() => {
+                                                                        const d = new Date();
+                                                                        d.setFullYear(d.getFullYear() + 1);
+                                                                        return d.toISOString().split('T')[0];
+                                                                    })()}
+                                                                    className="pl-10 h-12 text-lg font-bold"
+                                                                />
+                                                            </div>
+                                                            <span className="text-sm font-bold text-gray-500">まで有効</span>
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                <div className="space-y-2 pt-2 border-t border-gray-50">
+                                                    <div className="flex items-start gap-2 text-[11px] text-red-600 font-bold leading-relaxed">
+                                                        <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                                                        <span>{t('cardOrder.expirationWarning')}</span>
+                                                    </div>
+                                                    <div className="flex items-start gap-2 text-[11px] text-blue-600 font-medium leading-relaxed">
+                                                        <Info className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                                                        <span>{t('cardOrder.designNote')}</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                    </div>
+
                                     <div className="space-y-4">
                                         <Label className="text-sm font-bold flex items-center gap-2">
                                             <div className="w-1 h-4 bg-primary rounded-full" />
@@ -213,9 +311,12 @@ export function OrderCardSection({ shopId }: { shopId: string }) {
                                             />
                                             <span className="text-gray-500 font-medium">{tc('unitCard')}</span>
                                         </div>
+                                    </div>
+
+                                    <div className="pt-4">
                                         <Dialog open={isConfirmOrderDialogOpen} onOpenChange={(open) => setOrderCard({ isConfirmOrderDialogOpen: open })}>
                                             <DialogTrigger asChild>
-                                                <Button className="h-12 px-8 text-lg font-bold shadow-xl hover:shadow-2xl transition-all active:scale-[0.98] w-full mt-4">
+                                                <Button className="h-12 px-8 text-lg font-bold shadow-xl hover:shadow-2xl transition-all active:scale-[0.98] w-full">
                                                     <ShoppingBasket className="w-5 h-5 mr-3" />
                                                     {t('cardOrder.placeOrder')}
                                                 </Button>
@@ -288,7 +389,7 @@ function ProductSelection({ products, selectedOrderProduct, setOrderCard, t }: P
                 >
                     {(product.design || product.design_id) && (
                         <img
-                            src={getDesignImages(product.design_id, [], product.design).front}
+                            src={getDesignImages(product.design_id, [], product.design).front || undefined}
                             alt={product.name}
                             className="absolute inset-0 w-full h-full object-fill"
                             crossOrigin="anonymous"

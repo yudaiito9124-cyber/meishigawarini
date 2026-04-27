@@ -98,7 +98,7 @@ export function ShopHeader({
                     </div>
                 </div>
 
-                <div className="flex items-center space-x-2">
+                <div className="flex items-center space-x-2 flex-wrap gap-2">
                     {/*
                      * ─── ショップ向け通知ベルボタン ───────────────────────────────────────────
                      * UnifiedChatNotifications はショップとユーザー双方で使い回せる共用コンポーネントです。

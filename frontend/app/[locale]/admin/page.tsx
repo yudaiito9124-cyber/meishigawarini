@@ -2939,7 +2939,7 @@ function QRCodeListSection({ apiUrl, onGeneratePDF, paperFormat, cardFormat, dbC
             const email = item.shipping_info?.email || '-';
             const phone = item.shipping_info?.phone || '-';
             const contact = `${email}${phone !== '-' ? ' / ' + phone : ''}`;
-            const preferredDateTime = `${item.preferred_date ? item.preferred_date : '-'} / ${item.preferred_time ? tt(item.preferred_time) : '-'}`;
+            const preferredDateTime = `${item.preferred_date ? item.preferred_date : '-'} / ${item.preferred_time ? (tt.has(item.preferred_time) ? tt(item.preferred_time) : item.preferred_time) : '-'}`;
 
             return [
                 qr_id,
@@ -3430,7 +3430,7 @@ function QRCodeRow({ item, apiUrl, onGeneratePDF, onRefresh, paperFormat, cardFo
 
                         <div>
                             <h4 className="text-sm font-semibold text-gray-500">{tShop('orders.preferredDateTime')}</h4>
-                            <p className="text-sm">{item.preferred_date ? item.preferred_date : '-'}  /  {item.preferred_time ? tt(item.preferred_time) : '-'}</p>
+                            <p className="text-sm">{item.preferred_date ? item.preferred_date : '-'}  /  {item.preferred_time ? (tt.has(item.preferred_time) ? tt(item.preferred_time) : item.preferred_time) : '-'}</p>
                         </div>
 
                         {/* Order Info */}

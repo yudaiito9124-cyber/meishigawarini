@@ -1,5 +1,18 @@
 'use client';
 
+/**
+ * OrderRow コンポーネント
+ * 
+ * このコンポーネントは、単一のカード発注をテーブルの行として表示し、ダイアログを介して詳細ビューを提供します。
+ * 発注ステータス、商品詳細、カードデザインのプレビュー、および配送情報の視覚化を処理します。
+ * 
+ * 主な機能:
+ * - レスポンシブなテーブル行: 親セクションで設定された表示列に適応します。
+ * - 詳細ダイアログ: 発注に使用されたカードデザインの表面と裏面のプレビューを表示します。
+ * - メタデータの編集: 管理者が内部メモや配送関連のメモを更新できるようにします。
+ * - クイックアクション: 発注IDや商品IDの簡単なコピー機能を提供します。
+ */
+
 import React, { useState } from 'react';
 import { Package, Copy, Check, User, Truck, Clock, RefreshCw, Plus, ArrowRight, HelpCircle, Pencil, Loader2, Save } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
@@ -145,7 +158,7 @@ export function OrderRow({
                                                             style={{ aspectRatio }}
                                                         >
                                                             <img
-                                                                src={order.thumbf || images.front}
+                                                                src={order.thumbf || images.front || undefined}
                                                                 alt="Front"
                                                                 className="w-full h-full object-fill select-none"
                                                                 draggable={false}
@@ -159,7 +172,7 @@ export function OrderRow({
                                                             style={{ aspectRatio }}
                                                         >
                                                             <img
-                                                                src={order.thumbb || images.back}
+                                                                src={order.thumbb || images.back || undefined}
                                                                 alt="Back"
                                                                 className="w-full h-full object-fill select-none"
                                                                 draggable={false}

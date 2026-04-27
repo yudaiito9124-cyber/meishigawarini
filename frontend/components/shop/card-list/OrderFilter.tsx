@@ -51,7 +51,8 @@ export function OrderFilter() {
 
     return (
         <div className="mb-2">
-            <div className={cn("flex gap-2 flex", isDetailFiltering ? "flex-col" : "")}>
+            <div className={cn("flex gap-2 flex", isDetailFiltering ? "flex-col " : "")}>
+
 
                 {/* 絞り込み */}
                 <div className={cn("relative", isDetailFiltering ? "rounded-xl border-dashed border-gray-300 p-2 mb-4 flex justify-start flex-col mt-1 w-full bg-gray-100" : "")}>
@@ -291,66 +292,65 @@ export function OrderFilter() {
                     )}
                 </div>
 
-                <div className="w-full flex gap-2 justify-between">
-                    {/* カラム設定ボタン */}
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setList({ isColumnSettingsOpen: true })}
-                        className={`flex justify-end gap-2 text-xs border-gray-200 rounded-lg shadow-sm hover:ring-2 hover:ring-primary/10 transition-all ${visibleOrderColumns.length < orderColOptions.length ? 'text-primary border-primary/20 bg-primary/5' : 'text-gray-600'}`}
-                    >
-                        <Table2 className="w-3.5 h-3.5" />
-                        {t('orders.columnSettings')}
-                        {visibleOrderColumns.length < orderColOptions.length && (
-                            <span className="flex items-center justify-center w-4 h-4 text-[10px] bg-primary text-white rounded-full font-bold">
-                                {visibleOrderColumns.length}
-                            </span>
-                        )}
-                    </Button>
 
-                    <div className="flex items-center gap-2">
-                        {/* CSV出力ボタン */}
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={handleExportCSV}
-                            disabled={subRefreshing || ordersLoading || filteredOrdersCount === 0 || isExporting}
-                            className="text-primary hover:text-primary/80 hover:bg-primary/5"
-                        >
-                            {/* 0件時は無効化して空CSVダウンロードを防止 */}
-                            <Download className="mr-2 h-4 w-4" />
-                            CSV出力
-                        </Button>
+                {/* カラム設定ボタン */}
+                <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setList({ isColumnSettingsOpen: true })}
+                    className={`flex w-[120px] gap-2 text-xs border-gray-200 rounded-lg shadow-sm hover:ring-2 hover:ring-primary/10 transition-all ${visibleOrderColumns.length < orderColOptions.length ? 'text-primary border-primary/20 bg-primary/5' : 'text-gray-600'}`}
+                >
+                    <Table2 className="w-3.5 h-3.5" />
+                    {t('orders.columnSettings')}
+                    {visibleOrderColumns.length < orderColOptions.length && (
+                        <span className="flex items-center justify-center w-4 h-4 text-[10px] bg-primary text-white rounded-full font-bold">
+                            {visibleOrderColumns.length}
+                        </span>
+                    )}
+                </Button>
+            </div>
 
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleExportShippinglabelPDF('yubin')}
-                            disabled={subRefreshing || ordersLoading || usedOrdersCount === 0 || isExporting}
-                            className="text-amber-600 hover:text-amber-700 hover:bg-amber-50 gap-2"
-                        >
-                            {isExporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Printer className="h-4 w-4" />}
-                            郵便 ({usedOrdersCount})
-                        </Button>
+            <div className="flex items-center gap-2 flex-wrap w-full">
+                {/* CSV出力ボタン */}
+                <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleExportCSV}
+                    disabled={subRefreshing || ordersLoading || filteredOrdersCount === 0 || isExporting}
+                    className="text-primary hover:text-primary/80 hover:bg-primary/5"
+                >
+                    {/* 0件時は無効化して空CSVダウンロードを防止 */}
+                    <Download className="mr-2 h-4 w-4" />
+                    CSV出力
+                </Button>
 
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleExportShippinglabelPDF('takkyubin')}
-                            disabled={subRefreshing || ordersLoading || usedOrdersCount === 0 || isExporting}
-                            className="text-amber-600 hover:text-amber-700 hover:bg-amber-50 gap-2"
-                        >
-                            {isExporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Printer className="h-4 w-4" />}
-                            宅急便 ({usedOrdersCount})
-                        </Button>
+                <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleExportShippinglabelPDF('yubin')}
+                    disabled={subRefreshing || ordersLoading || usedOrdersCount === 0 || isExporting}
+                    className="text-amber-600 hover:text-amber-700 hover:bg-amber-50 gap-2"
+                >
+                    {isExporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Printer className="h-4 w-4" />}
+                    郵便 ({usedOrdersCount})
+                </Button>
 
-                        {/* 更新ボタン */}
-                        <Button variant="ghost" size="sm" onClick={() => fetchSectionData(true)} disabled={subRefreshing}>
-                            <RefreshCw className={`mr-2 h-4 w-4 ${subRefreshing ? 'animate-spin' : ''}`} />
-                            {t('refresh')}
-                        </Button>
-                    </div>
-                </div>
+                <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleExportShippinglabelPDF('takkyubin')}
+                    disabled={subRefreshing || ordersLoading || usedOrdersCount === 0 || isExporting}
+                    className="text-amber-600 hover:text-amber-700 hover:bg-amber-50 gap-2"
+                >
+                    {isExporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Printer className="h-4 w-4" />}
+                    宅急便 ({usedOrdersCount})
+                </Button>
+
+                {/* 更新ボタン */}
+                <Button variant="ghost" size="sm" onClick={() => fetchSectionData(true)} disabled={subRefreshing}>
+                    <RefreshCw className={`mr-2 h-4 w-4 ${subRefreshing ? 'animate-spin' : ''}`} />
+                    {t('refresh')}
+                </Button>
             </div>
         </div>
     );

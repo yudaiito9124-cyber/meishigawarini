@@ -53,6 +53,8 @@ const initialListState = {
 const initialOrderCardState = {
     selectedOrderProduct: null as any | null, // 注文対象の商品
     orderQuantity: 100,                     // 注文数量
+    useCustomExpiration: false,             // 有効期限のカスタム指定フラグ
+    expirationDate: '' as string,          // 指定された有効期限 (YYYY-MM-DD)
     isCreatingCardOrder: false,             // 発注リクエスト送信中
     isConfirmOrderDialogOpen: false        // 発注確認ダイアログの開閉
 };

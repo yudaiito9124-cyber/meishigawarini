@@ -17,6 +17,7 @@ import SandboxedHtml from '@/components/SandboxedHtml';
 import { ProductCard } from '@/components/shop/ProductCard';
 import { useBackendError } from '@/hooks/useBackendError';
 import { cn } from '@/lib/utils';
+import { Textarea } from '../ui/textarea';
 
 interface ProductsSectionProps {
     shopId: string;
@@ -31,12 +32,12 @@ export function ProductsSection({
     const st = useTranslations('Status');
     const { translateError } = useBackendError();
 
-    const { 
-        shop, 
-        products, 
-        productsLoading, 
-        refreshProducts, 
-        refreshShopDetails 
+    const {
+        shop,
+        products,
+        productsLoading,
+        refreshProducts,
+        refreshShopDetails
     } = useShop();
 
     const allowedDesigns = shop?.allowed_designs || [];
@@ -75,7 +76,7 @@ export function ProductsSection({
     });
 
     const fetchProducts = refreshProducts;
-    const setProductsLoading = (loading: boolean) => {};
+    const setProductsLoading = (loading: boolean) => { };
 
     // --- Handlers Internalized from ShopPage ---
 
@@ -462,7 +463,7 @@ export function ProductsSection({
                                                     </div>
                                                     <div className="space-y-2">
                                                         <Label htmlFor="description">{t('addProduct.description')}</Label>
-                                                        <Input id="description" name="description" defaultValue={editingProduct?.description} required />
+                                                        <Textarea id="description" name="description" defaultValue={editingProduct?.description} required />
                                                     </div>
                                                     <div className="grid grid-cols-2 gap-4">
                                                         <div className="space-y-2">
@@ -502,39 +503,39 @@ export function ProductsSection({
                                                             {allowedDesigns?.map((design: any, idx: number) => {
                                                                 const designId = getDesignId(design);
                                                                 return (
-                                                                <div
-                                                                    key={designId || `${design.name || 'design'}-${idx}`}
-                                                                    onClick={() => designId && setSelectedDesignId(designId)}
-                                                                    className={`group relative h-24 rounded-lg border-2 overflow-hidden cursor-pointer transition-all hover:shadow-md ${selectedDesignId === designId
-                                                                        ? 'border-green-500 ring-2 ring-green-500/20 shadow-lg'
-                                                                        : 'border-gray-100 hover:border-primary/30'
-                                                                        }`}
-                                                                    style={{ aspectRatio: `${design.width || 84} / ${design.height || 52}` }}
-                                                                >
-                                                                    <img
-                                                                        src={design.thumbf || design.bgimgf}
-                                                                        alt={design.name || ''}
-                                                                        className="w-full h-full object-fill"
-                                                                        crossOrigin="anonymous"
-                                                                    />
-                                                                    <div className={`absolute bottom-0 left-0 right-0 bg-black/60 p-1.5 transition-all duration-300 ${selectedDesignId === designId ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
-                                                                        <p className="text-[10px] text-white truncate text-center font-bold">
-                                                                            {design.name || '-'}
-                                                                        </p>
-                                                                        {design.description && (
-                                                                            <p className="text-[8px] text-gray-200 line-clamp-2 text-center mt-0.5 leading-tight opacity-0 group-hover:opacity-100 transition-opacity duration-500">
-                                                                                {design.description}
+                                                                    <div
+                                                                        key={designId || `${design.name || 'design'}-${idx}`}
+                                                                        onClick={() => designId && setSelectedDesignId(designId)}
+                                                                        className={`group relative h-24 rounded-lg border-2 overflow-hidden cursor-pointer transition-all hover:shadow-md ${selectedDesignId === designId
+                                                                            ? 'border-green-500 ring-2 ring-green-500/20 shadow-lg'
+                                                                            : 'border-gray-100 hover:border-primary/30'
+                                                                            }`}
+                                                                        style={{ aspectRatio: `${design.width || 84} / ${design.height || 52}` }}
+                                                                    >
+                                                                        <img
+                                                                            src={design.thumbf || design.bgimgf}
+                                                                            alt={design.name || ''}
+                                                                            className="w-full h-full object-fill"
+                                                                            crossOrigin="anonymous"
+                                                                        />
+                                                                        <div className={`absolute bottom-0 left-0 right-0 bg-black/60 p-1.5 transition-all duration-300 ${selectedDesignId === designId ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
+                                                                            <p className="text-[10px] text-white truncate text-center font-bold">
+                                                                                {design.name || '-'}
                                                                             </p>
+                                                                            {design.description && (
+                                                                                <p className="text-[8px] text-gray-200 line-clamp-2 text-center mt-0.5 leading-tight opacity-0 group-hover:opacity-100 transition-opacity duration-500">
+                                                                                    {design.description}
+                                                                                </p>
+                                                                            )}
+                                                                        </div>
+                                                                        {selectedDesignId === designId && (
+                                                                            <div className="absolute top-0 right-0">
+                                                                                <div className="bg-green-500 text-white text-[9px] font-bold px-2 py-0.5 rounded-bl shadow-sm flex items-center gap-1">
+                                                                                    <Check className="w-2.5 h-2.5" />
+                                                                                </div>
+                                                                            </div>
                                                                         )}
                                                                     </div>
-                                                                    {selectedDesignId === designId && (
-                                                                        <div className="absolute top-0 right-0">
-                                                                            <div className="bg-green-500 text-white text-[9px] font-bold px-2 py-0.5 rounded-bl shadow-sm flex items-center gap-1">
-                                                                                <Check className="w-2.5 h-2.5" />
-                                                                            </div>
-                                                                        </div>
-                                                                    )}
-                                                                </div>
                                                                 );
                                                             })}
                                                         </div>

@@ -31,6 +31,7 @@ export function ConfirmOrderDialog() {
 
     const { 
         selectedOrderProduct, orderQuantity, isCreatingCardOrder, 
+        useCustomExpiration, expirationDate,
         set: setOrderCard 
     } = useOrderCardUI();
 
@@ -105,8 +106,11 @@ export function ConfirmOrderDialog() {
                     <div className="text-xs text-gray-500 mt-1">{t('cardOrder.card back')}</div>
                 </div>
 
-                <div className="text-center mt-4">
+                <div className="text-center mt-4 space-y-1">
                     <p className="text-2xl font-black text-primary">{orderQuantity.toLocaleString()} <span className="text-sm">{tc('unitCard')}</span></p>
+                    <p className="text-sm font-bold text-gray-500">
+                        {t('cardOrder.expirationDate')}: {useCustomExpiration ? (expirationDate || '-') : t('cardOrder.defaultExpiration')}
+                    </p>
                 </div>
 
                 <div className="w-full mt-6 rounded-xl border border-gray-200 bg-gray-50 p-4 space-y-3">

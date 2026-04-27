@@ -566,7 +566,7 @@
         "tooManyCards": "発注枚数は100枚までに制限されています。"
       },
       "subtitle": "カード（QR付きカード）の発注を行います。",
-      "selectProduct": "商品一覧から発注するカードのデザイン（商品）を選択",
+      "selectProduct": "商品一覧から発注するカードのデザインと商品を選択",
       "selectProductDesc": "発注するカードのデザインを選択してください。",
       "quantity": "発注枚数",
       "quantitydescription": "10枚単位(10〜100枚)で発注できます。",
@@ -585,6 +585,14 @@
       "card front": "カード表面デザイン",
       "card back": "カード裏面デザイン",
       "historyTitle": "発注履歴",
+      "customExpiration": "有効期限を任意の日付で指定する",
+      "customExpirationDesc": "有効化タイミングに関わらず特定の日付を有効期限とする",
+      "expirationDate": "有効期限",
+      "expirationDateDesc": "最大1年先まで指定可能です。未指定の場合は商品設定に従います。",
+      "defaultExpiration": "商品の有効期限に従う",
+      "defaultExpirationDesc": "レジで有効化してから {days} 日間 (商品設定に従う)",
+      "expirationWarning": "※有効期限が切れたカードは一切使えなくなります",
+      "designNote": "カードデザインに有効期限が記載されている場合、差異がないことを確認してください",
       "noOrders": "発注履歴はありません。",
       "cancel": "キャンセル",
       "received": "受け取り完了",
@@ -605,6 +613,7 @@
         "actions": "操作",
         "details": "詳細"
       },
+      "manualSelection": "自分で指定する",
       "details": {
         "title": "注文詳細",
         "orderInfo": "注文情報",
