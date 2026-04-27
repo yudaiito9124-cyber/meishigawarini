@@ -8,6 +8,8 @@ import { Switch } from "@/components/ui/switch";
 import { ChevronUp, ChevronDown, ChevronLeft, ChevronRight, ChevronsUp, ChevronsDown, ChevronsLeft, ChevronsRight, Eye } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ShippingLabelConfig, TextPos, PaperFormat } from "@shared/api-types";
+import { PaperPreview } from "./PaperPreview";
+
 
 
 interface ShippingLabelSettingsProps {
@@ -19,7 +21,7 @@ interface ShippingLabelSettingsProps {
     t: (key: string) => string;
 }
 
-// 日本の標準的なA4 4面（クリックポスト等に近い）
+// A-one 31370 のサイズに無理やり詰め込み
 export const DEFAULT_POST_CONFIG: ShippingLabelConfig = {
     labelWidth: 86.4,
     labelHeight: 50.8,
@@ -29,8 +31,8 @@ export const DEFAULT_POST_CONFIG: ShippingLabelConfig = {
         recipientAddressPos: { x: 2, y: 7.5, fontSize: 10, enabled: true, maxWidth: 80 },
         recipientNamePos: { x: 2, y: 22, fontSize: 16, fontWeight: 'bold', enabled: true, maxWidth: 80 },
         recipientPhonePos: { x: 0, y: 0, fontSize: 10, enabled: false, maxWidth: 85 },
-        senderZipPos: { x: 2, y: 30.5, fontSize: 9, enabled: true },
-        senderAddressPos: { x: 2, y: 34, fontSize: 8, enabled: true, maxWidth: 80 },
+        senderZipPos: { x: 2, y: 31, fontSize: 9, enabled: true },
+        senderAddressPos: { x: 2, y: 34.5, fontSize: 8, enabled: true, maxWidth: 80 },
         senderNamePos: { x: 5, y: 37.5, fontSize: 10, enabled: true, maxWidth: 80 },
         senderPhonePos: { x: 60, y: 31, fontSize: 8, enabled: true, maxWidth: 80 },
         orderIdPos: { x: 2, y: 45, fontSize: 7, enabled: true },
@@ -40,7 +42,7 @@ export const DEFAULT_POST_CONFIG: ShippingLabelConfig = {
     }
 };
 
-// 宅急便コンパクト/標準ラベルに近い 2列4面
+// A-one 31370 のサイズに無理やり詰め込み
 export const DEFAULT_EXPRESS_CONFIG: ShippingLabelConfig = {
     labelWidth: 86.4,
     labelHeight: 50.8,
@@ -160,16 +162,6 @@ const LabelPreview = React.memo(({ config, updateConfig, t }: LabelPreviewProps)
                         </div>
                     );
                 })}
-            </div>
-            <div className="flex flex-wrap justify-center gap-4">
-                <div className="space-y-1">
-                    <Label className="text-[10px]">{t('shopSettings.shippingLabel.width')}</Label>
-                    <Input type="number" value={config.labelWidth} onChange={e => updateConfig({ labelWidth: Number(e.target.value) })} className="h-8 w-24" />
-                </div>
-                <div className="space-y-1">
-                    <Label className="text-[10px]">{t('shopSettings.shippingLabel.height')}</Label>
-                    <Input type="number" value={config.labelHeight} onChange={e => updateConfig({ labelHeight: Number(e.target.value) })} className="h-8 w-24" />
-                </div>
             </div>
         </div>
     );
@@ -390,14 +382,23 @@ export function ShippingLabelSettings({ settings, onUpdate, t }: ShippingLabelSe
                                     <Label className="text-[10px]">{t('shopSettings.shippingLabel.offsetY')}</Label>
                                     <Input type="number" value={config.paper.offset_y} onChange={e => updatePaper({ offset_y: Number(e.target.value) })} className="h-9 rounded-lg" />
                                 </div>
+                                <div className="space-y-1.5">
+                                    <Label className="text-[10px]">{t('shopSettings.shippingLabel.width')}</Label>
+                                    <Input type="number" value={config.labelWidth} onChange={e => updateConfig({ labelWidth: Number(e.target.value) })} className="h-9 rounded-lg" />
+                                </div>
+                                <div className="space-y-1.5">
+                                    <Label className="text-[10px]">{t('shopSettings.shippingLabel.height')}</Label>
+                                    <Input type="number" value={config.labelHeight} onChange={e => updateConfig({ labelHeight: Number(e.target.value) })} className="h-9 rounded-lg" />
+                                </div>
                             </div>
-
+                            <PaperPreview config={config} t={t} />
                         </div>
+
 
                         {/* Layout Config */}
                         <div className="space-y-4">
                             <h4 className="text-xs font-bold text-gray-900 uppercase tracking-wider px-1">{t('shopSettings.shippingLabel.layout')}</h4>
-                            <div className="grid grid-cols-1 gap-2 max-h-[400px] overflow-y-auto pr-2">
+                            <div className="grid grid-cols-1 gap-2 max-h-[700px] overflow-y-auto pr-2">
                                 <AdjusterPanel title={t('shopSettings.shippingLabel.recipientZip')} field="recipientZipPos" config={config} updateLayout={updateLayout} adjust={adjust} />
                                 <AdjusterPanel title={t('shopSettings.shippingLabel.recipientAddress')} field="recipientAddressPos" config={config} updateLayout={updateLayout} adjust={adjust} />
                                 <AdjusterPanel title={t('shopSettings.shippingLabel.recipientName')} field="recipientNamePos" config={config} updateLayout={updateLayout} adjust={adjust} />
@@ -423,7 +424,8 @@ export function ShippingLabelSettings({ settings, onUpdate, t }: ShippingLabelSe
             <div className="p-4 bg-blue-50 rounded-2xl border border-blue-100">
                 <p className="text-[11px] text-blue-700 leading-relaxed">
                     {t('shopSettings.shippingLabel.unitNotice')}<br />
-                    {t('shopSettings.shippingLabel.originNotice')}
+                    {t('shopSettings.shippingLabel.originNotice')}<br />
+                    {t('shopSettings.shippingLabel.defaultSettingsNotice')}
                 </p>
             </div>
         </div>

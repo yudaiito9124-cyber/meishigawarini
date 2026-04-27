@@ -927,7 +927,11 @@
         "preferredDate": "お届け希望日",
         "preferredTime": "お届け希望時間帯",
         "unitNotice": "※ 数値はすべて mm 単位です。",
-        "originNotice": "※ X, Y は各ラベルの左上端を起点とした距離です。"
+        "originNotice": "※ X, Y は各ラベルの左上端を起点とした距離です。",
+        "defaultSettingsNotice": "※ 初期状態の設定は、ご参考までに スリーエムジャパン株式会社が展開するブランド、エーワン(a-one)の用紙「品番 31370」に印刷できるように設定した例です。",
+        "paperPreviewTitle": "用紙全体のレイアウトプレビュー",
+        "labelsLabel": "配置",
+        "marginsLabel": "余白ガイド"
       }
     },
     "productDetails": {

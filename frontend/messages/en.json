@@ -812,7 +812,10 @@
         "preferredDate": "Preferred Delivery Date",
         "preferredTime": "Preferred Time Slot",
         "unitNotice": "* All values are in millimeters (mm).",
-        "originNotice": "* X and Y are distances from the top-left corner of each label."
+        "originNotice": "* X and Y are distances from the top-left corner of each label.",
+        "paperPreviewTitle": "Overall Page Layout Preview",
+        "labelsLabel": "Labels",
+        "marginsLabel": "Margin Guide"
       }
     },
     "productDetails": {
