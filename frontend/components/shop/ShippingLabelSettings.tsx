@@ -28,15 +28,15 @@ export const DEFAULT_POST_CONFIG: ShippingLabelConfig = {
         recipientZipPos: { x: 2, y: 2.5, fontSize: 12, enabled: true },
         recipientAddressPos: { x: 2, y: 7.5, fontSize: 10, enabled: true, maxWidth: 80 },
         recipientNamePos: { x: 2, y: 22, fontSize: 16, fontWeight: 'bold', enabled: true, maxWidth: 80 },
-        recipientPhonePos: { x: 15, y: 65, fontSize: 10, enabled: false, maxWidth: 85 },
-        senderZipPos: { x: 2, y: 32.5, fontSize: 9, enabled: true },
-        senderAddressPos: { x: 2, y: 36, fontSize: 8, enabled: true, maxWidth: 80 },
-        senderNamePos: { x: 5, y: 39.5, fontSize: 10, enabled: true, maxWidth: 80 },
-        senderPhonePos: { x: 60, y: 33, fontSize: 8, enabled: true, maxWidth: 80 },
-        orderIdPos: { x: 15, y: 130, fontSize: 7, enabled: false },
-        productNamePos: { x: 2, y: 44, fontSize: 9, enabled: true, maxWidth: 80 },
-        preferredDatePos: { x: 15, y: 124, fontSize: 9, enabled: false, maxWidth: 85 },
-        preferredTimePos: { x: 15, y: 131, fontSize: 9, enabled: false, maxWidth: 85 },
+        recipientPhonePos: { x: 0, y: 0, fontSize: 10, enabled: false, maxWidth: 85 },
+        senderZipPos: { x: 2, y: 30.5, fontSize: 9, enabled: true },
+        senderAddressPos: { x: 2, y: 34, fontSize: 8, enabled: true, maxWidth: 80 },
+        senderNamePos: { x: 5, y: 37.5, fontSize: 10, enabled: true, maxWidth: 80 },
+        senderPhonePos: { x: 60, y: 31, fontSize: 8, enabled: true, maxWidth: 80 },
+        orderIdPos: { x: 2, y: 45, fontSize: 7, enabled: true },
+        productNamePos: { x: 2, y: 41.5, fontSize: 9, enabled: true, maxWidth: 80 },
+        preferredDatePos: { x: 0, y: 0, fontSize: 9, enabled: false, maxWidth: 85 },
+        preferredTimePos: { x: 0, y: 0, fontSize: 9, enabled: false, maxWidth: 85 },
     }
 };
 
@@ -50,12 +50,14 @@ export const DEFAULT_EXPRESS_CONFIG: ShippingLabelConfig = {
         recipientAddressPos: { x: 2, y: 7, fontSize: 9, enabled: true, maxWidth: 80 },
         recipientNamePos: { x: 1.5, y: 20, fontSize: 12, fontWeight: 'bold', enabled: true, maxWidth: 80 },
         recipientPhonePos: { x: 50, y: 2, fontSize: 10, enabled: true, maxWidth: 80 },
-        senderZipPos: { x: 2, y: 33.5, fontSize: 8, enabled: true },
-        senderAddressPos: { x: 2, y: 37, fontSize: 7, enabled: true, maxWidth: 80 },
-        senderNamePos: { x: 5, y: 40.5, fontSize: 9, enabled: true },
-        senderPhonePos: { x: 58, y: 33.5, fontSize: 8, enabled: true },
-        orderIdPos: { x: 5, y: 85, fontSize: 6, enabled: false },
-        productNamePos: { x: 2, y: 44.5, fontSize: 8, enabled: true },
+        senderZipPos: { x: 2, y: 31.5, fontSize: 8, enabled: true },
+        senderAddressPos: { x: 2, y: 35, fontSize: 7, enabled: true, maxWidth: 80 },
+        senderNamePos: { x: 5, y: 38.5, fontSize: 9, enabled: true },
+        senderPhonePos: { x: 58, y: 31.5, fontSize: 8, enabled: true },
+        orderIdPos: { x: 2, y: 45.5, fontSize: 6, enabled: true },
+        productNamePos: { x: 2, y: 42.5, fontSize: 8, enabled: true },
+        preferredDatePos: { x: 5, y: 25.5, fontSize: 9, enabled: true, maxWidth: 85 },
+        preferredTimePos: { x: 28, y: 25.5, fontSize: 9, enabled: true, maxWidth: 85 },
     }
 };
 
@@ -151,7 +153,7 @@ const LabelPreview = React.memo(({ config, updateConfig, t }: LabelPreviewProps)
                             {key === 'senderAddressPos' && "秋田県秋田市名刺がわりに町1-1"}
                             {key === 'senderNamePos' && "発送元ショップ名"}
                             {key === 'senderPhonePos' && "03-0000-0000"}
-                            {key === 'orderIdPos' && "ORDER-ID-12345"}
+                            {key === 'orderIdPos' && "2026XXXXXXXXXX-XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX"}
                             {key === 'productNamePos' && "オリジナルギフトカード"}
                             {key === 'preferredDatePos' && "2024/04/24"}
                             {key === 'preferredTimePos' && "14-16時"}
@@ -186,7 +188,7 @@ const AdjusterPanel = React.memo(({ title, field, config, updateLayout, adjust }
 
     return (
         <div className={cn("border rounded-lg p-3 bg-white", !pos.enabled && "opacity-50 grayscale")}>
-            <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center justify-between mb-1">
                 <div className="flex items-center gap-2">
                     <Switch
                         checked={pos.enabled !== false}
@@ -194,12 +196,12 @@ const AdjusterPanel = React.memo(({ title, field, config, updateLayout, adjust }
                     />
                     <span className="text-sm font-bold">{title}</span>
                 </div>
-                <div className="flex gap-2 text-[10px] font-mono text-gray-500">
-                    <span>X:{pos.x}</span>
-                    <span>Y:{pos.y}</span>
-                    <span>S:{pos.fontSize}</span>
-                    {pos.maxWidth !== undefined && <span>W:{pos.maxWidth}</span>}
-                </div>
+            </div>
+            <div className="flex gap-3 text-[10px] font-mono text-gray-400 mb-3 px-1 border-b border-gray-50 pb-1">
+                <span>X: {pos.x.toFixed(1)}</span>
+                <span>Y: {pos.y.toFixed(1)}</span>
+                <span>Size: {pos.fontSize.toFixed(1)}</span>
+                {pos.maxWidth !== undefined && <span>Width: {pos.maxWidth.toFixed(1)}</span>}
             </div>
             <div className="flex items-center justify-between">
                 <div className="grid grid-cols-3 gap-1">
@@ -238,15 +240,28 @@ export function ShippingLabelSettings({ settings, onUpdate, t }: ShippingLabelSe
 
     const config = React.useMemo(() => {
         if (!savedConfig) return defaultConfig;
+
+        // サポートされているすべてのレイアウトキー
+        const layoutKeys = [
+            'recipientZipPos', 'recipientAddressPos', 'recipientNamePos', 'recipientPhonePos',
+            'senderZipPos', 'senderAddressPos', 'senderNamePos', 'senderPhonePos',
+            'orderIdPos', 'productNamePos', 'preferredDatePos', 'preferredTimePos'
+        ] as const;
+
         return {
             ...defaultConfig,
             ...savedConfig,
-            layout: Object.keys(defaultConfig.layout).reduce((acc, key) => {
+            layout: layoutKeys.reduce((acc, key) => {
                 const k = key as keyof typeof defaultConfig.layout;
-                acc[k] = {
-                    ...defaultConfig.layout[k],
-                    ...(savedConfig.layout?.[k] || {})
-                };
+                const def = defaultConfig.layout[k];
+                const sav = savedConfig.layout?.[k];
+
+                if (def || sav) {
+                    acc[k] = {
+                        ...(def || { x: 0, y: 0, fontSize: 10, enabled: false }),
+                        ...(sav || {})
+                    } as any;
+                }
                 return acc;
             }, {} as any)
         };
@@ -281,7 +296,7 @@ export function ShippingLabelSettings({ settings, onUpdate, t }: ShippingLabelSe
         onUpdate((prev: any) => {
             const currentSaved = prev[activeTab] || {};
             const currentLayout = currentSaved.layout || {};
-            const currentPos = currentLayout[field] || (defaultConfig.layout as any)[field] || { x: 0, y: 0, fontSize: 10, enabled: true };
+            const currentPos = currentLayout[field] || (defaultConfig.layout as any)[field] || { x: 0, y: 0, fontSize: 10, enabled: false };
 
             const nextSaved = {
                 ...currentSaved,
@@ -298,7 +313,7 @@ export function ShippingLabelSettings({ settings, onUpdate, t }: ShippingLabelSe
         onUpdate((prev: any) => {
             const currentSaved = prev[activeTab] || {};
             const currentLayout = currentSaved.layout || {};
-            const currentPos = (currentLayout as any)[field] || (defaultConfig.layout as any)[field] || { x: 0, y: 0, fontSize: 10, enabled: true };
+            const currentPos = (currentLayout as any)[field] || (defaultConfig.layout as any)[field] || { x: 0, y: 0, fontSize: 10, enabled: false };
 
             const nextVal = Number(((currentPos[subfield] || 0) + delta).toFixed(1));
 
