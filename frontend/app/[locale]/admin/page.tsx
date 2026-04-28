@@ -380,7 +380,7 @@ export default function AdminPage() {
                 setTimeout(() => fetchCardOrders(), 1000);
             } else {
                 // 特殊ケース：バッチ情報なしに発送等へ移行している場合
-                alert("No QR codes found for this order. It may have been processed without saving a batch ID.");
+                alert(t('cardOrders.details.noBatchIdFound'));
                 return;
             }
 
@@ -420,7 +420,7 @@ export default function AdminPage() {
             }
         } catch (e) {
             console.error("Export failed", e);
-            alert("Export failed. Please check if the design and shop are correct.");
+            alert(t('cardOrders.details.exportFailed'));
         } finally {
             setIsExportingCsv(null);
         }
@@ -509,7 +509,7 @@ export default function AdminPage() {
             if (e.status === 404) {
                 alert(t('cardOrders.search.notFound'));
             } else {
-                alert(t('cardOrders.search.error') || 'Search failed. Please try again.');
+                alert(t('cardOrders.search.error'));
             }
         } finally {
             setIsSearching(false);
@@ -674,7 +674,7 @@ export default function AdminPage() {
                         <Card>
                             <CardHeader className="flex flex-row items-center gap-2">
                                 <Settings />
-                                <CardTitle>Config</CardTitle>
+                                <CardTitle>{t('cardOrders.config')}</CardTitle>
                             </CardHeader>
                             <CardContent>
                                 <div className="flex flex-col w-full gap-1 ">
@@ -4699,7 +4699,18 @@ function BatchItem({
                         onClick={async () => {
                             setIsExportingCsv(batch.id);
                             try {
-                                const design = resolveDesign(batch.design_id);
+                                let targetDesignId = batch.design_id;
+                                if (!targetDesignId && batch.order_id) {
+                                    try {
+                                        const order = await adminApi.admin_card_orders_get({ order_id: batch.order_id });
+                                        if (order && order.design_id) {
+                                            targetDesignId = order.design_id;
+                                        }
+                                    } catch (e) {
+                                        console.error("Failed to fetch order details for design_id", e);
+                                    }
+                                }
+                                const design = resolveDesign(targetDesignId);
                                 await handleGeneratePDF(batch, paperFormat, design);
                             } finally {
                                 setIsExportingCsv(null);
@@ -4721,7 +4732,18 @@ function BatchItem({
                         onClick={async () => {
                             setIsExportingCsv(batch.id);
                             try {
-                                const design = resolveDesign(batch.design_id);
+                                let targetDesignId = batch.design_id;
+                                if (!targetDesignId && batch.order_id) {
+                                    try {
+                                        const order = await adminApi.admin_card_orders_get({ order_id: batch.order_id });
+                                        if (order && order.design_id) {
+                                            targetDesignId = order.design_id;
+                                        }
+                                    } catch (e) {
+                                        console.error("Failed to fetch order details for design_id", e);
+                                    }
+                                }
+                                const design = resolveDesign(targetDesignId);
                                 await generateCSVExport(batch, design);
                             } finally {
                                 setIsExportingCsv(null);

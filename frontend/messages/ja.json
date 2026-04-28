@@ -634,7 +634,9 @@
         "back": "裏面",
         "designId": "デザインID",
         "receiverUserId": "受取人ユーザーID",
-        "close": "閉じる"
+        "close": "閉じる",
+        "noBatchIdFound": "この注文のQRコードが見つかりません。バッチIDを保存せずに処理された可能性があります。",
+        "exportFailed": "エクスポートに失敗しました。デザインとショップが正しいか確認してください。"
       }
     },
     "orders": {
@@ -755,6 +757,9 @@
       "failed": "インポートに失敗しました"
     },
     "linkQr": {
+      "summaryTotal": "スキャン合計: {count}枚",
+      "summaryAvailable": "商品未登録: {count}枚",
+      "summaryLinked": "商品登録済み: {count}枚",
       "title": "カード有効化",
       "cardDesign": "カードデザイン",
       "description": "会計後，カードと商品を紐付けし，使えるようにします。",
@@ -1569,6 +1574,7 @@
       "contact": "連絡先"
     },
     "cardOrders": {
+      "config": "設定",
       "title": "全ショップからのカード発注管理",
       "shopIdFilter": "ショップIDで絞り込み",
       "preparePrinting": "印刷準備 (PDF/CSV)",
@@ -1594,7 +1600,8 @@
         "placeholder": "ここにIDを入力してください...",
         "button": "検索",
         "searching": "検索中...",
-        "notFound": "注文またはバッチが見つかりません。"
+        "notFound": "注文またはバッチが見つかりません。",
+        "error": "検索に失敗しました。もう一度お試しください。"
       },
       "details": {
         "title": "注文詳細",
@@ -1633,6 +1640,39 @@
         "batchId": "バッチID",
         "qrGeneratedAt": "QR生成日時"
       }
+    },
+    "cardDesignEditor": {
+      "title": "デザインエディター",
+      "editorTitle": "エディター: {id}",
+      "name": "名前",
+      "namePlaceholder": "デザイン名 (例: クラシックゴールド)",
+      "description": "説明",
+      "descPlaceholder": "短い説明...",
+      "width": "幅 (mm)",
+      "height": "高さ (mm)",
+      "backgroundImages": "背景画像",
+      "frontBackground": "表面の背景",
+      "backBackground": "裏面の背景",
+      "uploading": "アップロード中...",
+      "uploadFront": "表面画像をアップロード",
+      "uploadBack": "裏面画像をアップロード",
+      "save": "デザインを保存",
+      "saving": "保存中...",
+      "cancel": "キャンセル",
+      "previewFront": "リアルタイムプレビュー (表面)",
+      "previewBack": "リアルタイムプレビュー (裏面)",
+      "cardDesigns": "カードデザイン一覧",
+      "refresh": "更新",
+      "newDesign": "新規デザイン",
+      "noBackground": "背景なし",
+      "noName": "(名前なし)",
+      "noDescription": "説明なし",
+      "savedSuccessfully": "正常に保存されました",
+      "saveError": "保存中にエラーが発生しました",
+      "confirmDelete": "本当に削除しますか？",
+      "uploadFailed": "アップロードに失敗しました",
+      "frontToggle": "Front",
+      "size": "Size"
     }
   },
   "VerifyPage": {

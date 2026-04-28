@@ -657,6 +657,9 @@
       "failed": "Import failed"
     },
     "linkQr": {
+      "summaryTotal": "Total Scanned: {count}",
+      "summaryAvailable": "No Product Linked: {count}",
+      "summaryLinked": "Product Linked: {count}",
       "title": "Link QR Code",
       "cardDesign": "Card Design",
       "description": "Connect a physical QR card to a product.",
@@ -1394,6 +1397,7 @@
       "contact": "Contact"
     },
     "cardOrders": {
+      "config": "Config",
       "title": "Global Card Order Management",
       "shopIdFilter": "Filter by Shop ID",
       "preparePrinting": "Prepare Printing (PDF/CSV)",
@@ -1415,7 +1419,8 @@
         "placeholder": "Enter ID here...",
         "button": "Search",
         "searching": "Searching...",
-        "notFound": "Order or Batch not found."
+        "notFound": "Order or Batch not found.",
+        "error": "Search failed. Please try again."
       },
       "details": {
         "orderInfo": "Order Information",
@@ -1450,8 +1455,43 @@
         "orderedByAdmin": "Ordered By (Admin)",
         "createdByAdmin": "Created By (Admin)",
         "batchId": "Batch ID",
-        "qrGeneratedAt": "QR Generated At"
+        "qrGeneratedAt": "QR Generated At",
+        "noBatchIdFound": "No QR codes found for this order. It may have been processed without saving a batch ID.",
+        "exportFailed": "Export failed. Please check if the design and shop are correct."
       }
+    },
+    "cardDesignEditor": {
+      "title": "Design Editor",
+      "editorTitle": "Editor: {id}",
+      "name": "Name",
+      "namePlaceholder": "Design Name (e.g. Classic Gold)",
+      "description": "Description",
+      "descPlaceholder": "Short description...",
+      "width": "Width (mm)",
+      "height": "Height (mm)",
+      "backgroundImages": "Background Images",
+      "frontBackground": "Front Background",
+      "backBackground": "Back Background",
+      "uploading": "Uploading...",
+      "uploadFront": "Upload Front Image",
+      "uploadBack": "Upload Back Image",
+      "save": "Save Design",
+      "saving": "Saving...",
+      "cancel": "Cancel",
+      "previewFront": "Real-time Preview (Front)",
+      "previewBack": "Real-time Preview (Back)",
+      "cardDesigns": "Card Designs",
+      "refresh": "Refresh",
+      "newDesign": "New Design",
+      "noBackground": "No Background",
+      "noName": "(No Name)",
+      "noDescription": "No description",
+      "savedSuccessfully": "Saved successfully",
+      "saveError": "Error saving",
+      "confirmDelete": "Are you sure?",
+      "uploadFailed": "Upload failed",
+      "frontToggle": "Front",
+      "size": "Size"
     }
   },
   "VerifyPage": {

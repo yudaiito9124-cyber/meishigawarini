@@ -181,13 +181,18 @@ const ScannedIdsList = ({ scannedQrIds, t, copiedId, handleCopy }: ScannedIdsLis
     const availableIds = scannedQrIds.filter(item => item.status && !item.status.product_linked);
     return (
         <div className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-center text-xs sm:text-sm font-bold bg-gray-50 border p-3 rounded-lg shadow-sm">
+                <div className="text-gray-700 py-1">{t('linkQr.summaryTotal', { count: scannedQrIds.length })}</div>
+                <div className="text-blue-600 py-1 bg-blue-50/50 rounded-md border border-blue-100">{t('linkQr.summaryAvailable', { count: availableIds.length })}</div>
+                <div className="text-amber-600 py-1 bg-amber-50/50 rounded-md border border-amber-100">{t('linkQr.summaryLinked', { count: linkedIds.length })}</div>
+            </div>
             {linkedIds.length > 0 && (
                 <div className="space-y-2">
                     <Label className="text-sm font-bold text-gray-500 flex items-center gap-2">
                         <div className="w-1 h-4 bg-amber-400 rounded-full" />
                         {t('linkQr.linkedTitle')}
                     </Label>
-                    <div className="bg-amber-50/50 rounded-lg border border-amber-100 divide-y divide-amber-100 max-h-[150px] overflow-y-auto">
+                    <div className="bg-amber-50/50 rounded-lg border border-amber-100 divide-y divide-amber-100 min-h-[150px] max-h-[50vh] overflow-y-auto">
                         {linkedIds.map((item, i) => (
                             <div key={`${item.qr_id}-${i}`} className="p-3 flex justify-between items-center bg-white/40">
                                 <div className="flex flex-col">
@@ -223,7 +228,7 @@ const ScannedIdsList = ({ scannedQrIds, t, copiedId, handleCopy }: ScannedIdsLis
                         <div className="w-1 h-4 bg-blue-500 rounded-full" />
                         {t('linkQr.availableTitle')}
                     </Label>
-                    <div className="bg-blue-50/30 rounded-lg border border-blue-100 divide-y divide-blue-100 max-h-[150px] overflow-y-auto">
+                    <div className="bg-blue-50/30 rounded-lg border border-blue-100 divide-y divide-blue-100 min-h-[150px] max-h-[50vh] overflow-y-auto">
                         {availableIds.map((item, i) => (
                             <div key={`${item.qr_id}-${i}`} className="p-3 bg-white/40 flex justify-between items-center">
                                 <div className="flex flex-col">

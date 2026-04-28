@@ -101,19 +101,19 @@ export default function CardDesignEditor({ apiUrl }: { apiUrl: string }) {
                 await adminApi.admin_carddesigns_update({ design_id: designIdentifier, design: editingDesign });
             }
 
-            alert("Saved successfully");
+            alert(t('cardDesignEditor.savedSuccessfully'));
             setEditingDesign(null);
             fetchDesigns();
         } catch (e) {
             console.error(e);
-            alert("Error saving");
+            alert(t('cardDesignEditor.saveError'));
         } finally {
             setIsSaving(false);
         }
     };
 
     const handleDelete = async (id: string) => {
-        if (!confirm("Are you sure?")) return;
+        if (!confirm(t('cardDesignEditor.confirmDelete'))) return;
         try {
             await adminApi.admin_carddesigns_delete({ design_id: id });
             fetchDesigns();
@@ -170,7 +170,7 @@ export default function CardDesignEditor({ apiUrl }: { apiUrl: string }) {
             });
         } catch (e) {
             console.error(e);
-            alert("Upload failed");
+            alert(t('cardDesignEditor.uploadFailed'));
         } finally {
             setUploadingImage(null);
         }
@@ -214,7 +214,7 @@ export default function CardDesignEditor({ apiUrl }: { apiUrl: string }) {
                     </div>
                 </div>
                 <div className="flex items-center gap-2">
-                    <span className="text-[9px] text-mist-600 uppercase font-medium">Front</span>
+                    <span className="text-[9px] text-mist-600 uppercase font-medium">{t('cardDesignEditor.frontToggle')}</span>
                     <Switch checked={isFront} onCheckedChange={onFrontChange} className="scale-75 data-[state=checked]:bg-sky-500/70" />
                 </div>
             </div>
@@ -248,7 +248,7 @@ export default function CardDesignEditor({ apiUrl }: { apiUrl: string }) {
                 <div className="flex-1 flex flex-col items-center justify-center gap-0.5">
                     <Button variant="ghost" size="icon" className="h-6 w-6 hover:bg-mist-700 text-mist-500 hover:text-mist-200" onClick={() => adjust(sizeField, null, 1)}><ChevronsUp className="w-3.5 h-3.5" /></Button>
                     <Button variant="ghost" size="icon" className="h-6 w-6 hover:bg-mist-700 text-mist-300 hover:text-white" onClick={() => adjust(sizeField, null, 0.1)}><ChevronUp className="w-3.5 h-3.5" /></Button>
-                    <div className="text-[7px] text-mist-600 uppercase font-black select-none tracking-tighter">Size</div>
+                    <div className="text-[7px] text-mist-600 uppercase font-black select-none tracking-tighter">{t('cardDesignEditor.size')}</div>
                     <Button variant="ghost" size="icon" className="h-6 w-6 hover:bg-mist-700 text-mist-300 hover:text-white" onClick={() => adjust(sizeField, null, -0.1)}><ChevronDown className="w-3.5 h-3.5" /></Button>
                     <Button variant="ghost" size="icon" className="h-6 w-6 hover:bg-mist-700 text-mist-500 hover:text-mist-200" onClick={() => adjust(sizeField, null, -1)}><ChevronsDown className="w-3.5 h-3.5" /></Button>
                 </div>
@@ -265,7 +265,7 @@ export default function CardDesignEditor({ apiUrl }: { apiUrl: string }) {
                     <CardHeader className="flex flex-row items-center justify-between">
                         <CardTitle className="text-white flex items-center gap-2">
                             <Paintbrush className="w-5 h-5" />
-                            Design Editor
+                            {t('cardDesignEditor.title')}
                         </CardTitle>
                     </CardHeader>
                     <CardContent className="overflow-visible">
@@ -273,32 +273,32 @@ export default function CardDesignEditor({ apiUrl }: { apiUrl: string }) {
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 animate-in slide-in-from-bottom-4 duration-300">
                             <Card className="bg-mist-900 border-mist-700 text-white">
                                 <CardHeader>
-                                    <CardTitle>Editor: {editingDesign.design_id}</CardTitle>
+                                    <CardTitle>{t('cardDesignEditor.editorTitle', { id: editingDesign.design_id })}</CardTitle>
                                 </CardHeader>
                                 <CardContent className="space-y-6">
                                     <div className="grid gap-4">
                                         <div className="space-y-2">
-                                            <Label>Name</Label>
+                                            <Label>{t('cardDesignEditor.name')}</Label>
                                             <Input
                                                 value={editingDesign.name ?? ""}
                                                 onChange={e => setEditingDesign({ ...editingDesign, name: e.target.value })}
                                                 className="bg-mist-800 border-mist-700"
-                                                placeholder="Design Name (e.g. Classic Gold)"
+                                                placeholder={t('cardDesignEditor.namePlaceholder')}
                                             />
                                         </div>
                                         <div className="space-y-2">
-                                            <Label>Description</Label>
+                                            <Label>{t('cardDesignEditor.description')}</Label>
                                             <Input
                                                 value={editingDesign.description ?? ""}
                                                 onChange={e => setEditingDesign({ ...editingDesign, description: e.target.value })}
                                                 className="bg-mist-800 border-mist-700"
-                                                placeholder="Short description..."
+                                                placeholder={t('cardDesignEditor.descPlaceholder')}
                                             />
                                         </div>
 
                                         <div className="grid grid-cols-2 gap-4">
                                             <div className="space-y-2">
-                                                <Label>Width (mm)</Label>
+                                                <Label>{t('cardDesignEditor.width')}</Label>
                                                 <Input
                                                     type="number"
                                                     value={editingDesign.width ?? 0}
@@ -307,7 +307,7 @@ export default function CardDesignEditor({ apiUrl }: { apiUrl: string }) {
                                                 />
                                             </div>
                                             <div className="space-y-2">
-                                                <Label>Height (mm)</Label>
+                                                <Label>{t('cardDesignEditor.height')}</Label>
                                                 <Input
                                                     type="number"
                                                     value={editingDesign.height ?? 0}
@@ -320,29 +320,29 @@ export default function CardDesignEditor({ apiUrl }: { apiUrl: string }) {
                                         <div className="space-y-4 border-t border-mist-700 pt-4">
                                             <h4 className="text-sm font-bold flex items-center gap-2">
                                                 <Upload className="w-4 h-4" />
-                                                Background Images
+                                                {t('cardDesignEditor.backgroundImages')}
                                             </h4>
                                             <div className="grid grid-cols-2 gap-4">
                                                 <div className="space-y-2">
-                                                    <Label className="text-xs">Front Background</Label>
+                                                    <Label className="text-xs">{t('cardDesignEditor.frontBackground')}</Label>
                                                     <div className="flex flex-col gap-2">
                                                         <div className="bg-mist-800 rounded border border-mist-600 overflow-hidden" style={{ aspectRatio: `${editingDesign.width} / ${editingDesign.height}` }}>
                                                             {editingDesign.bgimgf && <img src={editingDesign.bgimgf} className="w-full h-full object-fill" crossOrigin="anonymous" />}
                                                         </div>
                                                         <Button variant="outline" size="sm" className="relative cursor-pointer bg-mist-800" disabled={!!uploadingImage}>
-                                                            {uploadingImage === 'bgimgf' ? "Uploading..." : "Upload Front Image"}
+                                                            {uploadingImage === 'bgimgf' ? t('cardDesignEditor.uploading') : t('cardDesignEditor.uploadFront')}
                                                             <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" onChange={e => handleImageUpload(e, 'bgimgf')} />
                                                         </Button>
                                                     </div>
                                                 </div>
                                                 <div className="space-y-2">
-                                                    <Label className="text-xs">Back Background</Label>
+                                                    <Label className="text-xs">{t('cardDesignEditor.backBackground')}</Label>
                                                     <div className="flex flex-col gap-2">
                                                         <div className="bg-mist-800 rounded border border-mist-600 overflow-hidden" style={{ aspectRatio: `${editingDesign.width} / ${editingDesign.height}` }}>
                                                             {editingDesign.bgimgb && <img src={editingDesign.bgimgb} className="w-full h-full object-fill" crossOrigin="anonymous" />}
                                                         </div>
                                                         <Button variant="outline" size="sm" className="relative cursor-pointer bg-mist-800" disabled={!!uploadingImage}>
-                                                            {uploadingImage === 'bgimgb' ? "Uploading..." : "Upload Back Image"}
+                                                            {uploadingImage === 'bgimgb' ? t('cardDesignEditor.uploading') : t('cardDesignEditor.uploadBack')}
                                                             <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" onChange={e => handleImageUpload(e, 'bgimgb')} />
                                                         </Button>
                                                     </div>
@@ -386,9 +386,9 @@ export default function CardDesignEditor({ apiUrl }: { apiUrl: string }) {
                                     <div className="pt-6 flex gap-3">
                                         <Button className="flex-1 bg-mist-800" variant="outline" onClick={handleSave} disabled={isSaving}>
                                             <Save className="w-4 h-4 mr-2" />
-                                            {isSaving ? "Saving..." : "Save Design"}
+                                            {isSaving ? t('cardDesignEditor.saving') : t('cardDesignEditor.save')}
                                         </Button>
-                                        <Button variant="secondary" onClick={() => setEditingDesign(null)}>Cancel</Button>
+                                        <Button variant="secondary" onClick={() => setEditingDesign(null)}>{t('cardDesignEditor.cancel')}</Button>
                                     </div>
                                 </CardContent>
                             </Card>
@@ -396,7 +396,7 @@ export default function CardDesignEditor({ apiUrl }: { apiUrl: string }) {
                             <div className="sticky bottom-8  flex flex-col justify-end space-y-6 pb-2">
                                 <Card className="bg-mist-900 border-mist-700 overflow-visible">
                                     <CardHeader>
-                                        <CardTitle className="text-white text-sm">Real-time Preview (Front)</CardTitle>
+                                        <CardTitle className="text-white text-sm">{t('cardDesignEditor.previewFront')}</CardTitle>
                                     </CardHeader>
                                     <CardContent className="flex flex-col items-center p-12 overflow-visible">
                                         <div className="w-full [container-type:inline-size] relative">
@@ -467,7 +467,7 @@ export default function CardDesignEditor({ apiUrl }: { apiUrl: string }) {
 
                                 <Card className="bg-mist-900 border-mist-700 overflow-visible">
                                     <CardHeader>
-                                        <CardTitle className="text-white text-sm">Real-time Preview (Back)</CardTitle>
+                                        <CardTitle className="text-white text-sm">{t('cardDesignEditor.previewBack')}</CardTitle>
                                     </CardHeader>
                                     <CardContent className="flex flex-col items-center p-12 overflow-visible">
                                         <div className="w-full [container-type:inline-size] relative">
@@ -547,16 +547,16 @@ export default function CardDesignEditor({ apiUrl }: { apiUrl: string }) {
                 <CardHeader className="flex flex-row items-center justify-between">
                     <CardTitle className="text-white flex items-center gap-2">
                         <Layers className="w-5 h-5" />
-                        Card Designs
+                        {t('cardDesignEditor.cardDesigns')}
                     </CardTitle>
                     <div className="flex gap-2">
                         <Button variant="outline" size="sm" onClick={fetchDesigns} disabled={loading}>
                             <RefreshCw className={cn("w-4 h-4 mr-2", loading && "animate-spin")} />
-                            Refresh
+                            {t('cardDesignEditor.refresh')}
                         </Button>
                         <Button size="sm" onClick={handleCreate}>
                             <Plus className="w-4 h-4 mr-2" />
-                            New Design
+                            {t('cardDesignEditor.newDesign')}
                         </Button>
                     </div>
                 </CardHeader>
@@ -569,16 +569,16 @@ export default function CardDesignEditor({ apiUrl }: { apiUrl: string }) {
                                         <img src={d.thumbf || d.bgimgf} className="w-full h-full object-fill select-none pointer-events-none" alt="Front" crossOrigin="anonymous" />
                                     ) : (
                                         <div className="w-full h-full flex items-center justify-center text-mist-500 text-xs text-center p-4">
-                                            No Background
+                                            {t('cardDesignEditor.noBackground')}
                                         </div>
                                     )}
                                 </div>
                                 <div className="p-2 pt-1 text-center w-full max-w-[150px]">
-                                    <h3 className="text-[11px] font-bold text-mist-100 truncate mb-0.5" title={d.name || "(No Name)"}>
-                                        {d.name || <span className="opacity-30 italic">(No Name)</span>}
+                                    <h3 className="text-[11px] font-bold text-mist-100 truncate mb-0.5" title={d.name || t('cardDesignEditor.noName')}>
+                                        {d.name || <span className="opacity-30 italic">{t('cardDesignEditor.noName')}</span>}
                                     </h3>
-                                    <p className="text-[9px] text-mist-400 line-clamp-1 h-3 leading-tight" title={d.description || "No description"}>
-                                        {d.description || <span className="opacity-30 italic">No description</span>}
+                                    <p className="text-[9px] text-mist-400 line-clamp-1 h-3 leading-tight" title={d.description || t('cardDesignEditor.noDescription')}>
+                                        {d.description || <span className="opacity-30 italic">{t('cardDesignEditor.noDescription')}</span>}
                                     </p>
                                     <p className="text-[8px] text-mist-500 mt-0.5 font-mono truncate">
                                         {d.design_id}
