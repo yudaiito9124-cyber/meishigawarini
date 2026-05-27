@@ -105,8 +105,19 @@ export class AdminApi extends cdk.NestedStack {
     const admin_dump = new nodejs.NodejsFunction(this, 'admin_dump', { entry: lampath('admin_dump'), ...commonProps });
     grantTablePermissions(admin_dump);
 
-    const admin_links = new nodejs.NodejsFunction(this, 'admin_links', { entry: lampath('admin_links'), ...commonProps });
+    const admin_links = new nodejs.NodejsFunction(this, 'admin_links', {
+      entry: lampath('admin_links'),
+      ...commonProps,
+      environment: {
+        ...commonProps.environment,
+        USER_POOL_ID: userPool.userPoolId,
+      }
+    });
     grantTablePermissions(admin_links, true);
+    admin_links.addToRolePolicy(new iam.PolicyStatement({
+      actions: ['cognito-idp:AdminGetUser'],
+      resources: [userPool.userPoolArn]
+    }));
 
 
 

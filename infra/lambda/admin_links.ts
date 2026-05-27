@@ -12,9 +12,9 @@
  */
 
 import { APIGatewayProxyHandler } from 'aws-lambda';
-import { GetCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
+import { GetCommand, UpdateCommand, PutCommand } from '@aws-sdk/lib-dynamodb';
 import { CognitoIdentityProviderClient, AdminGetUserCommand } from '@aws-sdk/client-cognito-identity-provider';
-import { successResponse, errorResponse } from './utils/response';
+import { successResponse, errorResponse, apiResponse } from './utils/response';
 import { ddb, TABLE_NAME, USER_POOL_ID } from './share/db';
 import { getUserId, getAction } from './utils/request';
 import { AdminApiSchema } from '@shared/api-types';
@@ -38,8 +38,12 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         if (action === 'validate') {
             let { shop_ids, user_ids } = body as AdminApiSchema['admin_links'];
             
-            if (Array.isArray(shop_ids)) shop_ids = Array.from(new Set(shop_ids));
-            if (Array.isArray(user_ids)) user_ids = Array.from(new Set(user_ids));
+            if (Array.isArray(shop_ids)) {
+                shop_ids = Array.from(new Set(shop_ids.map(id => id.trim().replace(/^SHOP#/, '')))).filter(Boolean);
+            }
+            if (Array.isArray(user_ids)) {
+                user_ids = Array.from(new Set(user_ids.map(id => id.trim().replace(/^USER#/, '')))).filter(Boolean);
+            }
 
             if (!Array.isArray(shop_ids) || !Array.isArray(user_ids) || !action) {
                 return errorResponse(400, 'Missing required fields: shop_ids, user_ids, action');
@@ -58,7 +62,24 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 if (res.Item) {
                     userMetadataList.push({ id: uid, email: res.Item.email });
                 } else {
-                    missingIds.push(`USER#${uid}`);
+                    // Fallback to Cognito if not found in DynamoDB (e.g. newly created user)
+                    let cognitoEmail: string | undefined;
+                    if (USER_POOL_ID) {
+                        try {
+                            const cognitoRes = await cognito.send(new AdminGetUserCommand({
+                                UserPoolId: USER_POOL_ID,
+                                Username: uid
+                            }));
+                            cognitoEmail = cognitoRes.UserAttributes?.find(a => a.Name === 'email')?.Value;
+                        } catch (e) {
+                            console.warn(`Failed to fetch user from Cognito: ${uid}`, e);
+                        }
+                    }
+                    if (cognitoEmail) {
+                        userMetadataList.push({ id: uid, email: cognitoEmail });
+                    } else {
+                        missingIds.push(`USER#${uid}`);
+                    }
                 }
             }
 
@@ -76,7 +97,13 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             }
 
             if (missingIds.length > 0) {
-                return errorResponse(400, 'Some IDs not found', { missingIds, missingIdsFormatted: missingIds.join(', ') });
+                return apiResponse(400, {
+                    message: 'Some IDs not found',
+                    error: 'Some IDs not found',
+                    detail: 'Some IDs not found',
+                    missingIds,
+                    missingIdsFormatted: missingIds.join(', ')
+                });
             }
 
             return successResponse({ users: userMetadataList, shops: shopMetadataList });
@@ -91,8 +118,12 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         if (action === 'execute') {
             let { shop_ids, user_ids } = body as AdminApiSchema['admin_links'];
             
-            if (Array.isArray(shop_ids)) shop_ids = Array.from(new Set(shop_ids));
-            if (Array.isArray(user_ids)) user_ids = Array.from(new Set(user_ids));
+            if (Array.isArray(shop_ids)) {
+                shop_ids = Array.from(new Set(shop_ids.map(id => id.trim().replace(/^SHOP#/, '')))).filter(Boolean);
+            }
+            if (Array.isArray(user_ids)) {
+                user_ids = Array.from(new Set(user_ids.map(id => id.trim().replace(/^USER#/, '')))).filter(Boolean);
+            }
 
             if (!Array.isArray(shop_ids) || !Array.isArray(user_ids) || !action) {
                 return errorResponse(400, 'Missing required fields: shop_ids, user_ids, action');
@@ -103,18 +134,11 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             // 1. ユーザー側の更新 (全選択ユーザーに対してループ)
             for (const uid of user_ids) {
                 const userRes = await ddb.send(new GetCommand({ TableName: TABLE_NAME, Key: { PK: `USER#${uid}`, SK: 'SHOP' } }));
-                if (!userRes.Item) continue;
-
-                const ownerShopIds = userRes.Item.owner_shop_ids || [];
-                const currentGmShopIds = userRes.Item.gm_shop_ids || [];
-
-                // フィルタ: 既にオーナー権限を持っている、または既に GM であるショップはスキップ
-                const finalShopIdsToLink = shop_ids.filter(id => !ownerShopIds.includes(id) && !currentGmShopIds.includes(id));
-
-                if (finalShopIdsToLink.length > 0) {
+                
+                if (!userRes.Item) {
                     // ユーザーの最新のメールアドレスを取得（同期用）
-                    let userEmail = userRes.Item.email;
-                    if (!userEmail && USER_POOL_ID) {
+                    let userEmail = null;
+                    if (USER_POOL_ID) {
                         try {
                             const cognitoRes = await cognito.send(new AdminGetUserCommand({ UserPoolId: USER_POOL_ID, Username: uid }));
                             userEmail = cognitoRes.UserAttributes?.find(a => a.Name === 'email')?.Value;
@@ -123,28 +147,62 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                         }
                     }
 
-                    // GM 管理対象リストへのアペンド
-                    await ddb.send(new UpdateCommand({
+                    // 既存のコード（admin_changeowner.tsなど）と同様に、PutCommandで標準レコードを新規作成
+                    await ddb.send(new PutCommand({
                         TableName: TABLE_NAME,
-                        Key: { PK: `USER#${uid}`, SK: 'SHOP' },
-                        UpdateExpression: 'SET gm_shop_ids = list_append(if_not_exists(gm_shop_ids, :empty_list), :new_shop_list), email = :email, ts_updated_at = :now',
-                        ExpressionAttributeValues: { ':new_shop_list': finalShopIdsToLink, ':empty_list': [], ':email': userEmail || null, ':now': now }
+                        Item: {
+                            PK: `USER#${uid}`,
+                            SK: 'SHOP',
+                            email: userEmail || null,
+                            roles: ['SHOP_MANAGER', 'GENERAL_MANAGER'],
+                            owner_shop_ids: [],
+                            gm_shop_ids: shop_ids,
+                            ts_created_at: now,
+                            ts_updated_at: now
+                        }
                     }));
-                }
+                } else {
+                    const ownerShopIds = userRes.Item.owner_shop_ids || [];
+                    const currentGmShopIds = userRes.Item.gm_shop_ids || [];
 
-                // 「GENERAL_MANAGER」ロールの条件付き付与
-                try {
-                    await ddb.send(new UpdateCommand({
-                        TableName: TABLE_NAME,
-                        Key: { PK: `USER#${uid}`, SK: 'SHOP' },
-                        UpdateExpression: 'SET #roles = list_append(if_not_exists(#roles, :empty_list), :gm_role_list)',
-                        ConditionExpression: 'attribute_not_exists(#roles) OR NOT contains(#roles, :gm_role_str)',
-                        ExpressionAttributeNames: { '#roles': 'roles' },
-                        ExpressionAttributeValues: { ':gm_role_list': ['GENERAL_MANAGER'], ':gm_role_str': 'GENERAL_MANAGER', ':empty_list': [] }
-                    }));
-                } catch (e: any) {
-                    // 既にロールを持っている場合は ConditionalCheckFailedException が発生するが、問題ないので無視する
-                    if (e.name !== 'ConditionalCheckFailedException') throw e;
+                    // フィルタ: 既にオーナー権限を持っている、または既に GM であるショップはスキップ
+                    const finalShopIdsToLink = shop_ids.filter(id => !ownerShopIds.includes(id) && !currentGmShopIds.includes(id));
+
+                    if (finalShopIdsToLink.length > 0) {
+                        // ユーザーの最新のメールアドレスを取得（同期用）
+                        let userEmail = userRes.Item.email;
+                        if (!userEmail && USER_POOL_ID) {
+                            try {
+                                const cognitoRes = await cognito.send(new AdminGetUserCommand({ UserPoolId: USER_POOL_ID, Username: uid }));
+                                userEmail = cognitoRes.UserAttributes?.find(a => a.Name === 'email')?.Value;
+                            } catch (e) {
+                                console.warn(`Failed to fetch email for GM user: ${uid}`, e);
+                            }
+                        }
+
+                        // GM 管理対象リストへのアペンド
+                        await ddb.send(new UpdateCommand({
+                            TableName: TABLE_NAME,
+                            Key: { PK: `USER#${uid}`, SK: 'SHOP' },
+                            UpdateExpression: 'SET gm_shop_ids = list_append(if_not_exists(gm_shop_ids, :empty_list), :new_shop_list), email = :email, ts_updated_at = :now',
+                            ExpressionAttributeValues: { ':new_shop_list': finalShopIdsToLink, ':empty_list': [], ':email': userEmail || null, ':now': now }
+                        }));
+                    }
+
+                    // 「GENERAL_MANAGER」ロールの条件付き付与
+                    try {
+                        await ddb.send(new UpdateCommand({
+                            TableName: TABLE_NAME,
+                            Key: { PK: `USER#${uid}`, SK: 'SHOP' },
+                            UpdateExpression: 'SET #roles = list_append(if_not_exists(#roles, :empty_list), :gm_role_list)',
+                            ConditionExpression: 'attribute_not_exists(#roles) OR NOT contains(#roles, :gm_role_str)',
+                            ExpressionAttributeNames: { '#roles': 'roles' },
+                            ExpressionAttributeValues: { ':gm_role_list': ['GENERAL_MANAGER'], ':gm_role_str': 'GENERAL_MANAGER', ':empty_list': [] }
+                        }));
+                    } catch (e: any) {
+                        // 既にロールを持っている場合は ConditionalCheckFailedException が発生するが、問題ないので無視する
+                        if (e.name !== 'ConditionalCheckFailedException') throw e;
+                    }
                 }
             }
 
@@ -184,8 +242,12 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         if (action === 'unlink') {
             let { shop_ids, user_ids } = body as AdminApiSchema['admin_links'];
             
-            if (Array.isArray(shop_ids)) shop_ids = Array.from(new Set(shop_ids));
-            if (Array.isArray(user_ids)) user_ids = Array.from(new Set(user_ids));
+            if (Array.isArray(shop_ids)) {
+                shop_ids = Array.from(new Set(shop_ids.map(id => id.trim().replace(/^SHOP#/, '')))).filter(Boolean);
+            }
+            if (Array.isArray(user_ids)) {
+                user_ids = Array.from(new Set(user_ids.map(id => id.trim().replace(/^USER#/, '')))).filter(Boolean);
+            }
 
             if (!Array.isArray(shop_ids) || !Array.isArray(user_ids) || !action) {
                 return errorResponse(400, 'Missing required fields: shop_ids, user_ids, action');

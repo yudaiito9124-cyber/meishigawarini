@@ -159,12 +159,45 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         // [意図] オーナーのユーザーレコードに対し、所有ショップ ID リストを追加更新します。
         // [Key] PK: `USER#${owner_id}`, SK: 'SHOP'
         // list_append と if_not_exists を組み合わせることで、リストが未存在の場合でも安全にアトミック更新（規格化）します。
-        await ddb.send(new UpdateCommand({
-            TableName: TABLE_NAME,
-            Key: { PK: `USER#${owner_id}`, SK: 'SHOP' },
-            UpdateExpression: 'SET owner_shop_ids = list_append(if_not_exists(owner_shop_ids, :empty_list), :new_shop_list), email = :email, ts_updated_at = :now',
-            ExpressionAttributeValues: { ':new_shop_list': [newShopId], ':empty_list': [], ':email': email || null, ':now': now }
-        }));
+        const ownerUserRes = await ddb.send(new GetCommand({ TableName: TABLE_NAME, Key: { PK: `USER#${owner_id}`, SK: 'SHOP' } }));
+        if (!ownerUserRes.Item) {
+            // 新規ユーザーオーナーの場合はレコードを新規作成
+            await ddb.send(new PutCommand({
+                TableName: TABLE_NAME,
+                Item: {
+                    PK: `USER#${owner_id}`,
+                    SK: 'SHOP',
+                    email: email || null,
+                    roles: ['SHOP_MANAGER'],
+                    owner_shop_ids: [newShopId],
+                    gm_shop_ids: [],
+                    ts_created_at: now,
+                    ts_updated_at: now
+                }
+            }));
+        } else {
+            // 既存ユーザーオーナーの場合は従来通りアップデート
+            await ddb.send(new UpdateCommand({
+                TableName: TABLE_NAME,
+                Key: { PK: `USER#${owner_id}`, SK: 'SHOP' },
+                UpdateExpression: 'SET owner_shop_ids = list_append(if_not_exists(owner_shop_ids, :empty_list), :new_shop_list), email = :email, ts_updated_at = :now',
+                ExpressionAttributeValues: { ':new_shop_list': [newShopId], ':empty_list': [], ':email': email || null, ':now': now }
+            }));
+
+            // ロールの付与 (SHOP_MANAGER)
+            try {
+                await ddb.send(new UpdateCommand({
+                    TableName: TABLE_NAME,
+                    Key: { PK: `USER#${owner_id}`, SK: 'SHOP' },
+                    UpdateExpression: 'SET #roles = list_append(if_not_exists(#roles, :empty_list), :owner_role_list)',
+                    ConditionExpression: 'attribute_not_exists(#roles) OR NOT contains(#roles, :owner_role_str)',
+                    ExpressionAttributeNames: { '#roles': 'roles' },
+                    ExpressionAttributeValues: { ':owner_role_list': ['SHOP_MANAGER'], ':owner_role_str': 'SHOP_MANAGER', ':empty_list': [] }
+                }));
+            } catch (e: any) {
+                if (e.name !== 'ConditionalCheckFailedException') throw e;
+            }
+        }
 
         // 【DB操作: UpdateItem (GM - ゼネラルマネージャー)】
         // [意図] 指定された各 GM ユーザーの管理ショップリストに新規ショップを追加し、
@@ -172,8 +205,9 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         for (const gmid of gm_idslist) {
             // GM のメールアドレスを取得（通知用）
             let gmEmail = null;
+            let gmUserRes = null;
             try {
-                const gmUserRes = await ddb.send(new GetCommand({
+                gmUserRes = await ddb.send(new GetCommand({
                     TableName: TABLE_NAME,
                     Key: { PK: `USER#${gmid}`, SK: 'SHOP' }
                 }));
@@ -189,28 +223,46 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 console.warn(`Failed to fetch GM email: ${gmid}`, e);
             }
 
-            // 管理ショップ ID の追加（アトミック操作）
-            await ddb.send(new UpdateCommand({
-                TableName: TABLE_NAME,
-                Key: { PK: `USER#${gmid}`, SK: 'SHOP' },
-                UpdateExpression: 'SET gm_shop_ids = list_append(if_not_exists(gm_shop_ids, :empty_list), :new_shop_list), email = :email, ts_updated_at = :now',
-                ExpressionAttributeValues: { ':new_shop_list': [newShopId], ':empty_list': [], ':email': gmEmail || null, ':now': now }
-            }));
-
-            // ロールの付与（排他制御）
-            // ConditionExpression を使用し、既にロールを持っている場合は二重に追加しない「フールプルーフ」な更新を行います。
-            try {
+            if (!gmUserRes?.Item) {
+                // 新規ユーザー GM の場合はレコードを新規作成
+                await ddb.send(new PutCommand({
+                    TableName: TABLE_NAME,
+                    Item: {
+                        PK: `USER#${gmid}`,
+                        SK: 'SHOP',
+                        email: gmEmail || null,
+                        roles: ['SHOP_MANAGER', 'GENERAL_MANAGER'],
+                        owner_shop_ids: [],
+                        gm_shop_ids: [newShopId],
+                        ts_created_at: now,
+                        ts_updated_at: now
+                    }
+                }));
+            } else {
+                // 既存ユーザー GM の場合は従来通りアップデート
+                // 管理ショップ ID の追加（アトミック操作）
                 await ddb.send(new UpdateCommand({
                     TableName: TABLE_NAME,
                     Key: { PK: `USER#${gmid}`, SK: 'SHOP' },
-                    UpdateExpression: 'SET #roles = list_append(if_not_exists(#roles, :empty_list), :gm_role_list)',
-                    ConditionExpression: 'attribute_not_exists(#roles) OR NOT contains(#roles, :gm_role_str)',
-                    ExpressionAttributeNames: { '#roles': 'roles' },
-                    ExpressionAttributeValues: { ':gm_role_list': ['GENERAL_MANAGER'], ':gm_role_str': 'GENERAL_MANAGER', ':empty_list': [] }
+                    UpdateExpression: 'SET gm_shop_ids = list_append(if_not_exists(gm_shop_ids, :empty_list), :new_shop_list), email = :email, ts_updated_at = :now',
+                    ExpressionAttributeValues: { ':new_shop_list': [newShopId], ':empty_list': [], ':email': gmEmail || null, ':now': now }
                 }));
-            } catch (e: any) {
-                // 条件不一致（既にロールあり）の場合はエラーにせず、正常系として継続
-                if (e.name !== 'ConditionalCheckFailedException') throw e;
+
+                // ロールの付与（排他制御）
+                // ConditionExpression を使用し、既にロールを持っている場合は二重に追加しない「フールプルーフ」な更新を行います。
+                try {
+                    await ddb.send(new UpdateCommand({
+                        TableName: TABLE_NAME,
+                        Key: { PK: `USER#${gmid}`, SK: 'SHOP' },
+                        UpdateExpression: 'SET #roles = list_append(if_not_exists(#roles, :empty_list), :gm_role_list)',
+                        ConditionExpression: 'attribute_not_exists(#roles) OR NOT contains(#roles, :gm_role_str)',
+                        ExpressionAttributeNames: { '#roles': 'roles' },
+                        ExpressionAttributeValues: { ':gm_role_list': ['GENERAL_MANAGER'], ':gm_role_str': 'GENERAL_MANAGER', ':empty_list': [] }
+                    }));
+                } catch (e: any) {
+                    // 条件不一致（既にロールあり）の場合はエラーにせず、正常系として継続
+                    if (e.name !== 'ConditionalCheckFailedException') throw e;
+                }
             }
         }
 
