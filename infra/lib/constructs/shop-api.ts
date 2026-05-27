@@ -18,6 +18,7 @@ import * as nodejs from 'aws-cdk-lib/aws-lambda-nodejs';
 import * as apigateway from 'aws-cdk-lib/aws-apigateway';
 import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as path from 'path';
+import * as iam from 'aws-cdk-lib/aws-iam';
 import { SHOP_ALLOW_HEADERS } from '../../../shared/constants';
 
 export interface ShopApiProps {
@@ -84,17 +85,38 @@ export class ShopApi extends cdk.NestedStack {
       }
     };
 
-    const shop_list = new nodejs.NodejsFunction(this, 'shop_list', { entry: lampath('shop_list'), ...fnProps });
+    const shop_list = new nodejs.NodejsFunction(this, 'shop_list', {
+      entry: lampath('shop_list'),
+      ...fnProps,
+      environment: {
+        ...fnProps.environment,
+        USER_POOL_ID: userPool.userPoolId,
+      }
+    });
     const shop_details = new nodejs.NodejsFunction(this, 'shop_details', { entry: lampath('shop_details'), ...fnProps });
     const shop_products = new nodejs.NodejsFunction(this, 'shop_products', { entry: lampath('shop_products'), ...fnProps });
     const shop_products_import = new nodejs.NodejsFunction(this, 'shop_products_import', { entry: lampath('shop_products_import'), ...fnProps });
     const shop_products_uploadurl = new nodejs.NodejsFunction(this, 'shop_products_uploadurl', { entry: lampath('shop_products_uploadurl'), ...fnProps });
     const shop_qr = new nodejs.NodejsFunction(this, 'shop_qr', { entry: lampath('shop_qr'), ...fnProps });
-    const shop_admins = new nodejs.NodejsFunction(this, 'shop_admins', { entry: lampath('shop_admins'), ...fnProps });
+    const shop_admins = new nodejs.NodejsFunction(this, 'shop_admins', {
+      entry: lampath('shop_admins'),
+      ...fnProps,
+      environment: {
+        ...fnProps.environment,
+        USER_POOL_ID: userPool.userPoolId,
+      }
+    });
     const shop_delete_images = new nodejs.NodejsFunction(this, 'shop_delete_images', { entry: lampath('shop_delete_images'), ...fnProps });
     const shop_orders = new nodejs.NodejsFunction(this, 'shop_orders', { entry: lampath('shop_orders'), ...fnProps });
     const shop_card_orders = new nodejs.NodejsFunction(this, 'shop_card_orders', { entry: lampath('shop_card_orders'), ...fnProps });
-    const shop_owner_transfer = new nodejs.NodejsFunction(this, 'shop_owner_transfer', { entry: lampath('shop_owner_transfer'), ...fnProps });
+    const shop_owner_transfer = new nodejs.NodejsFunction(this, 'shop_owner_transfer', {
+      entry: lampath('shop_owner_transfer'),
+      ...fnProps,
+      environment: {
+        ...fnProps.environment,
+        USER_POOL_ID: userPool.userPoolId,
+      }
+    });
 
     // --- Permissions ---
     const allShopLambdas = [
@@ -108,6 +130,15 @@ export class ShopApi extends cdk.NestedStack {
       bucket.grantRead(fn);
       bucket.grantDelete(fn);
     });
+
+    // Cognito Read Permissions for Lambdas requiring User lookups
+    const cognitoReadStatement = new iam.PolicyStatement({
+      actions: ['cognito-idp:AdminGetUser'],
+      resources: [userPool.userPoolArn],
+    });
+    shop_list.addToRolePolicy(cognitoReadStatement);
+    shop_admins.addToRolePolicy(cognitoReadStatement);
+    shop_owner_transfer.addToRolePolicy(cognitoReadStatement);
 
     /**
      * ルーティングの構築

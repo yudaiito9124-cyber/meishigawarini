@@ -146,7 +146,7 @@ function toStandardSenderLabel(senderId?: string): string {
     if (!m) return id;
 
     const kind = m[1].toUpperCase();
-    const suffix = m[2].replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+    const suffix = m[2].trim();
     if (!suffix) return `${kind}-UNKNOWN`;
     return `${kind}-${suffix}`;
 }

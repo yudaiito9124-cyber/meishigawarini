@@ -52,6 +52,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             const userMetadataList = [];
             const shopMetadataList = [];
             const missingIds = [];
+            const cognitoErrors: Record<string, string> = {};
 
             // 1. ユーザーの存在確認
             for (const uid of user_ids) {
@@ -71,9 +72,12 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                                 Username: uid
                             }));
                             cognitoEmail = cognitoRes.UserAttributes?.find(a => a.Name === 'email')?.Value;
-                        } catch (e) {
+                        } catch (e: any) {
                             console.warn(`Failed to fetch user from Cognito: ${uid}`, e);
+                            cognitoErrors[uid] = e?.message || String(e);
                         }
+                    } else {
+                        cognitoErrors[uid] = 'USER_POOL_ID is not configured in Lambda environment';
                     }
                     if (cognitoEmail) {
                         userMetadataList.push({ id: uid, email: cognitoEmail });
@@ -102,7 +106,8 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                     error: 'Some IDs not found',
                     detail: 'Some IDs not found',
                     missingIds,
-                    missingIdsFormatted: missingIds.join(', ')
+                    missingIdsFormatted: missingIds.join(', '),
+                    cognitoErrors
                 });
             }
 
