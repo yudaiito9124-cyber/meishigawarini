@@ -286,8 +286,8 @@ QRコードのライフサイクルや注文ステータス、商品との紐付
 | `bgimgb` | String | 裏面背景画像URL (S3) |
 | `thumbf` | String | 表面サムネイル画像URL (WebP, S3) |
 | `thumbb` | String | 裏面サムネイル画像URL (WebP, S3) |
-| `width` | Number | カード幅 (mm, デフォルト 84) |
-| `height` | Number | カード高さ (mm, デフォルト 52) |
+| `width` | Number | カード幅 (mm, デフォルト 91) |
+| `height` | Number | カード高さ (mm, デフォルト 55) |
 | `qrsize` | Number | QRコードサイズ (mm) |
 | `qrpos` | Map | QR位置 `{x: Number, y: Number}` |
 | `pinsize` | Number | PIN文字サイズ |

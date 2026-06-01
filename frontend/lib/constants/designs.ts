@@ -74,6 +74,86 @@ export const paperformats: { [format: string]: any } = {
         dots: false,
         dotsedge: true
     },
+    "51677E": {
+        description: "[A-one 51677E] A4-10切名刺サイズ(縁スッキリ，表面のみ全面印刷対応，厚口) 等倍",
+        pageWidth: 210, // mm
+        pageHeight: 297, // mm
+        cols: 2,
+        rows: 5,
+        cols_gap: 4, // mm
+        rows_gap: 2, // mm
+        offset_x: 12, // mm
+        offset_y: 7, // mm
+        uraomote: true,
+        comment: "x1.00",
+        scale: 1,
+        dots: false,
+        dotsedge: true
+    },
+    "51677E-1.01": {
+        description: "[A-one 51677E] A4-10切名刺サイズ(縁スッキリ，表面のみ全面印刷対応，厚口) 縁無し(1.01倍)",
+        pageWidth: 210, // mm
+        pageHeight: 297, // mm
+        cols: 2,
+        rows: 5,
+        cols_gap: 4, // mm
+        rows_gap: 2, // mm
+        offset_x: 12, // mm
+        offset_y: 7, // mm
+        uraomote: true,
+        comment: "x1.01",
+        scale: 1.01,
+        dots: false,
+        dotsedge: true
+    },
+    "51677E-1.02": {
+        description: "[A-one 51677E] A4-10切名刺サイズ(縁スッキリ，表面のみ全面印刷対応，厚口) 縁無し(1.02倍)",
+        pageWidth: 210, // mm
+        pageHeight: 297, // mm
+        cols: 2,
+        rows: 5,
+        cols_gap: 4, // mm
+        rows_gap: 2, // mm
+        offset_x: 12, // mm
+        offset_y: 7, // mm
+        uraomote: true,
+        comment: "x1.02",
+        scale: 1.02,
+        dots: false,
+        dotsedge: true
+    },
+    "51677E-1.03": {
+        description: "[A-one 51677E] A4-10切名刺サイズ(縁スッキリ，表面のみ全面印刷対応，厚口) 縁無し(1.03倍)",
+        pageWidth: 210, // mm
+        pageHeight: 297, // mm
+        cols: 2,
+        rows: 5,
+        cols_gap: 4, // mm
+        rows_gap: 2, // mm
+        offset_x: 12, // mm
+        offset_y: 7, // mm
+        uraomote: true,
+        comment: "x1.03",
+        scale: 1.03,
+        dots: false,
+        dotsedge: true
+    },
+    "51677E-1.036": {
+        description: "[A-one 51677E] A4-10切名刺サイズ(縁スッキリ，表面のみ全面印刷対応，厚口) 縁無し(1.036倍)",
+        pageWidth: 210, // mm
+        pageHeight: 297, // mm
+        cols: 2,
+        rows: 5,
+        cols_gap: 4, // mm
+        rows_gap: 2, // mm
+        offset_x: 12, // mm
+        offset_y: 7, // mm
+        uraomote: true,
+        comment: "x1.036",
+        scale: 1.036363636,
+        dots: false,
+        dotsedge: true
+    },
     "meishitanai-katamen": {
         description: "名刺サイズ（単体・片面）",
         pageWidth: 91, // mm
