@@ -4,6 +4,8 @@
  */
 'use client';
 
+import { useEffect, useRef, useState } from 'react';
+
 // import Link from 'next/link';
 // import { useTranslations } from 'next-intl';
 
@@ -418,6 +420,29 @@ export default function HomePage() {
 
   const { locale } = useParams();
   const router = useRouter();
+  const navRef = useRef<HTMLElement | null>(null);
+  const [navHeight, setNavHeight] = useState(72);
+  const heroCenterOffset = Math.round(navHeight * 0.42);
+
+  useEffect(() => {
+    const nav = navRef.current;
+    if (!nav) return;
+
+    const updateNavHeight = () => {
+      setNavHeight(nav.getBoundingClientRect().height);
+    };
+
+    updateNavHeight();
+
+    const resizeObserver = new ResizeObserver(updateNavHeight);
+    resizeObserver.observe(nav);
+    window.addEventListener('resize', updateNavHeight);
+
+    return () => {
+      resizeObserver.disconnect();
+      window.removeEventListener('resize', updateNavHeight);
+    };
+  }, []);
 
   /**
    * Managed Login (Hosted UI) を呼び出す共通ハンドラー
@@ -454,17 +479,16 @@ export default function HomePage() {
     <main className="bg-white text-black">
 
       {/* ━━━ Nav ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-      <nav className="fixed top-0 w-full md:justify-between items-center px-8 py-5 z-50 bg-white/80 backdrop-blur-sm border-b border-gray-50 md:flex sm:flex-row">
+      <nav ref={navRef} className="fixed top-0 w-full md:justify-between items-center px-8 py-5 z-50 bg-white/80 backdrop-blur-sm border-b border-gray-50 md:flex sm:flex-row">
         {/* <a href="#" className="font-black text-lg tracking-tight hover:opacity-80 transition-opacity">{ts("name")}</a> */}
         <div className="flex items-center justify-center mb-2 md:mb-0">
-
-        <img
-          src="/sitelogo-noicon.png"
-          alt="Logo"
-          className="h-8 object-cover cursor-pointer sm:ml-3"
-          onClick={() => window.scrollTo({ top: 0, behavior: 'auto' })}
-          />
-          </div>
+          <img
+            src="/sitelogo-noicon.png"
+            alt="Logo"
+            className="h-8 object-cover cursor-pointer"
+            onClick={() => window.scrollTo({ top: 0, behavior: 'auto' })}
+            />
+        </div>
         <div className="flex items-center justify-center gap-4">
           <a href="#howto" className="hidden lg:block text-sm text-gray-500 hover:text-black transition-colors">使い方</a>
           <a href="#shops" className="hidden lg:block text-sm text-gray-500 hover:text-black transition-colors">ショップ一覧</a>
@@ -472,7 +496,7 @@ export default function HomePage() {
 
           <button
             onClick={() => handleAuthRedirect()}
-            className="ml-2 bg-black text-white px-5 py-2 rounded-full text-sm font-medium hover:bg-gray-800 transition-colors"
+            className="md:ml-2 bg-black text-white px-5 py-2 rounded-full text-sm font-medium hover:bg-gray-800 transition-colors"
           >
             {t('shopAdmin')}
           </button>
@@ -480,12 +504,19 @@ export default function HomePage() {
       </nav >
 
       {/* ━━━ Hero ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-      <section className="flex flex-col items-center justify-center h-[100svh] [@media(max-height:760px)]:justify-start text-center px-6 pt-0 [@media(max-height:760px)]:pt-24">
+      <section
+        className="flex flex-col items-center justify-center text-center px-6 "
+        style={{
+          height: `calc(100svh - ${navHeight}px)`,
+          marginTop: `${navHeight}px`,
+        }}
+      >
         
         <img
           src="/sitelogo.png"
           alt="Hero Image"
-          className="w-full max-w-2xl h-auto max-h-[52svh] [@media(max-height:760px)]:max-h-[42svh] object-contain mb-0 mt-0 [@media(max-height:760px)]:mb-8 [@media(max-height:760px)]:mt-6"
+          className="w-full max-w-2xl h-auto max-h-[52svh] [@media(max-height:760px)]:max-h-[42svh] object-contain m-0"
+          style={{ transform: `translateY(-${heroCenterOffset}px)` }}
         />
 
 
