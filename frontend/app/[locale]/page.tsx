@@ -454,15 +454,18 @@ export default function HomePage() {
     <main className="bg-white text-black">
 
       {/* ━━━ Nav ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-      <nav className="fixed top-0 w-full flex justify-between items-center px-8 py-5 z-50 bg-white/80 backdrop-blur-sm border-b border-gray-50">
+      <nav className="fixed top-0 w-full md:justify-between items-center px-8 py-5 z-50 bg-white/80 backdrop-blur-sm border-b border-gray-50 md:flex sm:flex-row">
         {/* <a href="#" className="font-black text-lg tracking-tight hover:opacity-80 transition-opacity">{ts("name")}</a> */}
+        <div className="flex items-center justify-center mb-2 md:mb-0">
+
         <img
           src="/sitelogo-noicon.png"
           alt="Logo"
-          className="h-8 object-cover cursor-pointer"
+          className="h-8 object-cover cursor-pointer sm:ml-3"
           onClick={() => window.scrollTo({ top: 0, behavior: 'auto' })}
-        />
-        <div className="flex items-center gap-4">
+          />
+          </div>
+        <div className="flex items-center justify-center gap-4">
           <a href="#howto" className="hidden lg:block text-sm text-gray-500 hover:text-black transition-colors">使い方</a>
           <a href="#shops" className="hidden lg:block text-sm text-gray-500 hover:text-black transition-colors">ショップ一覧</a>
           <a href="#for-shops" className="hidden lg:block text-sm text-gray-500 hover:text-black transition-colors">ショップ開設</a>
@@ -477,12 +480,12 @@ export default function HomePage() {
       </nav >
 
       {/* ━━━ Hero ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-      <section className="flex flex-col items-center justify-center h-[100svh] [@media(max-height:760px)]:justify-start text-center px-6 pt-20 [@media(max-height:760px)]:pt-24">
+      <section className="flex flex-col items-center justify-center h-[100svh] [@media(max-height:760px)]:justify-start text-center px-6 pt-0 [@media(max-height:760px)]:pt-24">
         
         <img
           src="/sitelogo.png"
           alt="Hero Image"
-          className="w-full max-w-2xl h-auto max-h-[52svh] [@media(max-height:760px)]:max-h-[42svh] object-contain mb-16 mt-6 [@media(max-height:760px)]:mb-8"
+          className="w-full max-w-2xl h-auto max-h-[52svh] [@media(max-height:760px)]:max-h-[42svh] object-contain mb-0 mt-0 [@media(max-height:760px)]:mb-8 [@media(max-height:760px)]:mt-6"
         />
 
 
