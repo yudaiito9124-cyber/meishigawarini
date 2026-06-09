@@ -96,7 +96,7 @@ export default function SharePage() {
             <div className="w-full py-8 px-6 flex justify-center">
                 <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
                     <div className="w-10 h-10 rounded-xl overflow-hidden shadow-lg shadow-emerald-100/50 flex items-center justify-center">
-                        <img src="/presenticon.png" alt="Logo" className="w-full h-full object-cover" />
+                        <img src="/qricon.png" alt="Logo" className="w-full h-full object-cover" />
                     </div>
                     <span className="text-xl font-black tracking-tighter text-slate-800">名刺代わりに。</span>
                 </Link>
@@ -312,7 +312,7 @@ export default function SharePage() {
                 <div className="pt-16 pb-10 text-center space-y-6 border-t border-slate-200/60 transition-all duration-1000 animate-in fade-in slide-in-from-bottom-4 delay-1000">
                     <Link href="/" className="block group">
                         <div className="w-8 h-8 rounded-lg overflow-hidden shadow-sm animate-bounce mx-auto mb-4 group-hover:scale-110 transition-transform">
-                            <img src="/presenticon.png" alt="Logo" className="w-full h-full object-cover" />
+                            <img src="/qricon.png" alt="Logo" className="w-full h-full object-cover" />
                         </div>
                         <p className="text-sm font-bold text-slate-400 uppercase tracking-[0.2em] group-hover:text-emerald-600 transition-colors">
                             Presented by Meishigawarini.

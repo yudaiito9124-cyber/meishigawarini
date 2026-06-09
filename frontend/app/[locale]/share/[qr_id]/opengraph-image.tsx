@@ -127,7 +127,7 @@ export default async function Image({ params }: { params: Promise<{ qr_id: strin
   };
 
   const backgroundImageDataUrl = await getRawDataUrl(`${appBase}/Imagebg.jpg`, appBase, 'image/jpeg');
-  const logoIconDataUrl = await getRawDataUrl(`${appBase}/presenticon.png`, appBase, 'image/png');
+  const logoIconDataUrl = await getRawDataUrl(`${appBase}/qricon.png`, appBase, 'image/png');
 
   const cardUrlRaw = toAbsoluteUrl(
     data?.design?.thumbf ||

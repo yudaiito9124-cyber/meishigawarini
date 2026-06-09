@@ -455,7 +455,13 @@ export default function HomePage() {
 
       {/* ━━━ Nav ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
       <nav className="fixed top-0 w-full flex justify-between items-center px-8 py-5 z-50 bg-white/80 backdrop-blur-sm border-b border-gray-50">
-        <a href="#" className="font-black text-lg tracking-tight hover:opacity-80 transition-opacity">{ts("name")}</a>
+        {/* <a href="#" className="font-black text-lg tracking-tight hover:opacity-80 transition-opacity">{ts("name")}</a> */}
+        <img
+          src="/sitelogo-noicon.png"
+          alt="Logo"
+          className="h-8 object-cover cursor-pointer"
+          onClick={() => window.scrollTo({ top: 0, behavior: 'auto' })}
+        />
         <div className="flex items-center gap-4">
           <a href="#howto" className="hidden lg:block text-sm text-gray-500 hover:text-black transition-colors">使い方</a>
           <a href="#shops" className="hidden lg:block text-sm text-gray-500 hover:text-black transition-colors">ショップ一覧</a>
@@ -471,26 +477,38 @@ export default function HomePage() {
       </nav >
 
       {/* ━━━ Hero ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-      <section className="flex flex-col items-center justify-center h-screen max-h-[1000px] text-center px-6 pt-20">
-        <p className="text-xs text-gray-400 uppercase tracking-[0.2em] mb-7 font-medium">
+      <section className="flex flex-col items-center justify-center h-[100svh] [@media(max-height:760px)]:justify-start text-center px-6 pt-20 [@media(max-height:760px)]:pt-24">
+        
+        <img
+          src="/sitelogo.png"
+          alt="Hero Image"
+          className="w-full max-w-2xl h-auto max-h-[52svh] [@media(max-height:760px)]:max-h-[42svh] object-contain mb-16 mt-6 [@media(max-height:760px)]:mb-8"
+        />
+
+
+      </section >
+
+
+      <section className="flex flex-col items-center justify-center text-center px-6 pt-10 bg-gray-50">
+        {/* <p className="text-xs text-gray-400 uppercase tracking-[0.2em] mb-7 font-medium">
           Asset Transfer Token Card
-        </p>
+        </p> */}
+
 
         {/*  
           日本語の句読点は視覚重心を左にズラすため、
           末尾の「。」にネガティブマージンを適用してセンターバランスを調整。
         */}
-        <h1 className="text-6xl md:text-8xl font-black leading-tight mb-8">
+        {/* <h1 className="text-6xl md:text-8xl font-black leading-tight mb-8">
           名刺代わりに<span className=""></span><br />
           心を贈る<span className="-mr-[0.45em]">。</span>
-        </h1>
-
+        </h1> */}
+        
         <p className="text-gray-500 text-lg max-w-lg mb-12 leading-relaxed">
-          QRコード付きのカードを一言添えて手渡せば、
-          相手の自宅へ、プレゼントが届きます。
+          QRコード付きのカードを一言添えて手渡せば、相手の自宅へ、ギフトが届きます。
         </p>
 
-        <div className="flex flex-col sm:flex-row gap-4">
+        <div className="flex flex-col sm:flex-row gap-4 mb-12">
           <button
             onClick={() => handleAuthRedirect()}
             className="bg-black text-white px-8 py-4 rounded-full text-base font-medium hover:bg-gray-800 transition-colors"
@@ -512,8 +530,9 @@ export default function HomePage() {
         </div> */}
       </section >
 
+
       {/* ━━━ How it works ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-      <section id="howto" className="py-28 px-6 bg-gray-50">
+      <section id="howto" className="py-28 px-6 bg-gray-0">
         <div className="max-w-4xl mx-auto">
           <SectionLabel>How it works</SectionLabel>
           <SectionHeading>たった3ステップ</SectionHeading>
@@ -567,7 +586,7 @@ export default function HomePage() {
       </section >
 
       {/* ━━━ Use Cases ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-      <section id="usecases" className="py-28 px-6">
+      <section id="usecases" className="py-28 px-6 bg-gray-50">
         <div className="max-w-4xl mx-auto">
           <SectionLabel>Use Cases</SectionLabel>
           <SectionHeading>こんな場面で使えます</SectionHeading>
@@ -597,7 +616,7 @@ export default function HomePage() {
       </section >
 
       {/* ━━━ Shops ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-      <section id="shops" className="py-28 bg-gray-50 px-6">
+      <section id="shops" className="py-28 bg-gray-0 px-6">
         <div className="max-w-4xl mx-auto">
           <SectionLabel>Shops</SectionLabel>
           <SectionHeading>対応ショップ</SectionHeading>
@@ -619,7 +638,7 @@ export default function HomePage() {
       </section >
 
       {/* ━━━ FAQ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-      <section className="py-28 px-6">
+      <section className="py-28 px-6 bg-gray-50">
         <div className="max-w-2xl mx-auto">
           <SectionLabel>FAQ</SectionLabel>
           <SectionHeading>よくある質問</SectionHeading>
