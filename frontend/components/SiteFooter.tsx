@@ -1,10 +1,11 @@
 "use client";
 
 import { usePathname } from "@/i18n/routing";
-import router from "next/router";
+import { useRouter } from "next/navigation";
 
 export function SiteFooter({ siteName }: { siteName: string }) {
     const pathname = usePathname();
+    const router = useRouter();
 
     // Hide the header on the top page
     // if (pathname === "/") {
