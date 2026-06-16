@@ -2,7 +2,7 @@
  * ファイル概要: ショップ管理用ヘルプ インデックスページ
  * 
  * 役割:
- * ショップオーナーや運用担当者向けに、商品の登録から発送管理、
+ * ショップ管理者や運用担当者向けに、商品の登録から発送管理、
  * カード発注といった具体的な業務フロー別のマニュアルへの導線を提供します。
  * 
  * 特徴:
@@ -13,6 +13,7 @@
 import Link from 'next/link';
 import { getTranslations } from 'next-intl/server';
 import { ArrowLeft, ChevronRight, Gift, QrCode, Truck, CreditCard, CircleUserRound, Filter, Waypoints, Store, Paintbrush } from 'lucide-react';
+import { HelpQRCode } from '@/components/help/HelpQRCode';
 
 /**
  * SEO用メタデータの生成
@@ -47,8 +48,9 @@ export default function ShopHelpGatewayPage() {
                     <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 text-primary shadow-sm mx-auto">
                         <Store className="h-8 w-8" />
                     </div>
-                    <h1 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
-                        ショップ運用マニュアル
+                    <h1 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl inline-flex items-center justify-center gap-3">
+                        <span>ショップ運用マニュアル</span>
+                        <HelpQRCode href="/help/shop" popupAlign="bottom" />
                     </h1>
                     <p className="mt-4 text-lg text-muted-foreground">
                         確認したい項目をお選びください。

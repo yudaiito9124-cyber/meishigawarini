@@ -205,3 +205,73 @@
   font-weight: bold;
   font-style: normal;
 }
+
+/* ==========================================
+ * 印刷用のスタイル定義 (Print Styles)
+ * ヘルプページの印刷時に見出し位置での改ページや、不要なUI要素の非表示を制御します。
+ * ========================================== */
+@media print {
+  /* レイアウト崩れと改ページ無効化を防ぐためのリセット定義 */
+  html, body {
+    overflow: visible !important;
+    overflow-x: visible !important;
+    overflow-y: visible !important;
+    height: auto !important;
+    min-height: auto !important;
+  }
+
+  /* FlexboxやGrid、overflow:hiddenがあると改ページが効かなくなるブラウザ仕様（Blink/WebKit）への対策 */
+  .help-content,
+  .container,
+  main {
+    display: block !important;
+    float: none !important;
+    position: static !important;
+    overflow: visible !important;
+    height: auto !important;
+    min-height: auto !important;
+  }
+
+  /* 印刷時に不要なUI要素を完全に非表示化 */
+  .print\:hidden,
+  footer {
+    display: none !important;
+  }
+
+  /* ヘルプマニュアル内のH2見出しの手前で改ページを実行 */
+  .help-content h2 {
+    break-before: page !important;
+    page-break-before: always !important;
+  }
+
+  /* 最初のH2見出しの手前では改ページを回避 */
+  .help-content h2:first-of-type {
+    break-before: avoid !important;
+    page-break-before: avoid !important;
+  }
+
+  /* 見出しの直後での改ページを防止 */
+  .help-content h1,
+  .help-content h2,
+  .help-content h3,
+  .help-content h4,
+  .help-content h5,
+  .help-content h6 {
+    break-after: avoid !important;
+    page-break-after: avoid !important;
+  }
+
+  /* 画像、リスト、テーブル、コードブロック、notice/benefitブロックの途中での改ページを防止 */
+  .help-content img,
+  .help-content svg,
+  .help-content ul,
+  .help-content ol,
+  .help-content li,
+  .help-content pre,
+  .help-content blockquote,
+  .help-content .notice,
+  .help-content .benefit {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+}

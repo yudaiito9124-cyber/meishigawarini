@@ -45,6 +45,7 @@ import {
 } from 'lucide-react';
 
 import { HelpImage } from './HelpImage';
+import { HelpQRCode } from './HelpQRCode';
 import { Mermaid } from './Mermaid';
 
 /**
@@ -80,13 +81,15 @@ export async function MarkdownRenderer({
   className, 
   categoryIcon: Icon, 
   categoryTitle,
-  mermaidVariant = 'light'
+  mermaidVariant = 'light',
+  currentPath
 }: { 
   content: string; 
   className?: string; 
   categoryIcon?: React.ElementType; 
   categoryTitle?: string;
   mermaidVariant?: 'light' | 'dark';
+  currentPath?: string;
 }) {
   const components = {
     /**
@@ -106,8 +109,10 @@ export async function MarkdownRenderer({
             {categoryTitle}
           </span>
         )}
-        <h1 className="text-3xl font-bold tracking-tight sm:text-4xl text-center">
-          {children}
+        {/* タイトルの文字とQRコードを横並びにするため、inline-flex と items-center を適用 */}
+        <h1 className="text-3xl font-bold tracking-tight sm:text-4xl text-center inline-flex items-center gap-3">
+          <span>{children}</span>
+          {currentPath && <HelpQRCode href={currentPath} popupAlign="bottom" />}
         </h1>
       </div>
     ),
@@ -185,7 +190,34 @@ export async function MarkdownRenderer({
       );
     },
     /** 画像表示: HelpImageコンポーネント（角丸、シャドウ、最大幅制限）へマッピング */
-    img: ({ src, alt }: any) => <HelpImage src={src} alt={alt} />,
+    img: ({ src, alt, isInLink }: any) => {
+      // altテキストからURL（http/httpsから始まるもの、または/から始まる相対URL）を抽出する関数
+      const extractUrl = (text: string): string | null => {
+        if (!text) return null;
+        // URLを検出する正規表現
+        const urlRegex = /(https?:\/\/[^\s]+|\/[^\s]+)/;
+        const match = text.match(urlRegex);
+        return match ? match[0] : null;
+      };
+
+      const targetUrl = extractUrl(alt);
+
+      // 親要素がリンク（aタグ）である場合（isInLinkがtrue）は、親がQRを表示するためここでは生成しない
+      // altテキスト内に有効なURLがある場合のみQRコードを配置
+      if (targetUrl && !isInLink) {
+        return (
+          <span className="relative inline-block group/img-container max-w-full align-middle">
+            <HelpImage src={src} alt={alt} />
+            {/* 画像の右上にQRコードを絶対配置。印刷時は画像の下部に配置 */}
+            <span className="absolute top-6.5 right-3 z-10 print:relative print:top-auto print:right-auto print:block print:mt-2">
+              <HelpQRCode href={targetUrl} />
+            </span>
+          </span>
+        );
+      }
+
+      return <HelpImage src={src} alt={alt} />;
+    },
     /**
      * リンク (A)
      * - .card-help クラス: カード形式のプレミアムなリンク（アイコン付き、ホバーエフェクト）
@@ -195,32 +227,134 @@ export async function MarkdownRenderer({
      *   - 非マニュアル系内部リンクには背景色と ArrowUpRight を付与。
      */
     a: ({ href, children, className, 'data-icon': dataIcon }: any) => {
+      // リンクが内部遷移用（/から始まる）かどうかを判定
       const isInternal = href?.startsWith('/');
+
+      // 子要素に画像が含まれているかを再帰的に判定するヘルパー
+      const hasImageChild = (node: React.ReactNode): boolean => {
+        if (!node) return false;
+        if (Array.isArray(node)) {
+          return node.some(hasImageChild);
+        }
+        if (React.isValidElement(node)) {
+          // 型キャストを行い、Propertyへの安全なアクセスを確保
+          const props = node.props as Record<string, any>;
+          // HTMLのimgタグ、またはHelpImageコンポーネントであるかを判定
+          if (
+            node.type === 'img' || 
+            (node.type as any)?.name === 'HelpImage' ||
+            props?.src !== undefined
+          ) {
+            return true;
+          }
+          if (props && props.children) {
+            return hasImageChild(props.children);
+          }
+        }
+        return false;
+      };
+
+      // 子要素のツリーを走査し、imgまたはHelpImage要素に対して isInLink=true を注入するヘルパー
+      const injectIsInLink = (node: React.ReactNode): React.ReactNode => {
+        if (!node) return node;
+        if (Array.isArray(node)) {
+          return node.map(injectIsInLink);
+        }
+        if (React.isValidElement(node)) {
+          const props = node.props as Record<string, any>;
+          // 対象要素（imgまたはHelpImage）の場合、isInLink=trueを付与してクローン
+          if (node.type === 'img' || (node.type as any)?.name === 'HelpImage') {
+            return React.cloneElement(node, { ...props, isInLink: true } as any);
+          }
+          // それ以外の要素の場合、さらにそのchildrenを走査
+          if (props && props.children) {
+            return React.cloneElement(node, {
+              ...props,
+              children: injectIsInLink(props.children)
+            } as any);
+          }
+        }
+        return node;
+      };
+
+      const isImageLink = hasImageChild(children);
+
+      // 画像付きリンク用のレンダリングラッパー
+      const renderImageLink = (linkElement: React.ReactNode) => {
+        return (
+          <span className="relative inline-block group/img-link max-w-full align-middle">
+            {linkElement}
+            {/* 画像の右上にQRコードを絶対配置。印刷時は画像の下部にブロック配置する */}
+            <span className="absolute top-6 right-2 z-10 print:relative print:top-auto print:right-auto print:block print:mt-2">
+              <HelpQRCode href={href} />
+            </span>
+          </span>
+        );
+      };
+
+      // QRコードコンポーネントを隣に美しく整列させて配置するためのラッパー
+      const wrapWithQR = (linkElement: React.ReactNode) => {
+        return (
+          <span className="inline-flex items-center gap-1">
+            <span className="whitespace-normal">{linkElement}</span>
+            <HelpQRCode href={href} />
+          </span>
+        );
+      };
+
+      // 画像付きリンクの場合のハンドリング
+      if (isImageLink) {
+        const injectedChildren = injectIsInLink(children);
+        if (isInternal) {
+          return renderImageLink(
+            <Link href={href} className={className || "inline-block max-w-full"}>
+              {injectedChildren}
+            </Link>
+          );
+        }
+        return renderImageLink(
+          <a
+            href={href}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={className || "inline-block max-w-full"}
+          >
+            {injectedChildren}
+          </a>
+        );
+      }
 
       // 特殊: ヘルプカード（リッチな誘導リンク）
       if (className === 'card-help') {
         const CardIcon = dataIcon ? IconMap[dataIcon] : ChevronRight;
         return (
-          <Link href={href} className="group relative rounded-xl border bg-card p-8 shadow-sm transition-all hover:border-primary/50 hover:shadow-md block h-full">
-            {CardIcon && (
-              <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary">
-                <CardIcon className="h-6 w-6" />
+          <div className="relative group/card h-full">
+            <Link href={href} className="group relative rounded-xl border bg-card p-8 shadow-sm transition-all hover:border-primary/50 hover:shadow-md block h-full">
+              {CardIcon && (
+                <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary">
+                  <CardIcon className="h-6 w-6" />
+                </div>
+              )}
+              {/* QRコードと重ならないよう、右側に少し余白を設ける */}
+              <div className="space-y-2 pr-8">
+                {children}
               </div>
-            )}
-            <div className="space-y-2">
-              {children}
+              <div className="mt-6 flex items-center text-sm font-medium text-primary">
+                マニュアルを見る
+                <ChevronRight className="ml-1 h-4 w-4 transition-transform group-hover:translate-x-1" />
+              </div>
+            </Link>
+            {/* カードの右上に絶対配置でQRコードを配置 */}
+            <div className="absolute top-6 right-4 z-10">
+              <HelpQRCode href={href} />
             </div>
-            <div className="mt-6 flex items-center text-sm font-medium text-primary">
-              マニュアルを見る
-              <ChevronRight className="ml-1 h-4 w-4 transition-transform group-hover:translate-x-1" />
-            </div>
-          </Link>
+          </div>
         );
       }
 
       // 独自のカスタムクラスが指定されている場合はそれを尊重
       if (className && className !== 'card-help') {
-        return (
+        return wrapWithQR(
           <Link href={href} className={className}>
             {children}
           </Link>
@@ -231,7 +365,7 @@ export async function MarkdownRenderer({
         // マニュアル内移動とアプリケーション機能への誘導を視覚的に区別
         const isManualLink = href.startsWith('/help') || href.startsWith('/admin/help');
 
-        return (
+        return wrapWithQR(
           <Link
             href={href}
             className={`
@@ -246,7 +380,7 @@ export async function MarkdownRenderer({
           </Link>
         );
       }
-      return (
+      return wrapWithQR(
         <a
           href={href}
           target="_blank"

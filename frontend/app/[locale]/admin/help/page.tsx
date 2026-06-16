@@ -13,6 +13,7 @@
 import Link from 'next/link';
 import { getTranslations } from 'next-intl/server';
 import { ArrowLeft, BookOpen, Paintbrush, ChevronRight, Store, Printer, Search, Waypoints, CreditCard, Crown, Wrench } from 'lucide-react';
+import { HelpQRCode } from '@/components/help/HelpQRCode';
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }) {
     const { locale } = await params;
@@ -40,8 +41,9 @@ export default function AdminHelpGatewayPage() {
                     <div className="inline-flex h-16 w-16 items-center justify-center rounded-full bg-white/10 text-white mb-4 shadow-sm">
                         <Crown className="h-8 w-8" />
                     </div>
-                    <h1 className="text-3xl font-bold tracking-tight text-white sm:text-4xl">
-                        システム管理者マニュアル
+                    <h1 className="text-3xl font-bold tracking-tight text-white sm:text-4xl inline-flex items-center justify-center gap-3">
+                        <span>システム管理者マニュアル</span>
+                        <HelpQRCode href="/admin/help" popupAlign="bottom" />
                     </h1>
                     <p className="mt-4 text-lg text-white/60">
                         確認したい項目をお選びください。

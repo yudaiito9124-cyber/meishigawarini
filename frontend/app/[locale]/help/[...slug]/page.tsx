@@ -102,7 +102,7 @@ export default async function DynamicHelpPage({ params }: Props) {
     <div className="min-h-screen bg-background pb-20 pt-10">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-4xl">
         {/* Header Section */}
-        <div className="mb-8">
+        <div className="mb-8 print:hidden">
           <Link
             href={parentPath}
             className="inline-flex items-center text-sm font-medium text-muted-foreground hover:text-foreground mb-4 transition-colors"
@@ -112,17 +112,18 @@ export default async function DynamicHelpPage({ params }: Props) {
           </Link>
         </div>
 
-        <div className="flex-grow font-sans">
+        <div className="flex-grow font-sans help-content">
           <MarkdownRenderer 
             content={content} 
             categoryIcon={Icon} 
             categoryTitle={categoryTitle} 
             mermaidVariant="light"
+            currentPath={`/help/${slug.join('/')}`}
           />
         </div>
 
         {/* Footer Section */}
-        <div className="mt-12 pt-8 border-t flex flex-col items-center gap-4">
+        <div className="mt-12 pt-8 border-t flex flex-col items-center gap-4 print:hidden">
           <Link
             href={parentPath}
             className="inline-flex items-center text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"

@@ -1,3 +1,14 @@
+/**
+ * ファイル概要: 共通フッターコンポーネント (Site Footer)
+ * 
+ * 役割:
+ * アプリケーションのすべてのページで共通して表示されるフッターを提供します。
+ * 
+ * 仕様:
+ * 1. レスポンシブ対応のレイアウト。
+ * 2. 印刷時 (print) は非表示にします。
+ */
+
 "use client";
 
 import { usePathname } from "@/i18n/routing";
@@ -13,7 +24,7 @@ export function SiteFooter({ siteName }: { siteName: string }) {
     // }
 
     return (
-        <footer className="py-10 border-t border-gray-100 flex flex-col md:flex-row items-center justify-between px-8 text-sm text-gray-400" >
+        <footer className="py-10 border-t border-gray-100 flex flex-col md:flex-row items-center justify-between px-8 text-sm text-gray-400 print:hidden" >
             {/* <a
                 href="/#"
                 className="font-black text-black text-base mb-4 md:mb-0"

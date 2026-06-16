@@ -2,7 +2,7 @@
  * ファイル概要: ヘルプ・操作マニュアル インデックスページ
  * 
  * 役割:
- * 受取人、贈り主、ショップオーナーなど、役割に応じた操作マニュアルへの導線を提供します。
+ * 受取人、贈り主、ショップ管理者など、役割に応じた操作マニュアルへの導線を提供します。
  * Markdown形式で提供される各詳細ページへの玄関口となります。
  * 
  * 仕様:
@@ -14,6 +14,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { getTranslations } from 'next-intl/server';
 import { Store, Package, ChevronRight, Bug, SendHorizontal, Gift, CircleUserRound, Waypoints, Crown, CircleQuestionMark } from 'lucide-react';
+import { HelpQRCode } from '@/components/help/HelpQRCode';
 
 /**
  * SEO用メタデータの生成
@@ -45,8 +46,9 @@ export default function HelpPage() {
                 </div>
 
                 <div className="mb-10 text-center">
-                    <h1 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
-                        ヘルプ・操作マニュアル
+                    <h1 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl inline-flex items-center justify-center gap-3">
+                        <span>ヘルプ・操作マニュアル</span>
+                        <HelpQRCode href="/help" popupAlign="bottom" />
                     </h1>
                     <p className="mt-4 text-lg text-muted-foreground">
                         ご利用の目的に合わせて、該当するマニュアルをお選びください。
@@ -138,7 +140,7 @@ export default function HelpPage() {
                                 <Store className="h-6 w-6" />
                             </div>
                             <h2 className="text-2xl font-bold tracking-tight text-foreground group-hover:text-primary transition-colors">
-                                ショップオーナーの方
+                                ショップ管理者の方
                             </h2>
                             <p className="mt-2 text-muted-foreground">
                                 ショップの作成や商品の管理、QRコードの有効化など、運用に関するマニュアルです。

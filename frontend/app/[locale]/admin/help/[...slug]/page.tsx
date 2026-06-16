@@ -84,7 +84,7 @@ export default async function AdminHelpPage({ params }: Props) {
     <div className="dark min-h-screen bg-mist-900 text-white pb-20 pt-10 px-4 sm:px-6 lg:px-10">
       <div className="max-w-4xl mx-auto">
         {/* Breadcrumb / Navigation */}
-        <div className="flex justify-between items-center mb-10">
+        <div className="flex justify-between items-center mb-10 print:hidden">
           <Link href={parentPath}>
             <Button variant="ghost" className="text-white/60 hover:text-white hover:bg-white/5">
               <ArrowLeft className="mr-2 h-4 w-4" />
@@ -95,14 +95,14 @@ export default async function AdminHelpPage({ params }: Props) {
         </div>
 
         {/* Content Section */}
-        <div className="bg-mist-200/10 border border-white/5 rounded-3xl p-8 sm:p-12 backdrop-blur-xl shadow-2xl overflow-hidden">
+        <div className="bg-mist-200/10 border border-white/5 rounded-3xl p-8 sm:p-12 backdrop-blur-xl shadow-2xl overflow-hidden help-content">
           <div className="prose prose-invert max-w-none">
             <MarkdownRenderer content={content} categoryIcon={CategoryIcon} mermaidVariant="dark" />
           </div>
         </div>
 
         {/* Bottom Navigation */}
-        <div className="mt-12 flex justify-center">
+        <div className="mt-12 flex justify-center print:hidden">
           <Link href="/admin">
             <Button variant="outline" className="bg-white/5 border-white/10 text-white/70 hover:bg-white/10 hover:text-white rounded-full px-8">
               <Home className="mr-2 h-4 w-4" />
