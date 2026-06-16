@@ -15,6 +15,7 @@
  * `react-zoom-pan-pinch` を導入しました。また、縦長画像表示時に閉じるボタンが見切れて
  * 戻れなくなる不具合を解消するため、セーフエリア対応のフローティング閉じるボタンの実装、
  * および画像外の背景領域をクリックした際にモーダルを閉じる処理を実装しています。
+ * ドラッグ・スワイプ時の誤クローズを防ぐため、ポインターイベントによるドラッグ移動量検知を導入しています。
  */
 
 "use client";
@@ -61,6 +62,8 @@ export function HelpImage({ src, alt }: HelpImageProps) {
   const [imgSrc, setImgSrc] = useState(src);
   // エラーハンドラーの無限ループを防ぐためのフラグ
   const [hasError, setHasError] = useState(false);
+  // クリックとドラッグ操作を識別するためのポインター開始位置
+  const [pointerStart, setPointerStart] = useState<{ x: number; y: number } | null>(null);
 
   // 外部からの src プロパティ変更に追従して状態を更新
   useEffect(() => {
@@ -74,6 +77,28 @@ export function HelpImage({ src, alt }: HelpImageProps) {
       setImgSrc('/images/placeholder.webp');
       setHasError(true);
     }
+  };
+
+  // 背景でポインターが押し下げられた時の処理
+  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    // マウスの左クリックまたはタッチ操作のみを対象とします
+    if (e.button === 0) {
+      setPointerStart({ x: e.clientX, y: e.clientY });
+    }
+  };
+
+  // 背景でポインターが離された時の処理
+  const handlePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!pointerStart) return;
+    // ポインター移動量を計算します
+    const dx = Math.abs(e.clientX - pointerStart.x);
+    const dy = Math.abs(e.clientY - pointerStart.y);
+    // 移動量が5ピクセル未満の場合は純粋なクリック・タップとみなし、モーダルを閉じます
+    // ドラッグ操作（画像のスクロール移動など）の場合は閉じないようにします
+    if (dx < 5 && dy < 5) {
+      setIsOpen(false);
+    }
+    setPointerStart(null);
   };
 
   return (
@@ -103,34 +128,40 @@ export function HelpImage({ src, alt }: HelpImageProps) {
               />
             </button>
           </DialogTrigger>
-          {/* プレビューモーダル本体の定義 */}
-          {/* w-screen h-screen で画面全体をカバーし、デフォルトの閉じるボタンは非表示にします */}
           <DialogContent 
-            className="max-w-screen max-h-screen w-screen h-screen p-0 border-none bg-transparent shadow-none flex items-center justify-center"
+            className="max-w-[calc(100vw-20px)] sm:max-w-[calc(100vw-20px)] max-h-[calc(100vh-20px)] w-[calc(100vw-20px)] h-[calc(100vh-20px)] p-0 border-none bg-transparent shadow-none flex items-center justify-center"
             showCloseButton={false}
           >
             <DialogTitle className="sr-only">Image Preview</DialogTitle>
             <DialogDescription className="sr-only">Lightbox view of: {alt || 'Help content image'}</DialogDescription>
             {/* 背景のクリックでモーダルを閉じるための全画面コンテナ */}
+            {/* 画面端に20pxの余白を持たせるため、w-full h-full で角丸とシャドウを適用します */}
             <div 
-              className="relative w-screen h-screen flex flex-col items-center justify-center bg-black/85"
-              onClick={() => setIsOpen(false)}
+              className="relative w-full h-full flex flex-col items-center justify-center bg-black/90 select-none rounded-2xl border border-white/10 shadow-2xl overflow-hidden"
+              onPointerDown={handlePointerDown}
+              onPointerUp={handlePointerUp}
             >
-              {/* カスタム閉じるボタン: 右上のセーフエリアを考慮した位置に固定表示 */}
-              {/* タップ領域を広めに取り、半透明の背景を敷くことで白系画像や暗い背景のどちらでも視認可能にします */}
+              {/* カスタム閉じるボタン: 黒いコンテナの右上（absolute）に固定表示 */}
+              {/* コンテナ自体が画面内に収まるため、absolute 配置で完全に見切れを防ぎます */}
+              {/* 背景のポインターイベントとの競合を防ぐため、イベント伝播をブロックします */}
               <button
                 type="button"
                 onClick={() => setIsOpen(false)}
-                className="fixed top-[calc(env(safe-area-inset-top,16px)+16px)] right-[calc(env(safe-area-inset-right,16px)+16px)] z-50 p-3 rounded-full bg-black/60 hover:bg-black/80 text-white transition-colors border border-white/10 focus:outline-none focus:ring-2 focus:ring-white cursor-pointer"
+                onPointerDown={(e) => e.stopPropagation()}
+                onPointerUp={(e) => e.stopPropagation()}
+                className="absolute top-10 right-10 z-50 p-3 rounded-full bg-black/60 hover:bg-black/80 text-white transition-colors border border-white/10 focus:outline-none focus:ring-2 focus:ring-white cursor-pointer"
                 aria-label="閉じる"
               >
                 <X className="h-6 w-6" />
               </button>
 
-              {/* 画像表示とズーム操作を行うコンテナ領域。クリックイベントの親への伝播を防止します */}
+              {/* 画像表示とズーム操作を行うコンテナ領域 */}
+              {/* 内部操作が背景に漏れるのを防ぐため、各種ポインターイベントの伝播をブロックします */}
+              {/* 親の高さに合わせて自動調整されるように flex-1 を指定します */}
               <div 
-                className="w-full h-[80vh] flex items-center justify-center"
-                onClick={(e) => e.stopPropagation()}
+                className="w-full flex-1 flex items-center justify-center p-4"
+                onPointerDown={(e) => e.stopPropagation()}
+                onPointerUp={(e) => e.stopPropagation()}
               >
                 <TransformWrapper
                   initialScale={1}
@@ -145,17 +176,22 @@ export function HelpImage({ src, alt }: HelpImageProps) {
                     <img
                       src={imgSrc}
                       alt={alt || ''}
-                      className="max-w-full max-h-[80vh] mx-auto rounded-lg shadow-2xl object-contain bg-white cursor-grab active:cursor-grabbing"
+                      className="max-w-full max-h-[70vh] mx-auto rounded-lg shadow-2xl object-contain bg-white cursor-grab active:cursor-grabbing"
                       onError={handleError}
+                      onPointerDown={(e) => e.stopPropagation()}
+                      onPointerUp={(e) => e.stopPropagation()}
+                      onClick={(e) => e.stopPropagation()}
                     />
                   </TransformComponent>
                 </TransformWrapper>
               </div>
 
-              {/* キャプションが存在する場合は下部に表示。クリックイベントの親への伝播を防止します */}
+              {/* キャプションが存在する場合は下部に表示。イベント伝播をブロックします */}
               {alt && (
                 <div 
-                  className="mt-4 px-4 py-2 bg-black/60 backdrop-blur-md rounded-full text-white text-sm max-w-[80vw] text-center"
+                  className="mb-6 px-4 py-2 bg-black/60 backdrop-blur-md rounded-full text-white text-sm max-w-[80vw] text-center"
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onPointerUp={(e) => e.stopPropagation()}
                   onClick={(e) => e.stopPropagation()}
                 >
                   {alt}
