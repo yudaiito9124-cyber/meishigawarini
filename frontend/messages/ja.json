@@ -1409,7 +1409,7 @@
         "processing": "処理中"
       },
       "downloadPdf": "印刷用PDF",
-      "downloadCsv": "印刷用画像(カードプリンタ等)",
+      "downloadCsv": "印刷会社用eps/xlsx",
       "downloading": "ダウンロード準備中...",
       "table": {
         "qrId": "UUID",
@@ -1464,7 +1464,7 @@
         "failed": "BANに失敗しました",
         "error": "エラーが発生しました",
         "pdf": "印刷用PDF",
-        "image": "印刷用画像",
+        "image": "印刷会社用eps/xlsx",
         "reasonPlaceholder": "BANの理由を入力してください"
       },
       "restore": {
@@ -1577,7 +1577,7 @@
       "config": "設定",
       "title": "全ショップからのカード発注管理",
       "shopIdFilter": "ショップIDで絞り込み",
-      "preparePrinting": "印刷準備 (PDF/CSV)",
+      "preparePrinting": "印刷準備 (PDF, eps/xlsx生成)",
       "acceptAndGenerate": "受託してカードを生成する",
       "markAsOrdered": "発注済みにする",
       "markAsPrinting": "印刷中にする",
@@ -1632,8 +1632,8 @@
         "designId": "デザインID",
         "receiverUserId": "受取人ユーザーID",
         "availableActions": "可能な操作",
-        "exportPdf": "PDF出力",
-        "exportCsv": "CSV出力",
+        "exportPdf": "印刷用PDF出力",
+        "exportCsv": "印刷会社用eps/xlsx出力",
         "adminDetails": "管理者用詳細",
         "orderedByAdmin": "注文者(ユーザーID)",
         "createdByAdmin": "生成者(管理者のユーザーID)",
