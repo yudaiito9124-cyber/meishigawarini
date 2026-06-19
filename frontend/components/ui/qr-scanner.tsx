@@ -1,19 +1,21 @@
 /**
- * ファイル概要: QRコードリーダーコンポーネント (強化版)
- * 目的: html5-qrcodeを利用し、デバイスのカメラからQRコードをスキャンして結果をコールバックで返す機能を提供します。
- * 改善点: カメラの列挙、切り替え機能、高コントラストなUIオーバーレイ、連続スキャン対応。
+ * ファイル概要: QRコードリーダーコンポーネント (Nimiq qr-scanner版)
+ * 目的: WebWorker + WebAssembly で高速スキャンを実現する qr-scanner を用いて、
+ *       デバイスのカメラからQRコードをスキャンして結果をコールバックで返します。
+ * 改善点: メインスレッドをブロックしない60fpsのプレビュー、高い認識率、自動フォーカス、スキャンボックス可視化。
+ *         小さいQRコード対応として、1080p HD解像度指定、スキャン領域のピクセル保存量拡大、ズーム切り替えボタンを追加。
  */
 'use client';
 
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
+import QrScanner from 'qr-scanner';
 import { useTranslations } from 'next-intl';
-import { Camera, RefreshCcw, AlertCircle, Loader2 } from 'lucide-react';
+import { RefreshCcw, AlertCircle, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 interface QRScannerProps {
-    fps?: number;
-    qrbox?: number | ((viewfinderWidth: number, viewfinderHeight: number) => { width: number; height: number } | number);
+    fps?: number; // qr-scanner では maxScansPerSecond として扱われます
+    qrbox?: any;
     aspectRatio?: number;
     disableFlip?: boolean;
     verbose?: boolean;
@@ -26,20 +28,18 @@ interface QRScannerProps {
 
 const QRScanner = (props: QRScannerProps) => {
     const t = useTranslations('UI');
-    // Unique ID for this instance to prevent collisions in Strict Mode
-    const scannerRegionId = useRef(`html5qr-code-${Math.random().toString(36).substring(7)}`).current;
-    const scannerRef = useRef<Html5Qrcode | null>(null);
+    const videoRef = useRef<HTMLVideoElement | null>(null);
+    const scannerRef = useRef<QrScanner | null>(null);
     
     // States
     const [permissionError, setPermissionError] = useState(false);
     const [cameras, setCameras] = useState<{ id: string; label: string }[]>([]);
     const [selectedCameraId, setSelectedCameraId] = useState<string>("");
     const [isStarting, setIsStarting] = useState(true);
+    const [zoomSupported, setZoomSupported] = useState(false);
+    const [currentZoom, setCurrentZoom] = useState(1);
 
-    // Refs to track lifecycle and transition promises
     const isMounted = useRef(true);
-    const startPromiseRef = useRef<Promise<any> | null>(null);
-    const stopPromiseRef = useRef<Promise<any> | null>(null);
 
     // Store latest callbacks in refs to avoid stale closures
     const successCallbackRef = useRef(props.qrCodeSuccessCallback);
@@ -53,145 +53,147 @@ const QRScanner = (props: QRScannerProps) => {
     }, [props.qrCodeSuccessCallback, props.qrCodeErrorCallback, props.isContinuous]);
 
     const stopScanner = useCallback(async () => {
-        // If already stopping, return the current stop promise
-        if (stopPromiseRef.current) {
-            return stopPromiseRef.current;
-        }
-
-        // If starting is in progress, wait for it to finish first
-        if (startPromiseRef.current) {
+        if (scannerRef.current) {
             try {
-                await startPromiseRef.current;
-            } catch (e) {
-                // If start failed, no need to stop
-                return;
-            }
-        }
-
-        if (scannerRef.current && scannerRef.current.isScanning) {
-            try {
-                const stopPromise = scannerRef.current.stop();
-                stopPromiseRef.current = stopPromise;
-                await stopPromise;
+                scannerRef.current.stop();
             } catch (e) {
                 console.error("Failed to stop scanner", e);
-            } finally {
-                stopPromiseRef.current = null;
             }
         }
     }, []);
 
     const startScanner = useCallback(async (cameraId?: string) => {
-        if (!scannerRef.current) return;
+        if (!videoRef.current) return;
         setIsStarting(true);
         setPermissionError(false);
 
-        // If stopping is in progress, wait for it to finish first
-        if (stopPromiseRef.current) {
+        // 既存のスキャナーインスタンスがあれば破棄する
+        if (scannerRef.current) {
             try {
-                await stopPromiseRef.current;
+                scannerRef.current.destroy();
             } catch (e) { /* ignore */ }
+            scannerRef.current = null;
         }
-
-        // If starting is already in progress, wait for it (prevent duplicate start calls)
-        if (startPromiseRef.current) {
-            try {
-                await startPromiseRef.current;
-            } catch (e) { /* ignore */ }
-            if (isMounted.current) {
-                setIsStarting(false);
-            }
-            return;
-        }
-
-        const config = {
-            fps: props.fps || 30,
-            qrbox: (props.qrbox || ((viewfinderWidth: number, viewfinderHeight: number) => {
-                const size = Math.max(50, Math.floor(Math.min(viewfinderWidth, viewfinderHeight) * 0.85));
-                return { width: size, height: size };
-            })) as any,
-            aspectRatio: props.aspectRatio,
-            disableFlip: props.disableFlip !== undefined ? props.disableFlip : false,
-            formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE],
-            experimentalFeatures: {
-                useBarCodeDetectorIfSupported: true,
-            },
-            videoConstraints: {
-                width: { ideal: 1280 },
-                height: { ideal: 720 },
-                facingMode: cameraId ? undefined : "environment",
-                deviceId: cameraId ? { exact: cameraId } : undefined,
-                frameRate: { ideal: 30, max: 60 },
-            } as any,
-        };
 
         try {
-            // If no cameraId provided, use environment facing mode as default
-            const cameraConfig = cameraId ? { deviceId: { exact: cameraId } } : { facingMode: "environment" };
-            
-            const startPromise = scannerRef.current.start(
-                cameraConfig as any,
-                config as any,
-                (decodedText: string, decodedResult: any) => {
-                    successCallbackRef.current(decodedText, decodedResult);
-                    // Continuousでない場合はスキャン成功時に停止
+            const scanner = new QrScanner(
+                videoRef.current,
+                (result) => {
+                    successCallbackRef.current(result.data, result);
                     if (!isContinuousRef.current) {
                         stopScanner();
                     }
                 },
-                (errorMessage: any) => {
-                    if (errorCallbackRef.current) {
-                        errorCallbackRef.current(errorMessage);
+                {
+                    preferredCamera: cameraId || 'environment',
+                    highlightScanRegion: true,
+                    highlightCodeOutline: true,
+                    maxScansPerSecond: props.fps || 25,
+                    calculateScanRegion: (video) => {
+                        const videoWidth = video.videoWidth;
+                        const videoHeight = video.videoHeight;
+                        const minDimension = Math.min(videoWidth, videoHeight);
+                        // スキャン領域を全体の60%に絞り、ピントが合う距離を保ちやすくします
+                        const scanRegionSize = Math.round(minDimension * 0.6);
+                        
+                        return {
+                            x: Math.round((videoWidth - scanRegionSize) / 2),
+                            y: Math.round((videoHeight - scanRegionSize) / 2),
+                            width: scanRegionSize,
+                            height: scanRegionSize,
+                            // 小さいQRコードの解像度を保つため、デフォルト(400px)より大きい600pxでスレッドに送ります
+                            downScaledWidth: 600,
+                            downScaledHeight: 600,
+                        };
+                    },
+                    onDecodeError: (err) => {
+                        if (errorCallbackRef.current && typeof err === 'string') {
+                            errorCallbackRef.current(err);
+                        }
                     }
                 }
             );
-            
-            startPromiseRef.current = startPromise;
-            await startPromise;
 
-            // Attempt to apply continuous autofocus and optimal frame rate (if supported by hardware/browser)
-            try {
-                await scannerRef.current.applyVideoConstraints({
-                    focusMode: "continuous",
-                    frameRate: { ideal: 30, max: 60 },
-                } as any);
-            } catch (focusErr) {
-                // Focus mode or frame rate not supported or failed to apply, ignore silently
+            scannerRef.current = scanner;
+            await scanner.start();
+
+            // 起動に成功したら、カメラトラックの詳細な高画質化・フォーカス設定を適用
+            const stream = videoRef.current.srcObject as MediaStream;
+            if (stream) {
+                const videoTrack = stream.getVideoTracks()[0];
+                if (videoTrack) {
+                    try {
+                        // 1080p Full HD、30-60FPS、および連続オートフォーカスを適用
+                        await videoTrack.applyConstraints({
+                            width: { ideal: 1920 },
+                            height: { ideal: 1080 },
+                            frameRate: { ideal: 30, max: 60 },
+                            advanced: [{ focusMode: "continuous" }]
+                        } as any);
+
+                        // デバイスがズームに対応しているか判定
+                        const capabilities = videoTrack.getCapabilities() as any;
+                        if (capabilities && capabilities.zoom) {
+                            setZoomSupported(true);
+                            setCurrentZoom(capabilities.zoom.min || 1);
+                        } else {
+                            setZoomSupported(false);
+                        }
+                    } catch (e) {
+                        console.warn("Failed to apply optimal video constraints", e);
+                    }
+                }
+            }
+
+            // カメラリストを再取得（ラベル取得のため）
+            if (isMounted.current && scannerRef.current) {
+                const activeCameraList = await QrScanner.listCameras(true);
+                setCameras(activeCameraList.map(c => ({ id: c.id, label: c.label })));
+                
+                if (cameraId) {
+                    setSelectedCameraId(cameraId);
+                } else {
+                    // 現在のアクティブカメラを推測してセット
+                    const environmentCam = activeCameraList.find(c => 
+                        c.label.toLowerCase().includes('back') || 
+                        c.label.toLowerCase().includes('environment') || 
+                        c.label.toLowerCase().includes('背面')
+                    );
+                    if (environmentCam) {
+                        setSelectedCameraId(environmentCam.id);
+                    } else if (activeCameraList.length > 0) {
+                        setSelectedCameraId(activeCameraList[0].id);
+                    }
+                }
             }
         } catch (err: any) {
-            if (err.name !== 'AbortError') {
-                console.error(t("Error starting scanner"), err);
-                if (isMounted.current) {
-                    setPermissionError(true);
-                    if (props.onFatalError) {
-                        props.onFatalError(err);
-                    }
+            console.error("Error starting QrScanner", err);
+            if (isMounted.current) {
+                setPermissionError(true);
+                if (props.onFatalError) {
+                    props.onFatalError(err);
                 }
             }
         } finally {
             if (isMounted.current) {
                 setIsStarting(false);
             }
-            startPromiseRef.current = null;
         }
-    }, [props, stopScanner, t]);
+    }, [props, stopScanner]);
 
     useEffect(() => {
         isMounted.current = true;
 
-        // Initialize scanner instance
-        const html5QrCode = new Html5Qrcode(scannerRegionId);
-        scannerRef.current = html5QrCode;
-
-        // Get available cameras
-        Html5Qrcode.getCameras().then(devices => {
-            if (devices && devices.length > 0 && isMounted.current) {
-                setCameras(devices.map(d => ({ id: d.id, label: d.label })));
-                // We don't set selectedCameraId yet to allow facingMode: environment fallback
-            }
-        }).catch(err => {
-            console.error("Failed to get cameras", err);
-        });
+        // 利用可能なカメラ一覧の初期取得
+        QrScanner.listCameras(true)
+            .then(devices => {
+                if (devices && devices.length > 0 && isMounted.current) {
+                    setCameras(devices.map(d => ({ id: d.id, label: d.label })));
+                }
+            })
+            .catch(err => {
+                console.error("Failed to list cameras", err);
+            });
 
         const timerId = setTimeout(() => {
             if (isMounted.current) {
@@ -202,33 +204,54 @@ const QRScanner = (props: QRScannerProps) => {
         return () => {
             isMounted.current = false;
             clearTimeout(timerId);
-            stopScanner().then(() => {
+            if (scannerRef.current) {
                 try {
-                    scannerRef.current?.clear();
+                    scannerRef.current.destroy();
                 } catch (e) { /* ignore */ }
-            });
+                scannerRef.current = null;
+            }
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     const handleSwitchCamera = async () => {
-        if (cameras.length <= 1) return;
+        if (cameras.length <= 1 || !scannerRef.current) return;
         
-        // Rotate through cameras
         let nextIndex = 0;
         if (selectedCameraId) {
             const currentIndex = cameras.findIndex(c => c.id === selectedCameraId);
             nextIndex = (currentIndex + 1) % cameras.length;
         } else {
-            // If we started with facingMode, just pick the first one which is usually not the one we're using if we want to switch
             nextIndex = 0;
         }
         
         const nextCamera = cameras[nextIndex];
         setSelectedCameraId(nextCamera.id);
         
-        await stopScanner();
         await startScanner(nextCamera.id);
+    };
+
+    const handleToggleZoom = async () => {
+        if (!videoRef.current || !zoomSupported) return;
+        const stream = videoRef.current.srcObject as MediaStream;
+        if (!stream) return;
+        const videoTrack = stream.getVideoTracks()[0];
+        if (!videoTrack) return;
+
+        try {
+            const capabilities = videoTrack.getCapabilities() as any;
+            const min = capabilities.zoom.min || 1;
+            const max = capabilities.zoom.max || 3;
+            // ズーム倍率は 1倍 と 2倍 (または最大倍率) で切り替え
+            const nextZoom = currentZoom === min ? Math.min(2, max) : min;
+            
+            await videoTrack.applyConstraints({
+                advanced: [{ zoom: nextZoom }]
+            } as any);
+            setCurrentZoom(nextZoom);
+        } catch (e) {
+            console.error("Failed to apply zoom", e);
+        }
     };
 
     if (permissionError) {
@@ -247,7 +270,12 @@ const QRScanner = (props: QRScannerProps) => {
 
     return (
         <div className="relative w-full h-full group overflow-hidden rounded-2xl bg-black">
-            <div id={scannerRegionId} className="w-full h-full" />
+            <video 
+                ref={videoRef} 
+                className="w-full h-full object-cover" 
+                playsInline 
+                muted 
+            />
             
             {/* Overlay UI */}
             <div className="absolute inset-0 flex flex-col pointer-events-none">
@@ -273,6 +301,17 @@ const QRScanner = (props: QRScannerProps) => {
                         </div>
 
                         <div className="flex items-center gap-2">
+                            {zoomSupported && (
+                                <Button 
+                                    variant="ghost" 
+                                    size="sm" 
+                                    className="h-10 px-3 rounded-full bg-white/10 hover:bg-white/20 text-white border border-white/20 backdrop-blur-md transition-all active:scale-90 text-xs font-bold mr-1"
+                                    onClick={handleToggleZoom}
+                                    title="ズーム切り替え"
+                                >
+                                    {currentZoom.toFixed(1)}x
+                                </Button>
+                            )}
                             {cameras.length > 1 && (
                                 <Button 
                                     variant="ghost" 
