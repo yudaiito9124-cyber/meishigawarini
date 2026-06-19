@@ -6,7 +6,7 @@
 'use client';
 
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { Html5Qrcode } from 'html5-qrcode';
+import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
 import { useTranslations } from 'next-intl';
 import { Camera, RefreshCcw, AlertCircle, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -36,6 +36,11 @@ const QRScanner = (props: QRScannerProps) => {
     const [selectedCameraId, setSelectedCameraId] = useState<string>("");
     const [isStarting, setIsStarting] = useState(true);
 
+    // Refs to track lifecycle and transition promises
+    const isMounted = useRef(true);
+    const startPromiseRef = useRef<Promise<any> | null>(null);
+    const stopPromiseRef = useRef<Promise<any> | null>(null);
+
     // Store latest callbacks in refs to avoid stale closures
     const successCallbackRef = useRef(props.qrCodeSuccessCallback);
     const errorCallbackRef = useRef(props.qrCodeErrorCallback);
@@ -48,13 +53,30 @@ const QRScanner = (props: QRScannerProps) => {
     }, [props.qrCodeSuccessCallback, props.qrCodeErrorCallback, props.isContinuous]);
 
     const stopScanner = useCallback(async () => {
+        // If already stopping, return the current stop promise
+        if (stopPromiseRef.current) {
+            return stopPromiseRef.current;
+        }
+
+        // If starting is in progress, wait for it to finish first
+        if (startPromiseRef.current) {
+            try {
+                await startPromiseRef.current;
+            } catch (e) {
+                // If start failed, no need to stop
+                return;
+            }
+        }
+
         if (scannerRef.current && scannerRef.current.isScanning) {
             try {
-                await scannerRef.current.stop();
-                // We don't necessarily want to clear() here if we're just switching cameras, 
-                // but Html5Qrcode requires stop() before start() again on the same ID.
+                const stopPromise = scannerRef.current.stop();
+                stopPromiseRef.current = stopPromise;
+                await stopPromise;
             } catch (e) {
                 console.error("Failed to stop scanner", e);
+            } finally {
+                stopPromiseRef.current = null;
             }
         }
     }, []);
@@ -64,21 +86,50 @@ const QRScanner = (props: QRScannerProps) => {
         setIsStarting(true);
         setPermissionError(false);
 
+        // If stopping is in progress, wait for it to finish first
+        if (stopPromiseRef.current) {
+            try {
+                await stopPromiseRef.current;
+            } catch (e) { /* ignore */ }
+        }
+
+        // If starting is already in progress, wait for it (prevent duplicate start calls)
+        if (startPromiseRef.current) {
+            try {
+                await startPromiseRef.current;
+            } catch (e) { /* ignore */ }
+            if (isMounted.current) {
+                setIsStarting(false);
+            }
+            return;
+        }
+
         const config = {
-            fps: props.fps || 10,
+            fps: props.fps || 30,
             qrbox: (props.qrbox || ((viewfinderWidth: number, viewfinderHeight: number) => {
-                const size = Math.max(50, Math.floor(Math.min(viewfinderWidth, viewfinderHeight) * 0.7));
+                const size = Math.max(50, Math.floor(Math.min(viewfinderWidth, viewfinderHeight) * 0.85));
                 return { width: size, height: size };
             })) as any,
-            aspectRatio: props.aspectRatio || 1.0,
+            aspectRatio: props.aspectRatio,
             disableFlip: props.disableFlip !== undefined ? props.disableFlip : false,
+            formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE],
+            experimentalFeatures: {
+                useBarCodeDetectorIfSupported: true,
+            },
+            videoConstraints: {
+                width: { ideal: 1280 },
+                height: { ideal: 720 },
+                facingMode: cameraId ? undefined : "environment",
+                deviceId: cameraId ? { exact: cameraId } : undefined,
+                frameRate: { ideal: 30, max: 60 },
+            } as any,
         };
 
         try {
             // If no cameraId provided, use environment facing mode as default
             const cameraConfig = cameraId ? { deviceId: { exact: cameraId } } : { facingMode: "environment" };
             
-            await scannerRef.current.start(
+            const startPromise = scannerRef.current.start(
                 cameraConfig as any,
                 config as any,
                 (decodedText: string, decodedResult: any) => {
@@ -94,27 +145,47 @@ const QRScanner = (props: QRScannerProps) => {
                     }
                 }
             );
+            
+            startPromiseRef.current = startPromise;
+            await startPromise;
+
+            // Attempt to apply continuous autofocus and optimal frame rate (if supported by hardware/browser)
+            try {
+                await scannerRef.current.applyVideoConstraints({
+                    focusMode: "continuous",
+                    frameRate: { ideal: 30, max: 60 },
+                } as any);
+            } catch (focusErr) {
+                // Focus mode or frame rate not supported or failed to apply, ignore silently
+            }
         } catch (err: any) {
             if (err.name !== 'AbortError') {
                 console.error(t("Error starting scanner"), err);
-                setPermissionError(true);
-                if (props.onFatalError) {
-                    props.onFatalError(err);
+                if (isMounted.current) {
+                    setPermissionError(true);
+                    if (props.onFatalError) {
+                        props.onFatalError(err);
+                    }
                 }
             }
         } finally {
-            setIsStarting(false);
+            if (isMounted.current) {
+                setIsStarting(false);
+            }
+            startPromiseRef.current = null;
         }
     }, [props, stopScanner, t]);
 
     useEffect(() => {
+        isMounted.current = true;
+
         // Initialize scanner instance
         const html5QrCode = new Html5Qrcode(scannerRegionId);
         scannerRef.current = html5QrCode;
 
         // Get available cameras
         Html5Qrcode.getCameras().then(devices => {
-            if (devices && devices.length > 0) {
+            if (devices && devices.length > 0 && isMounted.current) {
                 setCameras(devices.map(d => ({ id: d.id, label: d.label })));
                 // We don't set selectedCameraId yet to allow facingMode: environment fallback
             }
@@ -123,10 +194,13 @@ const QRScanner = (props: QRScannerProps) => {
         });
 
         const timerId = setTimeout(() => {
-            startScanner();
+            if (isMounted.current) {
+                startScanner();
+            }
         }, 150);
 
         return () => {
+            isMounted.current = false;
             clearTimeout(timerId);
             stopScanner().then(() => {
                 try {
