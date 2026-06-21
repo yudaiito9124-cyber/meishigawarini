@@ -10,7 +10,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import QrScanner from 'qr-scanner';
 import { useTranslations } from 'next-intl';
-import { RefreshCcw, AlertCircle, Loader2 } from 'lucide-react';
+import { RefreshCcw, AlertCircle, Loader2, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 interface QRScannerProps {
@@ -36,6 +36,12 @@ const QRScanner = (props: QRScannerProps) => {
     const [cameras, setCameras] = useState<{ id: string; label: string }[]>([]);
     const [selectedCameraId, setSelectedCameraId] = useState<string>("");
     const [isStarting, setIsStarting] = useState(true);
+    
+    // スキャン成功時のビジュアルフィードバック用ステート
+    const [scanSuccess, setScanSuccess] = useState(false);
+    
+    // スキャンの二重検知を防止するための直近スキャンデータ保持用参照
+    const lastSuccessRef = useRef<{ text: string; time: number } | null>(null);
     
     // Zoom control states
     const [zoomSupported, setZoomSupported] = useState(false);
@@ -96,7 +102,25 @@ const QRScanner = (props: QRScannerProps) => {
             const scanner = new QrScanner(
                 videoRef.current,
                 (result) => {
-                    successCallbackRef.current(result.data, result);
+                    const decodedText = result.data;
+                    const now = Date.now();
+                    
+                    // 同一のQRコードに対する重複フィードバックを防止する（クールダウン時間: 2秒）
+                    const isDuplicate = lastSuccessRef.current && 
+                                        lastSuccessRef.current.text === decodedText && 
+                                        (now - lastSuccessRef.current.time) < 2000;
+                    
+                    if (!isDuplicate) {
+                        lastSuccessRef.current = { text: decodedText, time: now };
+                        
+                        // スキャン成功時のフラッシュ表示を有効化
+                        setScanSuccess(true);
+                        setTimeout(() => {
+                            setScanSuccess(false);
+                        }, 350);
+                    }
+
+                    successCallbackRef.current(decodedText, result);
                     if (!isContinuousRef.current) {
                         stopScanner();
                     }
@@ -366,11 +390,35 @@ const QRScanner = (props: QRScannerProps) => {
                 </div>
             </div>
 
+            {/* スキャン成功時の緑色フラッシュオーバーレイ */}
+            <div 
+                className={`absolute inset-0 bg-emerald-500/20 pointer-events-none transition-opacity duration-150 z-30 ${
+                    scanSuccess ? 'opacity-100' : 'opacity-0'
+                }`} 
+            />
+            
+            {/* スキャン成功時の中央チェックマークアイコン */}
+            <div className={`absolute inset-0 flex items-center justify-center pointer-events-none z-40 transition-all duration-300 ${
+                scanSuccess ? 'scale-100 opacity-100' : 'scale-75 opacity-0'
+            }`}>
+                <div className="bg-emerald-500/90 text-white p-4 rounded-full shadow-[0_0_20px_rgba(16,185,129,0.5)] backdrop-blur-md flex items-center justify-center">
+                    <Check className="w-10 h-10 stroke-[3]" />
+                </div>
+            </div>
+
             {/* Corner Decorators */}
-            <div className="absolute top-4 left-4 w-6 h-6 border-t-2 border-l-2 border-white/30 rounded-tl-lg pointer-events-none" />
-            <div className="absolute top-4 right-4 w-6 h-6 border-t-2 border-r-2 border-white/30 rounded-tr-lg pointer-events-none" />
-            <div className="absolute bottom-4 left-4 w-6 h-6 border-b-2 border-l-2 border-white/30 rounded-bl-lg pointer-events-none" />
-            <div className="absolute bottom-4 right-4 w-6 h-6 border-b-2 border-r-2 border-white/30 rounded-br-lg pointer-events-none" />
+            <div className={`absolute top-4 left-4 w-6 h-6 border-t-2 border-l-2 rounded-tl-lg pointer-events-none transition-all duration-200 ${
+                scanSuccess ? 'border-emerald-500 shadow-[0_0_12px_rgba(16,185,129,0.8)]' : 'border-white/30'
+            }`} />
+            <div className={`absolute top-4 right-4 w-6 h-6 border-t-2 border-r-2 rounded-tr-lg pointer-events-none transition-all duration-200 ${
+                scanSuccess ? 'border-emerald-500 shadow-[0_0_12px_rgba(16,185,129,0.8)]' : 'border-white/30'
+            }`} />
+            <div className={`absolute bottom-4 left-4 w-6 h-6 border-b-2 border-l-2 rounded-bl-lg pointer-events-none transition-all duration-200 ${
+                scanSuccess ? 'border-emerald-500 shadow-[0_0_12px_rgba(16,185,129,0.8)]' : 'border-white/30'
+            }`} />
+            <div className={`absolute bottom-4 right-4 w-6 h-6 border-b-2 border-r-2 rounded-br-lg pointer-events-none transition-all duration-200 ${
+                scanSuccess ? 'border-emerald-500 shadow-[0_0_12px_rgba(16,185,129,0.8)]' : 'border-white/30'
+            }`} />
         </div>
     );
 };
