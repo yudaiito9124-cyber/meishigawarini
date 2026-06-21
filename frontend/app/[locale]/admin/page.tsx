@@ -41,7 +41,7 @@ import { Badge } from "@/components/ui/badge";
 import CardDesignEditor from "@/components/admin/CardDesignEditor";
 const NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 const NEXT_PUBLIC_APP_URL = process.env.NEXT_PUBLIC_APP_URL || "";
-// const PDF_PAPER_FORMAT = "10S31251"; //"1S31034"
+// const PDF_PAPER_FORMAT = "51677E-1.036"; //"1S31034"
 // const PDF_CARD_FORMAT = "gakuchousenbeiv1"; //"gakuchousenbeiv0"
 import {
     Dialog,
@@ -137,7 +137,7 @@ export default function AdminPage() {
     /** バッチ検索キーワード */
     const [batchSearchKeyword, setBatchSearchKeyword] = useState("");
     /** PDF生成時の用紙フォーマット（A4等） */
-    const [paperFormat, setPaperFormat] = useState("10S31251");
+    const [paperFormat, setPaperFormat] = useState("51677E-1.036");
     /** カードのデザイン（システムのプリセットまたはDBカスタムデザイン） */
     const [cardFormat, setCardFormat] = useState("gakuchousenbeiv1");
     /** DBから取得したカスタムデザイン一覧 */
@@ -172,6 +172,8 @@ export default function AdminPage() {
 
     /** 手動生成セクションの表示・非表示 */
     const [isManualGenerateOpen, setIsManualGenerateOpen] = useState(false);
+    /** 直近の印刷履歴セクションの表示・非表示 */
+    const [isBatchHistoryOpen, setIsBatchHistoryOpen] = useState(false);
 
 
     /**
@@ -232,9 +234,17 @@ export default function AdminPage() {
         }
         if (activeTab === "cardorders") {
             fetchCardOrders();
-            fetchBatchHistory();
         }
     }, [activeTab, reloadDbCardDesigns, cardOrderFilterStatus]);
+
+    /**
+     * 直近の印刷履歴が有効な場合のみデータを取得
+     */
+    useEffect(() => {
+        if (activeTab === "cardorders" && isBatchHistoryOpen) {
+            fetchBatchHistory();
+        }
+    }, [activeTab, isBatchHistoryOpen]);
 
     /**
      * カード注文の一覧を取得します（フィルタ条件に従う）。
@@ -752,93 +762,107 @@ export default function AdminPage() {
 
 
 
-                        {/* 印刷履歴セクション（データベースから直近10件を取得） */}
-                        <Card className="border-mist-200 overflow-hidden shadow-sm">
-                            <CardHeader className="bg-mist-50/50 border-b">
-                                <div className="flex justify-between items-center flex-wrap gap-4">
-                                    <div>
-                                        <CardTitle className="text-mist-900 flex items-center gap-2">
-                                            <Printer className="w-5 h-5" />
-                                            {t('batches.recentTitle') || "直近の印刷履歴"}
-                                        </CardTitle>
-                                        <CardDescription>
-                                            データベースから取得した最近の印刷バッチ（最新10件）
-                                        </CardDescription>
-                                    </div>
-                                    <div className="flex items-center gap-2 w-full sm:w-auto">
-                                        <div className="relative flex-1 sm:w-64">
-                                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                                            <Input
-                                                placeholder={t('batches.searchPlaceholder') || "バッチID / 注文ID / キーワード"}
-                                                value={batchSearchKeyword}
-                                                onChange={(e) => setBatchSearchKeyword(e.target.value)}
-                                                onKeyDown={(e) => e.key === 'Enter' && handleSearchBatches()}
-                                                className="pl-10 h-10 text-black bg-white border-gray-200 focus:ring-mist-500"
-                                            />
-                                        </div>
-                                        <Button
-                                            onClick={handleSearchBatches}
-                                            disabled={isBatchesLoading}
-                                            className="bg-mist-800 hover:bg-mist-700 text-white"
-                                        >
-                                            {isBatchesLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
-                                        </Button>
-                                    </div>
-                                </div>
-                            </CardHeader>
-                            <CardContent className="p-0">
-                                <div className="divide-y divide-gray-100">
-                                    {isBatchesLoading && batchHistory.length === 0 ? (
-                                        <div className="flex flex-col items-center justify-center p-12 text-mist-500">
-                                            <Loader2 className="w-8 h-8 animate-spin mb-4" />
-                                            <p>{t('batches.loading')}</p>
-                                        </div>
-                                    ) : batchHistory.length === 0 ? (
-                                        <div className="p-12 text-center text-gray-500">
-                                            <p>{t('batches.noBatches')}</p>
-                                        </div>
-                                    ) : (
-                                        <div className="p-4 space-y-4">
-                                            {batchHistory.map(batch => (
-                                                <BatchItem
-                                                    key={batch.id}
-                                                    batch={batch}
-                                                    t={t}
-                                                    handleCopy={handleCopy}
-                                                    copiedId={copiedId}
-                                                    setIsExportingCsv={setIsExportingCsv}
-                                                    isExportingCsv={isExportingCsv}
-                                                    cardFormat={cardFormat}
-                                                    dbCardDesigns={dbCardDesigns}
-                                                    handleGeneratePDF={handleGeneratePDF}
-                                                    paperFormat={paperFormat}
-                                                />
-                                            ))}
+                        {/* 印刷履歴セクションを表示/非表示 (Toggle Button) */}
+                        <div className="flex justify-end mb-2">
+                            <Button
+                                variant="outline"
+                                className="bg-mist-800 border-mist-700 text-mist-300 hover:bg-mist-700 hover:text-white transition-all duration-300 rounded-full"
+                                onClick={() => setIsBatchHistoryOpen(!isBatchHistoryOpen)}
+                            >
+                                <Plus className={cn("w-4 h-4 mr-2 transition-transform duration-300", isBatchHistoryOpen && "rotate-45")} />
+                                {isBatchHistoryOpen ? t('batches.hideBatchHistory') || "印刷履歴を隠す" : t('batches.showBatchHistory') || "印刷履歴を表示"}
+                            </Button>
+                        </div>
 
-                                            {batchCursor && (
-                                                <div className="flex justify-center pt-4">
-                                                    <Button
-                                                        variant="outline"
-                                                        onClick={() => fetchBatchHistory(batchCursor)}
-                                                        disabled={isBatchesLoading}
-                                                        className="w-full sm:w-auto text-mist-900 border-mist-200 hover:bg-mist-50"
-                                                    >
-                                                        {isBatchesLoading ? (
-                                                            <>
-                                                                <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                                                                {t('batches.loading')}
-                                                            </>
-                                                        ) : (
-                                                            t('batches.loadMore') || "さらに読み込む"
-                                                        )}
-                                                    </Button>
-                                                </div>
-                                            )}
+                        {/* 印刷履歴セクション（データベースから直近10件を取得） */}
+                        {isBatchHistoryOpen && (
+                            <Card className="border-mist-200 overflow-hidden shadow-sm animate-in fade-in slide-in-from-top-2 duration-300">
+                                <CardHeader className="bg-mist-50/50 border-b">
+                                    <div className="flex justify-between items-center flex-wrap gap-4">
+                                        <div>
+                                            <CardTitle className="text-mist-900 flex items-center gap-2">
+                                                <Printer className="w-5 h-5" />
+                                                {t('batches.recentTitle') || "直近の印刷履歴"}
+                                            </CardTitle>
+                                            <CardDescription>
+                                                データベースから取得した最近の印刷バッチ（最新10件）
+                                            </CardDescription>
                                         </div>
-                                    )}
-                                </div>
-                            </CardContent>
-                        </Card>
+                                        <div className="flex items-center gap-2 w-full sm:w-auto">
+                                            <div className="relative flex-1 sm:w-64">
+                                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                                                <Input
+                                                    placeholder={t('batches.searchPlaceholder') || "バッチID / 注文ID / キーワード"}
+                                                    value={batchSearchKeyword}
+                                                    onChange={(e) => setBatchSearchKeyword(e.target.value)}
+                                                    onKeyDown={(e) => e.key === 'Enter' && handleSearchBatches()}
+                                                    className="pl-10 h-10 text-black bg-white border-gray-200 focus:ring-mist-500"
+                                                />
+                                            </div>
+                                            <Button
+                                                onClick={handleSearchBatches}
+                                                disabled={isBatchesLoading}
+                                                className="bg-mist-800 hover:bg-mist-700 text-white"
+                                            >
+                                                {isBatchesLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+                                            </Button>
+                                        </div>
+                                    </div>
+                                </CardHeader>
+                                <CardContent className="p-0">
+                                    <div className="divide-y divide-gray-100">
+                                        {isBatchesLoading && batchHistory.length === 0 ? (
+                                            <div className="flex flex-col items-center justify-center p-12 text-mist-500">
+                                                <Loader2 className="w-8 h-8 animate-spin mb-4" />
+                                                <p>{t('batches.loading')}</p>
+                                            </div>
+                                        ) : batchHistory.length === 0 ? (
+                                            <div className="p-12 text-center text-gray-500">
+                                                <p>{t('batches.noBatches')}</p>
+                                            </div>
+                                        ) : (
+                                            <div className="p-4 space-y-4">
+                                                {batchHistory.map(batch => (
+                                                    <BatchItem
+                                                        key={batch.id}
+                                                        batch={batch}
+                                                        t={t}
+                                                        handleCopy={handleCopy}
+                                                        copiedId={copiedId}
+                                                        setIsExportingCsv={setIsExportingCsv}
+                                                        isExportingCsv={isExportingCsv}
+                                                        cardFormat={cardFormat}
+                                                        dbCardDesigns={dbCardDesigns}
+                                                        handleGeneratePDF={handleGeneratePDF}
+                                                        paperFormat={paperFormat}
+                                                    />
+                                                ))}
+
+                                                {batchCursor && (
+                                                    <div className="flex justify-center pt-4">
+                                                        <Button
+                                                            variant="outline"
+                                                            onClick={() => fetchBatchHistory(batchCursor)}
+                                                            disabled={isBatchesLoading}
+                                                            className="w-full sm:w-auto text-mist-900 border-mist-200 hover:bg-mist-50"
+                                                        >
+                                                            {isBatchesLoading ? (
+                                                                <>
+                                                                    <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                                                                    {t('batches.loading')}
+                                                                </>
+                                                            ) : (
+                                                                t('batches.loadMore') || "さらに読み込む"
+                                                            )}
+                                                        </Button>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        )}
 
 
                         {/* QRコード手動生成 (Toggle Button) */}

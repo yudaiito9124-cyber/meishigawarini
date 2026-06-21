@@ -15,7 +15,7 @@
 ### 1-1. お届け先住所の登録完了 (注文者向け)
 *   **送信タイミング**: 注文者がQRコードをスキャンし、配送先住所を入力して「登録」を完了した瞬間。
 *   **送信条件**: 住所登録フォームでメールアドレスが入力されていること。
-*   **内容**: 登録完了の確認、追跡用URL、PINコードの案内。
+*   **内容**: 登録完了の確認、登録されたお届け先情報（氏名、郵便番号、住所、電話番号、メールアドレス、希望配送日時）、追跡用URL、PINコードの案内。
 
 ### 1-2. 新規注文（住所登録）の発生 (ショップオーナー向け)
 *   **送信タイミング**: 上記と同じく、注文者が住所登録を完了した瞬間。
@@ -98,7 +98,7 @@ AWS Cognitoから直接送信される、アカウントセキュリティに関
 | `MESSAGE_NOTIFICATION` | 新着メッセージ | `username`, `message`, `qr_id`, `pin`, `baseUrl` |
 | `SYSTEM_NOTIFICATION` | システム通知 | `message`, `qr_id`, `pin`, `baseUrl` |
 | `SHIPPING_NOTIFICATION` | 発送完了 | `qr_id`, `pin`, `baseUrl` |
-| `ADDRESS_REGISTRATION_CONFIRMATION` | 住所登録完了（注文者） | `qr_id`, `pin`, `baseUrl` |
+| `ADDRESS_REGISTRATION_CONFIRMATION` | 住所登録完了（注文者） | `qr_id`, `pin`, `baseUrl`, `name`, `zip_code`, `address`, `phone`, `email`, `preferred_date`, `preferred_time` |
 | `ADDRESS_REGISTRATION_NOTIFICATION` | 住所登録発生（オーナー） | `shopName`, `productName`, `qr_id`, `shopId`, `timestamp`, `baseUrl` |
 | `INQUIRY_NOTIFICATION` | 受取人からのお問い合わせ（オーナー向け） | `content`, `reply_email`, `phone`, `shopName`, `qr_id`, `shopId`, `baseUrl` |
 

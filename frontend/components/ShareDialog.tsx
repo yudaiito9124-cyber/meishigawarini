@@ -2,13 +2,14 @@
  * ファイル概要: ギフト受取体験共有ダイアログ (Gift Experience Share Dialog)
  * 
  * 役割:
- * 受取人がギフトを受け取った際の感動を、SNS（X, LINE）やリンクコピーで共有するための
+ * 受取人がギフトを受け取った際の感動を、SNS（X, LINE, Instagram）やリンクコピーで共有するための
  * インタラクティブなダイアログを提供します。
  * 
  * 主要機能:
  * 1. シェア用 URL の動的生成（表示項目のカスタマイズ対応）。
  * 2. ビジュアルプレビュー（OGP プレビューを模したアニメーション）。
- * 3. SNS 連携（X, LINE）。
+ * 3. SNS 連携（X, LINE, Instagram）。
+ *    - Instagram は URL 直接共有をサポートしていないため、クリップボードへのコピーを行い Instagram アプリ/サイトを開きます。
  * 4. クリップボードへのコピー & 紙吹雪エフェクト (canvas-confetti)。
  * 5. OS 標準のシェア機能 (Web Share API) との連携。
  */
@@ -21,7 +22,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Share2, Copy, Check, Gift, Sparkles } from "lucide-react";
-import { SiX, SiLine } from "@icons-pack/react-simple-icons";
+import { SiX, SiLine, SiInstagram } from "@icons-pack/react-simple-icons";
 import { cn } from "@/lib/utils";
 import confetti from "canvas-confetti";
 
@@ -58,6 +59,7 @@ export function ShareDialog({ qr_id, product, card, shop }: ShareDialogProps) {
     const [includeCard, setIncludeCard] = useState(true);
     const [includeShop, setIncludeShop] = useState(true);
     const [copied, setCopied] = useState(false);
+    const [instagramShared, setInstagramShared] = useState(false);
 
     /** 現在のベース URL (window オブジェクトから取得) */
     const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
@@ -113,6 +115,23 @@ export function ShareDialog({ qr_id, product, card, shop }: ShareDialogProps) {
     const handleShareLine = () => {
         const url = encodeURIComponent(generateShareUrl());
         window.open(`https://social-plugins.line.me/lineit/share?url=${url}`, '_blank');
+    };
+
+    /** Instagramで共有するため、URLをコピーしてInstagramを開きます。 */
+    const handleShareInstagram = () => {
+        navigator.clipboard.writeText(generateShareUrl());
+        setInstagramShared(true);
+        setTimeout(() => setInstagramShared(false), 3000);
+        
+        // 紙吹雪エフェクト
+        confetti({
+            particleCount: 100,
+            spread: 70,
+            origin: { y: 0.6 }
+        });
+
+        // Instagramを開く
+        window.open('https://instagram.com/', '_blank');
     };
 
     /** OS 標準のシェアメニューを呼び出します (モバイル推奨)。 */
@@ -241,20 +260,36 @@ export function ShareDialog({ qr_id, product, card, shop }: ShareDialogProps) {
 
                     {/* シェアボタン群 */}
                     <div className="space-y-4 pt-2">
-                        <div className="flex gap-3">
+                        <div className="grid grid-cols-2 gap-3">
                             <Button
                                 onClick={handleShareX}
-                                className="flex-1 h-14 rounded-2xl bg-[#000000] hover:bg-slate-800 text-white font-black text-base gap-3 shadow-lg shadow-black/10"
+                                className="h-14 rounded-2xl bg-[#000000] hover:bg-slate-800 text-white font-black text-base gap-3 shadow-lg shadow-black/10"
                             >
                                 <SiX className="w-5 h-5" />
                                 {t('x')}
                             </Button>
                             <Button
                                 onClick={handleShareLine}
-                                className="flex-1 h-14 rounded-2xl bg-[#06C755] hover:bg-[#05b14c] text-white font-black text-base gap-3 shadow-lg shadow-emerald-100"
+                                className="h-14 rounded-2xl bg-[#06C755] hover:bg-[#05b14c] text-white font-black text-base gap-3 shadow-lg shadow-emerald-100"
                             >
                                 <SiLine className="w-6 h-6" />
                                 {t('line')}
+                            </Button>
+                            <Button
+                                onClick={handleShareInstagram}
+                                className="col-span-2 h-14 rounded-2xl bg-gradient-to-r from-[#833AB4] via-[#FD1D1D] to-[#FCAF45] hover:opacity-90 text-white font-black text-base gap-3 shadow-lg shadow-pink-200/50 transition-all"
+                            >
+                                {instagramShared ? (
+                                    <>
+                                        <Check className="w-5 h-5 animate-bounce" />
+                                        {t('instagramCopied')}
+                                    </>
+                                ) : (
+                                    <>
+                                        <SiInstagram className="w-5 h-5" />
+                                        {t('instagram')}
+                                    </>
+                                )}
                             </Button>
                         </div>
 

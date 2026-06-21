@@ -1765,7 +1765,12 @@ export default function ReceivePage() {
                                         className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
                                     >
                                         <option value="">{t('formStep.noPreference')}</option>
-                                        {(gift?.delivery_time_options || ["timeMorning", "time1416", "time1618", "time1820", "time1921"]).map((opt: string) => (
+                                        {/*
+                                            配送希望時間の選択肢配列を展開します。
+                                            APIから返ってきたリストがnull/undefined、または空配列（[]）の場合は、
+                                            システム標準のデフォルト時間帯（午前中、14-16時など）を代わりに表示します。
+                                        */}
+                                        {((gift?.delivery_time_options && gift.delivery_time_options.length > 0) ? gift.delivery_time_options : ["timeMorning", "time1416", "time1618", "time1820", "time1921"]).map((opt: string) => (
                                             <option key={opt} value={opt}>{tt.has(opt) ? tt(opt) : opt}</option>
                                         ))}
                                     </select>

@@ -1186,6 +1186,8 @@
       "navigatorShare": "他のアプリでシェア",
       "x": "Xで自慢する",
       "line": "LINEでおねだり",
+      "instagram": "Instagramでお披露目",
+      "instagramCopied": "コピー完了！Instagramを開きます",
       "options": {
         "title": "シェアする内容",
         "description": "※サムネイルには選択の有無に関係なく上記全てが表示されます",
@@ -1423,7 +1425,9 @@
       "searchPlaceholder": "バッチIDで検索...",
       "recentTitle": "直近の印刷履歴",
       "loading": "読み込み中...",
-      "loadMore": "さらに取得"
+      "loadMore": "さらに取得",
+      "showBatchHistory": "印刷履歴を表示",
+      "hideBatchHistory": "印刷履歴を隠す"
     },
     "list": {
       "title": "全カード",

@@ -373,6 +373,7 @@ const genQRSVGText = async (code: string, size: number): Promise<string> => {
         type: "svg",
         width: ptWidth,
         height: ptHeight,
+        margin: ptWidth * 0.05,
         data: `${NEXT_PUBLIC_APP_URL}/receive/${code}`,
         image: APP_CONFIG.QR_LOGO_PATH,
         qrOptions: {
@@ -388,6 +389,7 @@ const genQRSVGText = async (code: string, size: number): Promise<string> => {
         },
         dotsOptions: {
             type: "dots",
+            roundSize: false,
         },
         backgroundOptions: {
             round: 0,
@@ -432,6 +434,7 @@ const genQRCanvas = async (code: string, size: number): Promise<HTMLCanvasElemen
     const qr = new QRCodeStyling({
         width: size * CANVAS_SCALE,
         height: size * CANVAS_SCALE,
+        margin: (size * CANVAS_SCALE) * 0.05,
         data: `${NEXT_PUBLIC_APP_URL}/receive/${code}`,
         image: APP_CONFIG.QR_LOGO_PATH,
         qrOptions: {
@@ -447,6 +450,7 @@ const genQRCanvas = async (code: string, size: number): Promise<HTMLCanvasElemen
         },
         dotsOptions: {
             type: "dots",
+            roundSize: false,
         },
         backgroundOptions: {
             round: 0,

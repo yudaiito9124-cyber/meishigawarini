@@ -1038,6 +1038,8 @@
       "navigatorShare": "Share via other apps",
       "x": "Brag on X",
       "line": "Share on LINE",
+      "instagram": "Show off on Instagram",
+      "instagramCopied": "Copied! Opening Instagram",
       "options": {
         "title": "What to share:",
         "product": "Product info",
@@ -1267,7 +1269,9 @@
       "searchPlaceholder": "Search by Batch ID...",
       "recentTitle": "Recent Print History",
       "loading": "Loading...",
-      "loadMore": "Fetch More"
+      "loadMore": "Fetch More",
+      "showBatchHistory": "Show Print History",
+      "hideBatchHistory": "Hide Print History"
     },
     "list": {
       "title": "All QR Codes",

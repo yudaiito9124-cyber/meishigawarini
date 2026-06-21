@@ -13,8 +13,8 @@
  *  - 【受取履歴への自動追加】
  *    - 被贈答者がログイン済みの場合、ギフト ID を `RECEIVEDLOG` へ追加し、自分の履歴からいつでもチャットを見返せるようにします。
  *  - 【購読と通知のマルチキャスト】
- *    - 受取人の Email をチャットの通知リストへ自動登録（Subscribe）し、登録完了メールを送信。
- *    - 同時にショップオーナーに対しても、新しい注文が入ったことを通知します。
+ *    - 受取人の Email をチャットの通知リストへ自動登録（Subscribe）し、登録されたすべての配送先情報を含めた登録完了メールを送信。
+ *    - 同時にショップオーナーに対しても、新しい注文が入ったことを通知します（個人情報保護のため、ショップ向けの通知メールには配送先住所やメールアドレスなどの個人情報は含めません）。
  * @context
  *  - ギフトを受け取るという体験のクライマックスであり、最もデータ整合性が求められるポイントです。
  */
@@ -182,10 +182,21 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                     ExpressionAttributeValues: { ':lang': 'ja' }
                 }));
                 // 確認メール送信
+                // 登録された配送先情報（氏名、郵便番号、住所、電話番号、メールアドレス、配送希望日、配送希望時間帯）をそのままゲスト宛てに転送します。
                 await sendLocalizedEmail({
                     type: 'ADDRESS_REGISTRATION_CONFIRMATION',
                     to: email,
-                    params: { qr_id, pin },
+                    params: {
+                        qr_id,
+                        pin,
+                        name: name || '',
+                        zip_code: normalizeZipCode(zip_code) || '',
+                        address: address || '',
+                        phone: phone || '指定なし',
+                        email: email || '',
+                        preferred_date: preferred_date || '指定なし',
+                        preferred_time: preferred_time || '指定なし'
+                    },
                     lang: 'ja'
                 });
             } catch (e) { console.error('Recipient notification/subscription failed', e); }

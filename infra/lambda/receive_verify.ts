@@ -117,7 +117,9 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             shop_detail_html: detail_html ? await signUrlsInHtml(detail_html, BUCKET_NAME) : undefined,
             shop_email: shopEmail,
             shortest_delivery_days: shop?.shortest_delivery_days ?? 3,
-            delivery_time_options: shop?.delivery_time_options ?? ["timeMorning", "time1416", "time1618", "time1820", "time1921"],
+            // 配送希望時間帯リスト
+            // DBに空配列（[]）が登録されている場合でも、システム標準のデフォルト時間帯配列を返却するようにフォールバックを強化します。
+            delivery_time_options: (shop?.delivery_time_options && shop.delivery_time_options.length > 0) ? shop.delivery_time_options : ["timeMorning", "time1416", "time1618", "time1820", "time1921"],
             product: product ? {
                 ...product,
                 image_url: product.image_url ? await signUrlIfS3(product.image_url, BUCKET_NAME) : undefined,

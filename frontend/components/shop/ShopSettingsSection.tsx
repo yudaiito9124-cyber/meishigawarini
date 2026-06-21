@@ -162,7 +162,10 @@ export function ShopSettingsSection({ shopId }: { shopId: string }) {
                 html_image_urls: htmlImageUrls,
                 deleted_html_image_urls: htmlImageUrlsToDelete,
                 shortest_delivery_days: shortestDeliveryDays !== '' ? Math.max(0, parseInt(shortestDeliveryDays, 10)) : null,
-                delivery_time_options: deliveryTimeOptionsText.trim() !== '' ? deliveryTimeOptionsText.split('\n').map(s => s.trim()).filter(s => s !== '') : [],
+                // 配送希望時間の選択肢リスト
+                // 空欄の場合はnullを設定することで、DB側に空配列ではなくnull（または非存在）を登録させ、
+                // システム標準のデフォルト時間帯が正しく適用されるようにします。
+                delivery_time_options: deliveryTimeOptionsText.trim() !== '' ? deliveryTimeOptionsText.split('\n').map(s => s.trim()).filter(s => s !== '') : null,
                 order_notification_user_ids: orderNotificationUserIds,
                 inquiry_notification_user_ids: inquiryNotificationUserIds,
                 shipping_label_settings: shippingLabelSettings

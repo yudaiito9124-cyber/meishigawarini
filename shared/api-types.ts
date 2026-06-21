@@ -74,7 +74,7 @@ export type ShopApiSchema = {
         shop_phone?: string;
         shop_recipient_name?: string;
         shortest_delivery_days?: number | null;
-        delivery_time_options?: string[];
+        delivery_time_options?: string[] | null;
         order_notification_user_ids?: string[];
         inquiry_notification_user_ids?: string[];
         shipping_label_settings?: {

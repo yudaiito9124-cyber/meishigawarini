@@ -10,6 +10,22 @@
  */
 
 export const paperformats: { [format: string]: any } = {
+    "51677E-1.036": {
+        description: "【デフォルト】[A-one 51677E] A4-10切名刺サイズ(縁スッキリ，表面のみ全面印刷対応，厚口) 縁無し(1.036倍)",
+        pageWidth: 210, // mm
+        pageHeight: 297, // mm
+        cols: 2,
+        rows: 5,
+        cols_gap: 4, // mm
+        rows_gap: 2, // mm
+        offset_x: 12, // mm
+        offset_y: 7, // mm
+        uraomote: true,
+        comment: "x1.036",
+        scale: 1.036363636,
+        dots: false,
+        dotsedge: true
+    },
     "1S31034": {
         description: "[A-one 31034] 切れ込みのないA4に10枚印刷",
         pageWidth: 210, // mm
@@ -135,22 +151,6 @@ export const paperformats: { [format: string]: any } = {
         uraomote: true,
         comment: "x1.03",
         scale: 1.03,
-        dots: false,
-        dotsedge: true
-    },
-    "51677E-1.036": {
-        description: "[A-one 51677E] A4-10切名刺サイズ(縁スッキリ，表面のみ全面印刷対応，厚口) 縁無し(1.036倍)",
-        pageWidth: 210, // mm
-        pageHeight: 297, // mm
-        cols: 2,
-        rows: 5,
-        cols_gap: 4, // mm
-        rows_gap: 2, // mm
-        offset_x: 12, // mm
-        offset_y: 7, // mm
-        uraomote: true,
-        comment: "x1.036",
-        scale: 1.036363636,
         dots: false,
         dotsedge: true
     },

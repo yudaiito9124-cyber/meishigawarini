@@ -40,6 +40,7 @@ const genQR = async (code: string) => {
     const qr = new QRCodeStyling({
         width: 600,
         height: 600,
+        margin: 30,
         data: `${NEXT_PUBLIC_APP_URL}/receive/${code}`,
         image: APP_CONFIG.QR_LOGO_PATH, // 中央に配置するロゴ
         qrOptions: {
@@ -55,6 +56,7 @@ const genQR = async (code: string) => {
         },
         dotsOptions: {
             type: "dots", // ドット形式の QR
+            roundSize: false,
         },
         backgroundOptions: {
             round: 0,
