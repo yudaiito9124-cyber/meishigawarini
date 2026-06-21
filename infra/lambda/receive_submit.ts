@@ -36,6 +36,37 @@ import { ReceiveApiSchema } from '@shared/api-types';
 const cognito = new CognitoIdentityProviderClient({});
 const USER_POOL_ID = process.env.USER_POOL_ID || '';
 
+/**
+ * 配送希望時間帯のキーを多言語対応した表示名に変換します。
+ * 標準キー以外（ショップ独自のカスタム指定文字列等）はそのまま返します。
+ *
+ * @param timeKey - 配送希望時間帯のキー（またはカスタム文字列）
+ * @param lang - 表示言語（'ja' または 'en'）
+ * @returns 変換後の表示名
+ */
+function getDisplayPreferredTime(timeKey: string | undefined, lang: 'ja' | 'en' = 'ja'): string {
+    if (!timeKey) {
+        return lang === 'ja' ? '指定なし' : 'Not specified';
+    }
+    const mappings: Record<'ja' | 'en', Record<string, string>> = {
+        ja: {
+            timeMorning: '午前中',
+            time1416: '14-16時',
+            time1618: '16-18時',
+            time1820: '18-20時',
+            time1921: '19-21時'
+        },
+        en: {
+            timeMorning: 'Morning',
+            time1416: '14:00 - 16:00',
+            time1618: '16:00 - 18:00',
+            time1820: '18:00 - 20:00',
+            time1921: '19:00 - 21:00'
+        }
+    };
+    return mappings[lang][timeKey] || timeKey;
+}
+
 export const handler: APIGatewayProxyHandler = async (event) => {
     try {
         if (event.httpMethod === 'OPTIONS') return successResponse();
@@ -195,7 +226,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                         phone: phone || '指定なし',
                         email: email || '',
                         preferred_date: preferred_date || '指定なし',
-                        preferred_time: preferred_time || '指定なし'
+                        preferred_time: getDisplayPreferredTime(preferred_time, 'ja')
                     },
                     lang: 'ja'
                 });
