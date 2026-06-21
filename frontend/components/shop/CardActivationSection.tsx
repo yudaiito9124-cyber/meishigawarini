@@ -42,7 +42,19 @@ const ActivationScanner = ({
     handleScanSuccess, handleScannerError, finishScan,
     copiedId, handleCopy, isManualInput, manualInput, t, st
 }: ActivationScannerProps) => (
-    <Dialog open={isScanning} onOpenChange={(open) => setActivation({ isScanning: open })}>
+    <Dialog open={isScanning} onOpenChange={(open) => {
+        if (!open) {
+            setActivation((prev: any) => {
+                const patch: any = { isScanning: false };
+                if (!prev.scannedQrId) {
+                    patch.scannedQrIds = [];
+                }
+                return patch;
+            });
+        } else {
+            setActivation({ isScanning: true });
+        }
+    }}>
         <DialogTrigger asChild>
             <Button type="button" variant="outline" className="w-full h-auto flex flex-col justify-center items-center gap-4 text-xl py-16 bg-gray-300">
                 <div style={{ width: '100px', aspectRatio: '1' }}>
@@ -402,7 +414,7 @@ export function CardActivationSection({ shopId }: CardActivationProps) {
             setActivation({ scannedQrIds: [{ qr_id, ts: Date.now(), status: data }] });
         } catch (error: any) {
             const translatedError = translateError(error.message, error.detail) || t('linkQr.foreignQrError');
-            setActivation({ scannedQrIds: [{ qr_id, ts: Date.now(), error: translatedError }], scannedQrId: '' });
+            setActivation({ scannedQrIds: [], scannedQrId: '' });
             alert(translatedError + (error.detail ? ` (${error.detail})` : ''));
         } finally {
             setIsChecking(false);
