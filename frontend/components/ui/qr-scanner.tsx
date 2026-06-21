@@ -3,7 +3,7 @@
  * 目的: WebWorker + WebAssembly で高速スキャンを実現する qr-scanner を用いて、
  *       デバイスのカメラからQRコードをスキャンして結果をコールバックで返します。
  * 改善点: メインスレッドをブロックしない60fpsのプレビュー、高い認識率、自動フォーカス、スキャンボックス可視化。
- *         小さいQRコード対応として、1080p HD解像度指定、スキャン領域のピクセル保存量拡大、ズーム切り替えボタンを追加。
+ *         遠くのQRコード対応として、ネイティブズームとCSS+クロップによる擬似ソフトウェアズーム（ハイブリッドズーム）を搭載。
  */
 'use client';
 
@@ -36,10 +36,25 @@ const QRScanner = (props: QRScannerProps) => {
     const [cameras, setCameras] = useState<{ id: string; label: string }[]>([]);
     const [selectedCameraId, setSelectedCameraId] = useState<string>("");
     const [isStarting, setIsStarting] = useState(true);
+    
+    // Zoom control states
     const [zoomSupported, setZoomSupported] = useState(false);
+    const [zoomState, setZoomState] = useState(1); // 1 = 1.0x, 2 = 1.8x (zoom)
     const [currentZoom, setCurrentZoom] = useState(1);
 
     const isMounted = useRef(true);
+    
+    // Refs to avoid stale closures in qr-scanner callbacks
+    const zoomStateRef = useRef(1);
+    const zoomSupportedRef = useRef(false);
+
+    useEffect(() => {
+        zoomStateRef.current = zoomState;
+    }, [zoomState]);
+
+    useEffect(() => {
+        zoomSupportedRef.current = zoomSupported;
+    }, [zoomSupported]);
 
     // Store latest callbacks in refs to avoid stale closures
     const successCallbackRef = useRef(props.qrCodeSuccessCallback);
@@ -66,6 +81,8 @@ const QRScanner = (props: QRScannerProps) => {
         if (!videoRef.current) return;
         setIsStarting(true);
         setPermissionError(false);
+        setZoomState(1);
+        zoomStateRef.current = 1;
 
         // 既存のスキャナーインスタンスがあれば破棄する
         if (scannerRef.current) {
@@ -88,22 +105,24 @@ const QRScanner = (props: QRScannerProps) => {
                     preferredCamera: cameraId || 'environment',
                     highlightScanRegion: true,
                     highlightCodeOutline: true,
-                    maxScansPerSecond: props.fps || 25,
+                    // 古い端末のCPU負荷を下げるため、デコード頻度を1秒あたり12回（十分スムーズかつ軽量）に制限
+                    maxScansPerSecond: props.fps || 12,
                     calculateScanRegion: (video) => {
                         const videoWidth = video.videoWidth;
                         const videoHeight = video.videoHeight;
                         const minDimension = Math.min(videoWidth, videoHeight);
-                        // スキャン領域を全体の60%に絞り、ピントが合う距離を保ちやすくします
-                        const scanRegionSize = Math.round(minDimension * 0.6);
+                        
+                        // ソフトウェアズーム（2x設定かつネイティブズーム非対応）のときは、スキャンエリアをより狭く切り取ります
+                        // 1xの時は50%、2xの時は全体の約28% (50% / 1.8) を切り取ることで、映像拡大とアライメント枠のサイズ維持を両立させます
+                        const cropFactor = (!zoomSupportedRef.current && zoomStateRef.current === 2) ? (0.5 / 1.8) : 0.5;
+                        const scanRegionSize = Math.round(minDimension * cropFactor);
                         
                         return {
                             x: Math.round((videoWidth - scanRegionSize) / 2),
                             y: Math.round((videoHeight - scanRegionSize) / 2),
                             width: scanRegionSize,
                             height: scanRegionSize,
-                            // 小さいQRコードの解像度を保つため、デフォルト(400px)より大きい600pxでスレッドに送ります
-                            downScaledWidth: 600,
-                            downScaledHeight: 600,
+                            // ダウンスケール指定を省略することで、カメラセンサーの生の画素ディテールをそのままデコーダーに渡します
                         };
                     },
                     onDecodeError: (err) => {
@@ -123,21 +142,25 @@ const QRScanner = (props: QRScannerProps) => {
                 const videoTrack = stream.getVideoTracks()[0];
                 if (videoTrack) {
                     try {
-                        // 1080p Full HD、30-60FPS、および連続オートフォーカスを適用
-                        await videoTrack.applyConstraints({
-                            width: { ideal: 1920 },
-                            height: { ideal: 1080 },
-                            frameRate: { ideal: 30, max: 60 },
-                            advanced: [{ focusMode: "continuous" }]
-                        } as any);
+                        // 古いiPhoneの負荷軽減のため、720p（十分高画質）かつ30FPSを要求し、連続オートフォーカスを適用
+                        if (typeof videoTrack.applyConstraints === 'function') {
+                            await videoTrack.applyConstraints({
+                                width: { ideal: 1280 },
+                                height: { ideal: 720 },
+                                frameRate: { ideal: 30 },
+                                advanced: [{ focusMode: "continuous" }]
+                            } as any);
+                        }
 
                         // デバイスがズームに対応しているか判定
-                        const capabilities = videoTrack.getCapabilities() as any;
-                        if (capabilities && capabilities.zoom) {
-                            setZoomSupported(true);
-                            setCurrentZoom(capabilities.zoom.min || 1);
-                        } else {
-                            setZoomSupported(false);
+                        if (typeof videoTrack.getCapabilities === 'function') {
+                            const capabilities = videoTrack.getCapabilities() as any;
+                            if (capabilities && capabilities.zoom) {
+                                setZoomSupported(true);
+                                setCurrentZoom(capabilities.zoom.min || 1);
+                            } else {
+                                setZoomSupported(false);
+                            }
                         }
                     } catch (e) {
                         console.warn("Failed to apply optimal video constraints", e);
@@ -232,25 +255,30 @@ const QRScanner = (props: QRScannerProps) => {
     };
 
     const handleToggleZoom = async () => {
-        if (!videoRef.current || !zoomSupported) return;
-        const stream = videoRef.current.srcObject as MediaStream;
-        if (!stream) return;
-        const videoTrack = stream.getVideoTracks()[0];
-        if (!videoTrack) return;
+        if (!videoRef.current) return;
+        const nextZoomState = zoomState === 1 ? 2 : 1;
+        setZoomState(nextZoomState);
 
-        try {
-            const capabilities = videoTrack.getCapabilities() as any;
-            const min = capabilities.zoom.min || 1;
-            const max = capabilities.zoom.max || 3;
-            // ズーム倍率は 1倍 と 2倍 (または最大倍率) で切り替え
-            const nextZoom = currentZoom === min ? Math.min(2, max) : min;
-            
-            await videoTrack.applyConstraints({
-                advanced: [{ zoom: nextZoom }]
-            } as any);
-            setCurrentZoom(nextZoom);
-        } catch (e) {
-            console.error("Failed to apply zoom", e);
+        if (zoomSupported) {
+            const stream = videoRef.current.srcObject as MediaStream;
+            if (!stream) return;
+            const videoTrack = stream.getVideoTracks()[0];
+            if (!videoTrack) return;
+
+            try {
+                const capabilities = videoTrack.getCapabilities() as any;
+                const min = capabilities.zoom.min || 1;
+                const max = capabilities.zoom.max || 3;
+                // ズーム倍率は 1倍 と 2倍 (または最大倍率) で切り替え
+                const nextZoom = nextZoomState === 2 ? Math.min(2, max) : min;
+                
+                await videoTrack.applyConstraints({
+                    advanced: [{ zoom: nextZoom }]
+                } as any);
+                setCurrentZoom(nextZoom);
+            } catch (e) {
+                console.error("Failed to apply zoom", e);
+            }
         }
     };
 
@@ -270,20 +298,32 @@ const QRScanner = (props: QRScannerProps) => {
 
     return (
         <div className="relative w-full h-full group overflow-hidden rounded-2xl bg-black">
-            <video 
-                ref={videoRef} 
-                className="w-full h-full object-cover" 
-                playsInline 
-                muted 
-            />
+            {/* ソフトウェアズーム適用時にビデオ要素とアライメントオーバーレイを一緒にCSS拡大 */}
+            <div 
+                className="w-full h-full transition-transform duration-300 ease-in-out"
+                style={{ 
+                    transform: (!zoomSupported && zoomState === 2) ? 'scale(1.8)' : 'scale(1.0)' 
+                }}
+            >
+                <video 
+                    ref={videoRef} 
+                    className="w-full h-full object-cover" 
+                    playsInline 
+                    muted 
+                />
+            </div>
             
             {/* Overlay UI */}
             <div className="absolute inset-0 flex flex-col pointer-events-none">
-                {/* Center Loading */}
-                <div className="flex-grow flex items-center justify-center">
-                    {isStarting && (
+                {/* Center Loading & Hint */}
+                <div className="flex-grow flex flex-col items-center justify-center gap-4">
+                    {isStarting ? (
                         <div className="bg-black/40 backdrop-blur-sm p-4 rounded-full">
                             <Loader2 className="w-8 h-8 text-white animate-spin" />
+                        </div>
+                    ) : (
+                        <div className="bg-black/50 backdrop-blur-sm px-4 py-2 rounded-full border border-white/10 shadow-lg text-[10px] sm:text-xs font-semibold text-white max-w-[85%] text-center leading-relaxed">
+                            QRコードを少し離して枠の中心に近づけてください
                         </div>
                     )}
                 </div>
@@ -301,17 +341,15 @@ const QRScanner = (props: QRScannerProps) => {
                         </div>
 
                         <div className="flex items-center gap-2">
-                            {zoomSupported && (
-                                <Button 
-                                    variant="ghost" 
-                                    size="sm" 
-                                    className="h-10 px-3 rounded-full bg-white/10 hover:bg-white/20 text-white border border-white/20 backdrop-blur-md transition-all active:scale-90 text-xs font-bold mr-1"
-                                    onClick={handleToggleZoom}
-                                    title="ズーム切り替え"
-                                >
-                                    {currentZoom.toFixed(1)}x
-                                </Button>
-                            )}
+                            <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                className="h-10 px-3 rounded-full bg-white/10 hover:bg-white/20 text-white border border-white/20 backdrop-blur-md transition-all active:scale-90 text-xs font-bold mr-1"
+                                onClick={handleToggleZoom}
+                                title="ズーム切り替え"
+                            >
+                                {zoomSupported ? `${currentZoom.toFixed(1)}x` : (zoomState === 2 ? "1.8x" : "1.0x")}
+                            </Button>
                             {cameras.length > 1 && (
                                 <Button 
                                     variant="ghost" 
