@@ -81,7 +81,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         const promises: Promise<any>[] = [];
         const now = new Date().toISOString();
 
-        // 3.1. メール送信 (Resend)
+        // 3.1. メール送信 (Resend) - ショップオーナー宛
         if (shopRecipients.length > 0) {
             promises.push(sendLocalizedEmail({
                 type: 'INQUIRY_NOTIFICATION',
@@ -97,6 +97,35 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 },
                 lang: 'ja' // 固定または何らかの方法で判定
             }));
+        }
+
+        // --------------------------------------------------------------------
+        // データベース参照: システム設定 (SYSTEM#SETTINGS, METADATA) の取得
+        // 目的: 新規の問い合わせがあった際に通知するべき管理者メーリングリストを取得します。
+        // --------------------------------------------------------------------
+        try {
+            const sysRes = await ddb.send(new GetCommand({
+                TableName: TABLE_NAME, Key: { PK: 'SYSTEM#SETTINGS', SK: 'METADATA' }
+            }));
+            const adminRecipients = sysRes.Item?.admin_inquiry_mailing_list;
+            if (adminRecipients && Array.isArray(adminRecipients) && adminRecipients.length > 0) {
+                promises.push(sendLocalizedEmail({
+                    type: 'ADMIN_INQUIRY_NOTIFICATION',
+                    to: adminRecipients,
+                    reply_to: reply_email,
+                    params: {
+                        content,
+                        reply_email,
+                        phone: phone || 'なし',
+                        shopName: shopRes.Item.name || 'Shop',
+                        qr_id,
+                        shopId
+                    },
+                    lang: 'ja'
+                }));
+            }
+        } catch (e) {
+            console.error('Failed to prepare admin inquiry notification:', e);
         }
 
         // 3.2. ショップオーナー向け Unified Chat 通知 (即クローズ)

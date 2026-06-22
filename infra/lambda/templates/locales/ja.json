@@ -4,5 +4,7 @@
   "SHIPPING_NOTIFICATION": "【名刺代わりに】発送完了のお知らせ",
   "ADDRESS_REGISTRATION_CONFIRMATION": "【名刺代わりに】住所登録完了のお知らせ",
   "ADDRESS_REGISTRATION_NOTIFICATION": "【名刺代わりに】お届け先住所が登録されました",
-  "INQUIRY_NOTIFICATION": "【名刺代わりに】お問い合わせのお知らせ"
+  "INQUIRY_NOTIFICATION": "【名刺代わりに】お問い合わせのお知らせ",
+  "ADMIN_INQUIRY_NOTIFICATION": "【名刺代わりに】[管理者通知] 新規お問い合わせ",
+  "ADMIN_CARD_ORDER_NOTIFICATION": "【名刺代わりに】[管理者通知] 新規カード発注"
 }

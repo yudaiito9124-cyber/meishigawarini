@@ -483,7 +483,7 @@ export function ProductsSection({
                                                                 <img src={editingProduct.image_url} className="w-full h-auto rounded-md border shadow-sm max-h-32 object-contain bg-gray-50" />
                                                             </div>
                                                         )}
-                                                        <Input id="image" name="image" type="file" accept="image/png, image/jpeg, image/gif, image/webp" required={!editingProduct} />
+                                                        <Input id="image" name="image" type="file" accept="image/*" required={!editingProduct} />
                                                         <p className="text-xs text-gray-500">{t('addProduct.imagePlaceholder')}</p>
                                                     </div>
 

@@ -248,6 +248,7 @@ export default function DeliverySettingsPage() {
                         {/* 住所 */}
                         <div className="space-y-3">
                             <Label htmlFor="address" className="text-md font-black text-slate-600 uppercase tracking-widest ml-1">{t('address')}</Label>
+                            <p className="text-xs text-red-500 font-medium ml-1">{t('addressNote')}</p>
                             <Input
                                 id="address"
                                 required

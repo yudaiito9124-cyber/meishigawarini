@@ -1656,6 +1656,7 @@ export default function ReceivePage() {
                                 </div>
                                 <div className="space-y-2">
                                     <Label htmlFor="address">{t('formStep.address')}</Label>
+                                    <p className="text-xs text-red-500 font-medium">{t('formStep.addressNote')}</p>
                                     <Input
                                         id="address"
                                         required

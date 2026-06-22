@@ -267,6 +267,21 @@ export class AdminApi extends cdk.NestedStack {
     grantTablePermissions(admin_card_orders, true);
     bucket.grantRead(admin_card_orders);
 
+    const admin_settings = new nodejs.NodejsFunction(this, 'admin_settings', {
+      entry: lampath('admin_settings'),
+      ...commonProps,
+      environment: {
+        ...commonProps.environment,
+        USER_POOL_ID: userPool.userPoolId,
+      }
+    });
+    grantTablePermissions(admin_settings, true);
+    admin_settings.addToRolePolicy(new iam.PolicyStatement({
+      actions: ['cognito-idp:AdminGetUser', 'cognito-idp:ListUsersInGroup'],
+      resources: [userPool.userPoolArn]
+    }));
+
+
 
 
     ////////////////////////////////////////////////////////////////////////////////
@@ -342,6 +357,11 @@ export class AdminApi extends cdk.NestedStack {
     addResourceWithCors(adminCardOrdersResource, 'update').addMethod('POST', new apigateway.LambdaIntegration(admin_card_orders), { authorizer: authorizerOfAdmin, });
     addResourceWithCors(adminCardOrdersResource, 'create').addMethod('POST', new apigateway.LambdaIntegration(admin_card_orders), { authorizer: authorizerOfAdmin, });
     addResourceWithCors(adminCardOrdersResource, 'get').addMethod('POST', new apigateway.LambdaIntegration(admin_card_orders), { authorizer: authorizerOfAdmin, });
+
+    // /admin/settings
+    const adminSettingsResource = addResourceWithCors(this.adminResource, 'settings');
+    addResourceWithCors(adminSettingsResource, 'get').addMethod('POST', new apigateway.LambdaIntegration(admin_settings), { authorizer: authorizerOfAdmin, });
+    addResourceWithCors(adminSettingsResource, 'update').addMethod('POST', new apigateway.LambdaIntegration(admin_settings), { authorizer: authorizerOfAdmin, });
 
 
   }

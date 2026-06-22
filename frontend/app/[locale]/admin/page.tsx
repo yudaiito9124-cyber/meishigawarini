@@ -64,6 +64,7 @@ import { getDisplayMessage } from '@/lib/chatMessage';
 import { toDisplayParticipantId } from '@/lib/chatId';
 import ChatAttachment from '@/components/chat/ChatAttachment';
 import OrderDetailsDialog from "@/components/admin/OrderDetailsDialog";
+import { AdminSettingsSection } from "@/components/admin/AdminSettingsSection";
 
 /**
  * SHOP_OPENING の form_snapshot を厳格に検証する type guard。
@@ -174,6 +175,10 @@ export default function AdminPage() {
     const [isManualGenerateOpen, setIsManualGenerateOpen] = useState(false);
     /** 直近の印刷履歴セクションの表示・非表示 */
     const [isBatchHistoryOpen, setIsBatchHistoryOpen] = useState(false);
+    /** 発注済みで未対応のカード印刷の件数 */
+    const [orderedCardOrdersCount, setOrderedCardOrdersCount] = useState(0);
+    /** 未対応の問い合わせ件数 */
+    const [activeInquiriesCount, setActiveInquiriesCount] = useState(0);
 
 
     /**
@@ -247,6 +252,71 @@ export default function AdminPage() {
     }, [activeTab, isBatchHistoryOpen]);
 
     /**
+     * 発注済みで未対応(ステータスが 'ORDERED')のカード注文の総数を取得します。
+     * バッジに表示するために使用します。
+     */
+    const fetchOrderedCardOrdersCount = async () => {
+        try {
+            // ステータス ORDERED の注文を最大100件取得して件数をカウントします。
+            const data = await adminApi.admin_card_orders_list({
+                status: 'ORDERED',
+                limit: 100
+            });
+            setOrderedCardOrdersCount(data.items?.length || 0);
+        } catch (e) {
+            console.error("Failed to fetch ordered card orders count", e);
+        }
+    };
+
+    /**
+     * 未対応の問い合わせ（アクティブなチャット）の総数を取得します。
+     * バッジに表示するために使用します。
+     */
+    const fetchActiveInquiriesCount = async () => {
+        try {
+            // 終了ステータスの定義
+            const TERMINAL_STATUSES = new Set(['APPROVED', 'REJECTED', 'CANCELLED', 'RESOLVED', 'CLOSED', 'NOTIFICATION']);
+            const normalizeStatus = (status?: string) => String(status || '').toUpperCase();
+            const isTerminalStatus = (status?: string) => TERMINAL_STATUSES.has(normalizeStatus(status));
+            
+            let collectedCount = 0;
+            let cursor: string | null = null;
+            
+            // 最大10回ループしてアクティブな件数を集計します（通常は数回で終了）
+            for (let i = 0; i < 10; i++) {
+                const response = await adminApi.fetch_post('/unified/chat/list', {
+                    participant_id: 'ADMIN',
+                    include_archived: false,
+                    limit: 50,
+                    ...(cursor ? { cursor } : {}),
+                });
+                
+                const items: any[] = response.items || [];
+                const activeItems = items.filter((chat) => !isTerminalStatus(chat?.status));
+                
+                collectedCount += activeItems.length;
+                
+                cursor = response.cursor ?? null;
+                if (!cursor || items.length < 50) {
+                    break;
+                }
+            }
+            
+            setActiveInquiriesCount(collectedCount);
+        } catch (e) {
+            console.error("Failed to fetch active inquiries count", e);
+        }
+    };
+
+    /**
+     * 初期表示時に未対応の件数を取得します。
+     */
+    useEffect(() => {
+        fetchOrderedCardOrdersCount();
+        fetchActiveInquiriesCount();
+    }, []);
+
+    /**
      * カード注文の一覧を取得します（フィルタ条件に従う）。
      */
     const fetchCardOrders = async () => {
@@ -257,6 +327,8 @@ export default function AdminPage() {
                 limit: 50
             });
             setCardOrders(data.items || []);
+            // リスト更新時にバッジ件数も再取得します。
+            fetchOrderedCardOrdersCount();
         } catch (e) {
             console.error("Failed to fetch card orders", e);
         } finally {
@@ -544,6 +616,8 @@ export default function AdminPage() {
                                 {t('helpButton') || "Help"}
                             </Button>
                         </Link>
+                        
+                        <AdminSettingsSection />
                         {/* <Link href="/login" className="w-full sm:w-auto">
                             <Button variant="destructive" className="shadow-md cursor-pointer border border-red-900 w-full sm:w-auto">
                                 {t('qrAdminLoginPage')}
@@ -586,12 +660,20 @@ export default function AdminPage() {
                     <button
                         onClick={() => setActiveTab("cardorders")}
                         className={cn(
-                            "flex flex-col items-center justify-center p-6 rounded-2xl border-2 transition-all duration-200 cursor-pointer shadow-sm hover:shadow-md",
+                            "relative flex flex-col items-center justify-center p-6 rounded-2xl border-2 transition-all duration-200 cursor-pointer shadow-sm hover:shadow-md",
                             activeTab === "cardorders"
                                 ? "bg-white border-white text-mist-900 ring-2 ring-mist-700 ring-offset-2 ring-offset-mist-900"
                                 : "bg-mist-800 border-mist-700 text-mist-300 hover:border-mist-600 hover:bg-mist-700/50"
                         )}
                     >
+                        {orderedCardOrdersCount > 0 && (
+                            <Badge
+                                variant="destructive"
+                                className="absolute top-3 right-3 px-2 py-0.5 text-xs font-bold rounded-full bg-red-500 text-white animate-pulse"
+                            >
+                                {orderedCardOrdersCount}
+                            </Badge>
+                        )}
                         <Printer className={cn("w-12 h-12 mb-3", activeTab === "cardorders" ? "text-mist-900" : "text-mist-400")} />
                         <span className="text-lg font-bold">{t('tabs.cardorders')}</span>
                     </button>
@@ -622,12 +704,20 @@ export default function AdminPage() {
                     <button
                         onClick={() => setActiveTab("inquiries")}
                         className={cn(
-                            "flex flex-col items-center justify-center p-6 rounded-2xl border-2 transition-all duration-200 cursor-pointer shadow-sm hover:shadow-md",
+                            "relative flex flex-col items-center justify-center p-6 rounded-2xl border-2 transition-all duration-200 cursor-pointer shadow-sm hover:shadow-md",
                             activeTab === "inquiries"
                                 ? "bg-white border-white text-mist-900 ring-2 ring-mist-700 ring-offset-2 ring-offset-mist-900"
                                 : "bg-mist-800 border-mist-700 text-mist-300 hover:border-mist-600 hover:bg-mist-700/50"
                         )}
                     >
+                        {activeInquiriesCount > 0 && (
+                            <Badge
+                                variant="destructive"
+                                className="absolute top-3 right-3 px-2 py-0.5 text-xs font-bold rounded-full bg-red-500 text-white animate-pulse"
+                            >
+                                {activeInquiriesCount}
+                            </Badge>
+                        )}
                         <HelpCircle className={cn("w-12 h-12 mb-3", activeTab === "inquiries" ? "text-mist-900" : "text-mist-400")} />
                         <span className="text-lg font-bold">{t('tabs.inquiries')}</span>
                     </button>
@@ -1152,7 +1242,7 @@ export default function AdminPage() {
                  */}
                 {activeTab === "inquiries" && (
                     <div className="grid grid-cols-1 gap-6 animate-in fade-in slide-in-from-bottom-2 duration-300 items-start">
-                        <AdminInquiryChatSection dbCardDesigns={dbCardDesigns} />
+                        <AdminInquiryChatSection dbCardDesigns={dbCardDesigns} onRefreshInquiriesCount={fetchActiveInquiriesCount} />
                     </div>
                 )}
 
@@ -1200,7 +1290,7 @@ export default function AdminPage() {
  * 管理者向けの問い合わせチャット画面。
  * 一覧と詳細を同一画面で表示し、ADMIN 参加者としてメッセージの閲覧・返信を行います。
  */
-function AdminInquiryChatSection({ dbCardDesigns }: { dbCardDesigns: any[] }) {
+function AdminInquiryChatSection({ dbCardDesigns, onRefreshInquiriesCount }: { dbCardDesigns: any[], onRefreshInquiriesCount?: () => void }) {
     const t = useTranslations('AdminPage');
     const [confirmTerminalAction, setConfirmTerminalAction] = useState<'RESOLVED' | 'APPROVED' | 'REJECTED' | null>(null);
     const [notificationLoading, setNotificationLoading] = useState(false);
@@ -1422,6 +1512,8 @@ function AdminInquiryChatSection({ dbCardDesigns }: { dbCardDesigns: any[] }) {
         setSelectedChat(null);
         setSelectedMessages([]);
         fetchPage(0, fresh);
+        // 親コンポーネントのバッジ件数を更新します。
+        onRefreshInquiriesCount?.();
     };
 
     const handleFetchPastChats = async () => {

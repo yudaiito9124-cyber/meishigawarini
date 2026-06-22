@@ -24,6 +24,7 @@ import { ShopApiSchema } from '@shared/api-types';
 import { validateQRParams } from './utils/qr-validation';
 import { signUrlIfS3 } from './utils/s3';
 import { getSystemDesign } from './utils/designs';
+import { sendLocalizedEmail } from './templates/email';
 
 export const handler: APIGatewayProxyHandler = async (event) => {
     try {
@@ -102,6 +103,35 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                     GSI2_SK: now
                 }
             }));
+
+            // --------------------------------------------------------------------
+            // データベース参照: システム設定 (SYSTEM#SETTINGS, METADATA) の取得
+            // 目的: 新規発注発生時に通知するべき管理者メーリングリストを取得します。
+            // --------------------------------------------------------------------
+            try {
+                const sysRes = await ddb.send(new GetCommand({
+                    TableName: TABLE_NAME,
+                    Key: { PK: 'SYSTEM#SETTINGS', SK: 'METADATA' }
+                }));
+                const adminEmails = sysRes.Item?.admin_order_mailing_list;
+                if (adminEmails && Array.isArray(adminEmails) && adminEmails.length > 0) {
+                    // 管理者向け通知メールは一旦日本語（ja）で送信します
+                    await sendLocalizedEmail({
+                        type: 'ADMIN_CARD_ORDER_NOTIFICATION',
+                        to: adminEmails,
+                        params: {
+                            orderId,
+                            shopId,
+                            quantity: String(quantity),
+                            designId: design_id,
+                            shopName: shopMetadata.name || 'Unknown Shop'
+                        },
+                        lang: 'ja'
+                    });
+                }
+            } catch (emailErr) {
+                console.error('Failed to send admin order notification:', emailErr);
+            }
 
             return apiResponse(201, { message: 'Card order created', order_id: orderId });
         }

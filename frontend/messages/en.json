@@ -863,6 +863,7 @@
       "name-placeholder": "John Doe",
       "address": "Delivery Address",
       "address-placeholder": "1-1 Meishigawarini St., Akita",
+      "addressNote": "Please note that some shops may not support delivery to Okinawa or remote islands.",
       "zip_code": "Postal Code",
       "zip_code-placeholder": "010-XXXX",
       "phone": "Phone Number",
@@ -1054,6 +1055,22 @@
     "qrAdminLoginPage": "Admin Login Page",
     "helpButton": "Help",
     "cancel": "Cancel",
+    "settings": {
+      "title": "System Settings",
+      "description": "Configure system-wide settings and administrator notifications.",
+      "adminList": "System Administrators",
+      "adminListDesc": "Users belonging to the Administrators or GlobalAdmins group in Cognito.",
+      "adminManageDesc": "Please manage adding or removing administrators from the AWS Cognito console.",
+      "notificationSettings": "Notification Settings",
+      "notificationSettingsDesc": "Configure email notification recipients for new card orders and inquiries.",
+      "user": "Administrator",
+      "orderNotifications": "Card Order Notifications",
+      "inquiryNotifications": "Inquiry Notifications",
+      "noAdminsFound": "No administrators found.",
+      "submit": "Save Settings",
+      "success": "Settings saved successfully.",
+      "error": "Failed to save settings."
+    },
     "tabs": {
       "qrcodes": "QR Codes",
       "shops": "Shop Management",
@@ -1495,7 +1512,20 @@
       "confirmDelete": "Are you sure?",
       "uploadFailed": "Upload failed",
       "frontToggle": "Front",
-      "size": "Size"
+      "size": "Size",
+      "qrCode": "QR Code",
+      "pin": "PIN",
+      "codeId": "Code ID",
+      "position": "Position",
+      "posX": "Pos: X",
+      "posY": "Pos: Y",
+      "newDesignName": "New Design",
+      "increaseSize": "Increase Size by {amount}mm",
+      "decreaseSize": "Decrease Size by {amount}mm",
+      "moveUp": "Move Up {amount}mm",
+      "moveDown": "Move Down {amount}mm",
+      "moveLeft": "Move Left {amount}mm",
+      "moveRight": "Move Right {amount}mm"
     }
   },
   "VerifyPage": {

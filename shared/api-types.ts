@@ -21,6 +21,11 @@ export type AdminApiSchema = {
     admin_shop_create: { name: string; description?: string; owner_id?: string; gm_ids?: string[] }; // ショップの作成
     admin_shop_carddesign_link_get: { shop_id: string }; // ショップとカードデザインの紐付け取得
     admin_shop_carddesign_link_update: { shop_id: string; card_designs: string[] }; // ショップとカードデザインの紐付け更新
+    // システム設定
+    // システム設定取得
+    admin_settings_get: {};
+    // システム設定更新
+    admin_settings_update: { admin_order_notification_user_ids: string[]; admin_inquiry_notification_user_ids: string[] };
     // QRコード
     admin_qr_ban: { qr_id: string; reason?: string }; //QRコードをBAN / 解除
     admin_qr_deleteban: { target?: string }; //BANされたQRコードを削除 (指定がない場合は全件)

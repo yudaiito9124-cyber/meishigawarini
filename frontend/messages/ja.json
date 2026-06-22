@@ -987,6 +987,7 @@
       "name-placeholder": "名刺代わりに 太郎",
       "address": "配送先住所",
       "address-placeholder": "秋田県秋田市名刺代わりに町1-1",
+      "addressNote": "ショップによっては沖縄や離島への配送に対応していない場合がございます。",
       "zip_code": "〒郵便番号",
       "zip_code-placeholder": "010-XXXX等(ハイフンなしでも可)",
       "phone": "電話番号",
@@ -1207,6 +1208,22 @@
     "back": "戻る",
     "table": {
       "receiverUserId": "受取人ユーザーID"
+    },
+    "settings": {
+      "title": "システム設定",
+      "description": "システムの全体設定や管理者への通知設定を行います。",
+      "adminList": "システム管理者一覧",
+      "adminListDesc": "Cognitoで Administrators または GlobalAdmins グループに所属するユーザーです。",
+      "adminManageDesc": "管理者の追加・削除はAWS Cognitoコンソールから行ってください。",
+      "notificationSettings": "通知設定",
+      "notificationSettingsDesc": "新規カード発注や問い合わせ発生時のメール通知先を設定します。",
+      "user": "管理者",
+      "orderNotifications": "カード発注通知",
+      "inquiryNotifications": "問い合わせ通知",
+      "noAdminsFound": "管理者が一人も見つかりません。",
+      "submit": "設定を保存する",
+      "success": "設定を保存しました。",
+      "error": "設定の保存に失敗しました。"
     },
     "tabs": {
       "qrcodes": "カード一覧",
@@ -1675,8 +1692,21 @@
       "saveError": "保存中にエラーが発生しました",
       "confirmDelete": "本当に削除しますか？",
       "uploadFailed": "アップロードに失敗しました",
-      "frontToggle": "Front",
-      "size": "Size"
+      "frontToggle": "表面に配置",
+      "size": "サイズ",
+      "qrCode": "QRコード",
+      "pin": "PINコード",
+      "codeId": "コードID",
+      "position": "配置位置",
+      "posX": "X座標",
+      "posY": "Y座標",
+      "newDesignName": "新規デザイン",
+      "increaseSize": "サイズを {amount}mm 大きくする",
+      "decreaseSize": "サイズを {amount}mm 小さくする",
+      "moveUp": "上に {amount}mm 移動",
+      "moveDown": "下に {amount}mm 移動",
+      "moveLeft": "左に {amount}mm 移動",
+      "moveRight": "右に {amount}mm 移動"
     }
   },
   "VerifyPage": {

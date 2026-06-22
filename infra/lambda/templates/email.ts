@@ -27,6 +27,10 @@ import * as jaAddressNotification from './locales/ja/ADDRESS_REGISTRATION_NOTIFI
 import * as enAddressNotification from './locales/en/ADDRESS_REGISTRATION_NOTIFICATION';
 import * as jaInquiryNotification from './locales/ja/INQUIRY_NOTIFICATION';
 import * as enInquiryNotification from './locales/en/INQUIRY_NOTIFICATION';
+import * as jaAdminInquiryNotification from './locales/ja/ADMIN_INQUIRY_NOTIFICATION';
+import * as enAdminInquiryNotification from './locales/en/ADMIN_INQUIRY_NOTIFICATION';
+import * as jaAdminCardOrderNotification from './locales/ja/ADMIN_CARD_ORDER_NOTIFICATION';
+import * as enAdminCardOrderNotification from './locales/en/ADMIN_CARD_ORDER_NOTIFICATION';
 
 /** システムで利用可能な通知メールのタイプ */
 export type EmailType =
@@ -35,7 +39,9 @@ export type EmailType =
     | 'SHIPPING_NOTIFICATION'
     | 'ADDRESS_REGISTRATION_CONFIRMATION'
     | 'ADDRESS_REGISTRATION_NOTIFICATION'
-    | 'INQUIRY_NOTIFICATION';
+    | 'INQUIRY_NOTIFICATION'
+    | 'ADMIN_INQUIRY_NOTIFICATION'
+    | 'ADMIN_CARD_ORDER_NOTIFICATION';
 
 /** 言語別の件名マッピング */
 const subjects: Record<string, any> = {
@@ -51,7 +57,9 @@ const bodies: Record<string, Record<string, string>> = {
         SHIPPING_NOTIFICATION: jaShippingNotification.body,
         ADDRESS_REGISTRATION_CONFIRMATION: jaAddressConfirmation.body,
         ADDRESS_REGISTRATION_NOTIFICATION: jaAddressNotification.body,
-        INQUIRY_NOTIFICATION: jaInquiryNotification.body
+        INQUIRY_NOTIFICATION: jaInquiryNotification.body,
+        ADMIN_INQUIRY_NOTIFICATION: jaAdminInquiryNotification.body,
+        ADMIN_CARD_ORDER_NOTIFICATION: jaAdminCardOrderNotification.body
     },
     en: {
         MESSAGE_NOTIFICATION: enMessageNotification.body,
@@ -59,7 +67,9 @@ const bodies: Record<string, Record<string, string>> = {
         SHIPPING_NOTIFICATION: enShippingNotification.body,
         ADDRESS_REGISTRATION_CONFIRMATION: enAddressConfirmation.body,
         ADDRESS_REGISTRATION_NOTIFICATION: enAddressNotification.body,
-        INQUIRY_NOTIFICATION: enInquiryNotification.body
+        INQUIRY_NOTIFICATION: enInquiryNotification.body,
+        ADMIN_INQUIRY_NOTIFICATION: enAdminInquiryNotification.body,
+        ADMIN_CARD_ORDER_NOTIFICATION: enAdminCardOrderNotification.body
     }
 };
 

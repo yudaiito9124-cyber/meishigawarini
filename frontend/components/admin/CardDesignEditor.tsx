@@ -1,3 +1,20 @@
+/**
+ * ファイル概要: カードデザイン管理エディタ (Card Design Editor)
+ * 
+ * 役割:
+ * システム管理者向けに、カードの背景画像設定、サイズ、および各種印刷要素（QRコード、PIN、コードID）の
+ * 配置位置やサイズを動的に編集・調整・プレビュー・保存するためのコンポーネントです。
+ * 
+ * 主要機能:
+ * 1. カードデザインのCRUD処理（一覧取得、新規作成、保存、削除）。
+ * 2. カードの表面・裏面の背景画像アップロードおよびサムネイル生成連携。
+ * 3. 印刷配置要素（QR, PIN, Code ID）の位置（X, Y座標）およびサイズ（S）の数値直接入力および微調整。
+ * 4. 表裏それぞれのレイアウトと配置要素のリアルタイムプレビュー表示。
+ * 
+ * コンテキスト:
+ * 管理者ダッシュボード（Admin Dashboard）内の「デザイン管理」タブから呼び出されます。
+ */
+
 "use client";
 
 import { useState, useEffect } from "react";
@@ -6,7 +23,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Plus, Trash2, Save, Upload, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, ChevronsUp, ChevronsDown, ChevronsLeft, ChevronsRight, RefreshCw, Layers, Paintbrush } from "lucide-react";
+import { Plus, Trash2, Save, Upload, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, ChevronsUp, ChevronsDown, ChevronsLeft, ChevronsRight, RefreshCw, Layers, Paintbrush, QrCode, Hash, Barcode, Move, Minus } from "lucide-react";
 import { fetchAuthSession } from 'aws-amplify/auth';
 import { cn } from "@/lib/utils";
 import { useTranslations } from 'next-intl';
@@ -36,6 +53,313 @@ interface CardDesign {
     isfront_code: boolean;
 }
 
+/**
+ * 位置（X, Y）またはサイズ（S）の数値を直接入力・表示するための入力バッジコンポーネント。
+ * 微調整用ボタンとの連動、および入力中の一時的な文字入力（空文字やマイナス符号）の許容を実現しています。
+ * 
+ * @param label バッジのラベル（X / Y / S）
+ * @param value 現在保持されている数値
+ * @param onChange 値が正常に更新された際に呼び出されるコールバック
+ */
+const ValueBadgeInput = ({
+    label,
+    value,
+    onChange
+}: {
+    label: string;
+    value: number;
+    onChange: (v: number) => void;
+}) => {
+    // 入力中の一時状態を保持するためのローカルステート
+    const [tempValue, setTempValue] = useState(value.toString());
+
+    // 外部（微調整ボタン等）で値が書き換わった場合に、ローカル入力欄と同期する
+    useEffect(() => {
+        // タイピング中の一時入力状態（空文字やマイナス符号のみ）の時は同期をスキップする
+        if (tempValue === "" || tempValue === "-") {
+            return;
+        }
+        const parsed = parseFloat(tempValue);
+        // 外部の値とローカルの数値が異なる場合のみ同期を行う
+        if (isNaN(parsed) || parsed !== value) {
+            setTempValue(value.toString());
+        }
+    }, [value]);
+
+    return (
+        <div className="bg-mist-900/80 px-1.5 py-0.5 rounded border border-mist-700/50 font-mono text-[9px] flex gap-1 items-center hover:border-sky-500/50 transition-colors">
+            <span className="text-mist-500 font-medium select-none">{label}</span>
+            <input
+                type="number"
+                step="any"
+                value={tempValue}
+                // 値 of 変更時に即座に親ステートの更新を実行する
+                onChange={(e) => {
+                    setTempValue(e.target.value);
+                    const val = parseFloat(e.target.value);
+                    if (!isNaN(val)) {
+                        onChange(val);
+                    }
+                }}
+                // 入力欄からフォーカスが外れた際に、一時的な状態をリセットしフォーマットを確定させる
+                onBlur={() => {
+                    const parsed = parseFloat(tempValue);
+                    if (tempValue === "" || isNaN(parsed)) {
+                        setTempValue(value.toString());
+                    } else {
+                        setTempValue(parsed.toString());
+                    }
+                }}
+                className="bg-transparent text-sky-400 w-11 text-right font-bold focus:outline-none focus:bg-mist-800 rounded px-0.5 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+            />
+        </div>
+    );
+};
+
+const CompactAdjusterPanel = ({
+    title, isFront, onFrontChange,
+    posField, posValue,
+    sizeField, sizeValue,
+    frontToggleLabel,
+    sizeLabel,
+    onValueChange,
+    onAdjust
+}: {
+    title: string;
+    isFront: boolean;
+    onFrontChange: (v: boolean) => void;
+    posField: 'qrpos' | 'pinpos' | 'codepos';
+    posValue: { x: number; y: number };
+    sizeField: 'qrsize' | 'pinsize' | 'codesize';
+    sizeValue: number;
+    frontToggleLabel: string;
+    sizeLabel: string;
+    onValueChange: (field: 'qrpos' | 'pinpos' | 'codepos' | 'qrsize' | 'pinsize' | 'codesize', subfield: 'x' | 'y' | null, val: number) => void;
+    onAdjust: (field: string, subfield: string | null, delta: number) => void;
+}) => {
+    const t = useTranslations('AdminPage');
+    const isQr = posField === 'qrpos';
+    const isPin = posField === 'pinpos';
+
+    // ヘッダーで使用するバッジコンポーネントを定義します
+    // QRコードはアイコンを表示し、PINは「123」、IDは「a-z」の文字バッジを表示します
+    const renderHeaderBadge = () => {
+        const badgeClass = "text-[9px] font-mono font-black px-1.5 py-0.5 rounded bg-mist-950/60 border border-mist-800 text-sky-400 select-none tracking-wider shrink-0 leading-none";
+        if (isQr) return <QrCode className="w-4 h-4 text-sky-400 shrink-0" />;
+        if (isPin) return <span className={badgeClass}>123</span>;
+        return <span className={badgeClass}>a-z</span>;
+    };
+
+    // サイズ調整ボタンのグラフィック表現のためのスケール別コンテンツ（アイコンまたはテキストバッジ）を生成します
+    const renderSizingBadge = (scale: 'large' | 'tiny') => {
+        if (isQr) {
+            return scale === 'large' 
+                ? <QrCode className="w-3 h-3 text-sky-400 shrink-0" />
+                : <QrCode className="w-1.5 h-1.5 text-sky-400/60 shrink-0" />;
+        }
+        const badgeText = isPin ? "123" : "a-z";
+        if (scale === 'large') {
+            return (
+                <span className="text-[7px] font-mono font-black px-0.5 rounded bg-mist-950/60 border border-mist-800 text-sky-400 leading-none py-px shrink-0">
+                    {badgeText}
+                </span>
+            );
+        } else {
+            return (
+                <span className="text-[5px] font-mono font-bold px-0.5 rounded bg-mist-950/40 border border-mist-900 text-sky-400/70 leading-none scale-90 origin-center shrink-0">
+                    {badgeText}
+                </span>
+            );
+        }
+    };
+
+    return (
+        <div className="group flex flex-col rounded-lg border border-mist-800 bg-mist-950/20 hover:border-mist-700 transition-colors">
+            {/* ヘッダー部分：タイトルと表示面スイッチ */}
+            <div className="flex items-center justify-between bg-mist-900/60 px-3 py-2 rounded-t-lg border-b border-mist-850 select-none">
+                <div className="flex items-center gap-2">
+                    {renderHeaderBadge()}
+                    <span className="text-xs font-bold text-mist-200 tracking-wide">{title}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                    <span className="text-[9px] text-mist-400 uppercase font-bold tracking-wider">{frontToggleLabel}</span>
+                    <Switch checked={isFront} onCheckedChange={onFrontChange} className="scale-75 data-[state=checked]:bg-sky-500/70" />
+                </div>
+            </div>
+
+            {/* 操作パネル部分 */}
+            <div className="flex flex-col gap-3 p-3 bg-mist-950/40 rounded-b-lg">
+                <div className="flex items-stretch gap-3">
+                    {/* 左側：サイズ調整操作パネル（SIZE） */}
+                    <div className="flex-[4] flex flex-col items-center justify-between py-2 bg-mist-950/20 rounded border border-mist-800/40 px-2 gap-2">
+                        <div className="text-[8px] font-black text-mist-500 select-none tracking-wider uppercase">
+                            <span>{t('cardDesignEditor.size')}</span>
+                        </div>
+                        <div className="flex flex-col items-stretch justify-center gap-1 w-full flex-1">
+                            {/* 大きく（+1.0）調整するボタン */}
+                            <button
+                                className="h-6 flex items-center justify-center gap-1 bg-mist-900/60 hover:bg-mist-800 border border-mist-800 hover:border-mist-700 rounded text-[9px] font-bold text-mist-200 transition-colors cursor-pointer"
+                                onClick={() => onAdjust(sizeField, null, 1)}
+                                title={t('cardDesignEditor.increaseSize', { amount: '1.0' })}
+                            >
+                                {renderSizingBadge('large')}
+                                <span>+1.0</span>
+                            </button>
+
+                            {/* 微調整（+0.1）調整するボタン */}
+                            <button
+                                className="h-6 flex items-center justify-center gap-1 bg-mist-900/60 hover:bg-mist-800 border border-mist-800 hover:border-mist-700 rounded text-[8px] font-medium text-mist-300 transition-colors cursor-pointer"
+                                onClick={() => onAdjust(sizeField, null, 0.1)}
+                                title={t('cardDesignEditor.increaseSize', { amount: '0.1' })}
+                            >
+                                <span>+0.1</span>
+                            </button>
+
+                            {/* 現在のサイズ設定に対応するシンボルを示す中央表示エリア */}
+                            <div className="flex flex-col items-center justify-center py-1 border-y border-mist-800/30 my-0.5 select-none bg-mist-950/40 rounded-sm w-full min-h-[32px]">
+                                {isQr ? (
+                                    <QrCode className="w-4 h-4 text-sky-400" />
+                                ) : (
+                                    <span className="font-mono font-black text-[9px] text-sky-400 leading-none select-none">
+                                        {isPin ? "123" : "a-z"}
+                                    </span>
+                                )}
+                            </div>
+
+                            {/* 微調整（-0.1）調整するボタン */}
+                            <button
+                                className="h-6 flex items-center justify-center gap-1 bg-mist-900/60 hover:bg-mist-800 border border-mist-800 hover:border-mist-700 rounded text-[8px] font-medium text-mist-300 transition-colors cursor-pointer"
+                                onClick={() => onAdjust(sizeField, null, -0.1)}
+                                title={t('cardDesignEditor.decreaseSize', { amount: '0.1' })}
+                            >
+                                <span>-0.1</span>
+                            </button>
+
+                            {/* 小さく（-1.0）調整するボタン */}
+                            <button
+                                className="h-6 flex items-center justify-center gap-1 bg-mist-900/60 hover:bg-mist-800 border border-mist-800 hover:border-mist-700 rounded text-[9px] font-bold text-mist-200 transition-colors cursor-pointer"
+                                onClick={() => onAdjust(sizeField, null, -1)}
+                                title={t('cardDesignEditor.decreaseSize', { amount: '1.0' })}
+                            >
+                                {renderSizingBadge('tiny')}
+                                <span>-1.0</span>
+                            </button>
+                        </div>
+
+                        {/* 実際のサイズ設定値の手動調整用テキストボックス（SIZEカラムの下） */}
+                        <div className="w-full flex justify-center mt-1">
+                            <ValueBadgeInput label={t('cardDesignEditor.size')} value={sizeValue} onChange={(v) => onValueChange(sizeField, null, v)} />
+                        </div>
+                    </div>
+
+                    {/* 右側：移動操作パネル（POSITION） */}
+                    <div className="flex-[5] flex flex-col items-center justify-between py-2 bg-mist-950/20 rounded border border-mist-800/40 px-2 gap-2">
+                        <div className="text-[8px] font-black text-mist-500 select-none tracking-wider flex items-center gap-1 uppercase">
+                            <Move className="w-2.5 h-2.5" />
+                            <span>{t('cardDesignEditor.position')}</span>
+                        </div>
+                        <div className="grid grid-cols-5 items-center justify-items-center gap-0.5 flex-1 my-auto">
+                            <div /> <div />
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6 hover:bg-mist-700 text-mist-500 hover:text-mist-200"
+                                onClick={() => onAdjust(posField, 'y', -1)}
+                                title={t('cardDesignEditor.moveUp', { amount: '1.0' })}
+                            >
+                                <ChevronsUp className="w-3.5 h-3.5" />
+                            </Button>
+                            <div /> <div />
+
+                            <div /> <div />
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6 hover:bg-mist-700 text-mist-300 hover:text-white"
+                                onClick={() => onAdjust(posField, 'y', -0.1)}
+                                title={t('cardDesignEditor.moveUp', { amount: '0.1' })}
+                            >
+                                <ChevronUp className="w-3.5 h-3.5" />
+                            </Button>
+                            <div /> <div />
+
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6 hover:bg-mist-700 text-mist-500 hover:text-mist-200"
+                                onClick={() => onAdjust(posField, 'x', -1)}
+                                title={t('cardDesignEditor.moveLeft', { amount: '1.0' })}
+                            >
+                                <ChevronsLeft className="w-3.5 h-3.5" />
+                            </Button>
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6 hover:bg-mist-700 text-mist-300 hover:text-white"
+                                onClick={() => onAdjust(posField, 'x', -0.1)}
+                                title={t('cardDesignEditor.moveLeft', { amount: '0.1' })}
+                            >
+                                <ChevronLeft className="w-3.5 h-3.5" />
+                            </Button>
+                            <div className="w-4 h-4 flex items-center justify-center text-mist-500">
+                                <Move className="w-3.5 h-3.5" />
+                            </div>
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6 hover:bg-mist-700 text-mist-300 hover:text-white"
+                                onClick={() => onAdjust(posField, 'x', 0.1)}
+                                title={t('cardDesignEditor.moveRight', { amount: '0.1' })}
+                            >
+                                <ChevronRight className="w-3.5 h-3.5" />
+                            </Button>
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6 hover:bg-mist-700 text-mist-500 hover:text-mist-200"
+                                onClick={() => onAdjust(posField, 'x', 1)}
+                                title={t('cardDesignEditor.moveRight', { amount: '1.0' })}
+                            >
+                                <ChevronsRight className="w-3.5 h-3.5" />
+                            </Button>
+
+                            <div /> <div />
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6 hover:bg-mist-700 text-mist-300 hover:text-white"
+                                onClick={() => onAdjust(posField, 'y', 0.1)}
+                                title={t('cardDesignEditor.moveDown', { amount: '0.1' })}
+                            >
+                                <ChevronDown className="w-3.5 h-3.5" />
+                            </Button>
+                            <div /> <div />
+
+                            <div /> <div />
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6 hover:bg-mist-700 text-mist-500 hover:text-mist-200"
+                                onClick={() => onAdjust(posField, 'y', 1)}
+                                title={t('cardDesignEditor.moveDown', { amount: '1.0' })}
+                            >
+                                <ChevronsDown className="w-3.5 h-3.5" />
+                            </Button>
+                            <div /> <div />
+                        </div>
+
+                        {/* 実際の位置設定値の手動調整用テキストボックス（十字ボタンの下） */}
+                        <div className="flex gap-1.5 justify-center w-full mt-1">
+                            <ValueBadgeInput label={t('cardDesignEditor.posX')} value={posValue.x} onChange={(v) => onValueChange(posField, 'x', v)} />
+                            <ValueBadgeInput label={t('cardDesignEditor.posY')} value={posValue.y} onChange={(v) => onValueChange(posField, 'y', v)} />
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 export default function CardDesignEditor({ apiUrl }: { apiUrl: string }) {
     const t = useTranslations('AdminPage');
     const [designs, setDesigns] = useState<CardDesign[]>([]);
@@ -47,6 +371,9 @@ export default function CardDesignEditor({ apiUrl }: { apiUrl: string }) {
     const fetchDesigns = async () => {
         setLoading(true);
         try {
+            // データベース操作概要: カードデザイン情報の一覧取得 (Query)
+            // 対象キー: PK = CARD_DESIGN#METADATA
+            // クエリ意図: システム管理者が登録済みのすべてのカードデザイン設定を一覧表示・管理するため
             const data = await adminApi.admin_carddesigns_list({});
             setDesigns(data.items || []);
         } catch (e) {
@@ -64,7 +391,7 @@ export default function CardDesignEditor({ apiUrl }: { apiUrl: string }) {
         const id = generateId();
         const newDesign: CardDesign = {
             design_id: id,
-            name: "New Design",
+            name: t('cardDesignEditor.newDesignName'),
             description: "",
             bgimgf: "",
             bgimgb: "",
@@ -96,8 +423,14 @@ export default function CardDesignEditor({ apiUrl }: { apiUrl: string }) {
             const designIdentifier = editingDesign.SK || editingDesign.design_id;
 
             if (isNew) {
+                // データベース操作概要: 新規カードデザイン情報の作成 (PutItem)
+                // 対象キー: PK = CARD_DESIGN#METADATA, SK = {design_id}
+                // クエリ意図: 新しいカードデザイン(画像、サイズ、要素配置など)の設定レコードをDBに新規保存するため
                 await adminApi.admin_carddesigns_create({ design_id: designIdentifier, design: editingDesign });
             } else {
+                // データベース操作概要: カードデザイン情報の更新 (UpdateItem)
+                // 対象キー: PK = CARD_DESIGN#METADATA, SK = {design_id}
+                // クエリ意図: 編集されたカードデザインの設定内容をDBに反映させて上書き保存するため
                 await adminApi.admin_carddesigns_update({ design_id: designIdentifier, design: editingDesign });
             }
 
@@ -115,6 +448,9 @@ export default function CardDesignEditor({ apiUrl }: { apiUrl: string }) {
     const handleDelete = async (id: string) => {
         if (!confirm(t('cardDesignEditor.confirmDelete'))) return;
         try {
+            // データベース操作概要: カードデザイン情報の削除 (DeleteItem)
+            // 対象キー: PK = CARD_DESIGN#METADATA, SK = {design_id}
+            // クエリ意図: 不要になった特定のカードデザイン設定レコードをデータベースから完全に物理削除するため
             await adminApi.admin_carddesigns_delete({ design_id: id });
             fetchDesigns();
         } catch (e) {
@@ -187,74 +523,42 @@ export default function CardDesignEditor({ apiUrl }: { apiUrl: string }) {
         setEditingDesign(newDesign);
     };
 
-    const ValueBadge = ({ label, value }: { label: string, value: number }) => (
-        <div className="bg-mist-900/80 px-1.5 py-0.5 rounded border border-mist-700/50 font-mono text-[9px] flex gap-1 items-center">
-            <span className="text-mist-500 font-medium">{label}</span>
-            <span className="text-sky-400 min-w-[30px] text-right font-bold">{value.toFixed(1)}</span>
-        </div>
-    );
+    /**
+     * 指定された位置(座標)またはサイズ属性の値を直接更新するハンドラー関数。
+     * 各種座標(qrpos, pinpos, codepos)やサイズ(qrsize, pinsize, codesize)のステータス更新を安全に行います。
+     * 
+     * @param field 更新対象の属性キー ('qrpos' | 'pinpos' | 'codepos' | 'qrsize' | 'pinsize' | 'codesize')
+     * @param subfield 座標系の更新時におけるサブキー ('x' | 'y')。サイズ系の場合は null を指定
+     * @param val 新しい数値
+     */
+    const setValue = (
+        field: 'qrpos' | 'pinpos' | 'codepos' | 'qrsize' | 'pinsize' | 'codesize',
+        subfield: 'x' | 'y' | null,
+        val: number
+    ) => {
+        if (!editingDesign) return;
+        const newDesign = { ...editingDesign };
+        const roundedVal = Number(val.toFixed(2));
+        if (field === 'qrpos') {
+            if (subfield === 'x') newDesign.qrpos = { ...newDesign.qrpos, x: roundedVal };
+            if (subfield === 'y') newDesign.qrpos = { ...newDesign.qrpos, y: roundedVal };
+        } else if (field === 'pinpos') {
+            if (subfield === 'x') newDesign.pinpos = { ...newDesign.pinpos, x: roundedVal };
+            if (subfield === 'y') newDesign.pinpos = { ...newDesign.pinpos, y: roundedVal };
+        } else if (field === 'codepos') {
+            if (subfield === 'x') newDesign.codepos = { ...newDesign.codepos, x: roundedVal };
+            if (subfield === 'y') newDesign.codepos = { ...newDesign.codepos, y: roundedVal };
+        } else if (field === 'qrsize') {
+            newDesign.qrsize = roundedVal;
+        } else if (field === 'pinsize') {
+            newDesign.pinsize = roundedVal;
+        } else if (field === 'codesize') {
+            newDesign.codesize = roundedVal;
+        }
+        setEditingDesign(newDesign);
+    };
 
-    const CompactAdjusterPanel = ({
-        title, isFront, onFrontChange,
-        posField, posValue,
-        sizeField, sizeValue
-    }: {
-        title: string, isFront: boolean, onFrontChange: (v: boolean) => void,
-        posField: string, posValue: { x: number; y: number },
-        sizeField: string, sizeValue: number
-    }) => (
-        <div className="group">
-            <div className="flex items-center justify-between bg-mist-950/40 p-1 px-3 rounded-t-lg border-x border-t border-mist-700 transition-colors group-hover:bg-mist-950/60">
-                <div className="flex items-center gap-4">
-                    <span className="text-[10px] font-bold text-mist-400 uppercase tracking-wider">{title}</span>
-                    <div className="flex gap-1.5">
-                        <ValueBadge label="X" value={posValue.x} />
-                        <ValueBadge label="Y" value={posValue.y} />
-                        <ValueBadge label="S" value={sizeValue} />
-                    </div>
-                </div>
-                <div className="flex items-center gap-2">
-                    <span className="text-[9px] text-mist-600 uppercase font-medium">{t('cardDesignEditor.frontToggle')}</span>
-                    <Switch checked={isFront} onCheckedChange={onFrontChange} className="scale-75 data-[state=checked]:bg-sky-500/70" />
-                </div>
-            </div>
-            <div className="flex items-stretch gap-1 bg-mist-900/10 p-1.5 rounded-b-lg border border-mist-700">
-                <div className="flex-[2] flex justify-center py-1">
-                    <div className="grid grid-cols-5 items-center justify-items-center gap-0.5">
-                        <div /> <div />
-                        <Button variant="ghost" size="icon" className="h-6 w-6 hover:bg-mist-700 text-mist-500 hover:text-mist-200" onClick={() => adjust(posField, 'y', -1)}><ChevronsUp className="w-3.5 h-3.5" /></Button>
-                        <div /> <div />
 
-                        <div /> <div />
-                        <Button variant="ghost" size="icon" className="h-6 w-6 hover:bg-mist-700 text-mist-300 hover:text-white" onClick={() => adjust(posField, 'y', -0.1)}><ChevronUp className="w-3.5 h-3.5" /></Button>
-                        <div /> <div />
-
-                        <Button variant="ghost" size="icon" className="h-6 w-6 hover:bg-mist-700 text-mist-500 hover:text-mist-200" onClick={() => adjust(posField, 'x', -1)}><ChevronsLeft className="w-3.5 h-3.5" /></Button>
-                        <Button variant="ghost" size="icon" className="h-6 w-6 hover:bg-mist-700 text-mist-300 hover:text-white" onClick={() => adjust(posField, 'x', -0.1)}><ChevronLeft className="w-3.5 h-3.5" /></Button>
-                        <div className="w-3 h-3 flex items-center justify-center"><div className="w-1 h-1 rounded-full bg-mist-700" /></div>
-                        <Button variant="ghost" size="icon" className="h-6 w-6 hover:bg-mist-700 text-mist-300 hover:text-white" onClick={() => adjust(posField, 'x', 0.1)}><ChevronRight className="w-3.5 h-3.5" /></Button>
-                        <Button variant="ghost" size="icon" className="h-6 w-6 hover:bg-mist-700 text-mist-500 hover:text-mist-200" onClick={() => adjust(posField, 'x', 1)}><ChevronsRight className="w-3.5 h-3.5" /></Button>
-
-                        <div /> <div />
-                        <Button variant="ghost" size="icon" className="h-6 w-6 hover:bg-mist-700 text-mist-300 hover:text-white" onClick={() => adjust(posField, 'y', 0.1)}><ChevronDown className="w-3.5 h-3.5" /></Button>
-                        <div /> <div />
-
-                        <div /> <div />
-                        <Button variant="ghost" size="icon" className="h-6 w-6 hover:bg-mist-700 text-mist-500 hover:text-mist-200" onClick={() => adjust(posField, 'y', 1)}><ChevronsDown className="w-3.5 h-3.5" /></Button>
-                        <div /> <div />
-                    </div>
-                </div>
-                <div className="w-px bg-mist-700/50 my-1" />
-                <div className="flex-1 flex flex-col items-center justify-center gap-0.5">
-                    <Button variant="ghost" size="icon" className="h-6 w-6 hover:bg-mist-700 text-mist-500 hover:text-mist-200" onClick={() => adjust(sizeField, null, 1)}><ChevronsUp className="w-3.5 h-3.5" /></Button>
-                    <Button variant="ghost" size="icon" className="h-6 w-6 hover:bg-mist-700 text-mist-300 hover:text-white" onClick={() => adjust(sizeField, null, 0.1)}><ChevronUp className="w-3.5 h-3.5" /></Button>
-                    <div className="text-[7px] text-mist-600 uppercase font-black select-none tracking-tighter">{t('cardDesignEditor.size')}</div>
-                    <Button variant="ghost" size="icon" className="h-6 w-6 hover:bg-mist-700 text-mist-300 hover:text-white" onClick={() => adjust(sizeField, null, -0.1)}><ChevronDown className="w-3.5 h-3.5" /></Button>
-                    <Button variant="ghost" size="icon" className="h-6 w-6 hover:bg-mist-700 text-mist-500 hover:text-mist-200" onClick={() => adjust(sizeField, null, -1)}><ChevronsDown className="w-3.5 h-3.5" /></Button>
-                </div>
-            </div>
-        </div>
-    );
 
     return (
         <div className="space-y-6">
@@ -270,7 +574,7 @@ export default function CardDesignEditor({ apiUrl }: { apiUrl: string }) {
                     </CardHeader>
                     <CardContent className="overflow-visible">
 
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 animate-in slide-in-from-bottom-4 duration-300">
+                        <div className="grid grid-cols-1 lg:grid-cols-[500px_1fr] gap-6 animate-in slide-in-from-bottom-4 duration-300">
                             <Card className="bg-mist-900 border-mist-700 text-white">
                                 <CardHeader>
                                     <CardTitle>{t('cardDesignEditor.editorTitle', { id: editingDesign.design_id })}</CardTitle>
@@ -352,33 +656,45 @@ export default function CardDesignEditor({ apiUrl }: { apiUrl: string }) {
 
                                         <div className="grid gap-4 mt-2">
                                             <CompactAdjusterPanel
-                                                title="QR Code"
+                                                title={t('cardDesignEditor.qrCode')}
                                                 isFront={editingDesign.isfront_qr}
                                                 onFrontChange={v => setEditingDesign({ ...editingDesign, isfront_qr: v })}
                                                 posField="qrpos"
                                                 posValue={editingDesign.qrpos}
                                                 sizeField="qrsize"
                                                 sizeValue={editingDesign.qrsize}
+                                                frontToggleLabel={t('cardDesignEditor.frontToggle')}
+                                                sizeLabel={t('cardDesignEditor.size')}
+                                                onValueChange={setValue}
+                                                onAdjust={adjust}
                                             />
 
                                             <CompactAdjusterPanel
-                                                title="PIN"
+                                                title={t('cardDesignEditor.pin')}
                                                 isFront={editingDesign.isfront_pin}
                                                 onFrontChange={v => setEditingDesign({ ...editingDesign, isfront_pin: v })}
                                                 posField="pinpos"
                                                 posValue={editingDesign.pinpos}
                                                 sizeField="pinsize"
                                                 sizeValue={editingDesign.pinsize}
+                                                frontToggleLabel={t('cardDesignEditor.frontToggle')}
+                                                sizeLabel={t('cardDesignEditor.size')}
+                                                onValueChange={setValue}
+                                                onAdjust={adjust}
                                             />
 
                                             <CompactAdjusterPanel
-                                                title="Code ID"
+                                                title={t('cardDesignEditor.codeId')}
                                                 isFront={editingDesign.isfront_code}
                                                 onFrontChange={v => setEditingDesign({ ...editingDesign, isfront_code: v })}
                                                 posField="codepos"
                                                 posValue={editingDesign.codepos}
                                                 sizeField="codesize"
                                                 sizeValue={editingDesign.codesize}
+                                                frontToggleLabel={t('cardDesignEditor.frontToggle')}
+                                                sizeLabel={t('cardDesignEditor.size')}
+                                                onValueChange={setValue}
+                                                onAdjust={adjust}
                                             />
                                         </div>
                                     </div>
