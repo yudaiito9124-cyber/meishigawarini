@@ -6,5 +6,6 @@
   "ADDRESS_REGISTRATION_NOTIFICATION": "[Meishigawarini] Recipient Address Registered",
   "INQUIRY_NOTIFICATION": "[Meishigawarini] New Inquiry Received",
   "ADMIN_INQUIRY_NOTIFICATION": "[Meishigawarini] [Admin Notification] New Inquiry",
-  "ADMIN_CARD_ORDER_NOTIFICATION": "[Meishigawarini] [Admin Notification] New Card Order"
+  "ADMIN_CARD_ORDER_NOTIFICATION": "[Meishigawarini] [Admin Notification] New Card Order",
+  "ADMIN_SUPPORT_CHAT_NOTIFICATION": "[Meishigawarini] [Admin Notification] New Support Chat"
 }

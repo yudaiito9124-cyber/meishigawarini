@@ -31,6 +31,8 @@ import * as jaAdminInquiryNotification from './locales/ja/ADMIN_INQUIRY_NOTIFICA
 import * as enAdminInquiryNotification from './locales/en/ADMIN_INQUIRY_NOTIFICATION';
 import * as jaAdminCardOrderNotification from './locales/ja/ADMIN_CARD_ORDER_NOTIFICATION';
 import * as enAdminCardOrderNotification from './locales/en/ADMIN_CARD_ORDER_NOTIFICATION';
+import * as jaAdminSupportChatNotification from './locales/ja/ADMIN_SUPPORT_CHAT_NOTIFICATION';
+import * as enAdminSupportChatNotification from './locales/en/ADMIN_SUPPORT_CHAT_NOTIFICATION';
 
 /** システムで利用可能な通知メールのタイプ */
 export type EmailType =
@@ -41,7 +43,8 @@ export type EmailType =
     | 'ADDRESS_REGISTRATION_NOTIFICATION'
     | 'INQUIRY_NOTIFICATION'
     | 'ADMIN_INQUIRY_NOTIFICATION'
-    | 'ADMIN_CARD_ORDER_NOTIFICATION';
+    | 'ADMIN_CARD_ORDER_NOTIFICATION'
+    | 'ADMIN_SUPPORT_CHAT_NOTIFICATION';
 
 /** 言語別の件名マッピング */
 const subjects: Record<string, any> = {
@@ -59,7 +62,8 @@ const bodies: Record<string, Record<string, string>> = {
         ADDRESS_REGISTRATION_NOTIFICATION: jaAddressNotification.body,
         INQUIRY_NOTIFICATION: jaInquiryNotification.body,
         ADMIN_INQUIRY_NOTIFICATION: jaAdminInquiryNotification.body,
-        ADMIN_CARD_ORDER_NOTIFICATION: jaAdminCardOrderNotification.body
+        ADMIN_CARD_ORDER_NOTIFICATION: jaAdminCardOrderNotification.body,
+        ADMIN_SUPPORT_CHAT_NOTIFICATION: jaAdminSupportChatNotification.body
     },
     en: {
         MESSAGE_NOTIFICATION: enMessageNotification.body,
@@ -69,7 +73,8 @@ const bodies: Record<string, Record<string, string>> = {
         ADDRESS_REGISTRATION_NOTIFICATION: enAddressNotification.body,
         INQUIRY_NOTIFICATION: enInquiryNotification.body,
         ADMIN_INQUIRY_NOTIFICATION: enAdminInquiryNotification.body,
-        ADMIN_CARD_ORDER_NOTIFICATION: enAdminCardOrderNotification.body
+        ADMIN_CARD_ORDER_NOTIFICATION: enAdminCardOrderNotification.body,
+        ADMIN_SUPPORT_CHAT_NOTIFICATION: enAdminSupportChatNotification.body
     }
 };
 

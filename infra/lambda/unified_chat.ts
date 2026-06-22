@@ -25,6 +25,7 @@ import { generateId } from './utils/id';
 import { successResponse, errorResponse } from './utils/response';
 import { getPublicUrl, signUrlIfS3, stripSignature } from './utils/s3';
 import { UnifiedChatApiSchema } from '@shared/api-types';
+import { sendLocalizedEmail } from './templates/email';
 import {
     assertValidWorkflowPayload,
     canTransitionTo,
@@ -165,6 +166,15 @@ function encodeCursor(lastKey?: Record<string, unknown>): string | null {
 }
 
 const TERMINAL_CHAT_STATUSES = new Set(['APPROVED', 'REJECTED', 'CANCELLED', 'RESOLVED', 'CLOSED']);
+
+const ADMIN_NOTIFICATION_CHAT_TYPES = new Set([
+    'SHOP_SUPPORT',
+    'USER_SUPPORT',
+    'SHOP_OPENING',
+    'CARD_DESIGN',
+    'SHOP_DESIGN',
+    'MISC',
+]);
 
 /**
  * 認証の責務を共通化し、未認証時のエラー文言を全エンドポイントで統一します。
@@ -468,6 +478,42 @@ async function createChat(body: UnifiedChatApiSchema['unified_chat_create'], cal
     // META + 参加者inbox(+初期メッセージ)を単一トランザクションで確定します。
     // これにより「チャットだけ作成されて inbox がない」などの部分成功を防ぎます。
     await ddb.send(new TransactWriteCommand({ TransactItems: transactItems }));
+
+    // --------------------------------------------------------------------
+    // データベース参照: システム設定 (SYSTEM#SETTINGS, METADATA) の取得
+    // 目的: 新規のサポートチャットが作成された際に通知するべき管理者メーリングリストを取得します。
+    // --------------------------------------------------------------------
+    if (ADMIN_NOTIFICATION_CHAT_TYPES.has(body.chat_type)) {
+        try {
+            const sysRes = await ddb.send(new GetCommand({
+                TableName: TABLE_NAME,
+                Key: {
+                    PK: 'SYSTEM#SETTINGS',
+                    SK: 'METADATA',
+                },
+            }));
+            const adminRecipients = sysRes.Item?.admin_inquiry_mailing_list;
+            if (adminRecipients && Array.isArray(adminRecipients) && adminRecipients.length > 0) {
+                // メール送信の失敗がチャットの作成処理全体を妨げないよう、非同期で送信を実行します。
+                // また、送信時のエラーはログに記録し、例外を上方に伝播させません。
+                sendLocalizedEmail({
+                    type: 'ADMIN_SUPPORT_CHAT_NOTIFICATION',
+                    to: adminRecipients,
+                    params: {
+                        chatId: chat_id,
+                        chatType: body.chat_type,
+                        initiatorId,
+                        message: body.initial_message?.message || '(本文なし)',
+                    },
+                    lang: 'ja',
+                }).catch((e) => {
+                    console.error('Failed to send admin support chat notification email:', e);
+                });
+            }
+        } catch (e) {
+            console.error('Failed to fetch admin settings for support chat notification:', e);
+        }
+    }
 
     return successResponse({ chat_id, status: initialStatus, participants });
 }
