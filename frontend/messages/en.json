@@ -773,6 +773,10 @@
       "shortestDeliveryDaysDesc": "Set how many days in advance the delivery date can be selected",
       "deliveryTimeOptions": "Delivery Time List",
       "deliveryTimeOptionsDesc": "Enter options separated by newlines (defaults to 5 slots if empty)",
+      "deliveryNotes": "Delivery & Product Notes",
+      "deliveryNotesPlaceholder": "Enter delivery restrictions or precautions (e.g., Delivery to Okinawa and remote islands is not supported.)",
+      "deliveryNotesDesc": "Displayed with a confirmation checkbox before the recipient registers their address on the receiving page. If left blank, no confirmation screen is shown. Max 1000 characters.",
+      "charCount": "{current}/1000 characters",
       "notificationSettings": "Notification Settings",
       "notificationSettingsDesc": "Configure which managers receive each notification",
       "notificationList": "Notification Management",
@@ -883,6 +887,8 @@
       "passwordPlaceholder": "4+ characters",
       "confirmPasswordLabel": "Confirm Password",
       "confirmPasswordPlaceholder": "Enter again",
+      "deliveryNotesTitle": "Delivery precautions",
+      "deliveryNotesConfirm": "I have read and agree to the delivery precautions.",
       "privacyPolicy": "The personal information you enter will be used only for shipping and shipping-related communications and will not be used for any other purpose."
     },
     "successStep": {
@@ -915,7 +921,8 @@
       "receiveFailed": "Failed to receive the gift.",
       "requiredField": "Please fill in the required fields.",
       "emailMismatch": "Email addresses do not match.",
-      "invalidDate": "The selected delivery date is not available (Please select a date after the shortest delivery date)."
+      "invalidDate": "The selected delivery date is not available (Please select a date after the shortest delivery date).",
+      "notesNotChecked": "Please read the delivery precautions and check the checkbox."
     },
     "chat": {
       "title": "Chat",
@@ -1594,6 +1601,7 @@
     "missing_urls_array": "Missing urls array.",
     "images_deleted": "Images deleted.",
     "operation_failed_qr_might_not_be_in_correct_state_or_belongs_to_another_shop": "Operation failed. QR might not be in correct state or belongs to another shop.",
+    "invalid_delivery_notes_length": "Precautions must be within 1,000 characters.",
     "internal_server_error": "Internal Server Error.",
     "invalid_gift_or_pin": "Invalid Gift or PIN.",
     "too_many_attempts_please_try_again_later": "Too many attempts. Please try again later.",

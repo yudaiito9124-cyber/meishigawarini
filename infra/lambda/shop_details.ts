@@ -143,8 +143,14 @@ export const handler: APIGatewayProxyHandler = async (event) => {
                 delivery_time_options,
                 order_notification_user_ids,
                 inquiry_notification_user_ids,
-                shipping_label_settings
+                shipping_label_settings,
+                delivery_notes
             } = body as ShopApiSchema['shop_details_update'];
+
+            // バリデーション: 注意事項の文字数制限（1000文字以内）
+            if (delivery_notes !== undefined && delivery_notes !== null && delivery_notes.length > 1000) {
+                return errorResponse(400, 'INVALID_DELIVERY_NOTES_LENGTH');
+            }
 
             // 【物理削除の整合性】現在の画像リストを正確に把握するため、DETAIL_HTML レコードを先行取得
             const currentDetailRes = await ddb.send(new GetCommand({
@@ -196,6 +202,10 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             if (inquiry_notification_user_ids !== undefined) { 
                 metadataUpdateExprParts.push('inquiry_notification_user_ids = :iuid'); 
                 attrValues[':iuid'] = inquiry_notification_user_ids; 
+            }
+            if (delivery_notes !== undefined) { 
+                metadataUpdateExprParts.push('delivery_notes = :delivery_notes'); 
+                attrValues[':delivery_notes'] = delivery_notes; 
             }
 
             // 画像 URL リストの同期と物理削除処理

@@ -34,9 +34,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card";
 import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { MessageCircleQuestion, Paperclip, X, FileText, File as FileIcon, Loader2, Save, SendHorizontal, Pencil, UserPlus, Globe, Gift, User, MessagesSquare, Heart, Sparkles, Calendar, Clock, ShoppingBasket, Plus, Copy, Trash2, ChevronDown, ImageIcon, Import, Download, Package, Truck, Send, Check } from "lucide-react";
+import { AlertTriangle, MessageCircleQuestion, Paperclip, X, FileText, File as FileIcon, Loader2, Save, SendHorizontal, Pencil, UserPlus, Globe, Gift, User, MessagesSquare, Heart, Sparkles, Calendar, Clock, ShoppingBasket, Plus, Copy, Trash2, ChevronDown, ImageIcon, Import, Download, Package, Truck, Send, Check } from "lucide-react";
 import { SiFacebook, SiInstagram, SiThreads, SiX, SiYoutube, SiLine, SiTiktok, SiLinktree, SiEight } from "@icons-pack/react-simple-icons";
 import SandboxedHtml from "@/components/SandboxedHtml";
+import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import confetti from "canvas-confetti";
 import { resizeImage } from "@/lib/image-utils";
@@ -166,6 +167,8 @@ export default function ReceivePage() {
     const [preferred_date, setPreferredDate] = useState("");
     /** 希望配送時間帯 */
     const [preferred_time, setPreferredTime] = useState("");
+    /** 配送の注意事項同意チェック */
+    const [notesChecked, setNotesChecked] = useState(false);
 
     // --- パスワード保護関連の状態 ---
     /** 設定用パスワード */
@@ -545,6 +548,13 @@ export default function ReceivePage() {
 
         if (email !== email2) {
             alert(t('formStep.email-mismatch-error'));
+            return;
+        }
+
+        // 配送の注意事項（delivery_notes）が設定されている場合は同意が必要
+        // 未同意の状態で登録しようとした場合にはアラートを表示して処理をブロックします。
+        if (gift?.delivery_notes && !notesChecked) {
+            alert(t('errors.notesNotChecked'));
             return;
         }
 
@@ -1808,6 +1818,31 @@ export default function ReceivePage() {
 
                                 {/* Password Setting Section (Commented out) */}
 
+                                {gift?.delivery_notes && (
+                                    <div className="space-y-4 p-4 border border-amber-200 bg-amber-50/50 rounded-xl animate-in fade-in slide-in-from-top-2 duration-300">
+                                        <div className="text-sm font-bold text-amber-900 flex items-center gap-2">
+                                            <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                                            {t('formStep.deliveryNotesTitle')}
+                                        </div>
+                                        <div className="text-xs text-amber-950 whitespace-pre-wrap leading-relaxed">
+                                            {gift.delivery_notes}
+                                        </div>
+                                        <div className="flex items-start gap-2 pt-2 border-t border-amber-100">
+                                            <Checkbox
+                                                id="delivery_notes_check"
+                                                checked={notesChecked}
+                                                onCheckedChange={(checked) => setNotesChecked(checked === true)}
+                                                className="mt-0.5"
+                                            />
+                                            <Label
+                                                htmlFor="delivery_notes_check"
+                                                className="text-xs font-semibold text-amber-900 cursor-pointer select-none leading-normal"
+                                            >
+                                                {t('formStep.deliveryNotesConfirm')}
+                                            </Label>
+                                        </div>
+                                    </div>
+                                )}
 
                                 <Button type="submit" className="w-full flex flex-row items-center justify-center h-12 mt-14" disabled={loading}>
                                     {loading ? (

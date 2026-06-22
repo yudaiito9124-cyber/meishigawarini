@@ -94,7 +94,7 @@ export function AdminSettingsSection() {
     return (
         <Dialog open={isOpen} onOpenChange={setIsOpen}>
             <DialogTrigger asChild>
-                <Button variant="outline" className="text-gray-500 hover:text-gray-900 cursor-pointer rounded-full gap-3">
+                <Button variant="outline" className="bg-mist-800 border-mist-700 text-mist-300 hover:bg-mist-700 hover:text-white transition-all duration-300 rounded-full gap-3">
                     <Settings className="h-5 w-5" />{t('settings.title')}
                 </Button>
             </DialogTrigger>

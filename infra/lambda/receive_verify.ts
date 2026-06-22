@@ -116,6 +116,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
             shop_name: shop?.name,
             shop_detail_html: detail_html ? await signUrlsInHtml(detail_html, BUCKET_NAME) : undefined,
             shop_email: shopEmail,
+            delivery_notes: shop?.delivery_notes ?? null,
             shortest_delivery_days: shop?.shortest_delivery_days ?? 3,
             // 配送希望時間帯リスト
             // DBに空配列（[]）が登録されている場合でも、システム標準のデフォルト時間帯配列を返却するようにフォールバックを強化します。

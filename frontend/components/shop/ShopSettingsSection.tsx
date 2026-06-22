@@ -1,3 +1,12 @@
+/**
+ * @file ShopSettingsSection.tsx
+ * @role ショップ管理設定画面コンポーネント
+ * @responsibility
+ *  - ショップの基本情報（名前、住所、郵便番号、電話番号、宛名）、紹介HTML、配送設定（最短配送日、配送時間枠、注意事項）、通知設定、および伝票送り状印刷設定のフォームを提供します。
+ *  - 1000文字制限の配送注意事項（delivery_notes）などの入力を受け付け、保存時に shopApi.shop_details_update を呼び出して永続化します。
+ * @context
+ *  - ショップ管理ダッシュボード内の「設定」モーダル内で使用されます。
+ */
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
@@ -31,6 +40,7 @@ export function ShopSettingsSection({ shopId }: { shopId: string }) {
     const [shopName, setShopName] = useState('');
     const [shopAddress, setShopAddress] = useState('');
     const [shopDetailHtml, setShopDetailHtml] = useState('');
+    const [deliveryNotes, setDeliveryNotes] = useState('');
 
     const { shop, userId, refreshShopDetails } = useShop();
     const {
@@ -55,6 +65,7 @@ export function ShopSettingsSection({ shopId }: { shopId: string }) {
             setShopRecipientName(shop.shop_recipient_name || '');
             setShortestDeliveryDays(shop.shortest_delivery_days != null ? String(shop.shortest_delivery_days) : '');
             setDeliveryTimeOptionsText(Array.isArray(shop.delivery_time_options) ? shop.delivery_time_options.join('\n') : '');
+            setDeliveryNotes(shop.delivery_notes || '');
             setSettings({
                 htmlImageUrls: shop.html_image_urls || [],
                 debouncedPreviewHtml: shop.detail_html || '',
@@ -168,7 +179,8 @@ export function ShopSettingsSection({ shopId }: { shopId: string }) {
                 delivery_time_options: deliveryTimeOptionsText.trim() !== '' ? deliveryTimeOptionsText.split('\n').map(s => s.trim()).filter(s => s !== '') : null,
                 order_notification_user_ids: orderNotificationUserIds,
                 inquiry_notification_user_ids: inquiryNotificationUserIds,
-                shipping_label_settings: shippingLabelSettings
+                shipping_label_settings: shippingLabelSettings,
+                delivery_notes: deliveryNotes || null
             });
 
             alert(t('shopSettings.success'));
@@ -454,6 +466,24 @@ export function ShopSettingsSection({ shopId }: { shopId: string }) {
                                             className="flex min-h-[120px] w-full rounded-xl border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
                                         />
                                         <p className="text-[10px] text-gray-400 font-medium">{t('shopSettings.deliveryTimeOptionsDesc')}</p>
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <div className="flex justify-between items-center">
+                                            <Label htmlFor="delivery_notes">{t('shopSettings.deliveryNotes')}</Label>
+                                            <span className="text-[10px] text-gray-400 font-medium">
+                                                {t('shopSettings.charCount', { current: deliveryNotes.length })}
+                                            </span>
+                                        </div>
+                                        <textarea
+                                            id="delivery_notes"
+                                            value={deliveryNotes}
+                                            onChange={(e) => setDeliveryNotes(e.target.value)}
+                                            placeholder={t('shopSettings.deliveryNotesPlaceholder')}
+                                            maxLength={1000}
+                                            className="flex min-h-[100px] w-full rounded-xl border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                                        />
+                                        <p className="text-[10px] text-gray-400 font-medium">{t('shopSettings.deliveryNotesDesc')}</p>
                                     </div>
                                 </div>
                             )}

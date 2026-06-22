@@ -887,6 +887,10 @@
       "shortestDeliveryDaysDesc": "配送希望日を何日先から選べるようにするか設定します（空欄時は3日, 例えば0なら今日を配送希望日に設定できます)",
       "deliveryTimeOptions": "配送希望時刻リスト",
       "deliveryTimeOptionsDesc": "選択肢を改行区切りで入力してください（空欄時は標準の5枠が表示されます）",
+      "deliveryNotes": "配送・商品の注意事項",
+      "deliveryNotesPlaceholder": "配送制限や注意事項を入力してください（例：沖縄・離島への配送は行っておりません。）",
+      "deliveryNotesDesc": "受け取り画面で配送先住所を登録する前に、受取人に同意を求めるチェックボックスと一緒に表示されます。空欄の場合は同意画面は表示されません。最大1000文字。",
+      "charCount": "{current}/1000 文字",
       "notificationDesc": "備考",
       "notificationSettings": "通知設定",
       "notificationSettingsDesc": "各通知をどの管理者に送るか設定します",
@@ -1011,6 +1015,8 @@
       "passwordPlaceholder": "4文字以上",
       "confirmPasswordLabel": "パスワード（確認）",
       "confirmPasswordPlaceholder": "もう一度入力",
+      "deliveryNotesTitle": "配送に関する注意事項",
+      "deliveryNotesConfirm": "注意事項を確認し、同意します。",
       "privacyPolicy": "入力された個人情報は、商品の発送および発送に関する連絡のみに使用され、その他の目的には使用されません。"
     },
     "successStep": {
@@ -1046,7 +1052,8 @@
       "invalidPhone": "電話番号の形式が正しくありません",
       "requiredField": "必須項目を入力してください",
       "emailMismatch": "メールアドレスが一致しません",
-      "invalidDate": "指定された配送希望日は選択できません（最短配送日以降を選択してください）"
+      "invalidDate": "指定された配送希望日は選択できません（最短配送日以降を選択してください）",
+      "notesNotChecked": "配送に関する注意事項を確認し、チェックボックスをチェックしてください。"
     },
     "chat": {
       "title": "メッセージチャット",
@@ -1775,6 +1782,7 @@
     "missing_urls_array": "URLリストが不足しています。",
     "images_deleted": "画像を削除しました。",
     "operation_failed_qr_might_not_be_in_correct_state_or_belongs_to_another_shop": "操作に失敗しました。QRコードの状態が正しくないか、すでに別のショップ・商品に紐付けられている可能性があります。",
+    "invalid_delivery_notes_length": "注意事項は1000文字以内で入力してください。",
     "internal_server_error": "システムエラーが発生しました。",
     "missing_uuid_or_pin": "UUIDまたはPINが不足しています。",
     "invalid_gift_or_pin": "ギフトまたはPINが無効です。",
