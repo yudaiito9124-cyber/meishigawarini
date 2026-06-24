@@ -173,11 +173,23 @@ const CompactAdjusterPanel = ({
         }
     }, [posValue.y]);
 
+    // 選択された要素に応じたヘッダー右横のアイコン・サンプル文字をレンダリングします
+    const renderHeaderImage = () => {
+        const badgeClass = "text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-mist-950/60 border border-mist-800 text-sky-400 select-none leading-none shrink-0";
+        if (selectedElement === 'qr') {
+            return <QrCode className="w-5 h-5 text-sky-400 shrink-0" />;
+        }
+        if (selectedElement === 'pin') {
+            return <span className={badgeClass}>12345678</span>;
+        }
+        return <span className={badgeClass}>abcdefgh-ijkl-mn...</span>;
+    };
+
     return (
         <div className="group flex flex-col rounded-xl border border-mist-800 bg-mist-950/20 hover:border-mist-700 transition-colors p-4 space-y-4">
-            {/* ヘッダー部分：選択プルダウンと表面記載トグル */}
+            {/* ヘッダー部分：選択プルダウンと表示バッジ、表面記載トグル */}
             <div className="flex items-center justify-between select-none">
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-2">
                     <select
                         value={selectedElement}
                         onChange={(e) => onSelectedElementChange(e.target.value as 'qr' | 'pin' | 'code')}
@@ -187,6 +199,7 @@ const CompactAdjusterPanel = ({
                         <option value="pin" className="bg-mist-900 text-white">{t('cardDesignEditor.pin')}</option>
                         <option value="code" className="bg-mist-900 text-white">{t('cardDesignEditor.codeId')}</option>
                     </select>
+                    {renderHeaderImage()}
                 </div>
                 <div className="flex items-center gap-3">
                     <span className="text-sm font-bold text-white">{frontToggleLabel}</span>
