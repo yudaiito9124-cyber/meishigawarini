@@ -117,7 +117,8 @@ const ValueBadgeInput = ({
 };
 
 const CompactAdjusterPanel = ({
-    title, isFront, onFrontChange,
+    selectedElement, onSelectedElementChange,
+    isFront, onFrontChange,
     posField, posValue,
     sizeField, sizeValue,
     frontToggleLabel,
@@ -125,7 +126,8 @@ const CompactAdjusterPanel = ({
     onValueChange,
     onAdjust
 }: {
-    title: string;
+    selectedElement: 'qr' | 'pin' | 'code';
+    onSelectedElementChange: (v: 'qr' | 'pin' | 'code') => void;
     isFront: boolean;
     onFrontChange: (v: boolean) => void;
     posField: 'qrpos' | 'pinpos' | 'codepos';
@@ -138,227 +140,297 @@ const CompactAdjusterPanel = ({
     onAdjust: (field: string, subfield: string | null, delta: number) => void;
 }) => {
     const t = useTranslations('AdminPage');
-    const isQr = posField === 'qrpos';
-    const isPin = posField === 'pinpos';
 
-    // ヘッダーで使用するバッジコンポーネントを定義します
-    // QRコードはアイコンを表示し、PINは「123」、IDは「a-z」の文字バッジを表示します
-    const renderHeaderBadge = () => {
-        const badgeClass = "text-[9px] font-mono font-black px-1.5 py-0.5 rounded bg-mist-950/60 border border-mist-800 text-sky-400 select-none tracking-wider shrink-0 leading-none";
-        if (isQr) return <QrCode className="w-4 h-4 text-sky-400 shrink-0" />;
-        if (isPin) return <span className={badgeClass}>123</span>;
-        return <span className={badgeClass}>a-z</span>;
-    };
+    // ローカルでの入力状態を保持し、ユーザーが快適に入力・タイピングできるようにします
+    const [tempSize, setTempSize] = useState(sizeValue.toString());
+    const [tempX, setTempX] = useState(posValue.x.toString());
+    const [tempY, setTempY] = useState(posValue.y.toString());
 
-    // サイズ調整ボタンのグラフィック表現のためのスケール別コンテンツ（アイコンまたはテキストバッジ）を生成します
-    const renderSizingBadge = (scale: 'large' | 'tiny') => {
-        if (isQr) {
-            return scale === 'large' 
-                ? <QrCode className="w-3 h-3 text-sky-400 shrink-0" />
-                : <QrCode className="w-1.5 h-1.5 text-sky-400/60 shrink-0" />;
+    // 外部のサイズ変更（サイズ調整ボタンなど）をローカル状態と同期します
+    useEffect(() => {
+        if (tempSize === "" || tempSize === "-") return;
+        const parsed = parseFloat(tempSize);
+        if (isNaN(parsed) || parsed !== sizeValue) {
+            setTempSize(sizeValue.toString());
         }
-        const badgeText = isPin ? "123" : "a-z";
-        if (scale === 'large') {
-            return (
-                <span className="text-[7px] font-mono font-black px-0.5 rounded bg-mist-950/60 border border-mist-800 text-sky-400 leading-none py-px shrink-0">
-                    {badgeText}
-                </span>
-            );
-        } else {
-            return (
-                <span className="text-[5px] font-mono font-bold px-0.5 rounded bg-mist-950/40 border border-mist-900 text-sky-400/70 leading-none scale-90 origin-center shrink-0">
-                    {badgeText}
-                </span>
-            );
+    }, [sizeValue]);
+
+    // 外部のX座標の変更（D-Pad等）をローカル状態と同期します
+    useEffect(() => {
+        if (tempX === "" || tempX === "-") return;
+        const parsed = parseFloat(tempX);
+        if (isNaN(parsed) || parsed !== posValue.x) {
+            setTempX(posValue.x.toString());
         }
-    };
+    }, [posValue.x]);
+
+    // 外部のY座標の変更（D-Pad等）をローカル状態と同期します
+    useEffect(() => {
+        if (tempY === "" || tempY === "-") return;
+        const parsed = parseFloat(tempY);
+        if (isNaN(parsed) || parsed !== posValue.y) {
+            setTempY(posValue.y.toString());
+        }
+    }, [posValue.y]);
 
     return (
-        <div className="group flex flex-col rounded-lg border border-mist-800 bg-mist-950/20 hover:border-mist-700 transition-colors">
-            {/* ヘッダー部分：タイトルと表示面スイッチ */}
-            <div className="flex items-center justify-between bg-mist-900/60 px-3 py-2 rounded-t-lg border-b border-mist-850 select-none">
-                <div className="flex items-center gap-2">
-                    {renderHeaderBadge()}
-                    <span className="text-xs font-bold text-mist-200 tracking-wide">{title}</span>
+        <div className="group flex flex-col rounded-xl border border-mist-800 bg-mist-950/20 hover:border-mist-700 transition-colors p-4 space-y-4">
+            {/* ヘッダー部分：選択プルダウンと表面記載トグル */}
+            <div className="flex items-center justify-between select-none">
+                <div className="flex items-center gap-1.5">
+                    <select
+                        value={selectedElement}
+                        onChange={(e) => onSelectedElementChange(e.target.value as 'qr' | 'pin' | 'code')}
+                        className="bg-transparent text-xl font-bold text-white focus:outline-none cursor-pointer pr-4 select-none hover:text-sky-400 transition-colors"
+                    >
+                        <option value="qr" className="bg-mist-900 text-white">{t('cardDesignEditor.qrCode')}</option>
+                        <option value="pin" className="bg-mist-900 text-white">{t('cardDesignEditor.pin')}</option>
+                        <option value="code" className="bg-mist-900 text-white">{t('cardDesignEditor.codeId')}</option>
+                    </select>
                 </div>
-                <div className="flex items-center gap-2">
-                    <span className="text-[9px] text-mist-400 uppercase font-bold tracking-wider">{frontToggleLabel}</span>
-                    <Switch checked={isFront} onCheckedChange={onFrontChange} className="scale-75 data-[state=checked]:bg-sky-500/70" />
+                <div className="flex items-center gap-3">
+                    <span className="text-sm font-bold text-white">{frontToggleLabel}</span>
+                    <Switch checked={isFront} onCheckedChange={onFrontChange} className="data-[state=checked]:bg-sky-500/70" />
                 </div>
             </div>
 
-            {/* 操作パネル部分 */}
-            <div className="flex flex-col gap-3 p-3 bg-mist-950/40 rounded-b-lg">
-                <div className="flex items-stretch gap-3">
-                    {/* 左側：サイズ調整操作パネル（SIZE） */}
-                    <div className="flex-[4] flex flex-col items-center justify-between py-2 bg-mist-950/20 rounded border border-mist-800/40 px-2 gap-2">
-                        <div className="text-[8px] font-black text-mist-500 select-none tracking-wider uppercase">
-                            <span>{t('cardDesignEditor.size')}</span>
-                        </div>
-                        <div className="flex flex-col items-stretch justify-center gap-1 w-full flex-1">
-                            {/* 大きく（+1.0）調整するボタン */}
-                            <button
-                                className="h-6 flex items-center justify-center gap-1 bg-mist-900/60 hover:bg-mist-800 border border-mist-800 hover:border-mist-700 rounded text-[9px] font-bold text-mist-200 transition-colors cursor-pointer"
-                                onClick={() => onAdjust(sizeField, null, 1)}
-                                title={t('cardDesignEditor.increaseSize', { amount: '1.0' })}
-                            >
-                                {renderSizingBadge('large')}
-                                <span>+1.0</span>
-                            </button>
-
-                            {/* 微調整（+0.1）調整するボタン */}
-                            <button
-                                className="h-6 flex items-center justify-center gap-1 bg-mist-900/60 hover:bg-mist-800 border border-mist-800 hover:border-mist-700 rounded text-[8px] font-medium text-mist-300 transition-colors cursor-pointer"
-                                onClick={() => onAdjust(sizeField, null, 0.1)}
-                                title={t('cardDesignEditor.increaseSize', { amount: '0.1' })}
-                            >
-                                <span>+0.1</span>
-                            </button>
-
-                            {/* 現在のサイズ設定に対応するシンボルを示す中央表示エリア */}
-                            <div className="flex flex-col items-center justify-center py-1 border-y border-mist-800/30 my-0.5 select-none bg-mist-950/40 rounded-sm w-full min-h-[32px]">
-                                {isQr ? (
-                                    <QrCode className="w-4 h-4 text-sky-400" />
-                                ) : (
-                                    <span className="font-mono font-black text-[9px] text-sky-400 leading-none select-none">
-                                        {isPin ? "123" : "a-z"}
-                                    </span>
-                                )}
+            {/* 操作パネル：左右2カラムレイアウト */}
+            <div className="grid grid-cols-2 gap-4">
+                {/* 左カラム：サイズ設定 */}
+                <div className="flex flex-col space-y-3">
+                    {/* 「サイズ」見出し */}
+                    <div className="border border-mist-700/60 rounded px-2 py-1 text-center font-bold text-sm text-mist-200 bg-mist-900/40 select-none">
+                        {t('cardDesignEditor.size')}
+                    </div>
+                    {/* - と + の調整エリア */}
+                    <div className="grid grid-cols-2 gap-2 flex-1">
+                        {/* 縮小ブロック (-) */}
+                        <div className="border border-mist-800 bg-mist-900/20 rounded p-2 flex flex-col items-center justify-between gap-3">
+                            <span className="text-4xl font-extrabold text-white select-none leading-none my-auto">-</span>
+                            <div className="flex flex-col gap-1.5 w-full mt-auto">
+                                <button
+                                    type="button"
+                                    onClick={() => onAdjust(sizeField, null, -1)}
+                                    title={t('cardDesignEditor.decreaseSize', { amount: '1.0' })}
+                                    className="w-full py-1.5 rounded bg-mist-800 hover:bg-mist-700 text-xs font-semibold text-white transition-colors border border-mist-700 cursor-pointer text-center"
+                                >
+                                    -1.0mm
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => onAdjust(sizeField, null, -0.1)}
+                                    title={t('cardDesignEditor.decreaseSize', { amount: '0.1' })}
+                                    className="w-full py-1 rounded bg-mist-800 hover:bg-mist-700 text-[11px] font-semibold text-white/90 transition-colors border border-mist-700 cursor-pointer text-center"
+                                >
+                                    -0.1mm
+                                </button>
                             </div>
-
-                            {/* 微調整（-0.1）調整するボタン */}
-                            <button
-                                className="h-6 flex items-center justify-center gap-1 bg-mist-900/60 hover:bg-mist-800 border border-mist-800 hover:border-mist-700 rounded text-[8px] font-medium text-mist-300 transition-colors cursor-pointer"
-                                onClick={() => onAdjust(sizeField, null, -0.1)}
-                                title={t('cardDesignEditor.decreaseSize', { amount: '0.1' })}
-                            >
-                                <span>-0.1</span>
-                            </button>
-
-                            {/* 小さく（-1.0）調整するボタン */}
-                            <button
-                                className="h-6 flex items-center justify-center gap-1 bg-mist-900/60 hover:bg-mist-800 border border-mist-800 hover:border-mist-700 rounded text-[9px] font-bold text-mist-200 transition-colors cursor-pointer"
-                                onClick={() => onAdjust(sizeField, null, -1)}
-                                title={t('cardDesignEditor.decreaseSize', { amount: '1.0' })}
-                            >
-                                {renderSizingBadge('tiny')}
-                                <span>-1.0</span>
-                            </button>
                         </div>
 
-                        {/* 実際のサイズ設定値の手動調整用テキストボックス（SIZEカラムの下） */}
-                        <div className="w-full flex justify-center mt-1">
-                            <ValueBadgeInput label={t('cardDesignEditor.size')} value={sizeValue} onChange={(v) => onValueChange(sizeField, null, v)} />
+                        {/* 拡大ブロック (+) */}
+                        <div className="border border-mist-800 bg-mist-900/20 rounded p-2 flex flex-col items-center justify-between gap-3">
+                            <span className="text-4xl font-extrabold text-white select-none leading-none my-auto">+</span>
+                            <div className="flex flex-col gap-1.5 w-full mt-auto">
+                                <button
+                                    type="button"
+                                    onClick={() => onAdjust(sizeField, null, 1)}
+                                    title={t('cardDesignEditor.increaseSize', { amount: '1.0' })}
+                                    className="w-full py-1.5 rounded bg-mist-800 hover:bg-mist-700 text-xs font-semibold text-white transition-colors border border-mist-700 cursor-pointer text-center"
+                                >
+                                    +1.0mm
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => onAdjust(sizeField, null, 0.1)}
+                                    title={t('cardDesignEditor.increaseSize', { amount: '0.1' })}
+                                    className="w-full py-1 rounded bg-mist-800 hover:bg-mist-700 text-[11px] font-semibold text-white/90 transition-colors border border-mist-700 cursor-pointer text-center"
+                                >
+                                    +0.1mm
+                                </button>
+                            </div>
                         </div>
                     </div>
 
-                    {/* 右側：移動操作パネル（POSITION） */}
-                    <div className="flex-[5] flex flex-col items-center justify-between py-2 bg-mist-950/20 rounded border border-mist-800/40 px-2 gap-2">
-                        <div className="text-[8px] font-black text-mist-500 select-none tracking-wider flex items-center gap-1 uppercase">
-                            <Move className="w-2.5 h-2.5" />
-                            <span>{t('cardDesignEditor.position')}</span>
+                    {/* サイズ値の手動編集欄 (幅 X.X mm) */}
+                    <div className="flex items-center justify-between w-full bg-mist-900 border border-mist-700 rounded px-3 py-2 text-white">
+                        <span className="text-sm font-bold text-mist-400 select-none">幅</span>
+                        <div className="flex items-center gap-1">
+                            <input
+                                type="number"
+                                step="any"
+                                value={tempSize}
+                                onChange={(e) => {
+                                    setTempSize(e.target.value);
+                                    const val = parseFloat(e.target.value);
+                                    if (!isNaN(val)) {
+                                        onValueChange(sizeField, null, val);
+                                    }
+                                }}
+                                onBlur={() => {
+                                    const parsed = parseFloat(tempSize);
+                                    if (tempSize === "" || isNaN(parsed)) {
+                                        setTempSize(sizeValue.toString());
+                                    } else {
+                                        setTempSize(parsed.toString());
+                                    }
+                                }}
+                                className="bg-white text-black border border-mist-300 rounded px-2 py-0.5 text-right font-bold text-lg focus:outline-none w-20 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                            />
+                            <span className="text-sm font-bold text-mist-400">mm</span>
                         </div>
-                        <div className="grid grid-cols-5 items-center justify-items-center gap-0.5 flex-1 my-auto">
-                            <div /> <div />
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-6 w-6 hover:bg-mist-700 text-mist-500 hover:text-mist-200"
+                    </div>
+                </div>
+
+                {/* 右カラム：配置位置設定 */}
+                <div className="flex flex-col space-y-3">
+                    {/* 「配置位置」見出し */}
+                    <div className="border border-mist-700/60 rounded px-2 py-1 text-center font-bold text-sm text-mist-200 bg-mist-900/40 select-none">
+                        {t('cardDesignEditor.position')}
+                    </div>
+
+                    {/* D-Pad 十字方向キー (絶対配置によるコンパクトな配置) */}
+                    <div className="flex flex-col items-center justify-center flex-1 my-auto min-h-[160px] select-none">
+                        <div className="relative w-40 h-40 select-none">
+                            {/* Double Up (上の外側) */}
+                            <button
+                                type="button"
+                                className="absolute left-[62px] top-[4px] h-9 w-9 hover:bg-mist-800 text-white hover:text-sky-400 rounded transition-all flex items-center justify-center cursor-pointer hover:scale-105"
                                 onClick={() => onAdjust(posField, 'y', -1)}
                                 title={t('cardDesignEditor.moveUp', { amount: '1.0' })}
                             >
-                                <ChevronsUp className="w-3.5 h-3.5" />
-                            </Button>
-                            <div /> <div />
+                                <ChevronsUp className="w-7 h-7" />
+                            </button>
 
-                            <div /> <div />
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-6 w-6 hover:bg-mist-700 text-mist-300 hover:text-white"
+                            {/* Single Up (上の内側) */}
+                            <button
+                                type="button"
+                                className="absolute left-[62px] top-[40px] h-9 w-9 hover:bg-mist-800 text-white hover:text-sky-400 rounded transition-all flex items-center justify-center cursor-pointer hover:scale-105"
                                 onClick={() => onAdjust(posField, 'y', -0.1)}
                                 title={t('cardDesignEditor.moveUp', { amount: '0.1' })}
                             >
-                                <ChevronUp className="w-3.5 h-3.5" />
-                            </Button>
-                            <div /> <div />
+                                <ChevronUp className="w-7 h-7" />
+                            </button>
 
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-6 w-6 hover:bg-mist-700 text-mist-500 hover:text-mist-200"
+                            {/* Double Left (左の外側) */}
+                            <button
+                                type="button"
+                                className="absolute left-[4px] top-[62px] h-9 w-9 hover:bg-mist-800 text-white hover:text-sky-400 rounded transition-all flex items-center justify-center cursor-pointer hover:scale-105"
                                 onClick={() => onAdjust(posField, 'x', -1)}
                                 title={t('cardDesignEditor.moveLeft', { amount: '1.0' })}
                             >
-                                <ChevronsLeft className="w-3.5 h-3.5" />
-                            </Button>
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-6 w-6 hover:bg-mist-700 text-mist-300 hover:text-white"
+                                <ChevronsLeft className="w-7 h-7" />
+                            </button>
+
+                            {/* Single Left (左の内側) */}
+                            <button
+                                type="button"
+                                className="absolute left-[40px] top-[62px] h-9 w-9 hover:bg-mist-800 text-white hover:text-sky-400 rounded transition-all flex items-center justify-center cursor-pointer hover:scale-105"
                                 onClick={() => onAdjust(posField, 'x', -0.1)}
                                 title={t('cardDesignEditor.moveLeft', { amount: '0.1' })}
                             >
-                                <ChevronLeft className="w-3.5 h-3.5" />
-                            </Button>
-                            <div className="w-4 h-4 flex items-center justify-center text-mist-500">
-                                <Move className="w-3.5 h-3.5" />
-                            </div>
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-6 w-6 hover:bg-mist-700 text-mist-300 hover:text-white"
+                                <ChevronLeft className="w-7 h-7" />
+                            </button>
+
+                            {/* Single Right (右の内側) */}
+                            <button
+                                type="button"
+                                className="absolute left-[84px] top-[62px] h-9 w-9 hover:bg-mist-800 text-white hover:text-sky-400 rounded transition-all flex items-center justify-center cursor-pointer hover:scale-105"
                                 onClick={() => onAdjust(posField, 'x', 0.1)}
                                 title={t('cardDesignEditor.moveRight', { amount: '0.1' })}
                             >
-                                <ChevronRight className="w-3.5 h-3.5" />
-                            </Button>
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-6 w-6 hover:bg-mist-700 text-mist-500 hover:text-mist-200"
+                                <ChevronRight className="w-7 h-7" />
+                            </button>
+
+                            {/* Double Right (右の外側) */}
+                            <button
+                                type="button"
+                                className="absolute left-[120px] top-[62px] h-9 w-9 hover:bg-mist-800 text-white hover:text-sky-400 rounded transition-all flex items-center justify-center cursor-pointer hover:scale-105"
                                 onClick={() => onAdjust(posField, 'x', 1)}
                                 title={t('cardDesignEditor.moveRight', { amount: '1.0' })}
                             >
-                                <ChevronsRight className="w-3.5 h-3.5" />
-                            </Button>
+                                <ChevronsRight className="w-7 h-7" />
+                            </button>
 
-                            <div /> <div />
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-6 w-6 hover:bg-mist-700 text-mist-300 hover:text-white"
+                            {/* Single Down (下の内側) */}
+                            <button
+                                type="button"
+                                className="absolute left-[62px] top-[84px] h-9 w-9 hover:bg-mist-800 text-white hover:text-sky-400 rounded transition-all flex items-center justify-center cursor-pointer hover:scale-105"
                                 onClick={() => onAdjust(posField, 'y', 0.1)}
                                 title={t('cardDesignEditor.moveDown', { amount: '0.1' })}
                             >
-                                <ChevronDown className="w-3.5 h-3.5" />
-                            </Button>
-                            <div /> <div />
+                                <ChevronDown className="w-7 h-7" />
+                            </button>
 
-                            <div /> <div />
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-6 w-6 hover:bg-mist-700 text-mist-500 hover:text-mist-200"
+                            {/* Double Down (下の外側) */}
+                            <button
+                                type="button"
+                                className="absolute left-[62px] top-[120px] h-9 w-9 hover:bg-mist-800 text-white hover:text-sky-400 rounded transition-all flex items-center justify-center cursor-pointer hover:scale-105"
                                 onClick={() => onAdjust(posField, 'y', 1)}
                                 title={t('cardDesignEditor.moveDown', { amount: '1.0' })}
                             >
-                                <ChevronsDown className="w-3.5 h-3.5" />
-                            </Button>
-                            <div /> <div />
+                                <ChevronsDown className="w-7 h-7" />
+                            </button>
                         </div>
+                    </div>
 
-                        {/* 実際の位置設定値の手動調整用テキストボックス（十字ボタンの下） */}
-                        <div className="flex gap-1.5 justify-center w-full mt-1">
-                            <ValueBadgeInput label={t('cardDesignEditor.posX')} value={posValue.x} onChange={(v) => onValueChange(posField, 'x', v)} />
-                            <ValueBadgeInput label={t('cardDesignEditor.posY')} value={posValue.y} onChange={(v) => onValueChange(posField, 'y', v)} />
+                    {/* 座標数値の手動編集欄 (X座標, Y座標) */}
+                    <div className="grid grid-cols-2 gap-2">
+                        {/* X座標 */}
+                        <div className="flex flex-col bg-mist-900 border border-mist-700 rounded px-3 py-1.5 text-white">
+                            <span className="text-[11px] font-bold text-mist-400 select-none">X座標</span>
+                            <input
+                                type="number"
+                                step="any"
+                                value={tempX}
+                                onChange={(e) => {
+                                    setTempX(e.target.value);
+                                    const val = parseFloat(e.target.value);
+                                    if (!isNaN(val)) {
+                                        onValueChange(posField, 'x', val);
+                                    }
+                                }}
+                                onBlur={() => {
+                                    const parsed = parseFloat(tempX);
+                                    if (tempX === "" || isNaN(parsed)) {
+                                        setTempX(posValue.x.toString());
+                                    } else {
+                                        setTempX(parsed.toString());
+                                    }
+                                }}
+                                className="bg-white text-black border border-mist-300 rounded px-2 py-0.5 text-left font-bold text-lg focus:outline-none w-full [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none mt-1"
+                            />
+                        </div>
+                        {/* Y座標 */}
+                        <div className="flex flex-col bg-mist-900 border border-mist-700 rounded px-3 py-1.5 text-white">
+                            <span className="text-[11px] font-bold text-mist-400 select-none">Y座標</span>
+                            <input
+                                type="number"
+                                step="any"
+                                value={tempY}
+                                onChange={(e) => {
+                                    setTempY(e.target.value);
+                                    const val = parseFloat(e.target.value);
+                                    if (!isNaN(val)) {
+                                        onValueChange(posField, 'y', val);
+                                    }
+                                }}
+                                onBlur={() => {
+                                    const parsed = parseFloat(tempY);
+                                    if (tempY === "" || isNaN(parsed)) {
+                                        setTempY(posValue.y.toString());
+                                    } else {
+                                        setTempY(parsed.toString());
+                                    }
+                                }}
+                                className="bg-white text-black border border-mist-300 rounded px-2 py-0.5 text-left font-bold text-lg focus:outline-none w-full [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none mt-1"
+                            />
                         </div>
                     </div>
                 </div>
             </div>
         </div>
     );
-};
+}
 
 export default function CardDesignEditor({ apiUrl }: { apiUrl: string }) {
     const t = useTranslations('AdminPage');
@@ -367,6 +439,7 @@ export default function CardDesignEditor({ apiUrl }: { apiUrl: string }) {
     const [editingDesign, setEditingDesign] = useState<CardDesign | null>(null);
     const [isSaving, setIsSaving] = useState(false);
     const [uploadingImage, setUploadingImage] = useState<string | null>(null);
+    const [selectedElement, setSelectedElement] = useState<'qr' | 'pin' | 'code'>('qr');
 
     const fetchDesigns = async () => {
         setLoading(true);
@@ -654,48 +727,57 @@ export default function CardDesignEditor({ apiUrl }: { apiUrl: string }) {
                                             </div>
                                         </div>
 
-                                        <div className="grid gap-4 mt-2">
-                                            <CompactAdjusterPanel
-                                                title={t('cardDesignEditor.qrCode')}
-                                                isFront={editingDesign.isfront_qr}
-                                                onFrontChange={v => setEditingDesign({ ...editingDesign, isfront_qr: v })}
-                                                posField="qrpos"
-                                                posValue={editingDesign.qrpos}
-                                                sizeField="qrsize"
-                                                sizeValue={editingDesign.qrsize}
-                                                frontToggleLabel={t('cardDesignEditor.frontToggle')}
-                                                sizeLabel={t('cardDesignEditor.size')}
-                                                onValueChange={setValue}
-                                                onAdjust={adjust}
-                                            />
+                                        <div className="space-y-4 mt-2">
+                                            {selectedElement === 'qr' && (
+                                                <CompactAdjusterPanel
+                                                    selectedElement={selectedElement}
+                                                    onSelectedElementChange={setSelectedElement}
+                                                    isFront={editingDesign.isfront_qr}
+                                                    onFrontChange={v => setEditingDesign({ ...editingDesign, isfront_qr: v })}
+                                                    posField="qrpos"
+                                                    posValue={editingDesign.qrpos}
+                                                    sizeField="qrsize"
+                                                    sizeValue={editingDesign.qrsize}
+                                                    frontToggleLabel={t('cardDesignEditor.frontToggle')}
+                                                    sizeLabel={t('cardDesignEditor.size')}
+                                                    onValueChange={setValue}
+                                                    onAdjust={adjust}
+                                                />
+                                            )}
 
-                                            <CompactAdjusterPanel
-                                                title={t('cardDesignEditor.pin')}
-                                                isFront={editingDesign.isfront_pin}
-                                                onFrontChange={v => setEditingDesign({ ...editingDesign, isfront_pin: v })}
-                                                posField="pinpos"
-                                                posValue={editingDesign.pinpos}
-                                                sizeField="pinsize"
-                                                sizeValue={editingDesign.pinsize}
-                                                frontToggleLabel={t('cardDesignEditor.frontToggle')}
-                                                sizeLabel={t('cardDesignEditor.size')}
-                                                onValueChange={setValue}
-                                                onAdjust={adjust}
-                                            />
+                                            {selectedElement === 'pin' && (
+                                                <CompactAdjusterPanel
+                                                    selectedElement={selectedElement}
+                                                    onSelectedElementChange={setSelectedElement}
+                                                    isFront={editingDesign.isfront_pin}
+                                                    onFrontChange={v => setEditingDesign({ ...editingDesign, isfront_pin: v })}
+                                                    posField="pinpos"
+                                                    posValue={editingDesign.pinpos}
+                                                    sizeField="pinsize"
+                                                    sizeValue={editingDesign.pinsize}
+                                                    frontToggleLabel={t('cardDesignEditor.frontToggle')}
+                                                    sizeLabel={t('cardDesignEditor.size')}
+                                                    onValueChange={setValue}
+                                                    onAdjust={adjust}
+                                                />
+                                            )}
 
-                                            <CompactAdjusterPanel
-                                                title={t('cardDesignEditor.codeId')}
-                                                isFront={editingDesign.isfront_code}
-                                                onFrontChange={v => setEditingDesign({ ...editingDesign, isfront_code: v })}
-                                                posField="codepos"
-                                                posValue={editingDesign.codepos}
-                                                sizeField="codesize"
-                                                sizeValue={editingDesign.codesize}
-                                                frontToggleLabel={t('cardDesignEditor.frontToggle')}
-                                                sizeLabel={t('cardDesignEditor.size')}
-                                                onValueChange={setValue}
-                                                onAdjust={adjust}
-                                            />
+                                            {selectedElement === 'code' && (
+                                                <CompactAdjusterPanel
+                                                    selectedElement={selectedElement}
+                                                    onSelectedElementChange={setSelectedElement}
+                                                    isFront={editingDesign.isfront_code}
+                                                    onFrontChange={v => setEditingDesign({ ...editingDesign, isfront_code: v })}
+                                                    posField="codepos"
+                                                    posValue={editingDesign.codepos}
+                                                    sizeField="codesize"
+                                                    sizeValue={editingDesign.codesize}
+                                                    frontToggleLabel={t('cardDesignEditor.frontToggle')}
+                                                    sizeLabel={t('cardDesignEditor.size')}
+                                                    onValueChange={setValue}
+                                                    onAdjust={adjust}
+                                                />
+                                            )}
                                         </div>
                                     </div>
 
