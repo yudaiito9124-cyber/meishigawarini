@@ -385,7 +385,7 @@ const CompactAdjusterPanel = ({
                     </div>
 
                     {/* 中央の縦線エリア */}
-                    <div className="w-[2px] bg-mist-700  self-stretch"></div>
+                    <div className="mt-10 w-[2px] bg-mist-700 self-stretch"></div>
                     
                     {/* 右カラム：配置位置設定 */}
                     <div className="flex flex-1 flex-col p-0 space-y-4">
@@ -720,6 +720,7 @@ export default function CardDesignEditor({ apiUrl }: { apiUrl: string }) {
         const file = e.target.files?.[0];
         if (!file || !editingDesign) return;
 
+        const startDesignId = editingDesign.design_id;
         setUploadingImage(type);
         try {
             const session = await fetchAuthSession();
@@ -730,7 +731,7 @@ export default function CardDesignEditor({ apiUrl }: { apiUrl: string }) {
             const { uploadUrl: mainUploadUrl, publicUrl: mainPublicUrl } = await adminApi.admin_carddesigns_uploadurl({
                 filename: file.name,
                 content_type: file.type,
-                design_id: editingDesign.design_id
+                design_id: startDesignId
             });
 
             // 2. Generate and Prepare Thumbnail (1280px WebP)
@@ -740,7 +741,7 @@ export default function CardDesignEditor({ apiUrl }: { apiUrl: string }) {
             const { uploadUrl: thumbUploadUrl, publicUrl: thumbPublicUrl } = await adminApi.admin_carddesigns_uploadurl({
                 filename: thumbFile.name,
                 content_type: "image/webp",
-                design_id: editingDesign.design_id
+                design_id: startDesignId
             });
 
             // 3. Upload both to S3
@@ -757,10 +758,13 @@ export default function CardDesignEditor({ apiUrl }: { apiUrl: string }) {
                 })
             ]);
 
-            setEditingDesign({
-                ...editingDesign,
-                [type]: mainPublicUrl,
-                [thumbType]: thumbPublicUrl
+            setEditingDesign(prev => {
+                if (!prev || prev.design_id !== startDesignId) return prev;
+                return {
+                    ...prev,
+                    [type]: mainPublicUrl,
+                    [thumbType]: thumbPublicUrl
+                };
             });
         } catch (e) {
             console.error(e);
@@ -900,7 +904,7 @@ export default function CardDesignEditor({ apiUrl }: { apiUrl: string }) {
                                                 <Label className="text-xs">{t('cardDesignEditor.frontBackground')}</Label>
                                                 <div className="flex flex-col gap-2">
                                                     <div className="bg-mist-800 rounded border border-mist-600 overflow-hidden bg-white" style={{ aspectRatio: `${editingDesign.width} / ${editingDesign.height}` }}>
-                                                        {editingDesign.bgimgf && <img src={editingDesign.bgimgf} className="w-full h-full object-fill" crossOrigin="anonymous" />}
+                                                        {editingDesign.bgimgf && <img key={`${editingDesign.design_id}-front-form`} src={editingDesign.bgimgf} className="w-full h-full object-fill" crossOrigin="anonymous" />}
                                                     </div>
                                                     <Button variant="outline" size="sm" className="relative cursor-pointer bg-mist-800 hover:bg-mist-700 border-mist-700 text-white hover:text-white transition-colors" disabled={!!uploadingImage}>
                                                         {uploadingImage === 'bgimgf' ? t('cardDesignEditor.uploading') : t('cardDesignEditor.uploadFront')}
@@ -912,7 +916,7 @@ export default function CardDesignEditor({ apiUrl }: { apiUrl: string }) {
                                                 <Label className="text-xs">{t('cardDesignEditor.backBackground')}</Label>
                                                 <div className="flex flex-col gap-2">
                                                     <div className="bg-mist-800 rounded border border-mist-600 overflow-hidden bg-white" style={{ aspectRatio: `${editingDesign.width} / ${editingDesign.height}` }}>
-                                                        {editingDesign.bgimgb && <img src={editingDesign.bgimgb} className="w-full h-full object-fill" crossOrigin="anonymous" />}
+                                                        {editingDesign.bgimgb && <img key={`${editingDesign.design_id}-back-form`} src={editingDesign.bgimgb} className="w-full h-full object-fill" crossOrigin="anonymous" />}
                                                     </div>
                                                     <Button variant="outline" size="sm" className="relative cursor-pointer bg-mist-800 hover:bg-mist-700 border-mist-700 text-white hover:text-white transition-colors" disabled={!!uploadingImage}>
                                                         {uploadingImage === 'bgimgb' ? t('cardDesignEditor.uploading') : t('cardDesignEditor.uploadBack')}
@@ -1012,7 +1016,7 @@ export default function CardDesignEditor({ apiUrl }: { apiUrl: string }) {
                                             >
                                                 <div className="absolute inset-0 bg-mist-950/20 shadow-[0_0_50px_rgba(0,0,0,0.4)] border border-mist-600 overflow-hidden">
                                                     <div className="absolute inset-0 bg-white" />
-                                                    {editingDesign.bgimgf && <img src={editingDesign.bgimgf} className="absolute inset-0 w-full h-full object-fill" crossOrigin="anonymous" />}
+                                                    {editingDesign.bgimgf && <img key={`${editingDesign.design_id}-front-preview`} src={editingDesign.bgimgf} className="absolute inset-0 w-full h-full object-fill" crossOrigin="anonymous" />}
 
                                                     {editingDesign.isfront_qr && (
                                                         <div
@@ -1091,7 +1095,7 @@ export default function CardDesignEditor({ apiUrl }: { apiUrl: string }) {
                                             >
                                                 <div className="absolute inset-0 bg-mist-950/20 shadow-[0_0_50px_rgba(0,0,0,0.4)] border border-mist-600 overflow-hidden">
                                                     <div className="absolute inset-0 bg-white" />
-                                                    {editingDesign.bgimgb && <img src={editingDesign.bgimgb} className="absolute inset-0 w-full h-full object-fill" crossOrigin="anonymous" />}
+                                                    {editingDesign.bgimgb && <img key={`${editingDesign.design_id}-back-preview`} src={editingDesign.bgimgb} className="absolute inset-0 w-full h-full object-fill" crossOrigin="anonymous" />}
 
                                                     {!editingDesign.isfront_qr && (
                                                         <div
@@ -1205,8 +1209,8 @@ export default function CardDesignEditor({ apiUrl }: { apiUrl: string }) {
                                     </p>
                                     <div className="flex gap-2 mt-3">
                                         {/* 編集状態での変更が一覧表示側の元のオブジェクトに影響（ミューテーション）を与えないよう、ディープコピーを作成して設定します */}
-                                        <Button variant="secondary" size="sm" className="flex-1 h-8 text-xs" onClick={() => setEditingDesign(structuredClone(d))}><Paintbrush className="!w-6 !h-6" /></Button>
-                                        <Button variant="destructive" size="icon" className="h-8 w-8" onClick={() => handleDelete(d.SK || d.design_id)}><Trash2 className="w-4 h-4" /></Button>
+                                        <Button variant="secondary" size="sm" className="flex-1 h-8 text-xs" onClick={() => setEditingDesign(structuredClone(d))} disabled={!!uploadingImage}><Paintbrush className="!w-6 !h-6" /></Button>
+                                        <Button variant="destructive" size="icon" className="h-8 w-8" onClick={() => handleDelete(d.SK || d.design_id)} disabled={!!uploadingImage}><Trash2 className="w-4 h-4" /></Button>
                                     </div>
                                 </div>
                             </div>
