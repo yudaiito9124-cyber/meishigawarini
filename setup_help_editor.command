@@ -37,7 +37,7 @@ echo "デスクトップ上に作業フォルダを作成します..."
 mkdir -p "$WORKDIR"
 cd "$WORKDIR" || exit 1
 
-# 3. リポジトリのクローン
+# 3. リポジトリのクローンと最新の main ブランチの取得
 if [ ! -d "meishigawarini" ]; then
   echo "リポジトリをダウンロード（クローン）しています..."
   git clone "$REPO_URL" meishigawarini
@@ -47,9 +47,15 @@ if [ ! -d "meishigawarini" ]; then
     read -p "Enterキーを押して終了します..."
     exit 1
   fi
-else
-  echo "既にリポジトリが存在します。スキップします。"
 fi
+
+# 確実に main ブランチへ切り替えて最新化する
+echo "最新のメイン(main)ブランチを同期しています..."
+cd meishigawarini || exit 1
+git checkout main
+git pull origin main
+cd ..
+
 
 # 4. ショートカット（シンボリックリンク）の作成
 echo "フォルダのショートカットを作成しています..."
