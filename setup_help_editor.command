@@ -49,11 +49,11 @@ if [ ! -d "meishigawarini" ]; then
   fi
 fi
 
-# 確実に main ブランチへ切り替えて最新化する
-echo "最新のメイン(main)ブランチを同期しています..."
+# 確実に master ブランチへ切り替えて最新化する
+echo "最新のマスター(master)ブランチを同期しています..."
 cd meishigawarini || exit 1
-git checkout main
-git pull origin main
+git checkout master
+git pull origin master
 cd ..
 
 

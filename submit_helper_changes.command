@@ -16,8 +16,8 @@ if [ -z "$CURRENT_BRANCH" ]; then
   exit 1
 fi
 
-if [ "$CURRENT_BRANCH" = "main" ]; then
-  echo "警告: 現在 main ブランチにいます。変更を送信する前に、まず start_helper_dev.command を実行して作業用ブランチを作成してください。"
+if [ "$CURRENT_BRANCH" = "master" ]; then
+  echo "警告: 現在 master ブランチにいます。変更を送信する前に、まず start_helper_dev.command を実行して作業用ブランチを作成してください。"
   read -p "Enterキーを押して終了します..."
   exit 1
 fi
@@ -51,7 +51,7 @@ if [ $? -eq 0 ]; then
   # git@github.com:user/repo.git または https://github.com/user/repo.git を https://github.com/user/repo に変換
   REPO_URL=$(echo "$REMOTE_URL" | sed -e 's/git@github.com:/https:\/\/github.com\//' -e 's/\.git$//')
   
-  PR_URL="${REPO_URL}/compare/main...${CURRENT_BRANCH}?expand=1"
+  PR_URL="${REPO_URL}/compare/master...${CURRENT_BRANCH}?expand=1"
   
   echo "ブラウザでプルリクエスト作成画面を開きます..."
   echo "URL: $PR_URL"
