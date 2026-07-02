@@ -6,7 +6,7 @@ title: 管理者用ヘルプ：デザイン設定
 # デザイン設定
 
 カードの見た目（背景画像やQRコードの配置）を定義する「カードデザイン」の管理方法について説明します。
-![デザイン一覧](/images/manual/admin++TAB=designs.webp)
+![デザイン一覧](/images/manual/admin/admin++TAB=designs.webp)
 
 ## 1. デザイン一覧
 
@@ -17,7 +17,7 @@ title: 管理者用ヘルプ：デザイン設定
 
 ## 2. デザインエディタの使い方
 
-![デザインエディタ](/images/manual/admin++DIALOG=design_editor.webp)
+![デザインエディタ](/images/manual/admin/admin++DIALOG=design_editor.webp)
 
 エディタでは、プレビューを見ながらリアルタイムに配置を調整できます。
 
