@@ -110,22 +110,22 @@ It contains the necessary navigation paths, triggers, and state requirements for
 ＃| `/shop/[shopId]` | Settings: Click Gear icon in header to open "ショップ設定" (`ShopPage.shopSettings.title`). | `shop_[shopId]++DIALOG=shop_settings.webp` |
 ＃| `/shop/[shopId]` | Settings: In Shop Settings, click "ソースコード" (`ShopPage.shopSettings.sourcecode`) toggle for HTML editor. | `shop_[shopId]++DIALOG=shop_settings+MODE=editor.webp` |
 | `/admin` | Admin Hub: Dashboard screen with aggregate stats. | `admin.webp` |
-| `/admin` | QR Management: Click "カード一覧" (`AdminPage.tabs.qrcodes`) tab. | `admin++TAB=qrcodes.webp` |
-| `/admin` | QR Filters: In QR Codes tab, view "カードIDで絞り込み..." (`AdminPage.list.keyword.placeholder`) search field. | `admin++TAB=qrcodes+SECTION=search.webp` |
-| `/admin` | Order Management: Click "カード印刷" (`AdminPage.tabs.cardorders`) tab. | `admin++TAB=cardorders.webp` |
-| `/admin` | Card Printing: Browse "PDF生成用の用紙設定" (`AdminPage.generate.paperFormat`) options. | `admin++TAB=cardorders+SECTION=paper_config.webp` |
-| `/admin` | Card Printing: Toggle "オプション情報を使用する" (`AdminPage.generate.useMetadata`) switch. | `admin++TAB=cardorders+SECTION=generate_form+METADATA=true.webp` |
-| `/admin` | Design Management: Click "デザイン設定" (`AdminPage.tabs.designs`) tab. | `admin++TAB=designs.webp` |
-| `/admin` | Shop Management: Click "ショップ管理" (`AdminPage.tabs.shops`) tab. | `admin++TAB=shops.webp` |
-| `/admin` | Tools: Click "ツール" (`AdminPage.tabs.tools`) tab. | `admin++TAB=tools.webp` |
-| `/admin` | QR Details: Click a row in QR list to open `QRCodeDetailsDialog`. | `admin++DIALOG=qr_details.webp` |
-| `/admin` | Order Details: Click a row in Order list to open `OrderDetailsDialog`. | `admin++DIALOG=order_details.webp` |
-| `/admin` | Manager Linking: In Shops tab, scroll to "管理者紐付け" section. | `admin++TAB=shops+SECTION=manager_link.webp` |
-| `/admin` | Owner Change: In Shops tab, scroll to "ショップオーナー変更" section. | `admin++TAB=shops+SECTION=owner_change.webp` |
-| `/admin` | Shop Creation: In Shops tab, scroll to "ショップ新規作成(システム管理者のみ)" (`ShopListPage.createShop`). | `admin++TAB=shops+SECTION=shop_creation.webp` |
-| `/admin` | Design Assignment: In Shops tab, scroll to "ショップカードデザイン設定" section. | `admin++TAB=shops+SECTION=design_link.webp` |
-| `/admin` | Editor: Click "新規作成" or "編集" in Designs tab to open `CardDesignEditor`. | `admin++DIALOG=design_editor.webp` |
-| `/admin` | Tools: In Tools tab, view "現在手動生成したカード" (`AdminPage.batches.title`) area. | `admin++TAB=tools+SECTION=data_dump.webp` |
+| `/admin` | QR Management: Click "カード一覧" (`AdminPage.tabs.qrcodes`) tab. | `admin/admin++TAB=qrcodes.webp` |
+| `/admin` | QR Filters: In QR Codes tab, view "カードIDで絞り込み..." (`AdminPage.list.keyword.placeholder`) search field. | `admin/admin++TAB=qrcodes+SECTION=search.webp` |
+| `/admin` | Order Management: Click "カード印刷" (`AdminPage.tabs.cardorders`) tab. | `admin/admin++TAB=cardorders.webp` |
+| `/admin` | Card Printing: Browse "PDF生成用の用紙設定" (`AdminPage.generate.paperFormat`) options. | `admin/admin++TAB=cardorders+SECTION=paper_config.webp` |
+| `/admin` | Card Printing: Toggle "オプション情報を使用する" (`AdminPage.generate.useMetadata`) switch. | `admin/admin++TAB=cardorders+SECTION=generate_form+METADATA=true.webp` |
+| `/admin` | Design Management: Click "デザイン設定" (`AdminPage.tabs.designs`) tab. | `admin/admin++TAB=designs.webp` |
+| `/admin` | Shop Management: Click "ショップ管理" (`AdminPage.tabs.shops`) tab. | `admin/admin++TAB=shops.webp` |
+| `/admin` | Tools: Click "ツール" (`AdminPage.tabs.tools`) tab. | `admin/admin++TAB=tools.webp` |
+| `/admin` | QR Details: Click a row in QR list to open `QRCodeDetailsDialog`. | `admin/admin++DIALOG=qr_details.webp` |
+| `/admin` | Order Details: Click a row in Order list to open `OrderDetailsDialog`. | `admin/admin++DIALOG=order_details.webp` |
+| `/admin` | Manager Linking: In Shops tab, scroll to "管理者紐付け" section. | `admin/admin++TAB=shops+SECTION=manager_link.webp` |
+| `/admin` | Owner Change: In Shops tab, scroll to "ショップオーナー変更" section. | `admin/admin++TAB=shops+SECTION=owner_change.webp` |
+| `/admin` | Shop Creation: In Shops tab, scroll to "ショップ新規作成(システム管理者のみ)" (`ShopListPage.createShop`). | `admin/admin++TAB=shops+SECTION=shop_creation.webp` |
+| `/admin` | Design Assignment: In Shops tab, scroll to "ショップカードデザイン設定" section. | `admin/admin++TAB=shops+SECTION=design_link.webp` |
+| `/admin` | Editor: Click "新規作成" or "編集" in Designs tab to open `CardDesignEditor`. | `admin/admin++DIALOG=design_editor.webp` |
+| `/admin` | Tools: In Tools tab, view "現在手動生成したカード" (`AdminPage.batches.title`) area. | `admin/admin++TAB=tools+SECTION=data_dump.webp` |
 | `/admin/help` | Admin Help / Maintenance guide list. | `admin_help.webp` |
 ＃| `/receive/[qr_id_active]` | Role Selection: If logged in, click "あなたはどちらですか？" (`ReceivePage.titles.selectRole`) buttons. | `receive_[qr_id]++DIALOG=role_selection.webp` |
 ＃| `/receive/[qr_id_pin]` | Step 1: PIN Input screen ("ギフトを受け取るにはPINコードを入力してください"). | `receive_[qr_id]++STEP=1.webp` |

@@ -5,7 +5,7 @@ title: 管理者用ヘルプ：カード一覧
 
 # カード一覧
 
-![カード一覧](/images/manual/admin++TAB=qrcodes.webp)
+![カード一覧](/images/manual/admin/admin++TAB=qrcodes.webp)
 
 システム内に存在するすべてのQRコードの状態確認や、個別カードの検索、不適切なカードの利用停止（BAN処理）を行う方法について説明します。
 
@@ -14,7 +14,7 @@ title: 管理者用ヘルプ：カード一覧
 「カード一覧」タブを開くと、すべてのカードが一覧で表示されます。
 - **ID検索**: カードIDで検索が可能です。入力すると自動的にフィルタリングされます。
 - **詳細の確認**: 各行をクリックすると、そのカードのメタデータ（ショップID、商品ID、作成日時、現在のステータスなど）の詳細が表示されます。
-![カード詳細](/images/manual/admin++DIALOG=qr_details.webp)
+![カード詳細](/images/manual/admin/admin++DIALOG=qr_details.webp)
 
 ## 2. 利用停止（BAN処理）
 

@@ -6,7 +6,7 @@ title: 管理者用ヘルプ：ツール
 # ツール
 
 システム管理の補助機能である「データダンプ」ツールの使い方を説明します。主にエンジニアや高度な管理権限を持つユーザーが、データベース（DynamoDB）の生データを確認するために使用します。
-![ツール](/images/manual/admin++TAB=tools.webp)
+![ツール](/images/manual/admin/admin++TAB=tools.webp)
 
 ##### IDの確認方法については、「[各種IDの確認方法](/admin/help/whereisid)」を参照してください。
 
