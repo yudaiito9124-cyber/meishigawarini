@@ -50,9 +50,51 @@ if [ ! -d "meishigawarini" ]; then
 fi
 
 # 確実に master ブランチへ切り替えて最新化し、作業用ブランチを作成する
-echo "最新のマスター(master)ブランチを同期しています..."
 cd meishigawarini || exit 1
-git checkout master
+
+# 現在のブランチ名を取得
+CURRENT_BRANCH=$(git symbolic-ref --short HEAD 2>/dev/null)
+
+if [ -n "$CURRENT_BRANCH" ] && [ "$CURRENT_BRANCH" != "master" ]; then
+  echo "------------------------------------------"
+  echo "⚠️ 前回の作業中のブランチ [${CURRENT_BRANCH}] が残っています。"
+  echo "安全のため、前回の変更を自動コミットして GitHub へ送信（プッシュ）します..."
+
+  # 未コミットの変更があるかチェック
+  if [ -n "$(git status --porcelain)" ]; then
+    git add .
+    git commit -m "自動保存: セットアップ再実行による退避"
+    HAS_CHANGES=1
+  else
+    HAS_CHANGES=0
+  fi
+
+  # プッシュを実行
+  echo "GitHubへ前回の変更を送信中..."
+  git push origin "$CURRENT_BRANCH"
+
+  if [ $? -eq 0 ] && [ "$HAS_CHANGES" -eq 1 ]; then
+    # プルリクエストのURLを取得してブラウザで開く
+    REMOTE_URL=$(git config --get remote.origin.url)
+    REPO_URL_HTML=$(echo "$REMOTE_URL" | sed -e 's/git@github.com:/https:\/\/github.com\//' -e 's/\.git$//')
+    PR_URL="${REPO_URL_HTML}/compare/master...${CURRENT_BRANCH}?expand=1"
+    echo "前回の作業のプルリクエスト作成画面を開きます..."
+    open "$PR_URL"
+  fi
+
+  # master に戻って古いブランチを削除
+  echo "ローカルの古い作業用ブランチを削除します..."
+  git checkout master
+  git branch -D "$CURRENT_BRANCH"
+  echo "古いブランチの片付けが完了しました。"
+  echo "------------------------------------------"
+else
+  # 安全のため master に切り替え
+  git checkout master
+fi
+
+# master の最新データを同期
+echo "最新のマスター(master)ブランチを同期しています..."
 git pull origin master
 
 # 日付ベースの新しい作業ブランチを作成して切り替える
