@@ -49,11 +49,16 @@ if [ ! -d "meishigawarini" ]; then
   fi
 fi
 
-# 確実に master ブランチへ切り替えて最新化する
+# 確実に master ブランチへ切り替えて最新化し、作業用ブランチを作成する
 echo "最新のマスター(master)ブランチを同期しています..."
 cd meishigawarini || exit 1
 git checkout master
 git pull origin master
+
+# 日付ベースの新しい作業ブランチを作成して切り替える
+BRANCH_NAME="update-help-$(date +%Y%m%d)"
+echo "新しい作業用ブランチ [${BRANCH_NAME}] を作成・移動します..."
+git checkout -b "${BRANCH_NAME}" 2>/dev/null || git checkout "${BRANCH_NAME}"
 cd ..
 
 
