@@ -1,0 +1,757 @@
+
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap');
+
+/* 全体のフェードインアニメーション */
+@keyframes akitaFadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* スコープを限定したCSSプレフィックスを使用 */
+.widget-akita-root,
+.widget-akita-root * {
+    box-sizing: border-box !important;
+}
+
+.widget-akita-root {
+    font-family: 'Helvetica Neue', 'Noto Sans JP', sans-serif;
+    width: 100%;
+    background-color: #f5f8f5; /* ほんのり緑がかった明るい背景 */
+    padding: 40px 12px 20px 12px; /* スマホでは横余白を狭くしてはみ出し防止 */
+    animation: akitaFadeIn 0.8s ease-out forwards;
+}
+
+@media (min-width: 480px) {
+    .widget-akita-root {
+        padding: 40px 24px 20px 24px;
+    }
+}
+
+.widget-akita-card {
+    background-color: #ffffff;
+    border-top: 4px solid #3e2879; /* 画像から抽出：テキストカラーの深い紫 */
+    border-radius: 12px; /* 角丸を統一 */
+    box-shadow: 0 8px 30px rgba(0,0,0,0.04); /* 影を揃える */
+    overflow: hidden;
+    padding: 16px;
+    transition: box-shadow 0.3s ease;
+    width: 100%;
+    max-width: 540px; /* 幅を揃える */
+    margin: 0 auto;
+    border-left: 1px solid rgba(0, 0, 0, 0.04);
+    border-right: 1px solid rgba(0, 0, 0, 0.04);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+}
+
+@media (min-width: 480px) {
+    .widget-akita-card {
+        padding: 24px;
+    }
+}
+
+/* カード全体へのホバー効果 */
+.widget-akita-card:hover {
+    box-shadow: 0 8px 16px rgba(62, 40, 121, 0.08); /* 紫のほんのりとした影 */
+}
+
+.widget-akita-banner-link {
+    display: block;
+    text-decoration: none;
+    margin-bottom: 16px;
+    transition: transform 0.2s ease;
+}
+
+.widget-akita-banner-link:hover {
+    transform: translateY(-2px);
+}
+
+.widget-akita-banner {
+    width: 100%;
+    height: auto;
+    border-radius: 4px;
+    background-color: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    box-sizing: border-box;
+    color: #00a049; /* 画像から抽出：ロゴの鮮やかな緑 */
+    font-weight: 500;
+    border: 1px solid #d8e5d6;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.widget-akita-banner-link:hover .widget-akita-banner {
+    border-color: #89c965;
+    box-shadow: 0 4px 12px rgba(137, 201, 101, 0.12);
+}
+
+.widget-akita-banner img {
+    max-width: 100%;
+    max-height: 140px; /* 画像サイズを大きく */
+    height: auto;
+    object-fit: contain;
+    display: block;
+}
+
+.widget-akita-title {
+    color: #3e2879; /* 画像から抽出：深い紫 */
+    font-size: 22px;
+    font-weight: 700;
+    text-align: center;
+    margin-bottom: 6px;
+}
+
+.widget-akita-subtitle {
+    font-size: 13px;
+    font-weight: 500;
+    color: #64748b;
+    text-align: center;
+    margin-top: 0;
+    margin-bottom: 20px;
+    letter-spacing: 0.05em;
+    font-style: italic;
+}
+
+.widget-akita-section-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: #3e2879;
+    margin: 28px 0 12px 0;
+    padding-left: 8px;
+    border-left: 4px solid #00a049;
+    text-align: left;
+}
+
+.widget-akita-video-container {
+    width: 100%;
+    position: relative;
+    padding-top: 56.25%; /* 16:9 */
+    background: #000;
+    border-radius: 6px;
+    overflow: hidden;
+    margin-bottom: 20px;
+}
+
+.widget-akita-video-container iframe {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    border: none;
+}
+
+.widget-akita-map-container {
+    width: 100%;
+    height: 220px;
+    border-radius: 6px;
+    overflow: hidden;
+    margin-bottom: 20px;
+    border: 1px solid #d8e5d6;
+}
+
+.widget-akita-map-container iframe {
+    width: 100%;
+    height: 100%;
+    border: none;
+}
+
+.widget-akita-oc-box {
+    background-color: #f8fafc;
+    border: 1px dashed #3e2879;
+    padding: 16px;
+    border-radius: 6px;
+    text-align: left;
+    margin-bottom: 20px;
+}
+
+.widget-akita-oc-date {
+    font-size: 13px;
+    font-weight: 700;
+    color: #e11d48;
+    margin-bottom: 4px;
+}
+
+.widget-akita-oc-place {
+    font-size: 12px;
+    font-weight: 500;
+    color: #3e2879;
+    margin-bottom: 8px;
+}
+
+.widget-akita-oc-desc {
+    font-size: 11px;
+    color: #475569;
+    line-height: 1.5;
+    margin-bottom: 12px;
+}
+
+.widget-akita-oc-btn {
+    display: inline-block;
+    background-color: #3e2879;
+    color: #ffffff !important;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 6px 12px;
+    border-radius: 4px;
+    text-decoration: none;
+    transition: background-color 0.2s;
+}
+
+.widget-akita-oc-btn:hover {
+    background-color: #2c1c56;
+}
+
+.widget-akita-info-table {
+    border: 1px solid #d8e5d6;
+    border-radius: 6px;
+    overflow: hidden;
+    margin-bottom: 20px;
+    text-align: left;
+}
+
+.widget-akita-info-row {
+    display: flex;
+    flex-direction: column; /* スマホでは縦並びにして幅を確保 */
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.widget-akita-info-row:last-child {
+    border-bottom: none;
+}
+
+.widget-akita-info-label {
+    width: 100%;
+    background-color: #f8fafc;
+    padding: 8px 12px;
+    font-size: 11px;
+    font-weight: 700;
+    color: #475569;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex;
+    align-items: center;
+}
+
+.widget-akita-info-value {
+    padding: 8px 12px;
+    font-size: 11px;
+    color: #1e293b;
+    word-break: break-all;
+    line-height: 1.4;
+}
+
+@media (min-width: 480px) {
+    .widget-akita-info-row {
+        flex-direction: row;
+    }
+    .widget-akita-info-label {
+        width: 100px;
+        border-right: 1px solid #e2e8f0;
+        border-bottom: none;
+    }
+}
+
+.widget-akita-info-value a {
+    color: #00a049;
+    text-decoration: none;
+    font-weight: 500;
+}
+
+.widget-akita-info-value a:hover {
+    text-decoration: underline;
+}
+
+.widget-akita-social-row {
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+    margin: 20px 0;
+}
+
+.widget-akita-social-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background-color: #f1f5f9;
+    transition: transform 0.2s, background-color 0.2s;
+    color: #475569;
+    text-decoration: none;
+}
+
+.widget-akita-social-btn:hover {
+    transform: scale(1.1);
+}
+
+.widget-akita-social-btn.facebook:hover {
+    background-color: #1877f2;
+    color: #ffffff;
+}
+
+.widget-akita-social-btn.instagram:hover {
+    background-color: #e1306c;
+    color: #ffffff;
+}
+
+.widget-akita-social-btn.x-twitter:hover {
+    background-color: #000000;
+    color: #ffffff;
+}
+
+.widget-akita-social-btn.youtube:hover {
+    background-color: #ff0000;
+    color: #ffffff;
+}
+
+.widget-akita-social-btn svg {
+    width: 18px;
+    height: 18px;
+    fill: currentColor;
+}
+
+.widget-akita-memo-box {
+    background-color: #fffbeb;
+    border: 1px solid #fde68a;
+    padding: 16px;
+    border-radius: 6px;
+    text-align: left;
+    margin-bottom: 24px;
+}
+
+.widget-akita-memo-title {
+    font-size: 12px;
+    font-weight: 700;
+    color: #b45309;
+    margin-bottom: 6px;
+}
+
+.widget-akita-memo-text {
+    font-size: 11px;
+    color: #78350f;
+    line-height: 1.6;
+    margin-bottom: 4px;
+}
+
+.widget-akita-memo-text:last-child {
+    margin-bottom: 0;
+}
+
+.widget-akita-desc {
+    font-size: 14px;
+    line-height: 1.6;
+    color: #333333;
+    margin-bottom: 24px;
+}
+
+.widget-akita-grid {
+    display: grid;
+    grid-template-columns: 1fr; /* スマホでは1列にしてはみ出し防止 */
+    gap: 12px;
+    margin-bottom: 24px;
+}
+
+@media (min-width: 480px) {
+    .widget-akita-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 16px;
+    }
+}
+
+.widget-akita-item {
+    background-color: #ffffff;
+    border: 1px solid #d8e5d6;
+    padding: 16px;
+    border-radius: 6px;
+    text-align: center;
+    transition: transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
+    cursor: default;
+}
+
+/* アイテムホバー時の浮き上がりと黄緑のハイライト */
+.widget-akita-item:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 6px 12px rgba(0, 160, 73, 0.1); /* 緑の柔らかな影 */
+    border-color: #89c965; /* 画像から抽出：ロゴの黄緑色 */
+}
+
+.widget-akita-item h4 {
+    margin: 0 0 8px 0;
+    font-size: 14px;
+    color: #00a049; /* 画像から抽出：鮮やかな緑 */
+    transition: color 0.3s ease;
+}
+
+.widget-akita-item p {
+    margin: 0;
+    font-size: 12px;
+    color: #475569;
+}
+
+.widget-akita-cta {
+    display: block;
+    width: 100%;
+    background-color: #00a049; /* CTAボタンはロゴの緑を採用 */
+    color: #ffffff;
+    text-align: center;
+    padding: 14px;
+    border-radius: 999px;
+    text-decoration: none;
+    font-weight: 700;
+    font-size: 16px;
+    box-sizing: border-box;
+    transition: background-color 0.3s ease, transform 0.2s ease, box-shadow 0.3s ease;
+    box-shadow: 0 4px 6px rgba(0, 160, 73, 0.2);
+    margin-bottom: 12px; /* 複数ボタン配置時の間隔調整 */
+}
+
+.widget-akita-cta:last-of-type {
+    margin-bottom: 0;
+}
+
+/* ボタンホバー時に少し濃い緑になる効果 */
+.widget-akita-cta:hover {
+    background-color: #00883d;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 12px rgba(0, 160, 73, 0.3);
+}
+
+.widget-akita-cta:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 4px rgba(0, 160, 73, 0.2);
+}
+
+.widget-akita-copy {
+    text-align: center;
+    font-size: 11px;
+    color: #94a3b8;
+    margin-top: 16px;
+}
+</style>
+
+<div class="widget-akita-root">
+    <div class="widget-akita-card">
+        <!-- いただいたロゴ画像などをここに配置すると美しくまとまります -->
+        <a href="https://www.akita-u.ac.jp" target="_blank" rel="noopener noreferrer" class="widget-akita-banner-link">
+            <div class="widget-akita-banner">
+                <img src="C:\git\meishigawarini\紹介ページデザイン例\20260317005219toz-a7f180a6-5dd4-4661-890b-b886d5fe0deb.webp" alt="秋田大学 ロゴ">
+            </div>
+        </a>
+        
+        <!-- <h2 class="widget-akita-title">秋田大学</h2>
+        <p class="widget-akita-subtitle">Make your dreams come true.</p> -->
+        
+        <p class="widget-akita-desc">
+            秋田大学は、新しいモットーを「Make your dreams come true.」と定めました。本学は、学生、教職員、秋田大学を構成する全ての人達一人ひとりが抱く「夢」を尊重し、その実現を支援します。自己実現に向けて主体的に人生を切り開いていく皆さんを応援します。
+        </p>
+        
+        <!-- 活動・支援項目（2列グリッド） -->
+        <div class="widget-akita-grid">
+            <div class="widget-akita-item">
+                <h4>教育プログラム</h4>
+                <p>実践的な学びと高度な研究</p>
+            </div>
+            <div class="widget-akita-item">
+                <h4>地域貢献</h4>
+                <p>秋田の未来を共創する</p>
+            </div>
+            <div class="widget-akita-item">
+                <h4>国際交流</h4>
+                <p>グローバルな視野の育成</p>
+            </div>
+            <div class="widget-akita-item">
+                <h4>キャンパスライフ</h4>
+                <p>豊かな自然と充実した環境</p>
+            </div>
+        </div>
+
+        <!-- 動画セクション -->
+        <h3 class="widget-akita-section-title">大学紹介</h3>
+        <div class="widget-akita-video-container">
+            <iframe width="560" height="315" src="https://www.youtube.com/embed/ipIpGDt0DyM?si=cBGF0EL6vS-fmDlC" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+        </div>
+
+        <!-- オープンキャンパス情報セクション -->
+        <h3 class="widget-akita-section-title">オープンキャンパス 2026</h3>
+        <div class="widget-akita-oc-box">
+            <p class="widget-akita-oc-date">開催日：2026年7月25日（土）</p>
+            <p class="widget-akita-oc-place">場所：手形キャンパス・本道キャンパス</p>
+            <p class="widget-akita-oc-desc">対面企画とオンライン企画のハイブリッド開催！各学部の説明会、模擬授業、研究室紹介などを実施し、本学での学びの魅力を伝えます。</p>
+            <a href="https://www.akita-u.ac.jp/admission/event/oc.html" target="_blank" rel="noopener noreferrer" class="widget-akita-oc-btn">特設サイトを見る</a>
+        </div>
+
+        <!-- 地図セクション -->
+        <h3 class="widget-akita-section-title">アクセス（手形キャンパス）</h3>
+        <div class="widget-akita-map-container">
+            <iframe src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3731.783691754597!2d140.13098814103768!3d39.727675371677144!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x5f8fc2a1f541d9dd%3A0x559394a11de8a215!2z56eL55Sw5aSn5a2m!5e1!3m2!1sja!2sjp!4v1784251774112!5m2!1sja!2sjp" width="600" height="450" style="border:0;" allowfullscreen="" loading="lazy" referrerpolicy="strict-origin-when-cross-origin"></iframe>
+        </div>
+
+        <!-- プロフィール情報 -->
+        <h3 class="widget-akita-section-title">ご連絡先</h3>
+        <div class="widget-akita-info-table">
+            <div class="widget-akita-info-row">
+                <div class="widget-akita-info-label">大学名</div>
+                <div class="widget-akita-info-value">秋田大学</div>
+            </div>
+            <div class="widget-akita-info-row">
+                <div class="widget-akita-info-label">部署</div>
+                <div class="widget-akita-info-value">総務企画部広報課</div>
+            </div>
+            <div class="widget-akita-info-row">
+                <div class="widget-akita-info-label">住所</div>
+                <div class="widget-akita-info-value">〒010-8502 秋田市手形学園町1番1号</div>
+            </div>
+            <div class="widget-akita-info-row">
+                <div class="widget-akita-info-label">電話番号</div>
+                <div class="widget-akita-info-value"><a href="tel:018-889-3019">018-889-3019</a></div>
+            </div>
+            <div class="widget-akita-info-row">
+                <div class="widget-akita-info-label">メール</div>
+                <div class="widget-akita-info-value"><a href="mailto:kouhou@jimu.akita-u.ac.jp">kouhou@jimu.akita-u.ac.jp</a></div>
+            </div>
+            <div class="widget-akita-info-row">
+                <div class="widget-akita-info-label">公式サイト</div>
+                <div class="widget-akita-info-value"><a href="https://www.akita-u.ac.jp" target="_blank" rel="noopener noreferrer">https://www.akita-u.ac.jp</a></div>
+            </div>
+        </div>
+
+        <!-- 公式SNSリンク -->
+        <div class="widget-akita-social-row">
+            <!-- Facebook -->
+            <a href="https://www.facebook.com/@akitauniv.official" class="widget-akita-social-btn facebook" target="_blank" rel="noopener noreferrer" aria-label="Facebook">
+                <svg viewBox="0 0 24 24"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
+            </a>
+            <!-- Instagram -->
+            <a href="https://www.instagram.com/akitauniversity" class="widget-akita-social-btn instagram" target="_blank" rel="noopener noreferrer" aria-label="Instagram">
+                <svg viewBox="0 0 24 24"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.051.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 1 0 0 12.324 6.162 6.162 0 0 0 0-12.324zM12 16a4 4 0 1 1 0-8 4 4 0 0 1 0 8zm6.406-11.845a1.44 1.44 0 1 0 0 2.881 1.44 1.44 0 0 0 0-2.881z"/></svg>
+            </a>
+            <!-- X (Twitter) -->
+            <a href="https://x.com/syudaikouhou" class="widget-akita-social-btn x-twitter" target="_blank" rel="noopener noreferrer" aria-label="X (Twitter)">
+                <svg viewBox="0 0 24 24"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+            </a>
+            <!-- YouTube Channel -->
+            <a href="https://www.youtube.com/channel/UCKJwnXj7NOIiBId1paf3l1w" class="widget-akita-social-btn youtube" target="_blank" rel="noopener noreferrer" aria-label="YouTube">
+                <svg viewBox="0 0 24 24"><path d="M23.498 6.163a3.003 3.003 0 0 0-2.11-2.11C19.517 3.545 12 3.545 12 3.545s-7.517 0-9.388.507a3.003 3.003 0 0 0-2.11 2.11C0 8.033 0 12 0 12s0 3.967.502 5.837a3.003 3.003 0 0 0 2.11 2.11c1.871.507 9.388.507 9.388.507s7.517 0 9.388-.507a3.003 3.003 0 0 0 2.11-2.11C24 15.967 24 12 24 12s0-3.967-.502-5.837zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
+            </a>
+        </div>
+
+        <!-- 注意事項（メモ） -->
+        <div class="widget-akita-memo-box">
+            <p class="widget-akita-memo-title">⚠️ ご注意事項</p>
+            <p class="widget-akita-memo-text">本カードを破損・紛失された場合、または使用期限を過ぎた場合は、お品物をご提供できかねますので、あらかじめご了承くださいますようお願いいたします。</p>
+            <p class="widget-akita-memo-text">なお、お品物は製造元の「米菓匠 鼎庵」より直接お届けとなります。</p>
+        </div>
+
+        <!-- CTAボタン -->
+        <a href="https://www.akita-u.ac.jp" target="_blank" rel="noopener noreferrer" class="widget-akita-cta">
+            秋田大学公式サイト
+        </a>
+        
+        <!-- CTAボタン -->
+        <a href="https://www.akita-u.ac.jp/admission/index.html" target="_blank" rel="noopener noreferrer" class="widget-akita-cta">
+            受験生ポータルサイトを見る
+        </a>
+
+        
+        <div class="widget-akita-copy">
+            &copy; Akita University
+        </div>
+    </div>
+</div>
+
+<style>
+    /* 1. リセット & 埋め込み環境への干渉防止 */
+    .teian-video-root, .teian-video-root * {
+        box-sizing: border-box !important;
+        margin: 0;
+        padding: 0;
+    }
+
+    /* 2. 背景：薄緑色 */
+    .teian-video-wrapper {
+        width: 100%;
+        display: flex;
+        justify-content: center;
+        background-color: #02000f; 
+        padding: 20px 12px 40px 12px; /* スマホでは横余白を狭く */
+        font-family: "Shippori Mincho", "Hiragino Mincho ProN", serif;
+        -webkit-font-smoothing: antialiased;
+    }
+
+    @media (min-width: 480px) {
+        .teian-video-wrapper {
+            padding: 20px 24px 40px 24px;
+        }
+    }
+
+    /* 3. メインパネル：レスポンシブ対応 */
+    .tv-box {
+        width: 100%;
+        max-width: 540px; /* 秋田大学カードと幅を540pxに統一 */
+        height: auto; 
+        background: #ffffff; /* 白に変更 */
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        border-radius: 12px; /* 角丸を統一 */
+        border: 1px solid #000000; /* フチ（枠）は黒に設定 */
+    }
+
+    /* 4. トップビジュアル */
+    .tv-hero {
+        width: 100%;
+        height: 240px; /* モバイル表示時のアスペクト比考慮 */
+        overflow: hidden;
+    }
+
+    @media (min-width: 480px) {
+        .tv-hero {
+            height: 380px;
+        }
+    }
+
+    .tv-hero img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    /* 5. コンテンツエリア */
+    .tv-content {
+        padding: 40px 20px; /* モバイル対応のパディング */
+        text-align: center;
+        flex-grow: 1;
+    }
+
+    @media (min-width: 480px) {
+        .tv-content {
+            padding: 80px 50px;
+        }
+    }
+
+    .tv-logo {
+        font-size: 30px;
+        letter-spacing: 0.5em;
+        margin-left: 0.5em;
+        color: #1a1a1a; /* 元の黒に戻す */
+        margin-bottom: 70px;
+        display: block;
+    }
+
+    /* メッセージ構成 */
+    .tv-headline {
+        font-size: 19px;
+        font-weight: 600;
+        line-height: 2.2;
+        color: #1a1a1a; /* 元の黒に戻す */
+        margin-bottom: 45px;
+        letter-spacing: 0.15em;
+    }
+
+    .tv-body-small {
+        font-size: 12px;
+        line-height: 2.8;
+        color: #555555; /* 元のグレーに戻す */
+        letter-spacing: 0.1em;
+        margin-bottom: 80px;
+    }
+
+    /* 6. YouTube 埋め込みセクション */
+    .tv-video-container {
+        width: 100%;
+        margin-bottom: 80px;
+        background: #000;
+        line-height: 0; /* 下部の隙間排除 */
+        position: relative;
+        padding-top: 56.25%; /* 16:9 のアスペクト比維持 */
+    }
+
+    .tv-video-container iframe {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        border: none;
+    }
+
+    /* アワード画像 */
+    .tv-award {
+        width: 120px;
+        height: 120px;
+        margin: 0 auto 60px;
+    }
+
+    .tv-award img {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+    }
+
+    /* 7. フッター */
+    .tv-footer {
+        padding-bottom: 70px;
+    }
+
+    .tv-btn {
+        display: inline-block;
+        padding: 16px 50px;
+        border: 1px solid #1a1a1a; /* 元の黒枠に戻す */
+        color: #1a1a1a !important; /* 元の黒文字に戻す */
+        text-decoration: none;
+        font-size: 11px;
+        letter-spacing: 0.3em;
+        transition: 0.4s;
+    }
+
+    .tv-btn:hover {
+        background: #1a1a1a; /* 元の黒背景に戻す */
+        color: #ffffff !important; /* ホバー時は白文字に戻す */
+    }
+
+    .tv-copy {
+        margin-top: 40px;
+        font-size: 9px;
+        color: #aaa; /* 元のグレーに戻す */
+        letter-spacing: 0.15em;
+    }
+</style>
+
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho&display=swap" rel="stylesheet">
+
+<div class="teian-video-wrapper teian-video-root">
+    <div class="tv-box">
+        <div class="tv-hero">
+            <img src="https://infrastack-productimagebucketdce10e3f-qmgx3s9tvlno.s3.ap-northeast-1.amazonaws.com/shop/20260312034701-504eb0a2-3562-4a7c-bfb8-a642c50cced1/shopcontent/371aed5d-a5d0-423e-a108-cd12dd2215af.jpg?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=ASIAYTMSSPW4G2RNOCSR%2F20260717%2Fap-northeast-1%2Fs3%2Faws4_request&X-Amz-Date=20260717T014830Z&X-Amz-Expires=3600&X-Amz-Security-Token=IQoJb3JpZ2luX2VjEIr%2F%2F%2F%2F%2F%2F%2F%2F%2F%2FwEaDmFwLW5vcnRoZWFzdC0xIkYwRAIgKj5xieIo19PN2s5WE8gLdL4xZNzMvG7NHSuG3xfh8EUCIE5mQDlf9Erw6kWmJ392pVt1CKnQdBuVQ%2BVyX2wZu0P1KoAFCFMQABoMNTkxNDAyMjcwMTM2IgzwS6V4QzN3EpUnCRAq3QR3qMEW%2F5p%2B0nvuIX3U9VfI2EdlEFSFSVZaC99XEwR4XgsNmspk%2F83KaX31xcaLADVaCtgDrEnoSdqE6SbZdlyZ21sKAonywM2NPPG1A9STSqsStTCAQjArgpIccD54YPkURzAcMgZ0l9U6B1k5HOxRpFDx%2BufzWGVfDH96T6Af%2BmVfa3Gcj3ZixUCeD8TWKqspcsE6HclvXtOF%2FN0gi7plRRRDKu6Wz%2BNLdmvSop851w8Fb8IcLmSpYBR8Flw%2F0jWqKaaVnqaTZD3WjkMHHQxY1XqkEI6p87HAkINSX8YWEDYmqHbty2QmynNWCMQ0CgNcDD%2FQPfpGT15Tl%2Bb0h%2F6yWbIAys2cAHgp%2FX5MTPEIm%2FduROGVGECgqs2GSfEYyLKyCn4mW5tWeVVJPzqfDtpybRgfz7XcLWsX%2FUADkIg%2FKcXyrmrZU5rNX%2BS3izb7dEdjZHCmpBeeFtP5vhjJMwgRMBFGHJXcz%2FfVc0fLhBIPqsMZV7l5BKdyOLFFXm4PSDhrg8nWN%2BbF%2B77yAwYMMcXbKwV0M9AQkrvBbU7jhGm9JhalbEBQqlfWk%2BeCexln2ZUAPf5Ky5RXIW%2FAkhRUoZ5%2Fzw8NmTWBKIEusV91lUJjY7U17msFOH3UNZXM3eqOvkU09wAMp1dwf0RXtVs1UwY5JduzL1vh5syiWlbHR2m73sgkH8oFWjZfI1Ccoel57IxgJ3qpyYjw49PPzfsjrJc0SSu5Tm8OpcD7c50RTeHkInQ4Mc1iFRRF%2FJ1GZE9dl3DMaqUhs3sYgTvVr%2BIAou%2FPsp0q5V%2B3VLEujTljzDCYk%2BbSBjqkAeHzhmbriHriw3yWRLfN62dwpNopakyfI4djoBN5kM2SnKu%2FBWFyY3ADjig2pZi3c98GFxuYSdFOK0dyt3H3vENxGc4%2Byl7ZMQ5oo4cEVGkvvwCCqxG1zdtBT2oplL29LK9phyN0NO2zQUToHBQ21GkdrhuPd3scYetRkbV%2Fy9v5NMKKzAACnjaqudg5QTVRzXMIjvZciNZMkVRuBCiDCU1mTCUg&X-Amz-Signature=9e580d9624cff79be597a2161f9ad24080b2241cd1c1801b281f3ed6112630c3&X-Amz-SignedHeaders=host&x-amz-checksum-mode=ENABLED&x-id=GetObject" alt="TEIAN Visual">
+        </div>
+
+        <div class="tv-content">
+            <span class="tv-logo">TEIAN</span>
+
+            <h2 class="tv-headline">
+                高品質の秋田県産米にて<br>
+                贈り物に喜ばれる秋田米菓を追求する
+            </h2>
+
+            <p class="tv-body-small">
+                日本を代表する米の名産地秋田から厳選した<br>
+                秋田県産あきたこまち一等米でつくる手焼きせんべいを<br>
+                発酵文化豊かな秋田の味噌醤油で味付けし<br>
+                秋田に生まれ育った私たちだからご提供できる唯一無二の米菓子を<br>
+                秋田の地より心を込めてお届けします。
+            </p>
+
+            <div class="tv-award">
+                <img src="https://infrastack-productimagebucketdce10e3f-qmgx3s9tvlno.s3.ap-northeast-1.amazonaws.com/shop/20260312034701-504eb0a2-3562-4a7c-bfb8-a642c50cced1/shopcontent/aaecc523-e683-4be9-834f-6419b14b047f.jpg?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=ASIAYTMSSPW4G2RNOCSR%2F20260717%2Fap-northeast-1%2Fs3%2Faws4_request&X-Amz-Date=20260717T014830Z&X-Amz-Expires=3600&X-Amz-Security-Token=IQoJb3JpZ2luX2VjEIr%2F%2F%2F%2F%2F%2F%2F%2F%2F%2FwEaDmFwLW5vcnRoZWFzdC0xIkYwRAIgKj5xieIo19PN2s5WE8gLdL4xZNzMvG7NHSuG3xfh8EUCIE5mQDlf9Erw6kWmJ392pVt1CKnQdBuVQ%2BVyX2wZu0P1KoAFCFMQABoMNTkxNDAyMjcwMTM2IgzwS6V4QzN3EpUnCRAq3QR3qMEW%2F5p%2B0nvuIX3U9VfI2EdlEFSFSVZaC99XEwR4XgsNmspk%2F83KaX31xcaLADVaCtgDrEnoSdqE6SbZdlyZ21sKAonywM2NPPG1A9STSqsStTCAQjArgpIccD54YPkURzAcMgZ0l9U6B1k5HOxRpFDx%2BufzWGVfDH96T6Af%2BmVfa3Gcj3ZixUCeD8TWKqspcsE6HclvXtOF%2FN0gi7plRRRDKu6Wz%2BNLdmvSop851w8Fb8IcLmSpYBR8Flw%2F0jWqKaaVnqaTZD3WjkMHHQxY1XqkEI6p87HAkINSX8YWEDYmqHbty2QmynNWCMQ0CgNcDD%2FQPfpGT15Tl%2Bb0h%2F6yWbIAys2cAHgp%2FX5MTPEIm%2FduROGVGECgqs2GSfEYyLKyCn4mW5tWeVVJPzqfDtpybRgfz7XcLWsX%2FUADkIg%2FKcXyrmrZU5rNX%2BS3izb7dEdjZHCmpBeeFtP5vhjJMwgRMBFGHJXcz%2FfVc0fLhBIPqsMZV7l5BKdyOLFFXm4PSDhrg8nWN%2BbF%2B77yAwYMMcXbKwV0M9AQkrvBbU7jhGm9JhalbEBQqlfWk%2BeCexln2ZUAPf5Ky5RXIW%2FAkhRUoZ5%2Fzw8NmTWBKIEusV91lUJjY7U17msFOH3UNZXM3eqOvkU09wAMp1dwf0RXtVs1UwY5JduzL1vh5syiWlbHR2m73sgkH8oFWjZfI1Ccoel57IxgJ3qpyYjw49PPzfsjrJc0SSu5Tm8OpcD7c50RTeHkInQ4Mc1iFRRF%2FJ1GZE9dl3DMaqUhs3sYgTvVr%2BIAou%2FPsp0q5V%2B3VLEujTljzDCYk%2BbSBjqkAeHzhmbriHriw3yWRLfN62dwpNopakyfI4djoBN5kM2SnKu%2FBWFyY3ADjig2pZi3c98GFxuYSdFOK0dyt3H3vENxGc4%2Byl7ZMQ5oo4cEVGkvvwCCqxG1zdtBT2oplL29LK9phyN0NO2zQUToHBQ21GkdrhuPd3scYetRkbV%2Fy9v5NMKKzAACnjaqudg5QTVRzXMIjvZciNZMkVRuBCiDCU1mTCUg&X-Amz-Signature=acabcf8c94d854ea3da4d8fb84533e2c0d5e4678221637a07944f2b96cce31c8&X-Amz-SignedHeaders=host&x-amz-checksum-mode=ENABLED&x-id=GetObject" alt="Logo">
+            </div>
+
+            <div class="tv-footer">
+                <a href="https://teian-akita.com/" target="_blank" class="tv-btn">ABOUT BRAND</a>
+                <p class="tv-copy">© KANAEYA / TEIAN ALL RIGHTS RESERVED.</p>
+            </div>
+        </div>
+    </div>
+</div>
