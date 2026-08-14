@@ -389,7 +389,7 @@
     "searchPlaceholder": "カードIDで絞り込み...",
     "tabs": {
       "activation": "アクティベーション",
-      "shipping": "カード・受注管理",
+      "shipping": "商品受注管理",
       "products": "商品登録",
       "orderCard": "カード発注"
     },

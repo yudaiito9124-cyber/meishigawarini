@@ -424,7 +424,7 @@ export default function LoginPage() {
                         <CardFooter className="flex-col gap-4">
                             {!isAdmin && (
                                 <p className="text-sm text-gray-500">
-                                    {t('noAccount')} <Link href="/register" className="text-blue-600 hover:underline">{t('signUpLink')}</Link>
+                                    {t('noAccount')} <Link href="/login" className="text-blue-600 hover:underline">{t('signUpLink')}</Link>
                                 </p>
                             )}
                             {isAdmin && (

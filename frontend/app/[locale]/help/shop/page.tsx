@@ -12,7 +12,7 @@
 
 import Link from 'next/link';
 import { getTranslations } from 'next-intl/server';
-import { ArrowLeft, ChevronRight, Gift, QrCode, Truck, CreditCard, CircleUserRound, Filter, Waypoints, Store, Paintbrush } from 'lucide-react';
+import { ArrowLeft, ChevronRight, Gift, QrCode, Truck, CreditCard, CircleUserRound, Filter, Waypoints, Store, Paintbrush, Search } from 'lucide-react';
 import { HelpQRCode } from '@/components/help/HelpQRCode';
 
 /**
@@ -59,7 +59,7 @@ export default function ShopHelpGatewayPage() {
 
                 <div className="grid gap-6 md:grid-cols-2">
 
-                    {/* Operational Flow (Shop Admin Specific) */}
+                    {/* Operational Flow (Top Full width) */}
                     <Link href="/help/shop/flow" className="group relative rounded-xl border border-primary/20 bg-primary/5 p-8 shadow-sm transition-all hover:border-primary/50 hover:shadow-md block md:col-span-2">
                         <div className="flex items-center gap-6">
                             <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg">
@@ -67,7 +67,7 @@ export default function ShopHelpGatewayPage() {
                             </div>
                             <div>
                                 <h2 className="text-2xl font-bold tracking-tight text-foreground group-hover:text-primary transition-colors">
-                                    ショップ運用マニュアル（全体像）
+                                    ご利用の流れ
                                 </h2>
                                 <p className="mt-2 text-muted-foreground">
                                     商品の準備からカードの発注、アクティベーション、発送までの業務フローを解説します。
@@ -75,12 +75,12 @@ export default function ShopHelpGatewayPage() {
                             </div>
                         </div>
                         <div className="mt-6 flex items-center text-sm font-medium text-primary">
-                            運用フロー図を見る
+                            全体の流れを見る
                             <ChevronRight className="ml-1 h-4 w-4 transition-transform group-hover:translate-x-1" />
                         </div>
                     </Link>
 
-                    {/* At First Card */}
+                    {/* 1. まず初めに */}
                     <Link href="/help/shop/atfirst" className="group relative rounded-xl border bg-card p-8 shadow-sm transition-all hover:border-primary/50 hover:shadow-md block">
                         <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary">
                             <CircleUserRound className="h-6 w-6" />
@@ -97,15 +97,16 @@ export default function ShopHelpGatewayPage() {
                         </div>
                     </Link>
 
+                    {/* 2. ショップの設定・商品登録 */}
                     <Link href="/help/shop/manage" className="group relative rounded-xl border bg-card p-8 shadow-sm transition-all hover:border-primary/50 hover:shadow-md block">
                         <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary">
-                            <Gift className="h-6 w-6" />
+                            <Store className="h-6 w-6" />
                         </div>
                         <h2 className="text-2xl font-bold tracking-tight text-foreground group-hover:text-primary transition-colors">
-                            商品登録・ショップ設定
+                            ショップの設定・商品登録
                         </h2>
                         <p className="mt-2 text-muted-foreground">
-                            ショップの基本設定や、商品の登録・管理操作について説明します。
+                            ショップの基本情報設定、カードデザイン追加申請、商品の登録・管理操作について説明します。
                         </p>
                         <div className="mt-6 flex items-center text-sm font-medium text-primary">
                             マニュアルを見る
@@ -113,6 +114,24 @@ export default function ShopHelpGatewayPage() {
                         </div>
                     </Link>
 
+                    {/* 3. カード印刷発注 */}
+                    <Link href="/help/shop/card-order" className="group relative rounded-xl border bg-card p-8 shadow-sm transition-all hover:border-primary/50 hover:shadow-md block">
+                        <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary">
+                            <CreditCard className="h-6 w-6" />
+                        </div>
+                        <h2 className="text-2xl font-bold tracking-tight text-foreground group-hover:text-primary transition-colors">
+                            カード印刷発注
+                        </h2>
+                        <p className="mt-2 text-muted-foreground">
+                            新しい物理カードが必要になった際の、システム管理者への申請・発注手順を説明します。
+                        </p>
+                        <div className="mt-6 flex items-center text-sm font-medium text-primary">
+                            マニュアルを見る
+                            <ChevronRight className="ml-1 h-4 w-4 transition-transform group-hover:translate-x-1" />
+                        </div>
+                    </Link>
+
+                    {/* 4. アクティベーション */}
                     <Link href="/help/shop/activate" className="group relative rounded-xl border bg-card p-8 shadow-sm transition-all hover:border-primary/50 hover:shadow-md block">
                         <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary">
                             <QrCode className="h-6 w-6" />
@@ -129,12 +148,13 @@ export default function ShopHelpGatewayPage() {
                         </div>
                     </Link>
 
+                    {/* 5. 商品受注管理 */}
                     <Link href="/help/shop/shipping" className="group relative rounded-xl border bg-card p-8 shadow-sm transition-all hover:border-primary/50 hover:shadow-md block">
                         <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary">
                             <Truck className="h-6 w-6" />
                         </div>
                         <h2 className="text-2xl font-bold tracking-tight text-foreground group-hover:text-primary transition-colors">
-                            カード・受注管理
+                            商品受注管理
                         </h2>
                         <p className="mt-2 text-muted-foreground">
                             ユーザーからの受注を確認し、商品の発送手続きを行う手順を説明します。
@@ -145,24 +165,7 @@ export default function ShopHelpGatewayPage() {
                         </div>
                     </Link>
 
-                    {/* New: Card Application */}
-                    <Link href="/help/shop/card-order" className="group relative rounded-xl border bg-card p-8 shadow-sm transition-all hover:border-primary/50 hover:shadow-md block">
-                        <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary">
-                            <CreditCard className="h-6 w-6" />
-                        </div>
-                        <h2 className="text-2xl font-bold tracking-tight text-foreground group-hover:text-primary transition-colors">
-                            物理カード発注
-                        </h2>
-                        <p className="mt-2 text-muted-foreground">
-                            新しい物理カードが必要になった際の、システム管理者への発注手順を説明します。
-                        </p>
-                        <div className="mt-6 flex items-center text-sm font-medium text-primary">
-                            マニュアルを見る
-                            <ChevronRight className="ml-1 h-4 w-4 transition-transform group-hover:translate-x-1" />
-                        </div>
-                    </Link>
-
-                    {/* New: Card Filtering */}
+                    {/* 6. カードの絞り込み */}
                     <Link href="/help/shop/filter" className="group relative rounded-xl border bg-card p-8 shadow-sm transition-all hover:border-primary/50 hover:shadow-md block">
                         <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary">
                             <Filter className="h-6 w-6" />
@@ -179,16 +182,33 @@ export default function ShopHelpGatewayPage() {
                         </div>
                     </Link>
 
-                    {/* New: Card Design */}
+                    {/* 7. オリジナルカードデザイン作成 */}
                     <Link href="/help/shop/card-design" className="group relative rounded-xl border bg-card p-8 shadow-sm transition-all hover:border-primary/50 hover:shadow-md block">
                         <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary">
                             <Paintbrush className="h-6 w-6" />
                         </div>
                         <h2 className="text-2xl font-bold tracking-tight text-foreground group-hover:text-primary transition-colors">
-                            カードデザイン作成
+                            オリジナルカードデザイン作成
                         </h2>
                         <p className="mt-2 text-muted-foreground">
                             ショップオリジナルのカードをデザインする際の、サイズや印字位置などの仕様を説明します。
+                        </p>
+                        <div className="mt-6 flex items-center text-sm font-medium text-primary">
+                            マニュアルを見る
+                            <ChevronRight className="ml-1 h-4 w-4 transition-transform group-hover:translate-x-1" />
+                        </div>
+                    </Link>
+
+                    {/* 8. 各種IDの確認方法 */}
+                    <Link href="/help/shop/whereisid" className="group relative rounded-xl border bg-card p-8 shadow-sm transition-all hover:border-primary/50 hover:shadow-md block">
+                        <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary">
+                            <Search className="h-6 w-6" />
+                        </div>
+                        <h2 className="text-2xl font-bold tracking-tight text-foreground group-hover:text-primary transition-colors">
+                            各種IDの確認方法
+                        </h2>
+                        <p className="mt-2 text-muted-foreground">
+                            ショップ管理で必要となるユーザーIDやショップIDの確認手順について説明します。
                         </p>
                         <div className="mt-6 flex items-center text-sm font-medium text-primary">
                             マニュアルを見る

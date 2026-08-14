@@ -1217,16 +1217,16 @@ export default function AdminPage() {
                 {activeTab === "shops" && (
                     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
                         <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 items-start">
-                            {/* ショップのメタデータ管理 (NEW) */}
-                            <AdminShopCardDesignLinkSection apiUrl={NEXT_PUBLIC_API_URL} dbCardDesigns={dbCardDesigns} />
-
-                            {/* ショップの新規作成 (NEW) */}
+                            {/* ショップの新規作成 (左上) */}
                             <AdminShopCreationSection apiUrl={NEXT_PUBLIC_API_URL} />
 
-                            {/* ショップオーナーの変更 (NEW) */}
+                            {/* ショップのメタデータ・デザイン紐づけ管理 (右上) */}
+                            <AdminShopCardDesignLinkSection apiUrl={NEXT_PUBLIC_API_URL} dbCardDesigns={dbCardDesigns} />
+
+                            {/* ショップオーナーの変更 (左下) */}
                             <ShopOwnerChangeSection apiUrl={NEXT_PUBLIC_API_URL} />
 
-                            {/* ショップ管理者の紐づけ (NEW) */}
+                            {/* ショップ管理者の紐づけ (右下) */}
                             <ManagerLinkingSection apiUrl={NEXT_PUBLIC_API_URL} />
                         </div>
                     </div>

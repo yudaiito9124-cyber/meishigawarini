@@ -67,9 +67,9 @@ It contains the necessary navigation paths, triggers, and state requirements for
 #| `/login` | MFA Challenge: After entering credentials, show TOTP input (`LoginPage.mfaCodeLabel`). | `login++STEP=mfa.webp` |
 #| `/login` | Post-Login Selection: Hub screen for Multi-role/Shop owners (`LoginPage.selectionTitle`). | `login++STEP=selection.webp` |
 #| `/login` | Error State: Form showing "Invalid credentials" (`LoginPage.errors.notAuthorized`). | `login++ERROR=invalid.webp` |
-#| `/register` | Registration Form: New account signup view. | `register.webp` |
-#| `/register` | Registration Form: New account signup view. | `register++STEP=form.webp` |
-#| `/register` | Success State: "Registration Complete" success card (`RegisterPage.successTitle`). | `register++STEP=success.webp` |
+#| `/login` | Registration Form: New account signup view. | `register.webp` |
+#| `/login` | Registration Form: New account signup view. | `register++STEP=form.webp` |
+#| `/login` | Success State: "Registration Complete" success card (`RegisterPage.successTitle`). | `register++STEP=success.webp` |
 #| `/verify` | Email Verification: Code entry page after registration. | `verify.webp` |
 #| `/mfa-setup` | Multi-factor authentication setup screen. | `mfa_setup.webp` |
 

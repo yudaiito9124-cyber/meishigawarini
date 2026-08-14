@@ -158,7 +158,7 @@ import { useEffect, useRef, useState } from 'react';
 //             ショップ登録・QRコード発行まで、すべて無料で始められます。
 //           </p>
 //           <Link
-//             href="/register"
+//             href="/login"
 //             className="border border-black px-8 py-4 rounded-full text-base font-medium hover:bg-black hover:text-white transition inline-block"
 //           >
 //             ショップを開設する（無料）

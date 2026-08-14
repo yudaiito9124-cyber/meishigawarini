@@ -41,11 +41,11 @@ const CategoryIconMap: Record<string, React.ElementType> = {
 
 /** カテゴリと日本語タイトルの対応定義 */
 const CategoryTitleMap: Record<string, string> = {
-  overview: 'ご利用ガイド',
-  receive: '受取人マニュアル',
-  send: '贈り主マニュアル',
-  user: 'マイページヘルプ',
-  shop: 'ショップ管理',
+  overview: '新しいギフト体験「名刺代わりに。」とは',
+  receive: 'ギフトの受け取り方',
+  send: 'ギフトの贈り方',
+  user: 'マイページの使い方',
+  shop: 'ショップ運用マニュアル',
 };
 
 /**

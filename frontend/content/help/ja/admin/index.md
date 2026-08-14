@@ -31,7 +31,7 @@ title: システム管理者の初期設定
   - 成功するとログイン画面に戻されます
 
 ### 5 再度ログイン
-　[https://meishigawarini.com/login](https://meishigawarini.com/login)
+　https://meishigawarini.com/login
   - これまでと同じメールアドレス、IDでログインし、2段階認証は認証アプリに表示されているPINを打ち込んでください
 
 ### 6 以降のログイン

@@ -37,6 +37,7 @@ export default function AdminHelpGatewayPage() {
                 </div>
 
                 {/* Header Section */}
+                {/* Header Section */}
                 <div className="mb-10 text-center">
                     <div className="inline-flex h-16 w-16 items-center justify-center rounded-full bg-white/10 text-white mb-4 shadow-sm">
                         <Crown className="h-8 w-8" />
@@ -52,7 +53,7 @@ export default function AdminHelpGatewayPage() {
 
                 <div className="grid gap-6 md:grid-cols-2">
 
-                    {/* Operational Flow (Common) */}
+                    {/* Operational Flow (Full width top) */}
                     <Link href="/admin/help/flow" className="group relative rounded-xl border border-white/10 bg-white/5 p-8 shadow-sm transition-all hover:bg-white/10 hover:border-white/20 block md:col-span-2">
                         <div className="flex items-center gap-6">
                             <div className="flex h-16 w-16 items-center justify-center rounded-full bg-white text-mist-900 shadow-lg">
@@ -60,10 +61,10 @@ export default function AdminHelpGatewayPage() {
                             </div>
                             <div>
                                 <h2 className="text-2xl font-bold tracking-tight text-white group-hover:text-white/80 transition-colors">
-                                    ご利用の流れ（全体像）
+                                    ご利用の流れ
                                 </h2>
                                 <p className="mt-2 text-white/60">
-                                    ユーザーがカードを受け取ってからギフトを受け取るまでの全体像を解説します。
+                                    カード発行、ショップのセットアップ、監視・メンテナンス、権限等の業務フローを解説します。
                                 </p>
                             </div>
                         </div>
@@ -73,16 +74,16 @@ export default function AdminHelpGatewayPage() {
                         </div>
                     </Link>
 
-                    {/* Admin Sections */}
-                    <Link href="/admin/help/overview" className="group relative rounded-xl border border-white/10 bg-white/5 p-8 shadow-sm transition-all hover:bg-white/10 block">
+                    {/* 1. ショップ管理 */}
+                    <Link href="/admin/help/shops" className="group relative rounded-xl border border-white/10 bg-white/5 p-8 shadow-sm transition-all hover:bg-white/10 block">
                         <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-white/10 text-white">
-                            <BookOpen className="h-6 w-6" />
+                            <Store className="h-6 w-6" />
                         </div>
                         <h2 className="text-xl font-bold text-white group-hover:text-white/80 transition-colors">
-                            管理者ヘルプ概要
+                            ショップ管理
                         </h2>
                         <p className="mt-2 text-sm text-white/60">
-                            管理者専用機能の全体的な使い方と権限について説明します。
+                            ショップの新規開設、オーナーや管理者の紐付け設定を説明します。
                         </p>
                         <div className="mt-6 flex items-center text-sm font-medium text-white/80">
                             詳細を見る
@@ -90,38 +91,7 @@ export default function AdminHelpGatewayPage() {
                         </div>
                     </Link>
 
-                    <Link href="/admin/help/qrcodes" className="group relative rounded-xl border border-white/10 bg-white/5 p-8 shadow-sm transition-all hover:bg-white/10 block">
-                        <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-white/10 text-white">
-                            <CreditCard className="h-6 w-6" />
-                        </div>
-                        <h2 className="text-xl font-bold text-white group-hover:text-white/80 transition-colors">
-                            カード一覧
-                        </h2>
-                        <p className="mt-2 text-sm text-white/60">
-                            カードの状態確認、BAN処理、検索方法について説明します。
-                        </p>
-                        <div className="mt-6 flex items-center text-sm font-medium text-white/80">
-                            詳細を見る
-                            <ChevronRight className="ml-1 h-4 w-4 transition-transform group-hover:translate-x-1" />
-                        </div>
-                    </Link>
-
-                    <Link href="/admin/help/cardorders" className="group relative rounded-xl border border-white/10 bg-white/5 p-8 shadow-sm transition-all hover:bg-white/10 block">
-                        <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-white/10 text-white">
-                            <Printer className="h-6 w-6" />
-                        </div>
-                        <h2 className="text-xl font-bold text-white group-hover:text-white/80 transition-colors">
-                            カード印刷
-                        </h2>
-                        <p className="mt-2 text-sm text-white/60">
-                            印刷用PDFのダウンロードや、バッチ管理について説明します。
-                        </p>
-                        <div className="mt-6 flex items-center text-sm font-medium text-white/80">
-                            詳細を見る
-                            <ChevronRight className="ml-1 h-4 w-4 transition-transform group-hover:translate-x-1" />
-                        </div>
-                    </Link>
-
+                    {/* 2. デザイン設定 */}
                     <Link href="/admin/help/designs" className="group relative rounded-xl border border-white/10 bg-white/5 p-8 shadow-sm transition-all hover:bg-white/10 block">
                         <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-white/10 text-white">
                             <Paintbrush className="h-6 w-6" />
@@ -138,15 +108,16 @@ export default function AdminHelpGatewayPage() {
                         </div>
                     </Link>
 
-                    <Link href="/admin/help/shops" className="group relative rounded-xl border border-white/10 bg-white/5 p-8 shadow-sm transition-all hover:bg-white/10 block">
+                    {/* 3. カード印刷 */}
+                    <Link href="/admin/help/cardorders" className="group relative rounded-xl border border-white/10 bg-white/5 p-8 shadow-sm transition-all hover:bg-white/10 block">
                         <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-white/10 text-white">
-                            <Store className="h-6 w-6" />
+                            <Printer className="h-6 w-6" />
                         </div>
                         <h2 className="text-xl font-bold text-white group-hover:text-white/80 transition-colors">
-                            ショップ管理
+                            カード印刷
                         </h2>
                         <p className="mt-2 text-sm text-white/60">
-                            ショップの新規開設、オーナーの紐付け設定を説明します。
+                            注文のカード生成、印刷用PDFのダウンロードや手動生成ツールについて説明します。
                         </p>
                         <div className="mt-6 flex items-center text-sm font-medium text-white/80">
                             詳細を見る
@@ -154,6 +125,24 @@ export default function AdminHelpGatewayPage() {
                         </div>
                     </Link>
 
+                    {/* 4. カード一覧 */}
+                    <Link href="/admin/help/qrcodes" className="group relative rounded-xl border border-white/10 bg-white/5 p-8 shadow-sm transition-all hover:bg-white/10 block">
+                        <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-white/10 text-white">
+                            <CreditCard className="h-6 w-6" />
+                        </div>
+                        <h2 className="text-xl font-bold text-white group-hover:text-white/80 transition-colors">
+                            カード一覧
+                        </h2>
+                        <p className="mt-2 text-sm text-white/60">
+                            カードの検索、状態確認（ステータスガイド）、BAN処理について説明します。
+                        </p>
+                        <div className="mt-6 flex items-center text-sm font-medium text-white/80">
+                            詳細を見る
+                            <ChevronRight className="ml-1 h-4 w-4 transition-transform group-hover:translate-x-1" />
+                        </div>
+                    </Link>
+
+                    {/* 5. ツール */}
                     <Link href="/admin/help/tools" className="group relative rounded-xl border border-white/10 bg-white/5 p-8 shadow-sm transition-all hover:bg-white/10 block">
                         <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-white/10 text-white">
                             <Wrench className="h-6 w-6" />
@@ -163,22 +152,6 @@ export default function AdminHelpGatewayPage() {
                         </h2>
                         <p className="mt-2 text-sm text-white/60">
                             データのエクスポートやメンテナンス用の特殊操作を説明します。
-                        </p>
-                        <div className="mt-6 flex items-center text-sm font-medium text-white/80">
-                            詳細を見る
-                            <ChevronRight className="ml-1 h-4 w-4 transition-transform group-hover:translate-x-1" />
-                        </div>
-                    </Link>
-
-                    <Link href="/admin/help/whereisid" className="group relative rounded-xl border border-white/10 bg-white/5 p-8 shadow-sm transition-all hover:bg-white/10 block">
-                        <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-white/10 text-white">
-                            <Search className="h-6 w-6" />
-                        </div>
-                        <h2 className="text-xl font-bold text-white group-hover:text-white/80 transition-colors">
-                            各種IDの確認方法
-                        </h2>
-                        <p className="mt-2 text-sm text-white/60">
-                            データのエクスポートやメンテナンス時に用いるIDの確認方法を説明します。
                         </p>
                         <div className="mt-6 flex items-center text-sm font-medium text-white/80">
                             詳細を見る

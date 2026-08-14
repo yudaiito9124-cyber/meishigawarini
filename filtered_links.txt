@@ -21,8 +21,8 @@ frontend/app/[locale]/receive/[qr_id]/page.tsx:                                 
 frontend/app/[locale]/receive/[qr_id]/page.tsx:                                                            <a href={`mailto:${gift.shop_email}`} className="text-blue-600 font-medium hover:underline text-sm break-all">
 frontend/app/[locale]/receive/[qr_id]/page.tsx:                                                                        window.open(url, '_blank', 'noopener,noreferrer');
 frontend/app/[locale]/receive/[qr_id]/page.tsx:                                                                <a href={msg.file_url} target="_blank" rel="noopener noreferrer" >
-frontend/app/[locale]/register/page.tsx:                        <Link href="/login">
-frontend/app/[locale]/register/page.tsx:                        {t('hasAccount')} <Link href="/login" className="text-blue-600 hover:underline">{t('loginLink')}</Link>
+frontend/app/[locale]/login/page.tsx:                        <Link href="/login">
+frontend/app/[locale]/login/page.tsx:                        {t('hasAccount')} <Link href="/login" className="text-blue-600 hover:underline">{t('loginLink')}</Link>
 frontend/app/[locale]/mfa-setup/page.tsx:                            <Link href="/help/admin">
 frontend/app/[locale]/page.tsx:        <a href="#" className="font-black text-lg tracking-tight hover:opacity-80 transition-opacity">{ts("name")}</a>
 frontend/app/[locale]/page.tsx:          <a href="#howto" className="hidden md:block text-sm text-gray-500 hover:text-black transition-colors">使い方</a>
@@ -34,7 +34,7 @@ frontend/app/[locale]/page.tsx:          <a href="#for-shops" className="hover:t
 frontend/app/[locale]/login/page.tsx:                                <Link href="/help/admin" className="w-full sm:w-auto">
 frontend/app/[locale]/login/page.tsx:                                <Link href="/admin" className="w-full sm:w-auto">
 frontend/app/[locale]/login/page.tsx:                                <Link href="/shop" className="w-full sm:w-auto">
-frontend/app/[locale]/login/page.tsx:                                    {t('noAccount')} <Link href="/register" className="text-blue-600 hover:underline">{t('signUpLink')}</Link>
+frontend/app/[locale]/login/page.tsx:                                    {t('noAccount')} <Link href="/login" className="text-blue-600 hover:underline">{t('signUpLink')}</Link>
 frontend/app/[locale]/login/page.tsx:                                    <Link href="/mfa-setup" className="text-sm text-gray-500 hover:text-blue-600 transition-colors">
 frontend/app/[locale]/help/shop/page.tsx:                    <Link href="/help" className="inline-flex items-center text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
 frontend/app/[locale]/help/shop/page.tsx:                    <Link href="/help/shop/flow" className="group relative rounded-xl border border-primary/20 bg-primary/5 p-8 shadow-sm transition-all hover:border-primary/50 hover:shadow-md block md:col-span-2">

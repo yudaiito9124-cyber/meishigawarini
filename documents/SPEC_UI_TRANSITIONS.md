@@ -18,7 +18,7 @@ graph TD
     
     Entry[/ページアクセス/] --> AuthCheck{セッション有効?}
     AuthCheck -->|No| CognitoUI[AWS Cognito Hosted UI]
-    CognitoUI --> Register["新規作成: /register"]
+    CognitoUI --> Register["新規作成: /login"]
     CognitoUI --> Login[ログイン完了]
     
     AuthCheck -->|Yes| Login
@@ -148,7 +148,7 @@ graph TD
     * **Hosted UI での操作**: 
         * 外部サービス（Amazon/Google等）連携ログイン。
         * パスワードを忘れた場合の再設定。
-        * **新規アカウント登録**: 「Sign Up」からアプリの `/register` または Cognito 側の登録画面へ。
+        * **新規アカウント登録**: 「Sign Up」からアプリの `/login` または Cognito 側の登録画面へ。
     * **アプリ内ログイン画面**: ID/PW の直接入力、および MFA コードの入力に対応。
     * **管理者向け MFA 強制フロー**:
         * システム管理者 (`Administrators` 等) が MFA 未設定状態で `/admin` 配下にアクセスしようとすると、自動的に `/mfa-setup` へリダイレクトされます。
@@ -157,7 +157,7 @@ graph TD
         * **システム管理者**: 管理者ダッシュボードへのアクセスが許可されます。
         * **ショップオーナー/店長**: 管理しているショップが1つ以上ある場合、ショップ一覧が表示されます。
         * **一般ユーザー**: 利便性のため、プロフィールや履歴を管理する `/user` へ自動リダイレクトされます。
-* **新規登録 (`/register`)**
+* **新規登録 (`/login`)**
     * **操作**: アカウント作成後、自動的に `/verify` へ遷移。
 * **アカウント認証 (`/verify`)**
     * **操作**: メール送信された6桁のコードを入力し、アカウントを有効化。

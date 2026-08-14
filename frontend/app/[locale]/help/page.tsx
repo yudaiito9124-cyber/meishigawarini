@@ -66,7 +66,7 @@ export default function HelpPage() {
                                 </div>
                                 <div className="flex-grow">
                                     <h2 className="text-2xl font-bold tracking-tight text-foreground group-hover:text-primary transition-colors">
-                                        新しいギフト体験を贈る
+                                        新しいギフト体験「名刺代わりに。」とは
                                     </h2>
                                     <p className="mt-2 text-muted-foreground">
                                         カードの受け取りからギフトの到着まで、ユーザーの体験をステップ形式で解説します。
@@ -86,7 +86,7 @@ export default function HelpPage() {
                                 <Gift className="h-6 w-6" />
                             </div>
                             <h2 className="text-2xl font-bold tracking-tight text-foreground group-hover:text-primary transition-colors">
-                                ギフトを受け取る方
+                                ギフトの受け取り方
                             </h2>
                             <p className="mt-2 text-muted-foreground">
                                 QRコードを受け取った後の操作方法、商品の引き換え手順、配送先住所の入力などに関するマニュアルです。
@@ -104,7 +104,7 @@ export default function HelpPage() {
                                 <SendHorizontal className="h-6 w-6" />
                             </div>
                             <h2 className="text-2xl font-bold tracking-tight text-foreground group-hover:text-primary transition-colors">
-                                ギフトを贈る方
+                                ギフトの贈り方
                             </h2>
                             <p className="mt-2 text-muted-foreground">
                                 QRコードを贈る方の操作方法、自分の連絡先を登録するためのマニュアルです。
@@ -140,7 +140,7 @@ export default function HelpPage() {
                                 <Store className="h-6 w-6" />
                             </div>
                             <h2 className="text-2xl font-bold tracking-tight text-foreground group-hover:text-primary transition-colors">
-                                ショップ管理者の方
+                                ショップ運用マニュアル
                             </h2>
                             <p className="mt-2 text-muted-foreground">
                                 ショップの作成や商品の管理、QRコードの有効化など、運用に関するマニュアルです。

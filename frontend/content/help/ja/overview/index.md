@@ -1,10 +1,10 @@
 ---
-title: ご利用の流れ
+title: 新しいギフト体験「名刺代わりに。」とは
 ---
 
 <section class="manual-container">
 
-# ご利用の流れ
+# 新しいギフト体験「名刺代わりに。」とは
 
 「名刺代わりに」をご利用いただく際の、カードの購入からギフトの到着までの流れをご説明します。
 
@@ -66,7 +66,7 @@ sequenceDiagram
 ### 6 思い出をいつでも見返す
 ギフトを受け取って終わりではありません。カードのQRコードは、あなたと贈り主をつなぐ「**デジタル名刺**」として残り続けます。
 
-- **マイページで管理**: [マイページ](/user)の履歴から、いつでも過去のやり取りやメッセージを見返すことができます。
+- **マイページで管理**: [マイページの使い方](/help/user) の履歴から、いつでも過去のやり取りやメッセージを見返すことができます。
 - **いつでも連絡**: 贈り主がプロフィールを更新していれば、いつでも最新の連絡先やSNSを確認し、つながりを維持することができます。
 
 </section>
@@ -88,17 +88,15 @@ sequenceDiagram
 </div>
 
 <section class="notice">
-贈り主も受け取り主も、アカウントをお持ちいただくことで履歴の確認や住所入力の利用がスムーズになり，名刺情報（プロフィール）の設定・更新ができるようになります。
+贈り主も受け取り主も、アカウントをお持ちいただくことで履歴の確認や住所入力の利用がスムーズになり、名刺情報（プロフィール）の設定・更新ができるようになります。
 </section>
 
 </section>
 
 <section class="manual-container mt-20 border rounded-xl">
 
-
-
 <section class="text-center text-4xl p-10">
-  「<span class="text-emerald-400 font-bold">名刺代わりに</span>」</br>が贈る、</br>新しい<span class="text-amber-400 font-bold">ギフト</span>の形
+  「<span class="text-emerald-400 font-bold">名刺代わりに</span>」<br/>が贈る、<br/>新しい<span class="text-amber-400 font-bold">ギフト</span>の形
 </section>
 
 <div class="grid-help">
