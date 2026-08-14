@@ -103,6 +103,12 @@ echo "新しい作業用ブランチ [${BRANCH_NAME}] を作成・移動しま�
 git checkout -b "${BRANCH_NAME}" 2>/dev/null || git checkout "${BRANCH_NAME}"
 cd ..
 
+# 環境変数ファイルの作成 (Amplify / Cognito 設定の自動コピー)
+if [ -f "meishigawarini/frontend/.env.example" ] && [ ! -f "meishigawarini/frontend/.env.local" ]; then
+  echo "環境変数ファイルを準備しています..."
+  cp meishigawarini/frontend/.env.example meishigawarini/frontend/.env.local
+fi
+
 
 # 4. ショートカット（シンボリックリンク）の作成
 echo "フォルダのショートカットを作成しています..."
